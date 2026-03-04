@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "tzz_mod",
+	"version": "${version}",
+	"name": "Tzz_mod",
+	"description": "全员逃走中游戏(数据包)适配mod 需搭配专属数据包使用",
+	"authors": [
+		"zcpu"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/tzz_mod/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.zcpu.tzzmod.Tzz_mod"
+		],
+		"fabric-datagen": [
+			"com.zcpu.tzzmod.Tzz_modDataGenerator"
+		]
+	},
+	"mixins": [
+		"tzz_mod.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
