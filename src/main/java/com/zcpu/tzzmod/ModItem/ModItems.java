@@ -1,5 +1,7 @@
 package com.zcpu.tzzmod.ModItem;
 
+import com.zcpu.tzzmod.ModItem.custom.AttentionItem;
+import com.zcpu.tzzmod.ModItem.custom.Game_BuilderItem;
 import com.zcpu.tzzmod.ModItem.custom.PhoneItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
@@ -15,6 +17,8 @@ public final class ModItems {
     }
 
     public static final Item PHONE = register("phone", PhoneItem::new, new Item.Settings().maxCount(1));
+    public static final Item GAME_BUILDER = register("game_builder", Game_BuilderItem::new, new Item.Settings().maxCount(1));
+    public static final Item ATTENTION = register("attention", AttentionItem::new, new Item.Settings().maxCount(1));
 
     public static Item register(String path, Function<Item.Settings, Item> factory, Item.Settings settings) {
         final RegistryKey<Item> registryKey = RegistryKey.of(RegistryKeys.ITEM, Identifier.of("tzz_mod", path));

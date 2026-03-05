@@ -14,6 +14,8 @@ public final class ModItemGroup {
             .displayName(Text.translatable("itemGroup.tzz_mod.main"))
             .entries((displayContext, entries) -> {
                 entries.add(ModItems.PHONE);
+                entries.add(ModItems.GAME_BUILDER);
+                entries.add(ModItems.ATTENTION);
             })
             .build();
 

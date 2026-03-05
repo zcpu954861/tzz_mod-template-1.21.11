@@ -1,5 +1,7 @@
 {
   "item.tzz_mod.phone": "Phone",
+  "item.tzz_mod.game_builder": "Game Builder(in development)",
+  "item.tzz_mod.attention": "Attention",
   "itemGroup.tzz_mod.main": "Tzz Mod",
   "phone.tzz_mod.home": "Home",
   "phone.tzz_mod.status.title": "TZZ",
