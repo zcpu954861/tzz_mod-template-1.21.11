@@ -1,0 +1,11 @@
+{
+  "item.tzz_mod.phone": "Phone",
+  "itemGroup.tzz_mod.main": "Tzz Mod",
+  "phone.tzz_mod.home": "Home",
+  "phone.tzz_mod.status.title": "TZZ",
+  "phone.tzz_mod.app.map": "Map",
+  "phone.tzz_mod.app.map.detail": "Map Details",
+  "phone.tzz_mod.back": "Back",
+  "phone.tzz_mod.open_subpage": "Details",
+  "phone.tzz_mod.map.missing": "Map texture not found"
+}

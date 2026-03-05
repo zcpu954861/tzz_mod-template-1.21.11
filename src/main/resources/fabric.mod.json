@@ -8,8 +8,8 @@
 		"zcpu"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://github.com/zcpu954861/tzz_mod-template-1.21.11",
+		"sources": "https://github.com/zcpu954861/tzz_mod-template-1.21.11"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/tzz_mod/icon.png",
@@ -17,6 +17,9 @@
 	"entrypoints": {
 		"main": [
 			"com.zcpu.tzzmod.Tzz_mod"
+		],
+		"client": [
+			"com.zcpu.tzzmod.client.Tzz_modClient"
 		],
 		"fabric-datagen": [
 			"com.zcpu.tzzmod.Tzz_modDataGenerator"
