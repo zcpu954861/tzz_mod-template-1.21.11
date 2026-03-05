@@ -1,5 +1,7 @@
 {
   "item.tzz_mod.phone": "Phone",
+  "item.tzz_mod.attention": "Attention",
+  "item.tzz_mod.split_iron_door": "Split Iron Door",
   "itemGroup.tzz_mod.main": "Tzz Mod",
   "phone.tzz_mod.home": "Home",
   "phone.tzz_mod.status.title": "TZZ",
@@ -23,5 +25,21 @@
   "phone.tzz_mod.chat.popup.title": "%s conversations have new messages",
   "phone.tzz_mod.chat.popup.line_single": "%s: new message",
   "phone.tzz_mod.chat.popup.line_count": "%s: %s new messages",
-  "phone.tzz_mod.chat.popup.more": "%s more conversations..."
+  "phone.tzz_mod.chat.popup.more": "%s more conversations...",
+  "item.tzz_mod.white_blocking_card": "White Blocking Card",
+  "item.tzz_mod.light_gray_blocking_card": "Light Gray Blocking Card",
+  "item.tzz_mod.gray_blocking_card": "Gray Blocking Card",
+  "item.tzz_mod.black_blocking_card": "Black Blocking Card",
+  "item.tzz_mod.brown_blocking_card": "Brown Blocking Card",
+  "item.tzz_mod.red_blocking_card": "Red Blocking Card",
+  "item.tzz_mod.orange_blocking_card": "Orange Blocking Card",
+  "item.tzz_mod.yellow_blocking_card": "Yellow Blocking Card",
+  "item.tzz_mod.lime_blocking_card": "Lime Blocking Card",
+  "item.tzz_mod.green_blocking_card": "Green Blocking Card",
+  "item.tzz_mod.cyan_blocking_card": "Cyan Blocking Card",
+  "item.tzz_mod.light_blue_blocking_card": "Light Blue Blocking Card",
+  "item.tzz_mod.blue_blocking_card": "Blue Blocking Card",
+  "item.tzz_mod.purple_blocking_card": "Purple Blocking Card",
+  "item.tzz_mod.magenta_blocking_card": "Magenta Blocking Card",
+  "item.tzz_mod.pink_blocking_card": "Pink Blocking Card"
 }

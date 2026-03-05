@@ -197,6 +197,19 @@ public final class PhoneChatService {
         return Collections.unmodifiableSet(group.members);
     }
 
+    // Find a group id by its (case-insensitive) name. Returns empty string if not found.
+    public static String findGroupIdByName(String name) {
+        if (name == null) return "";
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) return "";
+        for (ChatGroup group : GROUPS.values()) {
+            if (group.name != null && group.name.equalsIgnoreCase(trimmed)) {
+                return group.id;
+            }
+        }
+        return "";
+    }
+
     public static void sendResponse(ServerPlayerEntity player, String action, JsonObject body) {
         ServerPlayNetworking.send(player, new PhoneChatS2CPayload(action, body.toString()));
     }

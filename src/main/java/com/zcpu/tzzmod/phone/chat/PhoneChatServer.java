@@ -32,6 +32,7 @@ public final class PhoneChatServer {
         JsonObject body = new JsonObject();
         body.addProperty("enabled", config.enabled);
         body.addProperty("notificationSound", config.notificationSound);
+        body.addProperty("maxMessageLength", config.maxMessageLength);
         PhoneChatService.sendResponse(player, "app_state", body);
     }
 

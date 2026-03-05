@@ -1,5 +1,7 @@
 {
   "item.tzz_mod.phone": "手机",
+  "item.tzz_mod.attention": "立正器",
+  "item.tzz_mod.split_iron_door": "双开铁门",
   "itemGroup.tzz_mod.main": "全员逃走中",
   "phone.tzz_mod.home": "主屏幕",
   "phone.tzz_mod.status.title": "TZZ",
@@ -23,5 +25,21 @@
   "phone.tzz_mod.chat.popup.title": "你有 %s 个会话有新消息",
   "phone.tzz_mod.chat.popup.line_single": "%s: 新消息",
   "phone.tzz_mod.chat.popup.line_count": "%s: %s 条新消息",
-  "phone.tzz_mod.chat.popup.more": "还有 %s 个会话..."
+  "phone.tzz_mod.chat.popup.more": "还有 %s 个会话...",
+  "item.tzz_mod.white_blocking_card": "白色封锁卡",
+  "item.tzz_mod.light_gray_blocking_card": "浅灰色封锁卡",
+  "item.tzz_mod.gray_blocking_card": "灰色封锁卡",
+  "item.tzz_mod.black_blocking_card": "黑色封锁卡",
+  "item.tzz_mod.brown_blocking_card": "棕色封锁卡",
+  "item.tzz_mod.red_blocking_card": "红色封锁卡",
+  "item.tzz_mod.orange_blocking_card": "橙色封锁卡",
+  "item.tzz_mod.yellow_blocking_card": "黄色封锁卡",
+  "item.tzz_mod.lime_blocking_card": "黄绿色封锁卡",
+  "item.tzz_mod.green_blocking_card": "绿色封锁卡",
+  "item.tzz_mod.cyan_blocking_card": "青色封锁卡",
+  "item.tzz_mod.light_blue_blocking_card": "浅蓝色封锁卡",
+  "item.tzz_mod.blue_blocking_card": "蓝色封锁卡",
+  "item.tzz_mod.purple_blocking_card": "紫色封锁卡",
+  "item.tzz_mod.magenta_blocking_card": "洋红色封锁卡",
+  "item.tzz_mod.pink_blocking_card": "粉色封锁卡"
 }

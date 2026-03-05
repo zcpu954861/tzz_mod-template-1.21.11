@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.ModItem;
 
+import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemStack;
@@ -14,6 +15,24 @@ public final class ModItemGroup {
             .displayName(Text.translatable("itemGroup.tzz_mod.main"))
             .entries((displayContext, entries) -> {
                 entries.add(ModItems.PHONE);
+                entries.add(ModItems.ATTENTION);
+                entries.add(ModBlocks.SPLIT_IRON_DOOR);
+                entries.add(ModItems.WHITE_BLOCKING_CARD);
+                entries.add(ModItems.LIGHT_GRAY_BLOCKING_CARD);
+                entries.add(ModItems.GRAY_BLOCKING_CARD);
+                entries.add(ModItems.BLACK_BLOCKING_CARD);
+                entries.add(ModItems.BROWN_BLOCKING_CARD);
+                entries.add(ModItems.RED_BLOCKING_CARD);
+                entries.add(ModItems.ORANGE_BLOCKING_CARD);
+                entries.add(ModItems.YELLOW_BLOCKING_CARD);
+                entries.add(ModItems.LIME_BLOCKING_CARD);
+                entries.add(ModItems.GREEN_BLOCKING_CARD);
+                entries.add(ModItems.CYAN_BLOCKING_CARD);
+                entries.add(ModItems.LIGHT_BLUE_BLOCKING_CARD);
+                entries.add(ModItems.BLUE_BLOCKING_CARD);
+                entries.add(ModItems.PURPLE_BLOCKING_CARD);
+                entries.add(ModItems.MAGENTA_BLOCKING_CARD);
+                entries.add(ModItems.PINK_BLOCKING_CARD);
             })
             .build();
 

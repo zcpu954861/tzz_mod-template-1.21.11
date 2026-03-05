@@ -49,7 +49,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
                 .build());
 
         inputField = new TextFieldWidget(textRenderer, contentX + s(64), contentY + contentHeight - s(24), contentWidth - s(132), s(20), Text.empty());
-        inputField.setMaxLength(256);
+        inputField.setMaxLength(net.minecraft.util.math.MathHelper.clamp(com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.getMaxMessageLength(), 16, 25600));
         addDrawableChild(inputField);
 
         addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.send"), button -> sendMessage())

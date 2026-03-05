@@ -19,7 +19,7 @@ public final class PhoneChatConfig {
     private static final Map<MinecraftServer, PhoneChatConfig> CACHE = new WeakHashMap<>();
 
     public boolean enabled = true;
-    public int maxMessageLength = 256;
+    public int maxMessageLength = 25600;
     public int maxHistoryPerConversation = 120;
     public String notificationSound = "minecraft:entity.experience_orb.pickup";
 
@@ -65,8 +65,8 @@ public final class PhoneChatConfig {
         if (maxMessageLength < 16) {
             maxMessageLength = 16;
         }
-        if (maxMessageLength > 1024) {
-            maxMessageLength = 1024;
+        if (maxMessageLength > 25600) {
+            maxMessageLength = 25600;
         }
         if (maxHistoryPerConversation < 20) {
             maxHistoryPerConversation = 20;

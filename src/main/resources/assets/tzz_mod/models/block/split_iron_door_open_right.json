@@ -1,0 +1,7 @@
+{
+  "parent": "tzz_mod:block/split_iron_door_open",
+  "textures": {
+    "door": "tzz_mod:block/split_iron_door_open"
+  }
+}
+

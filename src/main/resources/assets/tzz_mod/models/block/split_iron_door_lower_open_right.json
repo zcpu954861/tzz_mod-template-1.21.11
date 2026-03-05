@@ -1,0 +1,33 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "door": "tzz_mod:block/split_iron_door_open"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 9],
+      "to": [2, 16, 16],
+      "faces": {
+        "north": { "texture": "#door" },
+        "south": { "texture": "#door" },
+        "west": { "texture": "#door" },
+        "east": { "texture": "#door" },
+        "up": { "texture": "#door" },
+        "down": { "texture": "#door" }
+      }
+    },
+    {
+      "from": [14, 0, 9],
+      "to": [16, 16, 16],
+      "faces": {
+        "north": { "texture": "#door" },
+        "south": { "texture": "#door" },
+        "west": { "texture": "#door" },
+        "east": { "texture": "#door" },
+        "up": { "texture": "#door" },
+        "down": { "texture": "#door" }
+      }
+    }
+  ]
+}
+

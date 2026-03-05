@@ -37,6 +37,8 @@ public final class PhoneChatClient {
     private static String activeConversationKey = "";
     private static long unreadNotificationExpireAtMs;
 
+    private static int maxMessageLength = 25600;
+
     private PhoneChatClient() {
     }
 
@@ -60,6 +62,10 @@ public final class PhoneChatClient {
 
     public static boolean isOp() {
         return isOp;
+    }
+
+    public static int getMaxMessageLength() {
+        return maxMessageLength;
     }
 
     public static List<ContactData> getContacts() {
@@ -212,6 +218,14 @@ public final class PhoneChatClient {
         String sound = getString(body, "notificationSound");
         if (!sound.isBlank()) {
             notificationSound = sound;
+        }
+        // read optional maxMessageLength from server config
+        try {
+            int serverMax = body.has("maxMessageLength") ? body.get("maxMessageLength").getAsInt() : maxMessageLength;
+            if (serverMax >= 16 && serverMax <= 25600) {
+                maxMessageLength = serverMax;
+            }
+        } catch (Exception ignored) {
         }
     }
 

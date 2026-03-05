@@ -2,14 +2,18 @@ package com.zcpu.tzzmod;
 
 import com.zcpu.tzzmod.ModItem.ModItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItems;
+import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.DeathSyncServer;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.zcpu.tzzmod.command.SendMsgCommand;
 
 public class Tzz_mod implements ModInitializer {
 	public static final String MOD_ID = "tzz_mod";
@@ -27,11 +31,18 @@ public class Tzz_mod implements ModInitializer {
 
 		ModItems.initialize();
 		ModItemGroup.inialize();
+		// Ensure blocks are registered by forcing ModBlocks static initialization
+		ModBlocks.init();
 
 		DeathStatusPayload.register();
 		DeathSyncServer.register();
 		PhoneChatPayloads.register();
 		PhoneChatServer.register();
+
+        // Register server commands
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            SendMsgCommand.register(dispatcher);
+        });
 
 		LOGGER.info("Hello Fabric world!");
 	}
