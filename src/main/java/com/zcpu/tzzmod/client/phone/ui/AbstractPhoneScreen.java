@@ -98,10 +98,24 @@ public abstract class AbstractPhoneScreen extends Screen {
                 ? client.player.getName().getString()
                 : "Player";
 
-        context.drawTextWithShadow(textRenderer, timeText, statusX + s(6), statusY + s(4), 0xFFECECEC);
+        // Use a Text literal for the time so it updates correctly each frame
+        context.drawTextWithShadow(textRenderer, Text.literal(timeText), statusX + s(6), statusY + s(4), 0xFFECECEC);
 
         String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), statusWidth - s(40)));
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), 0xFFECECEC);
+
+        // Draw death/alive indicator on the right side of the status bar.
+        boolean hasDeathTag = com.zcpu.tzzmod.client.DeathSyncClient.isLocalPlayerDead();
+
+        Text statusText = hasDeathTag ? Text.literal("死亡") : Text.literal("存活");
+        int statusColor = hasDeathTag ? 0xFFFF6666 : 0xFF66FF66; // red : green
+        int textWidth = textRenderer.getWidth(statusText);
+        int rightPadding = s(6);
+        int drawX = statusX + statusWidth - rightPadding - textWidth;
+        int drawY = statusY + s(4);
+        // Ensure we don't draw off the left side if phone is very narrow
+        if (drawX < statusX + s(6)) drawX = statusX + s(6);
+        context.drawTextWithShadow(textRenderer, statusText, drawX, drawY, statusColor);
 
         // Keep only the status divider line.
         int dividerY = statusY + statusHeight + s(1);

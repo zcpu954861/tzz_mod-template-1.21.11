@@ -32,14 +32,11 @@ public class MapAppDetailScreen extends AbstractPhoneScreen {
         int mapY = contentY + s(26);
         int mapWidth = contentWidth - s(16);
         int mapHeight = contentHeight - s(56);
-        // Removed texture rendering: show a text placeholder instead
 
         if (hasResource(mapTexture)) {
-            context.drawCenteredTextWithShadow(textRenderer,
-                    Text.translatable("phone.tzz_mod.map.available_text"),
-                    mapX + mapWidth / 2,
-                    mapY + mapHeight / 2 - s(4),
-                    0xFFE0E0E0);
+            // 直接绘制贴图
+            context.drawTexturedQuad(mapTexture, mapX, mapY, mapX + mapWidth, mapY + mapHeight,
+                    0.0F, 1.0F, 0.0F, 1.0F);
         } else {
             context.drawCenteredTextWithShadow(textRenderer,
                     Text.translatable("phone.tzz_mod.map.missing"),

@@ -2,6 +2,10 @@ package com.zcpu.tzzmod;
 
 import com.zcpu.tzzmod.ModItem.ModItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItems;
+import com.zcpu.tzzmod.network.DeathStatusPayload;
+import com.zcpu.tzzmod.network.DeathSyncServer;
+import com.zcpu.tzzmod.network.PhoneChatPayloads;
+import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import net.fabricmc.api.ModInitializer;
 
 import org.slf4j.Logger;
@@ -23,6 +27,11 @@ public class Tzz_mod implements ModInitializer {
 
 		ModItems.initialize();
 		ModItemGroup.inialize();
+
+		DeathStatusPayload.register();
+		DeathSyncServer.register();
+		PhoneChatPayloads.register();
+		PhoneChatServer.register();
 
 		LOGGER.info("Hello Fabric world!");
 	}

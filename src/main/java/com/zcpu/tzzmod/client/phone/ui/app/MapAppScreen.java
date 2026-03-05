@@ -9,7 +9,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 public class MapAppScreen extends AbstractPhoneScreen {
-    private static final Identifier MAP_TEXTURE = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/apps/map/map.png");
+    private static final Identifier MAP_TEXTURE = Identifier.of(Tzz_mod.MOD_ID, "phone/apps/map/map.png");
 
     public MapAppScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.map"), parent);
@@ -39,15 +39,11 @@ public class MapAppScreen extends AbstractPhoneScreen {
         int mapY = contentY + s(28);
         int mapWidth = contentWidth - s(20);
         int mapHeight = contentHeight - s(62);
-        // Removed texture drawing: render only text fallback/placeholder
 
         if (hasResource(MAP_TEXTURE)) {
-            // Resource exists but we intentionally avoid drawing textures; show a notice instead
-            context.drawCenteredTextWithShadow(textRenderer,
-                    Text.translatable("phone.tzz_mod.map.available_text"),
-                    mapX + mapWidth / 2,
-                    mapY + mapHeight / 2 - s(4),
-                    0xFFE0E0E0);
+            // 直接绘制贴图，拉伸以适应内容区域
+            context.drawTexturedQuad(MAP_TEXTURE, mapX, mapY, mapX + mapWidth, mapY + mapHeight,
+                    0.0F, 1.0F, 0.0F, 1.0F);
         } else {
             context.drawCenteredTextWithShadow(textRenderer,
                     Text.translatable("phone.tzz_mod.map.missing"),

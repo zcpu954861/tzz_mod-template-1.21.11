@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.client.phone.ui;
 
 import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
+import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
@@ -73,6 +74,8 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
 
+        int chatUnread = PhoneChatClient.getTotalUnreadCount();
+
         for (AppSlot slot : appSlots) {
             // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
             if (hasResource(slot.entry.iconTexture())) {
@@ -86,6 +89,10 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 context.drawCenteredTextWithShadow(textRenderer, Text.literal("?"), slot.x + slot.size / 2, slot.y + slot.size / 2 - s(4), 0xFF1A1A1A);
             }
 
+            if ("chat".equals(slot.entry.id()) && chatUnread > 0) {
+                renderChatBadge(context, slot, chatUnread);
+            }
+
             String appName = slot.entry.name().getString();
             if (appName == null || appName.isEmpty()) {
                 appName = slot.entry.id();
@@ -96,6 +103,30 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             }
             // Draw label text directly without a background so it appears over the game's blur.
             drawPhoneTextCenteredFixed(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4));
+        }
+    }
+
+    private void renderChatBadge(DrawContext context, AppSlot slot, int unreadCount) {
+        int centerX = slot.x + slot.size - s(4);
+        int centerY = slot.y + s(4);
+        int radius = s(5);
+
+        drawCircle(context, centerX, centerY, radius + 1, 0xCC000000);
+        drawCircle(context, centerX, centerY, radius, 0xFFE64545);
+
+        String badge = unreadCount > 99 ? "99+" : Integer.toString(unreadCount);
+        int textWidth = textRenderer.getWidth(badge);
+        context.drawTextWithShadow(textRenderer, badge, centerX - textWidth / 2, centerY - s(3), 0xFFFFFFFF);
+    }
+
+    private void drawCircle(DrawContext context, int centerX, int centerY, int radius, int color) {
+        int squared = radius * radius;
+        for (int y = -radius; y <= radius; y++) {
+            for (int x = -radius; x <= radius; x++) {
+                if (x * x + y * y <= squared) {
+                    context.fill(centerX + x, centerY + y, centerX + x + 1, centerY + y + 1, color);
+                }
+            }
         }
     }
 
