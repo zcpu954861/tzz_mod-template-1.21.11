@@ -6,6 +6,7 @@ import com.zcpu.tzzmod.client.phone.ui.TypingSubtitleAnimator;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
@@ -33,19 +34,18 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
 
         addPhoneButton(Text.translatable("phone.tzz_mod.chat.refresh"), contentX + s(76), contentY + contentHeight - s(24), s(64), s(20), button -> PhoneChatClient.requestBootstrap());
 
-        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.create_group"), contentX + contentWidth - s(88), contentY + s(26), s(88), s(20), button -> client.setScreen(new PhoneChatCreateGroupScreen(this)));
+        // Show the "Create Group" primary button if the client is OP or when running in singleplayer (integrated server).
+        // Use a permissive check: either the integrated server is running or a server instance exists.
+        boolean isSingleplayer = MinecraftClient.getInstance().isIntegratedServerRunning() || MinecraftClient.getInstance().getServer() != null;
+        if (PhoneChatClient.isOp() || isSingleplayer) {
+            addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.create_group"), contentX + contentWidth - s(88), contentY + s(26), s(88), s(20), button -> client.setScreen(new PhoneChatCreateGroupScreen(this)));
+        }
 
         stateListener = this::rebuildRows;
         PhoneChatClient.addListener(stateListener);
+        lastTotalUnread = PhoneChatClient.getTotalUnreadCount();
         rebuildRows();
         PhoneChatClient.requestBootstrap();
-
-        // initialize subtitle animator if alert mode is on and there are unread messages
-        lastTotalUnread = PhoneChatClient.getTotalUnreadCount();
-        if (PhoneSettingsClient.isAlertModeEnabled() && lastTotalUnread > 0) {
-            subtitleAnimator = new TypingSubtitleAnimator("你有新消息", 14, s -> playCharSound());
-            subtitleAnimator.start();
-        }
     }
 
     private int getListTop() {
@@ -120,10 +120,18 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
         }
 
         if (conversationCount == 0) {
+            // Ensure the empty-state hint is drawn below the "Create Group" button so it isn't obscured.
+            int defaultY = contentY + s(38);
+            int emptyY = defaultY;
+            // Only apply extra offset if the Create Group button is actually shown (OP or singleplayer)
+            if (PhoneChatClient.isOp() || MinecraftClient.getInstance().isIntegratedServerRunning() || MinecraftClient.getInstance().getServer() != null) {
+                int createButtonBottom = contentY + s(26) + s(20); // button Y + button height
+                emptyY = Math.max(defaultY, createButtonBottom + s(6));
+            }
             context.drawCenteredTextWithShadow(textRenderer,
                     Text.translatable("phone.tzz_mod.chat.empty"),
                     contentX + contentWidth / 2,
-                    contentY + s(38),
+                    emptyY,
                     0xFFECECEC);
             return;
         }

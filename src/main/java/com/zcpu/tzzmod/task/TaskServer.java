@@ -1,7 +1,6 @@
 package com.zcpu.tzzmod.task;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.network.TaskC2SPayload;
@@ -62,18 +61,8 @@ public final class TaskServer {
             return;
         }
 
-        // full sync to clients
         syncAll(server);
-        // also send an explicit 'triggered' notification so clients can immediately notify
-        JsonObject triggered = new JsonObject();
-        triggered.addProperty("lineName", lineName);
-        triggered.addProperty("taskIndex", taskIndex);
-        for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(p, new TaskS2CPayload("triggered", triggered.toString()));
-        }
-        if (player != null) {
-            player.sendMessage(Text.literal("已触发任务线 '" + lineName + "' 的第 " + taskIndex + " 个任务。"), false);
-        }
+        player.sendMessage(Text.literal("已保存任务线 '" + lineName + "' 的第 " + taskIndex + " 个任务配置。"), false);
     }
 
     private static void sendBootstrap(ServerPlayerEntity player, MinecraftServer server) {

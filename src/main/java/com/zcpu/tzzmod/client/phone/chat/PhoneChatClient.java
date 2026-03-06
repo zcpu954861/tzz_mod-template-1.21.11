@@ -19,6 +19,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,7 +64,15 @@ public final class PhoneChatClient {
     }
 
     public static boolean isOp() {
-        return isOp;
+        // Consider local singleplayer players as OP for client-side UI purposes so features like
+        // Create Group are available in singleplayer. Server will still enforce permissions.
+        try {
+            MinecraftClient client = MinecraftClient.getInstance();
+            boolean isSingleplayer = client != null && (client.isIntegratedServerRunning() || client.getServer() != null);
+            return isOp || isSingleplayer;
+        } catch (Throwable ignored) {
+            return isOp;
+        }
     }
 
     public static int getMaxMessageLength() {
@@ -193,6 +202,25 @@ public final class PhoneChatClient {
         send("add_member", body);
     }
 
+    public static void requestGroupMembers(String groupId) {
+        JsonObject body = new JsonObject();
+        body.addProperty("groupId", groupId);
+        send("request_group_members", body);
+    }
+
+    public static void removeGroupMember(String groupId, String memberUuid) {
+        JsonObject body = new JsonObject();
+        body.addProperty("groupId", groupId);
+        body.addProperty("memberUuid", memberUuid);
+        send("remove_member", body);
+    }
+
+    public static void deleteGroup(String groupId) {
+        JsonObject body = new JsonObject();
+        body.addProperty("groupId", groupId);
+        send("delete_group", body);
+    }
+
     private static void send(String action, JsonObject body) {
         if (MinecraftClient.getInstance().getNetworkHandler() == null) {
             return;
@@ -208,11 +236,41 @@ public final class PhoneChatClient {
             case "history" -> applyHistory(body);
             case "message" -> applyIncomingMessage(client, body);
             case "error" -> showError(client, body);
+            case "group_members" -> applyGroupMembers(body);
             default -> {
             }
         }
 
         notifyListeners();
+    }
+
+    // Client-side cache of server-provided group member lists (per group id)
+    private static final Map<String, List<GroupMemberData>> GROUP_MEMBERS_MAP = new HashMap<>();
+
+    private static void applyGroupMembers(JsonObject body) {
+        String groupId = getString(body, "groupId");
+        List<GroupMemberData> list = new ArrayList<>();
+        if (body.has("entries") && body.get("entries").isJsonArray()) {
+            for (JsonElement el : body.getAsJsonArray("entries")) {
+                if (!el.isJsonObject()) continue;
+                JsonObject obj = el.getAsJsonObject();
+                String uuid = getString(obj, "uuid");
+                String name = getString(obj, "name");
+                boolean isMember = getBoolean(obj, "isMember", false);
+                list.add(new GroupMemberData(uuid, name, isMember));
+            }
+        }
+        GROUP_MEMBERS_MAP.put(groupId, list);
+    }
+
+    public static List<GroupMemberData> getGroupMembersList(String groupId) {
+        return List.copyOf(GROUP_MEMBERS_MAP.getOrDefault(groupId, List.of()));
+    }
+
+    public record GroupMemberData(String uuid, String name, boolean isMember) {}
+
+    public static String getSelfUuid() {
+        return selfUuid;
     }
 
     private static void applyAppState(JsonObject body) {
@@ -251,9 +309,47 @@ public final class PhoneChatClient {
 
         CONTACTS.sort(Comparator.comparing(ContactData::name, String.CASE_INSENSITIVE_ORDER));
         GROUPS.sort(Comparator.comparing(GroupData::name, String.CASE_INSENSITIVE_ORDER));
+        pruneStaleGroupConversationState();
 
         selfUuid = getString(body, "selfUuid");
         isOp = getBoolean(body, "isOp", false);
+    }
+
+    private static void pruneStaleGroupConversationState() {
+        Set<String> visibleGroupIds = new HashSet<>();
+        for (GroupData group : GROUPS) {
+            visibleGroupIds.add(group.id());
+        }
+
+        pruneGroupStateMap(HISTORIES.keySet(), visibleGroupIds, HISTORIES::remove);
+        pruneGroupStateMap(TITLES.keySet(), visibleGroupIds, TITLES::remove);
+        pruneGroupStateMap(UNREAD_COUNTS.keySet(), visibleGroupIds, UNREAD_COUNTS::remove);
+        GROUP_MEMBERS_MAP.keySet().removeIf(groupId -> !visibleGroupIds.contains(groupId));
+
+        if (activeConversationKey.startsWith("group:")) {
+            String activeGroupId = activeConversationKey.substring("group:".length());
+            if (!visibleGroupIds.contains(activeGroupId)) {
+                activeConversationKey = "";
+            }
+        }
+    }
+
+    private static void pruneGroupStateMap(Set<String> keys, Set<String> visibleGroupIds, java.util.function.Consumer<String> remover) {
+        List<String> staleKeys = new ArrayList<>();
+        for (String key : keys) {
+            if (!key.startsWith("group:")) {
+                continue;
+            }
+
+            String groupId = key.substring("group:".length());
+            if (!visibleGroupIds.contains(groupId)) {
+                staleKeys.add(key);
+            }
+        }
+
+        for (String staleKey : staleKeys) {
+            remover.accept(staleKey);
+        }
     }
 
     private static void applyHistory(JsonObject body) {
@@ -441,4 +537,3 @@ public final class PhoneChatClient {
     public record UnreadEntry(String type, String targetId, String title, int count) {
     }
 }
-

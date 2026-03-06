@@ -18,6 +18,7 @@ import net.minecraft.util.Formatting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -62,6 +63,9 @@ public final class PhoneChatServer {
             case "send_group" -> handleSendGroup(server, player, body, config);
             case "create_group" -> handleCreateGroup(server, player, body);
             case "add_member" -> handleAddMember(server, player, body);
+            case "remove_member" -> handleRemoveMember(server, player, body);
+            case "request_group_members" -> handleRequestGroupMembers(server, player, body);
+            case "delete_group" -> handleDeleteGroup(server, player, body);
             case "call_admin" -> handleCallAdmin(server, player);
             default -> PhoneChatService.sendError(player, "Unknown chat action: " + payload.action());
         }
@@ -150,20 +154,77 @@ public final class PhoneChatServer {
     }
 
     private static void handleAddMember(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
-        if (!player.isCreativeLevelTwoOp()) {
-            PhoneChatService.sendError(player, "Only OP can add members into groups.");
+        String groupId = getString(body, "groupId");
+        String memberUuid = getString(body, "memberUuid");
+
+        // allow group owner or server OP to manage members
+        String ownerUuid = PhoneChatService.getGroupOwner(groupId);
+        boolean isOwner = ownerUuid != null && !ownerUuid.isBlank() && ownerUuid.equals(player.getUuidAsString());
+        if (!isOwner && !player.isCreativeLevelTwoOp()) {
+            PhoneChatService.sendError(player, "Only group owner or OP can add members into groups.");
             return;
         }
 
-        String groupId = getString(body, "groupId");
-        String memberUuid = getString(body, "memberUuid");
         boolean success = PhoneChatService.addMember(groupId, memberUuid);
         if (!success) {
             PhoneChatService.sendError(player, "Failed to add the member to group.");
             return;
         }
 
+        // Notify the added player with a direct notification
+        try {
+            PhoneChatConfig config = PhoneChatConfig.get(server);
+            String groupName = PhoneChatService.getGroupName(groupId);
+            PhoneChatService.sendDirectNotification(server, player, memberUuid, "你已被加入群组: " + (groupName.isBlank() ? groupId : groupName), config);
+        } catch (Exception ignored) {
+        }
+
+        // refresh bootstrap for the actor and try to refresh for the target if they're online
+        // Refresh bootstrap for all online players so group membership state updates everywhere
+        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
+            try {
+                handleBootstrap(server, online);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static void handleRemoveMember(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
+        String groupId = getString(body, "groupId");
+        String memberUuid = getString(body, "memberUuid");
+
+        String ownerUuid = PhoneChatService.getGroupOwner(groupId);
+        boolean isOwner = ownerUuid != null && !ownerUuid.isBlank() && ownerUuid.equals(player.getUuidAsString());
+        if (!isOwner && !player.isCreativeLevelTwoOp()) {
+            PhoneChatService.sendError(player, "Only group owner or OP can remove members from groups.");
+            return;
+        }
+
+        // Prevent removing the owner via this path
+        if (ownerUuid != null && ownerUuid.equals(memberUuid)) {
+            PhoneChatService.sendError(player, "Cannot remove the group owner.");
+            return;
+        }
+
+        boolean success = PhoneChatService.removeMember(groupId, memberUuid);
+        if (!success) {
+            PhoneChatService.sendError(player, "Failed to remove the member from group.");
+            return;
+        }
+
+        try {
+            PhoneChatConfig config = PhoneChatConfig.get(server);
+            String groupName = PhoneChatService.getGroupName(groupId);
+            PhoneChatService.sendDirectNotification(server, player, memberUuid, "你已被移出群组: " + (groupName.isBlank() ? groupId : groupName), config);
+        } catch (Exception ignored) {
+        }
+
         handleBootstrap(server, player);
+        // Refresh bootstrap for all online players so group membership state updates everywhere
+        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
+            try {
+                handleBootstrap(server, online);
+            } catch (Exception ignored) {}
+        }
     }
 
     // New handler for the call admin action
@@ -201,6 +262,67 @@ public final class PhoneChatServer {
         // Feedback to caller: green "已成功呼叫" and experience pick up sound
         player.sendMessage(Text.literal("已成功呼叫").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.GREEN))), false);
         player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
+    }
+
+    private static void handleRequestGroupMembers(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
+        String groupId = getString(body, "groupId");
+        if (groupId.isBlank()) {
+            PhoneChatService.sendError(player, "Missing groupId");
+            return;
+        }
+
+        JsonObject resp = new JsonObject();
+        resp.addProperty("groupId", groupId);
+        JsonArray entries = new JsonArray();
+
+        // Build list from online players; mark isMember if group's member set contains uuid
+        Set<String> members = PhoneChatService.getGroupMembers(groupId);
+        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
+            JsonObject e = new JsonObject();
+            e.addProperty("uuid", online.getUuidAsString());
+            e.addProperty("name", online.getName().getString());
+            e.addProperty("isMember", members.contains(online.getUuidAsString()));
+            entries.add(e);
+        }
+
+        resp.add("entries", entries);
+        PhoneChatService.sendResponse(player, "group_members", resp);
+    }
+
+    private static void handleDeleteGroup(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
+        String groupId = getString(body, "groupId");
+        if (groupId.isBlank()) {
+            PhoneChatService.sendError(player, "Missing groupId");
+            return;
+        }
+
+        String ownerUuid = PhoneChatService.getGroupOwner(groupId);
+        boolean isOwner = ownerUuid != null && !ownerUuid.isBlank() && ownerUuid.equals(player.getUuidAsString());
+        if (!isOwner && !player.isCreativeLevelTwoOp()) {
+            PhoneChatService.sendError(player, "Only group owner or OP can delete groups.");
+            return;
+        }
+
+        // capture members before deletion
+        String groupName = PhoneChatService.getGroupName(groupId);
+
+        // perform deletion
+        Set<String> deletedMembers = PhoneChatService.deleteGroup(groupId);
+
+        // notify all previous members with a direct-style notification
+        try {
+            PhoneChatConfig config = PhoneChatConfig.get(server);
+            String msg = "群组已被删除: " + (groupName.isBlank() ? groupId : groupName);
+            for (String m : deletedMembers) {
+                PhoneChatService.sendDirectNotification(server, player, m, msg, config);
+            }
+        } catch (Exception ignored) {
+        }
+
+        // refresh bootstrap for all online players
+        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
+            try { handleBootstrap(server, online); } catch (Exception ignored) {}
+        }
     }
 
     private static JsonObject parse(String json) {

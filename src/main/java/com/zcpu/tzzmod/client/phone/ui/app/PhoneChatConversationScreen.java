@@ -29,8 +29,8 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     private Runnable stateListener;
 
     private TextFieldWidget inputField;
-    private TextFieldWidget addMemberField;
     private int messageScrollOffset;
+    private boolean manageButtonVisible = false;
 
     public PhoneChatConversationScreen(Screen parent, String type, String targetId, String title) {
         super(Text.translatable("phone.tzz_mod.chat.conversation"), parent);
@@ -51,12 +51,20 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
 
         addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.send"), contentX + contentWidth - s(64), contentY + contentHeight - s(24), s(64), s(20), button -> sendMessage());
 
-        if ("group".equals(type) && PhoneChatClient.isOp()) {
-            addMemberField = new TextFieldWidget(textRenderer, contentX, contentY + contentHeight - s(48), contentWidth - s(70), s(20), Text.empty());
-            addMemberField.setMaxLength(64);
-            addDrawableChild(addMemberField);
-
-            addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.add"), contentX + contentWidth - s(66), contentY + contentHeight - s(48), s(66), s(20), button -> addMember());
+        if ("group".equals(type)) {
+            // Show Manage Members button to the group owner only (using client-side group metadata)
+            boolean isOwner = false;
+            for (PhoneChatClient.GroupData g : PhoneChatClient.getGroups()) {
+                if (g.id().equals(targetId) && g.ownerUuid().equals(PhoneChatClient.getSelfUuid())) {
+                    isOwner = true;
+                    break;
+                }
+            }
+            manageButtonVisible = isOwner;
+            if (isOwner) {
+                // place the Manage Members button up one row so it doesn't overlap the Send button
+                addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.manage_members"), contentX + contentWidth - s(120), contentY + contentHeight - s(48), s(120), s(20), button -> client.setScreen(new PhoneChatManageMembersScreen(this, targetId)));
+            }
         }
 
         stateListener = this::updateFromState;
@@ -68,6 +76,19 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
 
     private void updateFromState() {
         title = PhoneChatClient.getTitle(type, targetId);
+        // recompute whether the Manage Members button should be visible (owner may change)
+        if ("group".equals(type)) {
+            boolean isOwner = false;
+            for (PhoneChatClient.GroupData g : PhoneChatClient.getGroups()) {
+                if (g.id().equals(targetId) && g.ownerUuid().equals(PhoneChatClient.getSelfUuid())) {
+                    isOwner = true;
+                    break;
+                }
+            }
+            manageButtonVisible = isOwner;
+        } else {
+            manageButtonVisible = false;
+        }
         clampMessageScroll();
     }
 
@@ -90,26 +111,16 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         messageScrollOffset = 0;
     }
 
-    private void addMember() {
-        if (addMemberField == null) {
-            return;
-        }
-        String token = addMemberField.getText().trim();
-        if (token.isEmpty()) {
-            return;
-        }
-
-        String memberUuid = PhoneChatClient.resolveUuidByNameOrUuid(token);
-        PhoneChatClient.addGroupMember(targetId, memberUuid);
-        addMemberField.setText("");
-    }
-
     private int getMessagesTop() {
         return contentY + s(24);
     }
 
     private int getMessagesBottom() {
-        return (addMemberField == null) ? contentY + contentHeight - s(30) : contentY + contentHeight - s(54);
+        // If the Manage Members button is visible, reserve extra vertical space so the button doesn't obscure messages.
+        if ("group".equals(type) && manageButtonVisible) {
+            return contentY + contentHeight - s(56);
+        }
+        return contentY + contentHeight - s(30);
     }
 
     private int getLineStep() {

@@ -126,6 +126,21 @@ public final class PhoneChatService {
         return true;
     }
 
+    public static boolean removeMember(String groupId, String memberUuid) {
+        ChatGroup group = GROUPS.get(groupId);
+        if (group == null || !isValidUuid(memberUuid)) {
+            return false;
+        }
+        return group.members.remove(memberUuid);
+    }
+
+    // Convenience: build and deliver a direct notification message from sender to target
+    public static void sendDirectNotification(MinecraftServer server, ServerPlayerEntity sender, String targetUuid, String message, PhoneChatConfig config) {
+        JsonObject envelope = sendDirect(server, sender, targetUuid, message, config);
+        if (envelope == null) return;
+        deliverToParticipants(server, envelope, List.of(targetUuid));
+    }
+
     public static JsonObject sendDirect(
             MinecraftServer server,
             ServerPlayerEntity sender,
@@ -195,6 +210,23 @@ public final class PhoneChatService {
             return Set.of();
         }
         return Collections.unmodifiableSet(group.members);
+    }
+
+    public static Set<String> deleteGroup(String groupId) {
+        ChatGroup group = GROUPS.remove(groupId);
+        if (group == null) return Set.of();
+        // return a copy of members prior to deletion
+        return Set.copyOf(group.members);
+    }
+
+    public static String getGroupOwner(String groupId) {
+        ChatGroup group = GROUPS.get(groupId);
+        return group == null || group.ownerUuid == null ? "" : group.ownerUuid;
+    }
+
+    public static String getGroupName(String groupId) {
+        ChatGroup group = GROUPS.get(groupId);
+        return group == null || group.name == null ? "" : group.name;
     }
 
     // Find a group id by its (case-insensitive) name. Returns empty string if not found.

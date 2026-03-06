@@ -69,5 +69,11 @@
   "phone.tzz_mod.settings.alert_mode": "Alert mode",
   "phone.tzz_mod.settings.alert_mode.subtitle": "When enabled, new messages and tasks appear as a green subtitle-style typing alert near the center of the screen, with a vanilla sound per character.",
   "phone.tzz_mod.alert.chat_subtitle": "Received a new message",
-  "phone.tzz_mod.alert.task_subtitle": "Received a new task"
+  "phone.tzz_mod.alert.task_subtitle": "Received a new task",
+  "phone.tzz_mod.chat.manage_members": "Manage Members",
+  "phone.tzz_mod.chat.manage_members_hint": "Click a row to add/remove the player",
+  "phone.tzz_mod.chat.confirm_delete_title": "Delete Group",
+  "phone.tzz_mod.chat.confirm_delete_prompt": "Are you sure you want to delete this group? This will notify all members.",
+  "phone.tzz_mod.chat.confirm_delete_confirm": "Confirm Delete",
+  "phone.tzz_mod.chat.delete_group": "Delete Group"
 }
