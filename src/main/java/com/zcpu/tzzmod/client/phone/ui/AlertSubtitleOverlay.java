@@ -83,6 +83,7 @@ public final class AlertSubtitleOverlay {
             return;
         }
         if (client.currentScreen instanceof AbstractPhoneScreen) {
+            lastRenderMs = System.currentTimeMillis();
             return;
         }
 

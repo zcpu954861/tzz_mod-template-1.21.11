@@ -16,6 +16,7 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
 
     private String feedback = "";
     private Runnable stateListener;
+    private int previewScrollOffset;
 
     public TaskConfiguratorScreen(net.minecraft.client.gui.screen.Screen parent) {
         super(Text.translatable("phone.tzz_mod.task.configurator"), parent);
@@ -25,50 +26,70 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
     protected void init() {
         super.init();
 
-        // layout metrics
-        int topStart = contentY + s(28);
-        int fieldGap = s(22);
-        int fieldHeight = s(18);
-
-        // buttons at bottom
         int buttonY = contentY + contentHeight - s(28);
         addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, buttonY, s(70), s(20), button -> close());
-
         addPhonePrimaryButton(Text.translatable("phone.tzz_mod.task.config.save"), contentX + contentWidth - s(72), buttonY, s(72), s(20), button -> saveTask());
-
         addPhoneButton(Text.translatable("phone.tzz_mod.task.config.sync"), contentX + contentWidth - s(152), buttonY, s(72), s(20), button -> TaskClient.requestBootstrap());
 
-        // fields arranged vertically with consistent gaps
-        int y = topStart;
-        lineNameField = new TextFieldWidget(textRenderer, contentX, y + s(12), contentWidth, fieldHeight, Text.empty());
+        int labelGap = s(4);
+        int sectionGap = s(10);
+        int fieldHeight = s(18);
+        int wideFieldHeight = s(24);
+        int y = contentY + s(26);
+
+        lineNameField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         lineNameField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.line_name"));
         lineNameField.setMaxLength(64);
         addDrawableChild(lineNameField);
-        y += fieldGap;
+        y = lineNameField.getY() + fieldHeight + sectionGap;
 
-        indexField = new TextFieldWidget(textRenderer, contentX, y + s(12), contentWidth, fieldHeight, Text.empty());
+        indexField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         indexField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.index"));
         indexField.setMaxLength(6);
         addDrawableChild(indexField);
-        y += fieldGap;
+        y = indexField.getY() + fieldHeight + sectionGap;
 
-        titleJsonField = new TextFieldWidget(textRenderer, contentX, y + s(12), contentWidth, fieldHeight, Text.empty());
+        titleJsonField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         titleJsonField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.title_json"));
         titleJsonField.setMaxLength(25600);
         addDrawableChild(titleJsonField);
-        y += fieldGap;
+        y = titleJsonField.getY() + fieldHeight + sectionGap;
 
-        // make content field slightly taller to give more room
-        contentJsonField = new TextFieldWidget(textRenderer, contentX, y + s(12), contentWidth, s(28), Text.empty());
+        contentJsonField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, wideFieldHeight, Text.empty());
         contentJsonField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.content_json"));
         contentJsonField.setMaxLength(25600);
         addDrawableChild(contentJsonField);
-        // no further use of y after this point
 
         stateListener = () -> {
         };
         TaskClient.addListener(stateListener);
         TaskClient.requestBootstrap();
+    }
+
+    private int getPreviewHeaderY() {
+        return contentJsonField.getY() + contentJsonField.getHeight() + s(12);
+    }
+
+    private int getPreviewListTop() {
+        return getPreviewHeaderY() + s(12);
+    }
+
+    private int getPreviewListBottom() {
+        return contentY + contentHeight - s(34);
+    }
+
+    private int getPreviewContentHeight() {
+        int lineStep = s(Math.max(10, textRenderer.fontHeight + 2));
+        int total = 0;
+        for (TaskClient.TaskLineData line : TaskClient.getLines()) {
+            total += Math.max(lineStep, textRenderer.wrapLines(Text.literal(line.name() + " (" + line.tasks().size() + ")"), Math.max(s(20), contentWidth - s(4))).size() * lineStep) + s(4);
+        }
+        return total;
+    }
+
+    private int getPreviewMaxScroll() {
+        int visibleHeight = Math.max(1, getPreviewListBottom() - getPreviewListTop());
+        return Math.max(0, getPreviewContentHeight() - visibleHeight);
     }
 
     private void saveTask() {
@@ -97,48 +118,48 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.task.configurator"), contentX + contentWidth / 2, contentY + s(8));
 
-        // Labels placed slightly above their corresponding input fields
-        int topStart = contentY + s(28);
-        int fieldGap = s(22);
+        int labelGap = s(4);
+        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.line_name"), contentX, lineNameField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
+        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.index"), contentX, indexField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
+        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.title_json"), contentX, titleJsonField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
+        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.content_json"), contentX, contentJsonField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
 
-        int labelY = topStart;
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.line_name"), contentX, labelY, 0xFFBFC7D5);
-
-        labelY += fieldGap;
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.index"), contentX, labelY, 0xFFBFC7D5);
-
-        labelY += fieldGap;
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.title_json"), contentX, labelY, 0xFFBFC7D5);
-
-        labelY += fieldGap;
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.content_json"), contentX, labelY, 0xFFBFC7D5);
+        int previewHeaderY = getPreviewHeaderY();
+        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.preview"), contentX, previewHeaderY, 0xFF8BD6FF);
 
         if (!feedback.isEmpty()) {
-            context.drawTextWithShadow(textRenderer, Text.literal(feedback), contentX, labelY + s(28), 0xFFECECEC);
+            context.drawTextWithShadow(textRenderer, Text.literal(feedback), contentX, Math.min(previewHeaderY, getPreviewListBottom()) - s(12), 0xFFECECEC);
         }
 
-        List<TaskClient.TaskLineData> lines = TaskClient.getLines();
-        // compute preview start Y based on our fields
-        int previewY = topStart + fieldGap * 4 + s(36);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.preview"), contentX, previewY, 0xFF8BD6FF);
-        previewY += s(12);
+        previewScrollOffset = Math.max(0, Math.min(previewScrollOffset, getPreviewMaxScroll()));
+        int y = getPreviewListTop() - previewScrollOffset;
+        int lineStep = s(Math.max(10, textRenderer.fontHeight + 2));
+        int listTop = getPreviewListTop();
+        int listBottom = getPreviewListBottom();
 
-        int shown = 0;
-        for (TaskClient.TaskLineData line : lines) {
-            if (previewY > contentY + contentHeight - s(30)) {
-                break;
+        for (TaskClient.TaskLineData line : TaskClient.getLines()) {
+            List<net.minecraft.text.OrderedText> wrapped = textRenderer.wrapLines(Text.literal(line.name() + " (" + line.tasks().size() + ")"), Math.max(s(20), contentWidth - s(4)));
+            int blockHeight = Math.max(lineStep, wrapped.size() * lineStep);
+            if (y + blockHeight >= listTop && y <= listBottom) {
+                for (int i = 0; i < wrapped.size(); i++) {
+                    context.drawTextWithShadow(textRenderer, wrapped.get(i), contentX, y + i * lineStep, 0xFFECECEC);
+                }
             }
-            context.drawTextWithShadow(textRenderer,
-                    Text.literal(line.name() + " (" + line.tasks().size() + ")"),
-                    contentX,
-                    previewY,
-                    0xFFECECEC);
-            previewY += s(10);
-            shown++;
-            if (shown >= 6) {
-                break;
-            }
+            y += blockHeight + s(4);
         }
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        int mx = (int) mouseX;
+        int my = (int) mouseY;
+        int listTop = getPreviewListTop();
+        int listBottom = getPreviewListBottom();
+        if (mx >= contentX && mx <= contentX + contentWidth && my >= listTop && my <= listBottom) {
+            previewScrollOffset = Math.max(0, Math.min(previewScrollOffset - (int) Math.round(verticalAmount * s(12)), getPreviewMaxScroll()));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     @Override

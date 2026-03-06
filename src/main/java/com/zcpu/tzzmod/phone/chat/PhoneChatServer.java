@@ -149,8 +149,17 @@ public final class PhoneChatServer {
             }
         }
 
-        PhoneChatService.createGroup(player, name, members);
-        handleBootstrap(server, player);
+        JsonObject created = PhoneChatService.createGroup(player, name, members);
+        String groupName = getString(created, "name");
+        if (created.has("members") && created.get("members").isJsonArray()) {
+            for (JsonElement element : created.getAsJsonArray("members")) {
+                String memberUuid = element.getAsString();
+                if (!memberUuid.equals(player.getUuidAsString())) {
+                    sendNotice(server, memberUuid, "你已被加入群组: " + groupName);
+                }
+            }
+        }
+        refreshAllBootstraps(server);
     }
 
     private static void handleAddMember(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
@@ -171,21 +180,9 @@ public final class PhoneChatServer {
             return;
         }
 
-        // Notify the added player with a direct notification
-        try {
-            PhoneChatConfig config = PhoneChatConfig.get(server);
-            String groupName = PhoneChatService.getGroupName(groupId);
-            PhoneChatService.sendDirectNotification(server, player, memberUuid, "你已被加入群组: " + (groupName.isBlank() ? groupId : groupName), config);
-        } catch (Exception ignored) {
-        }
-
-        // refresh bootstrap for the actor and try to refresh for the target if they're online
-        // Refresh bootstrap for all online players so group membership state updates everywhere
-        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            try {
-                handleBootstrap(server, online);
-            } catch (Exception ignored) {}
-        }
+        String groupName = PhoneChatService.getGroupName(groupId);
+        sendNotice(server, memberUuid, "你已被加入群组: " + (groupName.isBlank() ? groupId : groupName));
+        refreshAllBootstraps(server);
     }
 
     private static void handleRemoveMember(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
@@ -211,20 +208,9 @@ public final class PhoneChatServer {
             return;
         }
 
-        try {
-            PhoneChatConfig config = PhoneChatConfig.get(server);
-            String groupName = PhoneChatService.getGroupName(groupId);
-            PhoneChatService.sendDirectNotification(server, player, memberUuid, "你已被移出群组: " + (groupName.isBlank() ? groupId : groupName), config);
-        } catch (Exception ignored) {
-        }
-
-        handleBootstrap(server, player);
-        // Refresh bootstrap for all online players so group membership state updates everywhere
-        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            try {
-                handleBootstrap(server, online);
-            } catch (Exception ignored) {}
-        }
+        String groupName = PhoneChatService.getGroupName(groupId);
+        sendGroupRemoved(server, memberUuid, groupId, "你已被移出群组: " + (groupName.isBlank() ? groupId : groupName));
+        refreshAllBootstraps(server);
     }
 
     // New handler for the call admin action
@@ -309,20 +295,48 @@ public final class PhoneChatServer {
         // perform deletion
         Set<String> deletedMembers = PhoneChatService.deleteGroup(groupId);
 
-        // notify all previous members with a direct-style notification
-        try {
-            PhoneChatConfig config = PhoneChatConfig.get(server);
-            String msg = "群组已被删除: " + (groupName.isBlank() ? groupId : groupName);
-            for (String m : deletedMembers) {
-                PhoneChatService.sendDirectNotification(server, player, m, msg, config);
-            }
-        } catch (Exception ignored) {
+        String msg = "群组已被删除: " + (groupName.isBlank() ? groupId : groupName);
+        for (String memberUuid : deletedMembers) {
+            sendGroupRemoved(server, memberUuid, groupId, msg);
         }
 
-        // refresh bootstrap for all online players
+        refreshAllBootstraps(server);
+    }
+
+    private static void refreshAllBootstraps(MinecraftServer server) {
         for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            try { handleBootstrap(server, online); } catch (Exception ignored) {}
+            try {
+                handleBootstrap(server, online);
+            } catch (Exception ignored) {
+            }
         }
+    }
+
+    private static void sendNotice(MinecraftServer server, String targetUuid, String message) {
+        if (targetUuid == null || targetUuid.isBlank() || message == null || message.isBlank()) {
+            return;
+        }
+        ServerPlayerEntity target = server.getPlayerManager().getPlayer(UUID.fromString(targetUuid));
+        if (target == null) {
+            return;
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("message", message);
+        PhoneChatService.sendResponse(target, "notice", body);
+    }
+
+    private static void sendGroupRemoved(MinecraftServer server, String targetUuid, String groupId, String message) {
+        if (targetUuid == null || targetUuid.isBlank() || groupId == null || groupId.isBlank()) {
+            return;
+        }
+        ServerPlayerEntity target = server.getPlayerManager().getPlayer(UUID.fromString(targetUuid));
+        if (target == null) {
+            return;
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("groupId", groupId);
+        body.addProperty("message", message);
+        PhoneChatService.sendResponse(target, "group_removed", body);
     }
 
     private static JsonObject parse(String json) {

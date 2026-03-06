@@ -24,6 +24,8 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
     private final List<DetailButtonData> detailButtons = new ArrayList<>();
     private TypingSubtitleAnimator subtitleAnimator;
     private int lastTotalUnread = 0;
+    private int currentScrollOffset;
+    private int flowScrollOffset;
 
     public PhoneTaskAppScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.task"), parent);
@@ -51,6 +53,52 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
         }
     }
 
+    private int getTabContentTop() {
+        int tabsBottom = contentY + s(24) + s(20);
+        int dividerY = tabsBottom + s(10);
+        return dividerY + s(10);
+    }
+
+    private int getTabContentBottom() {
+        return contentY + contentHeight - s(30);
+    }
+
+    private int getTextStep() {
+        return s(Math.max(10, textRenderer.fontHeight + 2));
+    }
+
+    private int getCurrentMaxScroll() {
+        int visibleHeight = Math.max(1, getTabContentBottom() - getTabContentTop());
+        int totalHeight = buildCurrentLines().size() * getTextStep() + s(8);
+        return Math.max(0, totalHeight - visibleHeight);
+    }
+
+    private int getFlowMaxScroll() {
+        int visibleHeight = Math.max(1, getTabContentBottom() - getTabContentTop());
+        int totalHeight = Math.max(0, computeFlowContentHeight() - getTabContentTop());
+        return Math.max(0, totalHeight - visibleHeight);
+    }
+
+    private void clampScrollOffsets() {
+        currentScrollOffset = Math.max(0, Math.min(currentScrollOffset, getCurrentMaxScroll()));
+        flowScrollOffset = Math.max(0, Math.min(flowScrollOffset, getFlowMaxScroll()));
+    }
+
+    private List<OrderedText> buildCurrentLines() {
+        List<OrderedText> lines = new ArrayList<>();
+        var current = TaskClient.getCurrentTask();
+        if (current == null) {
+            lines.addAll(textRenderer.wrapLines(Text.translatable("phone.tzz_mod.task.current.empty"), Math.max(s(20), contentWidth - s(8))));
+            return lines;
+        }
+
+        int wrapWidth = Math.max(s(20), contentWidth - s(8));
+        lines.addAll(textRenderer.wrapLines(parseComponentOrLiteral(current.titleJson()), wrapWidth));
+        lines.add(OrderedText.styledForwardsVisitedString("", net.minecraft.text.Style.EMPTY));
+        lines.addAll(textRenderer.wrapLines(parseComponentOrLiteral(current.contentJson()), wrapWidth));
+        return lines;
+    }
+
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         // App header (keeps at top)
@@ -72,6 +120,7 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
         context.fill(contentX + s(2), dividerY, contentX + contentWidth - s(2), dividerY + 1, 0xFFCCCCCC);
 
         detailButtons.clear();
+        clampScrollOffsets();
 
         if (showFlowTab) {
             renderFlowTab(context);
@@ -81,91 +130,107 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
     }
 
     private void renderCurrentTab(DrawContext context) {
-        // Display only current task: draw title below divider and render content with JSON component support
-        // place the title a bit further below the divider to avoid a cramped look
-        int titleY = contentY + s(24) + s(20) + s(16); // lower for more spacing
-        int contentTop = titleY + s(20);
+        int top = getTabContentTop();
+        int bottom = getTabContentBottom();
+        int lineStep = getTextStep();
+        List<OrderedText> lines = buildCurrentLines();
+        int y = top - currentScrollOffset;
 
-        var current = TaskClient.getCurrentTask();
-        if (current == null) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.current.empty"), contentX + contentWidth / 2, titleY, 0xFFECECEC);
-            return;
-        }
-
-        Text title = parseComponentOrLiteral(current.titleJson());
-        context.drawCenteredTextWithShadow(textRenderer, title, contentX + contentWidth / 2, titleY, 0xFFECECEC);
-
-        // Render content using textRenderer.wrapLines to preserve JSON component formatting
-        Text contentText = parseComponentOrLiteral(current.contentJson());
-        int wrapWidth = Math.max(s(20), contentWidth - s(8));
-        List<OrderedText> lines = textRenderer.wrapLines(contentText, wrapWidth);
-        int step = s(Math.max(10, textRenderer.fontHeight + 2));
-        for (int i = 0; i < lines.size(); i++) {
-            int y = contentTop + i * step;
-            if (y > contentY + contentHeight - s(28)) break;
-            context.drawTextWithShadow(textRenderer, lines.get(i), contentX + s(2), y, 0xFFECECEC);
+        for (OrderedText line : lines) {
+            if (y + lineStep >= top && y <= bottom) {
+                context.drawTextWithShadow(textRenderer, line, contentX + s(2), y, 0xFFECECEC);
+            }
+            y += lineStep;
         }
     }
 
-    private void renderFlowTab(DrawContext context) {
-        // Compute divider Y similar to renderPhoneContent so flow content starts below the divider
-        int tabsBottom = contentY + s(24) + s(20);
-        int dividerY = tabsBottom + s(10);
-        int topStart = dividerY + s(16);
-        int y = topStart;
-        int rowGap = s(18);
-        int dotX = contentX + s(6);
-        int lineMaxX = contentX + contentWidth - s(36);
+    private int computeFlowContentHeight() {
+        int y = getTabContentTop();
+        int lineStep = getTextStep();
+        int textWidth = Math.max(s(20), contentWidth - s(58));
+        int buttonHeight = s(12);
 
         for (TaskClient.TaskLineData line : TaskClient.getLines()) {
-            // Show only triggered nodes in the flow tab (cancelled/untriggered tasks should be hidden)
-            List<TaskClient.TaskNodeData> allNodes = line.tasks();
             List<TaskClient.TaskNodeData> visibleNodes = new ArrayList<>();
-            for (TaskClient.TaskNodeData n : allNodes) {
-                if (n.triggered()) visibleNodes.add(n);
+            for (TaskClient.TaskNodeData node : line.tasks()) {
+                if (node.triggered()) {
+                    visibleNodes.add(node);
+                }
             }
-            if (visibleNodes.isEmpty()) continue;
+            if (visibleNodes.isEmpty()) {
+                continue;
+            }
 
-            // Render only visible (triggered) nodes
-            for (int i = 0; i < visibleNodes.size(); i++) {
-                TaskClient.TaskNodeData node = visibleNodes.get(i);
-                int centerY = y + i * rowGap + s(6);
+            y += lineStep + s(4);
+            for (TaskClient.TaskNodeData node : visibleNodes) {
+                int textHeight = Math.max(lineStep, textRenderer.wrapLines(parseComponentOrLiteral(node.titleJson()), textWidth).size() * lineStep);
+                int rowHeight = Math.max(buttonHeight, textHeight) + s(6);
+                y += rowHeight + s(4);
+            }
+            y += s(4);
+        }
+        return y;
+    }
 
-                // Draw vertical connector between nodes
-                if (i < visibleNodes.size() - 1) {
-                    int nextCenterY = y + (i + 1) * rowGap + s(6);
-                    int connX = dotX;
-                    context.fill(connX, centerY + s(4), connX + s(1), nextCenterY - s(4), 0xFF7F8A97);
+    private void renderFlowTab(DrawContext context) {
+        int top = getTabContentTop();
+        int bottom = getTabContentBottom();
+        int lineStep = getTextStep();
+        int y = top - flowScrollOffset;
+        int dotX = contentX + s(6);
+        int textX = contentX + s(14);
+        int btnW = s(30);
+        int btnH = s(12);
+        int btnX = contentX + contentWidth - btnW - s(2);
+        int textWidth = Math.max(s(20), btnX - textX - s(6));
+        boolean drewAny = false;
+
+        for (TaskClient.TaskLineData line : TaskClient.getLines()) {
+            List<TaskClient.TaskNodeData> visibleNodes = new ArrayList<>();
+            for (TaskClient.TaskNodeData node : line.tasks()) {
+                if (node.triggered()) {
+                    visibleNodes.add(node);
+                }
+            }
+            if (visibleNodes.isEmpty()) {
+                continue;
+            }
+
+            drewAny = true;
+            if (y + lineStep >= top && y <= bottom) {
+                context.drawTextWithShadow(textRenderer, Text.literal(line.name()), contentX + s(2), y, 0xFF8BD6FF);
+            }
+            y += lineStep + s(4);
+
+            for (TaskClient.TaskNodeData node : visibleNodes) {
+                List<OrderedText> wrappedTitle = textRenderer.wrapLines(parseComponentOrLiteral(node.titleJson()), textWidth);
+                int textHeight = Math.max(lineStep, wrappedTitle.size() * lineStep);
+                int rowHeight = Math.max(btnH, textHeight) + s(6);
+                int rowTop = y;
+                int rowBottom = y + rowHeight;
+
+                if (rowBottom >= top && rowTop <= bottom) {
+                    context.fill(contentX, rowTop, contentX + contentWidth, rowBottom, 0x22333333);
+                    drawDot(context, dotX, rowTop + rowHeight / 2, 0xFF66FF66);
+                    for (int i = 0; i < wrappedTitle.size(); i++) {
+                        int lineY = rowTop + s(3) + i * lineStep;
+                        context.drawTextWithShadow(textRenderer, wrappedTitle.get(i), textX, lineY, 0xFFECECEC);
+                    }
+
+                    int btnY = rowTop + Math.max(0, (rowHeight - btnH) / 2);
+                    context.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0xAA2A8FC1);
+                    context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.open_subpage"), btnX + btnW / 2, btnY + Math.max(0, (btnH - textRenderer.fontHeight) / 2), 0xFFECECEC);
+                    detailButtons.add(new DetailButtonData(btnX, btnY, btnW, btnH, node.titleJson(), node.contentJson()));
                 }
 
-                // Draw dot
-                int radius = s(3);
-                drawDot(context, dotX, centerY, 0xFF66FF66);
-
-                // Small horizontal connector to title
-                context.fill(dotX + s(4), centerY, dotX + s(10), centerY + 1, 0xFF7F8A97);
-
-                // Draw title to the right
-                Text title = parseComponentOrLiteral(node.titleJson());
-                context.drawTextWithShadow(textRenderer, title, dotX + s(12), centerY - textRenderer.fontHeight / 2, 0xFFECECEC);
-
-                // Draw small detail button at rightmost area
-                int btnW = s(30);
-                int btnH = s(12);
-                int btnX = lineMaxX;
-                int btnY = centerY - btnH / 2;
-                // Draw a simple rounded rectangle (approx) for button background
-                context.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0xAA2A8FC1);
-                context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.open_subpage"), btnX + btnW / 2, btnY + Math.max(0, (btnH - textRenderer.fontHeight) / 2), 0xFFECECEC);
-
-                // register clickable area
-                detailButtons.add(new DetailButtonData(btnX, btnY, btnW, btnH, node.titleJson(), node.contentJson()));
+                y += rowHeight + s(4);
             }
 
-            // Advance y for next line group: visibleNodes.size * rowGap + spacing
-            y += visibleNodes.size() * rowGap + s(12);
-            // stop if exceeding content area
-            if (y > contentY + contentHeight - s(28)) break;
+            y += s(4);
+        }
+
+        if (!drewAny) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.flow.empty"), contentX + contentWidth / 2, top, 0xFFECECEC);
         }
     }
 
@@ -193,6 +258,26 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        int mx = (int) mouseX;
+        int my = (int) mouseY;
+        int top = getTabContentTop();
+        int bottom = getTabContentBottom();
+
+        if (mx >= contentX && mx <= contentX + contentWidth && my >= top && my <= bottom) {
+            int delta = (int) Math.round(verticalAmount * s(12));
+            if (showFlowTab) {
+                flowScrollOffset = Math.max(0, Math.min(flowScrollOffset - delta, getFlowMaxScroll()));
+            } else {
+                currentScrollOffset = Math.max(0, Math.min(currentScrollOffset - delta, getCurrentMaxScroll()));
+            }
+            return true;
+        }
+
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     private void playCharSound() {

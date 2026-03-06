@@ -25,7 +25,7 @@ public final class TaskClient {
     private static CurrentTaskData currentTask;
 
     // --- notification tracking (modeled after PhoneChatClient) ---
-    private static final Map<String, Integer> UNREAD_COUNTS = new HashMap<>();
+    private static final Set<String> UNREAD_TRIGGERED = new HashSet<>();
     private static long unreadNotificationExpireAtMs;
     private static String notificationSound = "minecraft:entity.experience_orb.pickup";
     // track last-seen triggered ids across payloads for reliable diffing
@@ -75,18 +75,13 @@ public final class TaskClient {
 
     // New: return total unread tasks across all lines (sum of UNREAD_COUNTS)
     public static int getTotalUnreadCount() {
-        int total = 0;
-        for (Integer value : UNREAD_COUNTS.values()) {
-            if (value != null && value > 0) {
-                total += value;
-            }
-        }
-        return total;
+        return UNREAD_TRIGGERED.size();
     }
 
     public static List<UnreadEntry> getUnreadEntries() {
+        Map<String, Integer> counts = buildUnreadCountsByLine();
         List<UnreadEntry> entries = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : UNREAD_COUNTS.entrySet()) {
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
             int count = entry.getValue();
             if (count <= 0) continue;
             String lineName = entry.getKey();
@@ -98,15 +93,29 @@ public final class TaskClient {
     }
 
     public static void clearAllUnread() {
-        if (!UNREAD_COUNTS.isEmpty()) {
-            UNREAD_COUNTS.clear();
+        if (!UNREAD_TRIGGERED.isEmpty()) {
+            UNREAD_TRIGGERED.clear();
             notifyListeners();
         }
     }
 
+    private static Map<String, Integer> buildUnreadCountsByLine() {
+        Map<String, Integer> counts = new HashMap<>();
+        for (String id : UNREAD_TRIGGERED) {
+            String[] parts = id.split(":", 2);
+            if (parts.length < 2 || parts[0].isBlank()) {
+                continue;
+            }
+            counts.merge(parts[0], 1, Integer::sum);
+        }
+        return counts;
+    }
+
     private static String resolveLineTitle(String lineName) {
         for (TaskLineData line : LINES) {
-            if (line.name().equals(lineName)) return lineName; // TODO: could parse friendly title from resources if present
+            if (line.name().equals(lineName)) {
+                return lineName;
+            }
         }
         return lineName;
     }
@@ -119,57 +128,59 @@ public final class TaskClient {
     }
 
     private static void handlePayload(MinecraftClient client, TaskS2CPayload payload) {
-        // capture whether we had a previous snapshot (used to suppress initial-join noise)
-        boolean hadPreviousSnapshot = !LINES.isEmpty();
-
         JsonObject body = parse(payload.bodyJson());
         String action = payload.action();
 
-        // Debug logging to help trace notification flows
         try {
             Tzz_mod.LOGGER.debug("TaskClient.handlePayload action={} bodyLinesPresent={}", action, body.has("lines"));
         } catch (Exception ignored) {}
 
-        // Server may send an explicit 'triggered' notification with a single lineName/taskIndex
-        // when a task is triggered. Handle it quickly: if it's new for us, mark unread and play alert.
         if ("triggered".equals(action)) {
             String lineName = getString(body, "lineName");
             int idx = getInt(body, "taskIndex");
             if (!lineName.isEmpty() && idx > 0) {
                 String id = lineName + ":" + idx;
-                if (!KNOWN_TRIGGERED.contains(id)) {
-                    UNREAD_COUNTS.merge(lineName, 1, Integer::sum);
+                if (UNREAD_TRIGGERED.add(id)) {
                     unreadNotificationExpireAtMs = System.currentTimeMillis() + 15_000L;
-                    // Always play a short sound so user receives audible feedback; if alert mode
-                    // is enabled also enqueue subtitle-style notification.
                     playNotification(client);
                     if (PhoneSettingsClient.isAlertModeEnabled()) {
                         AlertSubtitleOverlay.enqueue(Text.translatable("phone.tzz_mod.alert.task_subtitle"));
                     }
                 }
                 KNOWN_TRIGGERED.add(id);
-                // Also refresh full lines from server in case bootstrap wasn't sent
                 notifyListeners();
             }
             return;
         }
 
-        // Server may also send 'untriggered' when a task is cancelled. Ensure we clear known state
-        // so future re-triggers will be detected as new, and update unread counts/UI.
         if ("untriggered".equals(action)) {
             String lineName = getString(body, "lineName");
             int idx = getInt(body, "taskIndex");
             if (!lineName.isEmpty() && idx > 0) {
                 String id = lineName + ":" + idx;
                 KNOWN_TRIGGERED.remove(id);
-                // decrement unread count for that line if present (safely)
-                UNREAD_COUNTS.computeIfPresent(lineName, (k, v) -> v > 1 ? v - 1 : null);
+                UNREAD_TRIGGERED.remove(id);
                 notifyListeners();
             }
             return;
         }
 
-        // Build currentTriggeredFromBody from payload if available
+        Set<String> currentTriggeredFromBody = collectTriggeredIds(body);
+
+        switch (action) {
+            case "bootstrap" -> {
+                applyBootstrap(body);
+                reconcileTriggeredState(currentTriggeredFromBody);
+            }
+            case "error" -> showError(client, body);
+            default -> {
+            }
+        }
+
+        notifyListeners();
+    }
+
+    private static Set<String> collectTriggeredIds(JsonObject body) {
         Set<String> currentTriggeredFromBody = new HashSet<>();
         if (body.has("lines") && body.get("lines").isJsonArray()) {
             for (JsonElement lineEl : body.getAsJsonArray("lines")) {
@@ -182,50 +193,22 @@ public final class TaskClient {
                                 JsonObject taskObj = taskEl.getAsJsonObject();
                                 int idx = getInt(taskObj, "index");
                                 boolean trg = getBoolean(taskObj, "triggered", false);
-                                if (trg) currentTriggeredFromBody.add(lineName + ":" + idx);
+                                if (trg && !lineName.isEmpty() && idx > 0) {
+                                    currentTriggeredFromBody.add(lineName + ":" + idx);
+                                }
                             } catch (Exception ignored) {}
                         }
                     }
                 } catch (Exception ignored) {}
             }
         }
+        return currentTriggeredFromBody;
+    }
 
-        switch (action) {
-            case "bootstrap" -> applyBootstrap(body);
-            case "error" -> showError(client, body);
-            default -> {}
-        }
-
-        // Decide whether this is the very first bootstrap (client had no prior snapshot and
-        // we haven't observed any triggers yet). In that case, skip notifying to avoid noisy
-        // initial join behaviour. For subsequent bootstraps or other actions, detect newly
-        // triggered IDs by comparing the server-sent set against KNOWN_TRIGGERED.
-        boolean initialBootstrap = "bootstrap".equals(action) && !hadPreviousSnapshot && KNOWN_TRIGGERED.isEmpty();
-        if (!initialBootstrap) {
-            Set<String> newlyTriggered = new HashSet<>();
-            for (String id : currentTriggeredFromBody) {
-                if (!KNOWN_TRIGGERED.contains(id)) {
-                    newlyTriggered.add(id);
-                    String lineName = id.split(":", 2)[0];
-                    UNREAD_COUNTS.merge(lineName, 1, Integer::sum);
-                }
-            }
-
-            if (!newlyTriggered.isEmpty()) {
-                unreadNotificationExpireAtMs = System.currentTimeMillis() + 15_000L;
-                // Always play a sound; subtitle if alert mode enabled
-                playNotification(client);
-                if (PhoneSettingsClient.isAlertModeEnabled()) {
-                    AlertSubtitleOverlay.enqueue(Text.translatable("phone.tzz_mod.alert.task_subtitle"));
-                }
-            }
-        }
-
-        // Update KNOWN_TRIGGERED to the current server state so future diffs are correct.
+    private static void reconcileTriggeredState(Set<String> currentTriggeredFromBody) {
+        UNREAD_TRIGGERED.removeIf(id -> !currentTriggeredFromBody.contains(id));
         KNOWN_TRIGGERED.clear();
         KNOWN_TRIGGERED.addAll(currentTriggeredFromBody);
-
-        notifyListeners();
     }
 
     private static void applyBootstrap(JsonObject body) {

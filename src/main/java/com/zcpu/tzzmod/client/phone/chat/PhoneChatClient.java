@@ -235,6 +235,8 @@ public final class PhoneChatClient {
             case "bootstrap" -> applyBootstrap(body);
             case "history" -> applyHistory(body);
             case "message" -> applyIncomingMessage(client, body);
+            case "group_removed" -> applyGroupRemoved(client, body);
+            case "notice" -> showNotice(client, body);
             case "error" -> showError(client, body);
             case "group_members" -> applyGroupMembers(body);
             default -> {
@@ -321,9 +323,9 @@ public final class PhoneChatClient {
             visibleGroupIds.add(group.id());
         }
 
-        pruneGroupStateMap(HISTORIES.keySet(), visibleGroupIds, HISTORIES::remove);
-        pruneGroupStateMap(TITLES.keySet(), visibleGroupIds, TITLES::remove);
-        pruneGroupStateMap(UNREAD_COUNTS.keySet(), visibleGroupIds, UNREAD_COUNTS::remove);
+        pruneGroupStateMap(HISTORIES.keySet(), visibleGroupIds, key -> HISTORIES.remove(key));
+        pruneGroupStateMap(TITLES.keySet(), visibleGroupIds, key -> TITLES.remove(key));
+        pruneGroupStateMap(UNREAD_COUNTS.keySet(), visibleGroupIds, key -> UNREAD_COUNTS.remove(key));
         GROUP_MEMBERS_MAP.keySet().removeIf(groupId -> !visibleGroupIds.contains(groupId));
 
         if (activeConversationKey.startsWith("group:")) {
@@ -350,6 +352,28 @@ public final class PhoneChatClient {
         for (String staleKey : staleKeys) {
             remover.accept(staleKey);
         }
+    }
+
+    private static void removeGroupConversationState(String groupId) {
+        if (groupId == null || groupId.isBlank()) {
+            return;
+        }
+
+        String key = historyKey("group", groupId);
+        HISTORIES.remove(key);
+        TITLES.remove(key);
+        UNREAD_COUNTS.remove(key);
+        GROUP_MEMBERS_MAP.remove(groupId);
+        GROUPS.removeIf(group -> group.id().equals(groupId));
+        if (key.equals(activeConversationKey)) {
+            activeConversationKey = "";
+        }
+    }
+
+    private static void applyGroupRemoved(MinecraftClient client, JsonObject body) {
+        String groupId = getString(body, "groupId");
+        removeGroupConversationState(groupId);
+        showNotice(client, body);
     }
 
     private static void applyHistory(JsonObject body) {
@@ -440,6 +464,13 @@ public final class PhoneChatClient {
     }
 
     private static void showError(MinecraftClient client, JsonObject body) {
+        String message = getString(body, "message");
+        if (client.player != null && !message.isBlank()) {
+            client.player.sendMessage(Text.literal("[Phone Chat] " + message), false);
+        }
+    }
+
+    private static void showNotice(MinecraftClient client, JsonObject body) {
         String message = getString(body, "message");
         if (client.player != null && !message.isBlank()) {
             client.player.sendMessage(Text.literal("[Phone Chat] " + message), false);
