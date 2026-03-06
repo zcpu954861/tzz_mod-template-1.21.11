@@ -62,7 +62,11 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
             addPhoneGhostButton(Text.empty(), x, y, iconSize, iconSize, button -> {
                 if (client != null) {
-                    client.setScreen(slot.entry.rootScreenFactory().apply(this));
+                    net.minecraft.client.gui.screen.Screen nextScreen = slot.entry.rootScreenFactory().apply(this);
+                    if (nextScreen instanceof AbstractPhoneScreen) {
+                        ((AbstractPhoneScreen) nextScreen).setAppLaunchAnimation(slot.x, slot.y, slot.size, slot.size);
+                    }
+                    client.setScreen(nextScreen);
                 }
             });
         }

@@ -3,7 +3,7 @@ package com.zcpu.tzzmod.client;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatHudOverlay;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
-import com.zcpu.tzzmod.client.phone.ui.PhoneHomeScreen;
+import com.zcpu.tzzmod.client.phone.ui.PhoneLockScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.TaskConfiguratorScreen;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
@@ -22,7 +22,7 @@ public class Tzz_modClient implements ClientModInitializer {
             try {
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client.player != null) {
-                    client.setScreen(new PhoneHomeScreen());
+                    client.setScreen(new PhoneLockScreen());
                 }
             } catch (Exception exception) {
                 Tzz_mod.LOGGER.error("Failed to open phone screen", exception);

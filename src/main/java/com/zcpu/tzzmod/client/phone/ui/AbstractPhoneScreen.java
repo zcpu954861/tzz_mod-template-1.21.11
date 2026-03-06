@@ -1,9 +1,11 @@
 package com.zcpu.tzzmod.client.phone.ui;
 
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +30,9 @@ public abstract class AbstractPhoneScreen extends Screen {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
+    private static final long APP_OPEN_ANIMATION_MS = 220L;
+    private static final long APP_CLOSE_ANIMATION_MS = 180L;
+
     protected final Screen parent;
 
     protected int phoneX;
@@ -42,6 +47,9 @@ public abstract class AbstractPhoneScreen extends Screen {
 
     private float uiScale = 1.0F;
     private final List<PhoneButtonRenderData> phoneButtons = new ArrayList<>();
+    private AppLaunchAnimation appLaunchAnimation;
+    private long appLaunchAnimationStartedAtMs = -1L;
+    private long closeAnimationStartedAtMs = -1L;
 
     // Phone button styles
     private static final int PHONE_BUTTON_TEXT_COLOR = 0xFFECECEC;
@@ -98,22 +106,95 @@ public abstract class AbstractPhoneScreen extends Screen {
         contentY = phoneY + topInset + s(STATUS_BAR_HEIGHT) + statusGap;
         contentWidth = Math.max(1, phoneWidth - horizontalInset * 2);
         contentHeight = Math.max(1, phoneHeight - topInset - s(STATUS_BAR_HEIGHT) - statusGap - bottomInset);
+
+        if (appLaunchAnimation != null && appLaunchAnimationStartedAtMs < 0L) {
+            appLaunchAnimationStartedAtMs = System.currentTimeMillis();
+        }
+        closeAnimationStartedAtMs = -1L;
+    }
+
+    @Override
+    public void tick() {
+        if (isClosingToParent() && getCloseAnimationProgress() >= 1.0F && client != null) {
+            client.setScreen(parent);
+        }
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        boolean animatingOpen = hasAppLaunchAnimation();
+        boolean animatingClose = isClosingToParent();
+        if ((animatingOpen || animatingClose) && parent != null) {
+            parent.render(context, Integer.MIN_VALUE, Integer.MIN_VALUE, delta);
+        }
+
+        float openProgress = getOpenAnimationProgress();
+        float closeProgress = getCloseAnimationProgress();
+
+        if (animatingOpen && openProgress >= 1.0F) {
+            appLaunchAnimation = null;
+            appLaunchAnimationStartedAtMs = -1L;
+            animatingOpen = false;
+            openProgress = 1.0F;
+        }
+
+        int renderMouseX = isTransitionBlockingInteraction() ? Integer.MIN_VALUE : mouseX;
+        int renderMouseY = isTransitionBlockingInteraction() ? Integer.MIN_VALUE : mouseY;
+
+        float scaleX = 1.0F;
+        float scaleY = 1.0F;
+        float translateX = 0.0F;
+        float translateY = 0.0F;
+
+        if (animatingOpen && appLaunchAnimation != null) {
+            float startScaleX = appLaunchAnimation.width() / (float) Math.max(1, phoneWidth);
+            float startScaleY = appLaunchAnimation.height() / (float) Math.max(1, phoneHeight);
+            scaleX = MathHelper.lerp(openProgress, startScaleX, 1.0F);
+            scaleY = MathHelper.lerp(openProgress, startScaleY, 1.0F);
+            float drawX = MathHelper.lerp(openProgress, appLaunchAnimation.x(), phoneX);
+            float drawY = MathHelper.lerp(openProgress, appLaunchAnimation.y(), phoneY);
+            translateX = drawX - phoneX * scaleX;
+            translateY = drawY - phoneY * scaleY;
+        } else if (animatingClose) {
+            float closeScale = MathHelper.lerp(closeProgress, 1.0F, 0.92F);
+            float centerX = phoneX + phoneWidth / 2.0F;
+            float centerY = phoneY + phoneHeight / 2.0F;
+            scaleX = closeScale;
+            scaleY = closeScale;
+            translateX = centerX - centerX * closeScale;
+            translateY = centerY - centerY * closeScale;
+        }
+
+        if (animatingOpen || animatingClose) {
+            context.getMatrices().pushMatrix();
+            context.getMatrices().translate(translateX, translateY);
+            context.getMatrices().scale(scaleX, scaleY);
+            renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+            if (animatingClose) {
+                renderClosingRevealVeil(context, closeProgress);
+            }
+            context.getMatrices().popMatrix();
+            return;
+        }
+
+        renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+    }
+
+    protected void renderPhoneScreen(DrawContext context, int mouseX, int mouseY, float delta) {
         // Draw a thin rounded-line border: straight sides + stroked corner arcs (no filled center)
         drawLineBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
 
         renderStatusBar(context);
-        // Call the phone content render hook (subclasses should only draw text here).
         renderPhoneContent(context, mouseX, mouseY, delta);
         renderStyledPhoneButtons(context, mouseX, mouseY);
-
         super.render(context, mouseX, mouseY, delta);
+        renderPhoneOverlay(context, mouseX, mouseY, delta);
     }
 
-    private void renderStatusBar(DrawContext context) {
+    protected void renderPhoneOverlay(DrawContext context, int mouseX, int mouseY, float delta) {
+    }
+
+    protected void renderStatusBar(DrawContext context) {
         int statusX = contentX;
         int statusY = phoneY + s(8);
         int statusWidth = contentWidth;
@@ -124,26 +205,21 @@ public abstract class AbstractPhoneScreen extends Screen {
                 ? client.player.getName().getString()
                 : "Player";
 
-        // Use a Text literal for the time so it updates correctly each frame
         context.drawTextWithShadow(textRenderer, Text.literal(timeText), statusX + s(6), statusY + s(4), 0xFFECECEC);
 
         String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), statusWidth - s(40)));
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), 0xFFECECEC);
 
-        // Draw death/alive indicator on the right side of the status bar.
         boolean hasDeathTag = com.zcpu.tzzmod.client.DeathSyncClient.isLocalPlayerDead();
-
         Text statusText = hasDeathTag ? Text.literal("死亡") : Text.literal("存活");
-        int statusColor = hasDeathTag ? 0xFFFF6666 : 0xFF66FF66; // red : green
+        int statusColor = hasDeathTag ? 0xFFFF6666 : 0xFF66FF66;
         int textWidth = textRenderer.getWidth(statusText);
         int rightPadding = s(6);
         int drawX = statusX + statusWidth - rightPadding - textWidth;
         int drawY = statusY + s(4);
-        // Ensure we don't draw off the left side if phone is very narrow
         if (drawX < statusX + s(6)) drawX = statusX + s(6);
         context.drawTextWithShadow(textRenderer, statusText, drawX, drawY, statusColor);
 
-        // Keep only the status divider line.
         int dividerY = statusY + statusHeight + s(1);
         context.fill(statusX + s(2), dividerY, statusX + statusWidth - s(2), dividerY + 1, STATUS_DIVIDER_COLOR);
     }
@@ -165,7 +241,7 @@ public abstract class AbstractPhoneScreen extends Screen {
         context.drawCenteredTextWithShadow(textRenderer, text, centerX, y, 0xFFECECEC);
     }
 
-    private void drawLineBorder(DrawContext context, int x, int y, int width, int height) {
+    protected void drawLineBorder(DrawContext context, int x, int y, int width, int height) {
         if (width <= 0 || height <= 0) return;
 
         int t = Math.max(1, s(1)); // line thickness in pixels, scaled
@@ -232,16 +308,15 @@ public abstract class AbstractPhoneScreen extends Screen {
         }
     }
 
-    @Override
-    public void close() {
-        if (client != null) {
-            client.setScreen(parent);
-        }
-    }
-
-    @Override
-    public boolean shouldPause() {
-        return false;
+    private void renderClosingRevealVeil(DrawContext context, float closeProgress) {
+        int inset = s(4);
+        int screenX = phoneX + inset;
+        int screenY = phoneY + inset;
+        int screenWidth = Math.max(1, phoneWidth - inset * 2);
+        int screenHeight = Math.max(1, phoneHeight - inset * 2);
+        int radius = Math.max(s(10), s(14));
+        int alpha = MathHelper.clamp(Math.round(120.0F * closeProgress), 0, 120);
+        RoundedRectRenderer.fillRoundedRect(context, screenX, screenY, screenWidth, screenHeight, radius, alpha << 24);
     }
 
     protected ButtonWidget addPhoneButton(Text message, int x, int y, int width, int height, PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
@@ -352,6 +427,77 @@ public abstract class AbstractPhoneScreen extends Screen {
             return PHONE_BUTTON_TEXT_COLOR;
         }
         return PHONE_BUTTON_SUBTLE_TEXT_COLOR;
+    }
+
+    @Override
+    public void close() {
+        if (client == null) {
+            return;
+        }
+        if (parent == null) {
+            client.setScreen(null);
+            return;
+        }
+        if (!isClosingToParent()) {
+            closeAnimationStartedAtMs = System.currentTimeMillis();
+        }
+    }
+
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        if (isTransitionBlockingInteraction()) {
+            return true;
+        }
+        return super.mouseClicked(click, doubleClick);
+    }
+
+    public void setAppLaunchAnimation(int x, int y, int width, int height) {
+        appLaunchAnimation = new AppLaunchAnimation(x, y, Math.max(1, width), Math.max(1, height));
+        appLaunchAnimationStartedAtMs = -1L;
+    }
+
+    protected boolean isTransitionBlockingInteraction() {
+        return hasAppLaunchAnimation() || isClosingToParent();
+    }
+
+    private boolean hasAppLaunchAnimation() {
+        return appLaunchAnimation != null && appLaunchAnimationStartedAtMs >= 0L;
+    }
+
+    private boolean isClosingToParent() {
+        return closeAnimationStartedAtMs >= 0L && parent != null;
+    }
+
+    private float getOpenAnimationProgress() {
+        if (!hasAppLaunchAnimation()) {
+            return 1.0F;
+        }
+        long elapsed = Math.max(0L, System.currentTimeMillis() - appLaunchAnimationStartedAtMs);
+        return easeOutCubic(MathHelper.clamp(elapsed / (float) APP_OPEN_ANIMATION_MS, 0.0F, 1.0F));
+    }
+
+    private float getCloseAnimationProgress() {
+        if (!isClosingToParent()) {
+            return 0.0F;
+        }
+        long elapsed = Math.max(0L, System.currentTimeMillis() - closeAnimationStartedAtMs);
+        return smoothStep(MathHelper.clamp(elapsed / (float) APP_CLOSE_ANIMATION_MS, 0.0F, 1.0F));
+    }
+
+    private float easeOutCubic(float value) {
+        float inverse = 1.0F - value;
+        return 1.0F - inverse * inverse * inverse;
+    }
+
+    private float smoothStep(float value) {
+        return value * value * (3.0F - 2.0F * value);
+    }
+
+    private record AppLaunchAnimation(int x, int y, int width, int height) {
     }
 
 

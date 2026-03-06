@@ -59,9 +59,7 @@ public class PhoneCallAdminScreen extends AbstractPhoneScreen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-
+    protected void renderPhoneOverlay(DrawContext context, int mouseX, int mouseY, float delta) {
         // update visual button state based on client cooldown
         if (callButton != null) callButton.active = !PhoneCallAdminClient.isCoolingDown();
 
