@@ -75,5 +75,14 @@
   "phone.tzz_mod.chat.confirm_delete_title": "Delete Group",
   "phone.tzz_mod.chat.confirm_delete_prompt": "Are you sure you want to delete this group? This will notify all members.",
   "phone.tzz_mod.chat.confirm_delete_confirm": "Confirm Delete",
-  "phone.tzz_mod.chat.delete_group": "Delete Group"
+  "phone.tzz_mod.chat.delete_group": "Delete Group",
+  "phone.tzz_mod.app.compass": "Compass",
+  "phone.tzz_mod.direction.north": "North",
+  "phone.tzz_mod.direction.northeast": "Northeast",
+  "phone.tzz_mod.direction.east": "East",
+  "phone.tzz_mod.direction.southeast": "Southeast",
+  "phone.tzz_mod.direction.south": "South",
+  "phone.tzz_mod.direction.southwest": "Southwest",
+  "phone.tzz_mod.direction.west": "West",
+  "phone.tzz_mod.direction.northwest": "Northwest"
 }

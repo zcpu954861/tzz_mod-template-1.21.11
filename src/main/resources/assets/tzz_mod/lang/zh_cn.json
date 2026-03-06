@@ -74,5 +74,14 @@
   "phone.tzz_mod.chat.confirm_delete_title": "删除群组",
   "phone.tzz_mod.chat.confirm_delete_prompt": "确定要删除该群组吗？此操作会通知所有群成员。",
   "phone.tzz_mod.chat.confirm_delete_confirm": "确认删除",
-  "phone.tzz_mod.chat.delete_group": "删除群组"
+  "phone.tzz_mod.chat.delete_group": "删除群组",
+  "phone.tzz_mod.app.compass": "指南针",
+  "phone.tzz_mod.direction.north": "北",
+  "phone.tzz_mod.direction.northeast": "东北",
+  "phone.tzz_mod.direction.east": "东",
+  "phone.tzz_mod.direction.southeast": "东南",
+  "phone.tzz_mod.direction.south": "南",
+  "phone.tzz_mod.direction.southwest": "西南",
+  "phone.tzz_mod.direction.west": "西",
+  "phone.tzz_mod.direction.northwest": "西北"
 }

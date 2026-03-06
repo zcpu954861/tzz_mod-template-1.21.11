@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.client.phone.ui.app.PhoneChatAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneCallAdminScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneTaskAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneSettingsAppScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.CompassAppScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -21,6 +22,7 @@ public final class PhoneAppRegistry {
     private static final Identifier CALL_ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/call_admin.png");
     private static final Identifier TASK_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/task.png");
     private static final Identifier SETTINGS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/settings.png");
+    private static final Identifier COMPASS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/compass.png");
 
     private PhoneAppRegistry() {
     }
@@ -67,6 +69,13 @@ public final class PhoneAppRegistry {
                 Text.translatable("phone.tzz_mod.app.call_admin"),
                 iconOverrides.getOrDefault("call_admin", CALL_ADMIN_ICON),
                 PhoneCallAdminScreen::new
+        ));
+
+        entries.add(new PhoneAppEntry(
+                "compass",
+                Text.translatable("phone.tzz_mod.app.compass"),
+                iconOverrides.getOrDefault("compass", COMPASS_ICON),
+                CompassAppScreen::new
         ));
 
         return entries;
