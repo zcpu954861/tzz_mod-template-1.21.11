@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
+import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.network.PhoneChatC2SPayload;
 import com.zcpu.tzzmod.network.PhoneChatS2CPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -321,7 +323,11 @@ public final class PhoneChatClient {
 
         UNREAD_COUNTS.merge(key, 1, Integer::sum);
         unreadNotificationExpireAtMs = System.currentTimeMillis() + 15_000L;
-        playNotification(client);
+        if (PhoneSettingsClient.isAlertModeEnabled()) {
+            AlertSubtitleOverlay.enqueue(Text.translatable("phone.tzz_mod.alert.chat_subtitle"));
+        } else {
+            playNotification(client);
+        }
     }
 
     private static void playNotification(MinecraftClient client) {

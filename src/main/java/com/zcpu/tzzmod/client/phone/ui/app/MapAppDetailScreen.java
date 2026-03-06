@@ -3,7 +3,6 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
@@ -18,9 +17,7 @@ public class MapAppDetailScreen extends AbstractPhoneScreen {
     @Override
     protected void init() {
         super.init();
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.back"), button -> close())
-                .dimensions(contentX, contentY + contentHeight - s(24), s(72), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(72), s(20), button -> close());
     }
 
     @Override

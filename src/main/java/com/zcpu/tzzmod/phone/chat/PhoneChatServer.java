@@ -9,11 +9,22 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextColor;
+import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class PhoneChatServer {
+    // track last call timestamp per player to enforce cooldown
+    private static final Map<UUID, Long> lastCallAt = new ConcurrentHashMap<>();
+
     private PhoneChatServer() {
     }
 
@@ -51,6 +62,7 @@ public final class PhoneChatServer {
             case "send_group" -> handleSendGroup(server, player, body, config);
             case "create_group" -> handleCreateGroup(server, player, body);
             case "add_member" -> handleAddMember(server, player, body);
+            case "call_admin" -> handleCallAdmin(server, player);
             default -> PhoneChatService.sendError(player, "Unknown chat action: " + payload.action());
         }
     }
@@ -152,6 +164,43 @@ public final class PhoneChatServer {
         }
 
         handleBootstrap(server, player);
+    }
+
+    // New handler for the call admin action
+    private static void handleCallAdmin(MinecraftServer server, ServerPlayerEntity player) {
+        // enforce 5-second cooldown per player
+        UUID id = player.getUuid();
+        long now = System.currentTimeMillis();
+        Long previous = lastCallAt.get(id);
+        if (previous != null && now - previous < 5000L) {
+            PhoneChatService.sendError(player, "请等待冷却再呼叫管理员。");
+            return;
+        }
+        lastCallAt.put(id, now);
+
+        // Build the chat message for OPs: "<playerId>(黄色)在(浅灰色)<x,y,z>(青色#00ffff)呼叫管理员!(黄色)"
+        String playerName = player.getName().getString();
+        int x = (int)Math.floor(player.getX());
+        int y = (int)Math.floor(player.getY());
+        int z = (int)Math.floor(player.getZ());
+        Text partName = Text.literal(playerName).setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.YELLOW)));
+        Text partAt = Text.literal(" 在 ").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.GRAY)));
+        Text partCoords = Text.literal("<" + x + "," + y + "," + z + ">").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0x00FFFF)));
+        Text partEnd = Text.literal(" 呼叫管理员!").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.YELLOW)));
+
+        Text finalMessage = Text.empty().append(partName).append(partAt).append(partCoords).append(partEnd);
+
+        // Play bell sound and send the message to all online OP players
+        for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
+            if (online.isCreativeLevelTwoOp()) {
+                online.sendMessage(finalMessage, false);
+                online.playSound(SoundEvents.BLOCK_BELL_USE, 1.0F, 1.0F);
+            }
+        }
+
+        // Feedback to caller: green "已成功呼叫" and experience pick up sound
+        player.sendMessage(Text.literal("已成功呼叫").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.GREEN))), false);
+        player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
     }
 
     private static JsonObject parse(String json) {

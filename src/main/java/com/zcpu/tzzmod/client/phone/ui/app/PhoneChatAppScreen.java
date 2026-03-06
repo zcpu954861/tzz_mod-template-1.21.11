@@ -2,10 +2,11 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
+import com.zcpu.tzzmod.client.phone.ui.TypingSubtitleAnimator;
+import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -17,6 +18,9 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
     private int conversationCount;
     private int scrollOffset;
 
+    private TypingSubtitleAnimator subtitleAnimator;
+    private int lastTotalUnread = 0;
+
     public PhoneChatAppScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.chat"), parent);
     }
@@ -25,23 +29,23 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
     protected void init() {
         super.init();
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.back"), button -> close())
-                .dimensions(contentX, contentY + contentHeight - s(24), s(72), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(72), s(20), button -> close());
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.refresh"), button -> PhoneChatClient.requestBootstrap())
-                .dimensions(contentX + s(76), contentY + contentHeight - s(24), s(64), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.chat.refresh"), contentX + s(76), contentY + contentHeight - s(24), s(64), s(20), button -> PhoneChatClient.requestBootstrap());
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.create_group"),
-                        button -> client.setScreen(new PhoneChatCreateGroupScreen(this)))
-                .dimensions(contentX + contentWidth - s(88), contentY + s(26), s(88), s(20))
-                .build());
+        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.create_group"), contentX + contentWidth - s(88), contentY + s(26), s(88), s(20), button -> client.setScreen(new PhoneChatCreateGroupScreen(this)));
 
         stateListener = this::rebuildRows;
         PhoneChatClient.addListener(stateListener);
         rebuildRows();
         PhoneChatClient.requestBootstrap();
+
+        // initialize subtitle animator if alert mode is on and there are unread messages
+        lastTotalUnread = PhoneChatClient.getTotalUnreadCount();
+        if (PhoneSettingsClient.isAlertModeEnabled() && lastTotalUnread > 0) {
+            subtitleAnimator = new TypingSubtitleAnimator("你有新消息", 14, s -> playCharSound());
+            subtitleAnimator.start();
+        }
     }
 
     private int getListTop() {
@@ -73,6 +77,14 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
 
         conversationCount = rows.size();
         clampScrollOffset();
+
+        // Check unread change to trigger subtitle
+        int totalUnread = PhoneChatClient.getTotalUnreadCount();
+        if (PhoneSettingsClient.isAlertModeEnabled() && totalUnread > lastTotalUnread) {
+            subtitleAnimator = new TypingSubtitleAnimator("你有新消息", 14, s -> playCharSound());
+            subtitleAnimator.start();
+        }
+        lastTotalUnread = totalUnread;
     }
 
     private void clampScrollOffset() {
@@ -114,6 +126,19 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
                     contentY + s(38),
                     0xFFECECEC);
             return;
+        }
+
+        // advance subtitle animator
+        if (subtitleAnimator != null) {
+            subtitleAnimator.tick(delta);
+            Text sub = subtitleAnimator.getRenderedText();
+            if (!sub.getString().isEmpty()) {
+                // draw subtitle below title
+                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+            }
+            if (subtitleAnimator.isFinished()) {
+                subtitleAnimator = null;
+            }
         }
 
         int top = getListTop();
@@ -221,6 +246,13 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             PhoneChatClient.removeListener(stateListener);
             stateListener = null;
         }
+    }
+
+    private void playCharSound() {
+        if (client == null || client.player == null) return;
+        try {
+            client.player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
+        } catch (Exception ignored) {}
     }
 
     private static final class RowEntry {

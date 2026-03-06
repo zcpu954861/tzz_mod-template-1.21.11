@@ -7,6 +7,9 @@ import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.DeathSyncServer;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
+import com.zcpu.tzzmod.command.TaskCommand;
+import com.zcpu.tzzmod.network.TaskPayloads;
+import com.zcpu.tzzmod.task.TaskServer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
@@ -38,10 +41,13 @@ public class Tzz_mod implements ModInitializer {
 		DeathSyncServer.register();
 		PhoneChatPayloads.register();
 		PhoneChatServer.register();
+		TaskPayloads.register();
+		TaskServer.register();
 
         // Register server commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             SendMsgCommand.register(dispatcher);
+            TaskCommand.register(dispatcher);
         });
 
 		LOGGER.info("Hello Fabric world!");

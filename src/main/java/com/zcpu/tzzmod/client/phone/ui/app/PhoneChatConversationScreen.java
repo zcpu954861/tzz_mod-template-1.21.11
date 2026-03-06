@@ -7,7 +7,6 @@ import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.OrderedText;
@@ -44,26 +43,20 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     protected void init() {
         super.init();
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.back"), button -> close())
-                .dimensions(contentX, contentY + contentHeight - s(24), s(60), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(60), s(20), button -> close());
 
         inputField = new TextFieldWidget(textRenderer, contentX + s(64), contentY + contentHeight - s(24), contentWidth - s(132), s(20), Text.empty());
         inputField.setMaxLength(net.minecraft.util.math.MathHelper.clamp(com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.getMaxMessageLength(), 16, 25600));
         addDrawableChild(inputField);
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.send"), button -> sendMessage())
-                .dimensions(contentX + contentWidth - s(64), contentY + contentHeight - s(24), s(64), s(20))
-                .build());
+        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.send"), contentX + contentWidth - s(64), contentY + contentHeight - s(24), s(64), s(20), button -> sendMessage());
 
         if ("group".equals(type) && PhoneChatClient.isOp()) {
             addMemberField = new TextFieldWidget(textRenderer, contentX, contentY + contentHeight - s(48), contentWidth - s(70), s(20), Text.empty());
             addMemberField.setMaxLength(64);
             addDrawableChild(addMemberField);
 
-            addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.add"), button -> addMember())
-                    .dimensions(contentX + contentWidth - s(66), contentY + contentHeight - s(48), s(66), s(20))
-                    .build());
+            addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.add"), contentX + contentWidth - s(66), contentY + contentHeight - s(48), s(66), s(20), button -> addMember());
         }
 
         stateListener = this::updateFromState;

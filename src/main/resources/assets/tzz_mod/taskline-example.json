@@ -1,0 +1,11 @@
+{
+  "name": "example_line",
+  "tasks": [
+    {
+      "titleJson": "{\"text\":\"示例任务标题\"}",
+      "contentJson": "{\"text\":\"这是一个示例任务内容。将文件复制到 run/config/tzz_mod/taskline/ 并编辑以创建自定义任务线。\"}"
+    }
+  ],
+  "triggered": []
+}
+

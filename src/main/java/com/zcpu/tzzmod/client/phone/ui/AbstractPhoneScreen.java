@@ -2,10 +2,14 @@ package com.zcpu.tzzmod.client.phone.ui;
 
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public abstract class AbstractPhoneScreen extends Screen {
     // Reference: 3840x2054 with GUI scale 4 => 960x513.5 logical size.
@@ -37,6 +41,26 @@ public abstract class AbstractPhoneScreen extends Screen {
     protected int contentHeight;
 
     private float uiScale = 1.0F;
+    private final List<PhoneButtonRenderData> phoneButtons = new ArrayList<>();
+
+    // Phone button styles
+    private static final int PHONE_BUTTON_TEXT_COLOR = 0xFFECECEC;
+    private static final int PHONE_BUTTON_SUBTLE_TEXT_COLOR = 0xFFCFD9E6;
+    private static final int PHONE_BUTTON_DISABLED_TEXT_COLOR = 0xFF7F8A97;
+    private static final int PHONE_BUTTON_SECONDARY_FILL = 0x6626303C;
+    private static final int PHONE_BUTTON_SECONDARY_HOVER_FILL = 0x88405A73;
+    private static final int PHONE_BUTTON_PRIMARY_FILL = 0xAA2A8FC1;
+    private static final int PHONE_BUTTON_PRIMARY_HOVER_FILL = 0xCC45B3E6;
+    private static final int PHONE_BUTTON_SELECTED_FILL = 0xAA46657E;
+    private static final int PHONE_BUTTON_SELECTED_HOVER_FILL = 0xAA5B7992;
+    private static final int PHONE_BUTTON_DISABLED_FILL = 0x44161D26;
+    private static final int PHONE_BUTTON_SECONDARY_BORDER = 0x88DCE8F5;
+    private static final int PHONE_BUTTON_PRIMARY_BORDER = 0xCCB8F0FF;
+    private static final int PHONE_BUTTON_SELECTED_BORDER = 0xCCE6F6FF;
+    private static final int PHONE_BUTTON_DISABLED_BORDER = 0x508896A5;
+    private static final int PHONE_BUTTON_HIGHLIGHT = 0x55FFFFFF;
+    private static final int PHONE_BUTTON_GHOST_HOVER = 0x22E6EEF7;
+    private static final int PHONE_BUTTON_GHOST_FOCUS = 0x66E6EEF7;
 
     protected AbstractPhoneScreen(Text title, Screen parent) {
         super(title);
@@ -46,6 +70,7 @@ public abstract class AbstractPhoneScreen extends Screen {
     @Override
     protected void init() {
         int margin = SCREEN_MARGIN;
+        phoneButtons.clear();
 
         // Keep the same visual baseline size as 3840x2054 @ GUI scale 4.
         int targetWidth = Math.max(1, Math.round(REFERENCE_GUI_WIDTH * (BASE_PHONE_WIDTH / REFERENCE_GUI_WIDTH)));
@@ -83,6 +108,7 @@ public abstract class AbstractPhoneScreen extends Screen {
         renderStatusBar(context);
         // Call the phone content render hook (subclasses should only draw text here).
         renderPhoneContent(context, mouseX, mouseY, delta);
+        renderStyledPhoneButtons(context, mouseX, mouseY);
 
         super.render(context, mouseX, mouseY, delta);
     }
@@ -216,5 +242,120 @@ public abstract class AbstractPhoneScreen extends Screen {
     @Override
     public boolean shouldPause() {
         return false;
+    }
+
+    protected ButtonWidget addPhoneButton(Text message, int x, int y, int width, int height, PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
+        ButtonWidget button = addDrawableChild(ButtonWidget.builder(message, onPress)
+                .dimensions(x, y, width, height)
+                .build());
+        button.setAlpha(0.0F);
+        phoneButtons.add(new PhoneButtonRenderData(button, message, x, y, width, height, variant, selectedSupplier));
+        return button;
+    }
+
+    protected void addPhoneButton(Text message, int x, int y, int width, int height, ButtonWidget.PressAction onPress) {
+        addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.SECONDARY, () -> false, onPress);
+    }
+
+    protected void addPhonePrimaryButton(Text message, int x, int y, int width, int height, ButtonWidget.PressAction onPress) {
+        addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.PRIMARY, () -> false, onPress);
+    }
+
+    protected ButtonWidget addPhoneGhostButton(Text message, int x, int y, int width, int height, ButtonWidget.PressAction onPress) {
+        return addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.GHOST, () -> false, onPress);
+    }
+
+    protected void addPhoneTabButton(Text message, int x, int y, int width, int height, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
+        addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.SECONDARY, selectedSupplier, onPress);
+    }
+
+    private void renderStyledPhoneButtons(DrawContext context, int mouseX, int mouseY) {
+        for (PhoneButtonRenderData data : phoneButtons) {
+            renderStyledPhoneButton(context, mouseX, mouseY, data);
+        }
+    }
+
+    private void renderStyledPhoneButton(DrawContext context, int mouseX, int mouseY, PhoneButtonRenderData data) {
+        ButtonWidget button = data.button();
+        int x = data.x();
+        int y = data.y();
+        int width = data.width();
+        int height = data.height();
+        int radius = Math.max(3, Math.min(height / 2, s(7)));
+        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        boolean focused = button.isFocused();
+        boolean selected = data.selectedSupplier().getAsBoolean();
+
+        if (data.variant() != PhoneButtonWidget.Variant.GHOST || hovered || focused || selected) {
+            int borderColor = getPhoneButtonBorderColor(data.variant(), button.active, selected, focused);
+            int fillColor = getPhoneButtonFillColor(data.variant(), button.active, hovered, selected, focused);
+            int borderThickness = focused ? 2 : 1;
+            RoundedRectRenderer.fillRoundedRect(context, x, y, width, height, radius, borderColor);
+            int innerX = x + borderThickness;
+            int innerY = y + borderThickness;
+            int innerWidth = Math.max(1, width - borderThickness * 2);
+            int innerHeight = Math.max(1, height - borderThickness * 2);
+            int innerRadius = Math.max(1, radius - borderThickness);
+            RoundedRectRenderer.fillRoundedRect(context, innerX, innerY, innerWidth, innerHeight, innerRadius, fillColor);
+
+            if (button.active && data.variant() != PhoneButtonWidget.Variant.GHOST) {
+                int highlightHeight = Math.max(1, height / 5);
+                RoundedRectRenderer.fillRoundedRect(context, innerX, innerY, innerWidth, highlightHeight, Math.max(1, innerRadius - 1), PHONE_BUTTON_HIGHLIGHT);
+            }
+        }
+
+        String label = data.message().getString();
+        if (!label.isBlank()) {
+            int textColor = getPhoneButtonTextColor(data.variant(), button.active, selected);
+            int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
+            context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, textColor);
+        }
+    }
+
+    private int getPhoneButtonFillColor(PhoneButtonWidget.Variant variant, boolean active, boolean hovered, boolean selected, boolean focused) {
+        if (!active) {
+            return PHONE_BUTTON_DISABLED_FILL;
+        }
+        if (variant == PhoneButtonWidget.Variant.GHOST) {
+            if (selected || focused) {
+                return PHONE_BUTTON_GHOST_FOCUS;
+            }
+            return hovered ? PHONE_BUTTON_GHOST_HOVER : 0x00000000;
+        }
+        if (selected) {
+            return hovered ? PHONE_BUTTON_SELECTED_HOVER_FILL : PHONE_BUTTON_SELECTED_FILL;
+        }
+        if (variant == PhoneButtonWidget.Variant.PRIMARY) {
+            return hovered ? PHONE_BUTTON_PRIMARY_HOVER_FILL : PHONE_BUTTON_PRIMARY_FILL;
+        }
+        return hovered ? PHONE_BUTTON_SECONDARY_HOVER_FILL : PHONE_BUTTON_SECONDARY_FILL;
+    }
+
+    private int getPhoneButtonBorderColor(PhoneButtonWidget.Variant variant, boolean active, boolean selected, boolean focused) {
+        if (!active) {
+            return PHONE_BUTTON_DISABLED_BORDER;
+        }
+        if (variant == PhoneButtonWidget.Variant.GHOST) {
+            return (selected || focused) ? PHONE_BUTTON_GHOST_FOCUS : PHONE_BUTTON_GHOST_HOVER;
+        }
+        if (selected) {
+            return PHONE_BUTTON_SELECTED_BORDER;
+        }
+        return variant == PhoneButtonWidget.Variant.PRIMARY ? PHONE_BUTTON_PRIMARY_BORDER : PHONE_BUTTON_SECONDARY_BORDER;
+    }
+
+    private int getPhoneButtonTextColor(PhoneButtonWidget.Variant variant, boolean active, boolean selected) {
+        if (!active) {
+            return PHONE_BUTTON_DISABLED_TEXT_COLOR;
+        }
+        if (selected || variant == PhoneButtonWidget.Variant.PRIMARY) {
+            return PHONE_BUTTON_TEXT_COLOR;
+        }
+        return PHONE_BUTTON_SUBTLE_TEXT_COLOR;
+    }
+
+
+    private record PhoneButtonRenderData(ButtonWidget button, Text message, int x, int y, int width, int height,
+                                         PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier) {
     }
 }

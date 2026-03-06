@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.ModItem;
 
 import com.zcpu.tzzmod.ModItem.custom.PhoneItem;
+import com.zcpu.tzzmod.ModItem.custom.TaskConfiguratorItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.registry.RegistryKey;
@@ -29,6 +30,7 @@ public final class ModItems {
     public static final Item PURPLE_BLOCKING_CARD = register("purple_blocking_card", com.zcpu.tzzmod.ModItem.custom.BlockingCardItem::new, new Item.Settings().maxCount(64));
     public static final Item MAGENTA_BLOCKING_CARD = register("magenta_blocking_card", com.zcpu.tzzmod.ModItem.custom.BlockingCardItem::new, new Item.Settings().maxCount(64));
     public static final Item PINK_BLOCKING_CARD = register("pink_blocking_card", com.zcpu.tzzmod.ModItem.custom.BlockingCardItem::new, new Item.Settings().maxCount(64));
+    public static final Item TASK_CONFIGURATOR = register("task_configurator", TaskConfiguratorItem::new, new Item.Settings().maxCount(1));
 
     public static Item register(String path, Function<Item.Settings, Item> factory, Item.Settings settings) {
         final RegistryKey<Item> registryKey = RegistryKey.of(RegistryKeys.ITEM, Identifier.of("tzz_mod", path));

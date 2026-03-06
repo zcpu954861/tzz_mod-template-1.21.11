@@ -1,4 +1,4 @@
-package com.zcpu.tzzmod.client.phone.chat;
+package com.zcpu.tzzmod.client.task;
 
 import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
@@ -8,8 +8,8 @@ import net.minecraft.text.Text;
 
 import java.util.List;
 
-public final class PhoneChatHudOverlay {
-    private PhoneChatHudOverlay() {
+public final class TaskHudOverlay {
+    private TaskHudOverlay() {
     }
 
     public static void render(DrawContext context) {
@@ -22,12 +22,12 @@ public final class PhoneChatHudOverlay {
         }
 
         long now = System.currentTimeMillis();
-        long expiresAt = PhoneChatClient.getUnreadNotificationExpireAtMs();
+        long expiresAt = TaskClient.getUnreadNotificationExpireAtMs();
         if (expiresAt <= now) {
             return;
         }
 
-        List<PhoneChatClient.UnreadEntry> unreadEntries = PhoneChatClient.getUnreadEntries();
+        List<TaskClient.UnreadEntry> unreadEntries = TaskClient.getUnreadEntries();
         if (unreadEntries.isEmpty()) {
             return;
         }
@@ -36,19 +36,19 @@ public final class PhoneChatHudOverlay {
         int hiddenRows = Math.max(0, unreadEntries.size() - maxRows);
         int shownRows = Math.min(maxRows, unreadEntries.size());
 
-        String title = Text.translatable("phone.tzz_mod.chat.popup.title", unreadEntries.size()).getString();
+        String title = Text.translatable("phone.tzz_mod.task.popup.title", unreadEntries.size()).getString();
         int width = Math.max(200, client.textRenderer.getWidth(title) + 22);
 
         for (int i = 0; i < shownRows; i++) {
-            PhoneChatClient.UnreadEntry entry = unreadEntries.get(i);
+            TaskClient.UnreadEntry entry = unreadEntries.get(i);
             String line = entry.count() > 1
-                    ? Text.translatable("phone.tzz_mod.chat.popup.line_count", entry.title(), entry.count()).getString()
-                    : Text.translatable("phone.tzz_mod.chat.popup.line_single", entry.title()).getString();
+                    ? Text.translatable("phone.tzz_mod.task.popup.line_count", entry.title(), entry.count()).getString()
+                    : Text.translatable("phone.tzz_mod.task.popup.line_single", entry.title()).getString();
             width = Math.max(width, client.textRenderer.getWidth(line) + 22);
         }
 
         if (hiddenRows > 0) {
-            String more = Text.translatable("phone.tzz_mod.chat.popup.more", hiddenRows).getString();
+            String more = Text.translatable("phone.tzz_mod.task.popup.more", hiddenRows).getString();
             width = Math.max(width, client.textRenderer.getWidth(more) + 22);
         }
 
@@ -67,18 +67,17 @@ public final class PhoneChatHudOverlay {
         drawY += lineHeight;
 
         for (int i = 0; i < shownRows; i++) {
-            PhoneChatClient.UnreadEntry entry = unreadEntries.get(i);
+            TaskClient.UnreadEntry entry = unreadEntries.get(i);
             String line = entry.count() > 1
-                    ? Text.translatable("phone.tzz_mod.chat.popup.line_count", entry.title(), entry.count()).getString()
-                    : Text.translatable("phone.tzz_mod.chat.popup.line_single", entry.title()).getString();
+                    ? Text.translatable("phone.tzz_mod.task.popup.line_count", entry.title(), entry.count()).getString()
+                    : Text.translatable("phone.tzz_mod.task.popup.line_single", entry.title()).getString();
             context.drawTextWithShadow(client.textRenderer, line, x + 10, drawY, 0xFFE9EBF1);
             drawY += lineHeight;
         }
 
         if (hiddenRows > 0) {
-            String more = Text.translatable("phone.tzz_mod.chat.popup.more", hiddenRows).getString();
+            String more = Text.translatable("phone.tzz_mod.task.popup.more", hiddenRows).getString();
             context.drawTextWithShadow(client.textRenderer, more, x + 10, drawY, 0xFFD3D8E6);
         }
     }
 }
-

@@ -3,9 +3,8 @@ package com.zcpu.tzzmod.client.phone.ui;
 import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
+import com.zcpu.tzzmod.client.task.TaskClient;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -46,8 +45,10 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         // 当按 spacingX 可用后，可能会有剩余像素；把整体图标组在内容区居中
         int totalGroupWidth = iconSize * MAX_COLUMNS + spacingX * (MAX_COLUMNS + 1);
         int extraOffset = Math.max(0, (contentWidth - totalGroupWidth) / 2);
-        int startY = contentY + s(30);
-        int rowHeight = Math.min(s(58), (contentHeight - s(70)) / MAX_ROWS);
+        // ensure labels under icons have space: compute minimal row height to fit icon + label
+        int labelHeight = Math.max(1, textRenderer.fontHeight);
+        int rowHeight = Math.max(Math.min(s(58), (contentHeight - s(70)) / MAX_ROWS), iconSize + labelHeight + s(8));
+        int startY = contentY + s(20); // bring icons a bit lower so title and first-row labels are visible
 
         for (int index = 0; index < visibleCount; index++) {
             PhoneAppEntry entry = entries.get(index);
@@ -59,14 +60,11 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             AppSlot slot = new AppSlot(entry, x, y, iconSize);
             appSlots.add(slot);
 
-            ClickableWidget widget = addDrawableChild(ButtonWidget.builder(Text.empty(), button -> {
-                        if (client != null) {
-                            client.setScreen(slot.entry.rootScreenFactory().apply(this));
-                        }
-                    })
-                    .dimensions(x, y, iconSize, iconSize)
-                    .build());
-            widget.setAlpha(0.0F);
+            addPhoneGhostButton(Text.empty(), x, y, iconSize, iconSize, button -> {
+                if (client != null) {
+                    client.setScreen(slot.entry.rootScreenFactory().apply(this));
+                }
+            });
         }
     }
 
@@ -75,6 +73,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
 
         int chatUnread = PhoneChatClient.getTotalUnreadCount();
+        int taskUnread = TaskClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
             // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
@@ -89,8 +88,28 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 context.drawCenteredTextWithShadow(textRenderer, Text.literal("?"), slot.x + slot.size / 2, slot.y + slot.size / 2 - s(4), 0xFF1A1A1A);
             }
 
+            // Special overlay: if this is call_admin and it's cooling down, draw a small lock badge
+            if ("call_admin".equals(slot.entry.id()) && com.zcpu.tzzmod.client.phone.PhoneCallAdminClient.isCoolingDown()) {
+                int badgeW = s(14);
+                int badgeX = slot.x + slot.size - badgeW - s(2);
+                int badgeY = slot.y + slot.size - badgeW - s(2);
+                // dark rounded background
+                RoundedRectRenderer.fillRoundedRect(context, badgeX, badgeY, badgeW, badgeW, s(3), 0xCC000000);
+                // draw a simple lock shape (rect + shackle)
+                int lockW = badgeW - s(6);
+                int lockH = badgeW - s(8);
+                int lx = badgeX + (badgeW - lockW) / 2;
+                int ly = badgeY + (badgeW - lockH) / 2 + s(1);
+                context.fill(lx, ly, lx + lockW, ly + lockH, 0xFFFFFFFF);
+                context.fill(lx + s(1), ly - s(3), lx + lockW - s(1), ly, 0xFFFFFFFF);
+            }
+
             if ("chat".equals(slot.entry.id()) && chatUnread > 0) {
                 renderChatBadge(context, slot, chatUnread);
+            }
+
+            if ("task".equals(slot.entry.id()) && taskUnread > 0) {
+                renderChatBadge(context, slot, taskUnread);
             }
 
             String appName = slot.entry.name().getString();
@@ -131,8 +150,5 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
     }
 
     private record AppSlot(PhoneAppEntry entry, int x, int y, int size) {
-        private boolean contains(double mouseX, double mouseY) {
-            return mouseX >= x && mouseX <= x + size && mouseY >= y && mouseY <= y + size;
-        }
     }
 }

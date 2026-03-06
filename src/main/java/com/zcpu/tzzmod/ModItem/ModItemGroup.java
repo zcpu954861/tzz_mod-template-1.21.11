@@ -16,6 +16,7 @@ public final class ModItemGroup {
             .entries((displayContext, entries) -> {
                 entries.add(ModItems.PHONE);
                 entries.add(ModItems.ATTENTION);
+                entries.add(ModItems.TASK_CONFIGURATOR);
                 entries.add(ModBlocks.SPLIT_IRON_DOOR);
                 entries.add(ModItems.WHITE_BLOCKING_CARD);
                 entries.add(ModItems.LIGHT_GRAY_BLOCKING_CARD);

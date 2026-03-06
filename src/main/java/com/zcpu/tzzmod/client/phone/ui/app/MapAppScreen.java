@@ -4,7 +4,6 @@ import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
@@ -20,14 +19,9 @@ public class MapAppScreen extends AbstractPhoneScreen {
         super.init();
 
         int buttonY = contentY + contentHeight - s(24);
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.back"), button -> close())
-                .dimensions(contentX, buttonY, s(72), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, buttonY, s(72), s(20), button -> close());
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.open_subpage"),
-                        button -> client.setScreen(new MapAppDetailScreen(this, MAP_TEXTURE)))
-                .dimensions(contentX + contentWidth - s(120), buttonY, s(120), s(20))
-                .build());
+        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.open_subpage"), contentX + contentWidth - s(120), buttonY, s(120), s(20), button -> client.setScreen(new MapAppDetailScreen(this, MAP_TEXTURE)));
     }
 
     @Override

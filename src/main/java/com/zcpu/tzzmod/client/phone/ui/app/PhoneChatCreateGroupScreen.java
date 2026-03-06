@@ -4,7 +4,6 @@ import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
@@ -23,13 +22,9 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
     protected void init() {
         super.init();
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.back"), button -> close())
-                .dimensions(contentX, contentY + contentHeight - s(24), s(72), s(20))
-                .build());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(72), s(20), button -> close());
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("phone.tzz_mod.chat.create"), button -> createGroup())
-                .dimensions(contentX + contentWidth - s(82), contentY + contentHeight - s(24), s(82), s(20))
-                .build());
+        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.create"), contentX + contentWidth - s(82), contentY + contentHeight - s(24), s(82), s(20), button -> createGroup());
 
         nameField = new TextFieldWidget(textRenderer, contentX, contentY + s(28), contentWidth, s(20), Text.empty());
         nameField.setPlaceholder(Text.translatable("phone.tzz_mod.chat.group_name"));
