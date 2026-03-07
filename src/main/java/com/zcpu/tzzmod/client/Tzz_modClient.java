@@ -40,9 +40,14 @@ public class Tzz_modClient implements ClientModInitializer {
 
         // register client-side death status receiver
         com.zcpu.tzzmod.client.DeathSyncClient.register();
+        com.zcpu.tzzmod.client.AdminSyncClient.register();
+        com.zcpu.tzzmod.client.ForcedHudClient.register();
         com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.register();
         TaskClient.register();
         HudRenderCallback.EVENT.register((context, tickCounter) -> {
+            // render the player's head and ID in the top-left
+            com.zcpu.tzzmod.client.PlayerHeadHudOverlay.render(context);
+
             PhoneChatHudOverlay.render(context);
             TaskHudOverlay.render(context);
             AlertSubtitleOverlay.render(context);

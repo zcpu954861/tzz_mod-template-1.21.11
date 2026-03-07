@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.client.phone.ui.app.PhoneCallAdminScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneTaskAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneSettingsAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.CompassAppScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PhoneAdminAppScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -23,6 +24,7 @@ public final class PhoneAppRegistry {
     private static final Identifier TASK_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/task.png");
     private static final Identifier SETTINGS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/settings.png");
     private static final Identifier COMPASS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/compass.png");
+    private static final Identifier ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/admin.png");
 
     private PhoneAppRegistry() {
     }
@@ -30,6 +32,14 @@ public final class PhoneAppRegistry {
     public static List<PhoneAppEntry> getAppEntries() {
         MinecraftClient client = MinecraftClient.getInstance();
         Map<String, Identifier> iconOverrides = PhoneCustomization.resolveAppIconOverrides(client.getResourceManager());
+
+        // If connected to a remote server, request bootstrap to receive server-provided app state (including isOp)
+        try {
+            if (client != null && client.getNetworkHandler() != null) {
+                com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.requestBootstrap();
+            }
+        } catch (Throwable ignored) {
+        }
 
         List<PhoneAppEntry> entries = new ArrayList<>();
         entries.add(new PhoneAppEntry(
@@ -77,6 +87,19 @@ public final class PhoneAppRegistry {
                 iconOverrides.getOrDefault("compass", COMPASS_ICON),
                 CompassAppScreen::new
         ));
+
+        // Admin app (OP only)
+        try {
+            if (PhoneChatClient.isOp()) {
+                entries.add(new PhoneAppEntry(
+                        "admin",
+                        Text.translatable("phone.tzz_mod.app.admin"),
+                        iconOverrides.getOrDefault("admin", ADMIN_ICON),
+                        PhoneAdminAppScreen::new
+                ));
+            }
+        } catch (Throwable ignored) {
+        }
 
         return entries;
     }

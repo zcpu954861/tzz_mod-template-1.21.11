@@ -1,0 +1,23 @@
+{
+  "variants": {
+    "half=lower,open=false,facing=north": { "model": "tzz_mod:block/catcher_chest_lower_closed", "y": 270 },
+    "half=lower,open=false,facing=east":  { "model": "tzz_mod:block/catcher_chest_lower_closed", "y": 0 },
+    "half=lower,open=false,facing=south": { "model": "tzz_mod:block/catcher_chest_lower_closed", "y": 90 },
+    "half=lower,open=false,facing=west":  { "model": "tzz_mod:block/catcher_chest_lower_closed", "y": 180 },
+
+    "half=lower,open=true,facing=north": { "model": "tzz_mod:block/catcher_chest_lower_open", "y": 270 },
+    "half=lower,open=true,facing=east":  { "model": "tzz_mod:block/catcher_chest_lower_open", "y": 0 },
+    "half=lower,open=true,facing=south": { "model": "tzz_mod:block/catcher_chest_lower_open", "y": 90 },
+    "half=lower,open=true,facing=west":  { "model": "tzz_mod:block/catcher_chest_lower_open", "y": 180 },
+
+    "half=upper,open=false,facing=north": { "model": "tzz_mod:block/catcher_chest_upper_closed", "y": 270 },
+    "half=upper,open=false,facing=east":  { "model": "tzz_mod:block/catcher_chest_upper_closed", "y": 0 },
+    "half=upper,open=false,facing=south": { "model": "tzz_mod:block/catcher_chest_upper_closed", "y": 90 },
+    "half=upper,open=false,facing=west":  { "model": "tzz_mod:block/catcher_chest_upper_closed", "y": 180 },
+
+    "half=upper,open=true,facing=north": { "model": "tzz_mod:block/catcher_chest_upper_open", "y": 270 },
+    "half=upper,open=true,facing=east":  { "model": "tzz_mod:block/catcher_chest_upper_open", "y": 0 },
+    "half=upper,open=true,facing=south": { "model": "tzz_mod:block/catcher_chest_upper_open", "y": 90 },
+    "half=upper,open=true,facing=west":  { "model": "tzz_mod:block/catcher_chest_upper_open", "y": 180 }
+  }
+}

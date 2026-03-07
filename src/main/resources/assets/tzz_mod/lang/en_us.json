@@ -60,7 +60,6 @@
   "phone.tzz_mod.task.config.invalid_index": "Invalid line name or index",
   "phone.tzz_mod.task.config.saved": "Saved request sent",
   "phone.tzz_mod.task.details": "Details",
-
   "phone.tzz_mod.task.popup.title": "%s lines have triggered tasks",
   "phone.tzz_mod.task.popup.line_single": "%s: new task",
   "phone.tzz_mod.task.popup.line_count": "%s: %s new tasks",
@@ -87,5 +86,9 @@
   "phone.tzz_mod.direction.south": "South",
   "phone.tzz_mod.direction.southwest": "Southwest",
   "phone.tzz_mod.direction.west": "West",
-  "phone.tzz_mod.direction.northwest": "Northwest"
+  "phone.tzz_mod.direction.northwest": "Northwest",
+  "item.tzz_mod.catcher_chest": "Catcher Chest",
+  "phone.tzz_mod.app.admin": "Admin Options",
+  "phone.tzz_mod.admin.record_mode": "Recording Mode",
+  "phone.tzz_mod.admin.record_mode.subtitle": "When enabled: the server forces all players to show the head+ID overlay at top-left; when disabled local HUD settings are respected."
 }

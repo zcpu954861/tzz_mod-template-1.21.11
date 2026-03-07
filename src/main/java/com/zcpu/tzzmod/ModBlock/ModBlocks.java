@@ -1,6 +1,6 @@
 package com.zcpu.tzzmod.ModBlock;
 
-import com.zcpu.tzzmod.ModBlock.custom.SplitIronDoorBlock;
+import com.zcpu.tzzmod.ModBlock.custom.CatcherChestBlock;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.Tzz_mod;
 import net.minecraft.block.AbstractBlock;
@@ -16,10 +16,11 @@ import net.minecraft.util.Identifier;
 import java.util.function.Function;
 
 public class ModBlocks {
-    public static final Block SPLIT_IRON_DOOR = registerBlock(
-            "split_iron_door",
-            SplitIronDoorBlock::new,
-            AbstractBlock.Settings.copy(Blocks.IRON_DOOR).nonOpaque()
+
+    public static final Block CATCHER_CHEST = registerBlock(
+            "catcher_chest",
+            CatcherChestBlock::new,
+            AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).nonOpaque()
     );
 
     /**

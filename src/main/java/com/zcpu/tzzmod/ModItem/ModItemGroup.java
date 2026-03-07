@@ -17,7 +17,6 @@ public final class ModItemGroup {
                 entries.add(ModItems.PHONE);
                 entries.add(ModItems.ATTENTION);
                 entries.add(ModItems.TASK_CONFIGURATOR);
-                entries.add(ModBlocks.SPLIT_IRON_DOOR);
                 entries.add(ModItems.WHITE_BLOCKING_CARD);
                 entries.add(ModItems.LIGHT_GRAY_BLOCKING_CARD);
                 entries.add(ModItems.GRAY_BLOCKING_CARD);
@@ -34,6 +33,7 @@ public final class ModItemGroup {
                 entries.add(ModItems.PURPLE_BLOCKING_CARD);
                 entries.add(ModItems.MAGENTA_BLOCKING_CARD);
                 entries.add(ModItems.PINK_BLOCKING_CARD);
+                entries.add(ModBlocks.CATCHER_CHEST);
             })
             .build();
 
