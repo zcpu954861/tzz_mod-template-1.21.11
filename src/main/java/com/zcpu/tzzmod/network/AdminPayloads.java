@@ -11,4 +11,3 @@ public final class AdminPayloads {
         PayloadTypeRegistry.playS2C().register(AdminModePayload.ID, AdminModePayload.CODEC);
     }
 }
-

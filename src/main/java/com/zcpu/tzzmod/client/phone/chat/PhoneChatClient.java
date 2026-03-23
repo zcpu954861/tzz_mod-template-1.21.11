@@ -161,6 +161,10 @@ public final class PhoneChatClient {
         send("bootstrap", new JsonObject());
     }
 
+    public static void requestWhoAmI() {
+        send("whoami", new JsonObject());
+    }
+
     public static void requestHistory(String type, String targetId) {
         JsonObject body = new JsonObject();
         body.addProperty("type", type);
@@ -315,6 +319,13 @@ public final class PhoneChatClient {
 
         selfUuid = getString(body, "selfUuid");
         isOp = getBoolean(body, "isOp", false);
+        // apply apps visibility mapping if server included it in bootstrap
+        try {
+            if (body.has("apps") && body.get("apps").isJsonObject()) {
+                com.zcpu.tzzmod.client.phone.PhoneAppsClient.apply(body.getAsJsonObject("apps"));
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void pruneStaleGroupConversationState() {
@@ -465,6 +476,10 @@ public final class PhoneChatClient {
 
     private static void showError(MinecraftClient client, JsonObject body) {
         String message = getString(body, "message");
+        // Suppress the known benign server-side message when client probes 'whoami'
+        if (message != null && message.contains("Unknown chat action: whoami")) {
+            return;
+        }
         if (client.player != null && !message.isBlank()) {
             client.player.sendMessage(Text.literal("[Phone Chat] " + message), false);
         }

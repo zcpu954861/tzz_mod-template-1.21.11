@@ -33,72 +33,30 @@ public final class PhoneAppRegistry {
         MinecraftClient client = MinecraftClient.getInstance();
         Map<String, Identifier> iconOverrides = PhoneCustomization.resolveAppIconOverrides(client.getResourceManager());
 
-        // If connected to a remote server, request bootstrap to receive server-provided app state (including isOp)
-        try {
-            if (client != null && client.getNetworkHandler() != null) {
-                com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.requestBootstrap();
-            }
-        } catch (Throwable ignored) {
-        }
+        // Do not request bootstrap from here (this method is called frequently by the UI).
+        // PhoneHomeScreen will request bootstrap when opened to keep network traffic bounded.
+
+        // canonical list (ordered)
+        List<PhoneAppEntry> canonical = new ArrayList<>();
+        canonical.add(new PhoneAppEntry("map", Text.translatable("phone.tzz_mod.app.map"), iconOverrides.getOrDefault("map", MAP_ICON), MapAppScreen::new));
+        canonical.add(new PhoneAppEntry("settings", Text.translatable("phone.tzz_mod.app.settings"), iconOverrides.getOrDefault("settings", SETTINGS_ICON), PhoneSettingsAppScreen::new));
+        canonical.add(new PhoneAppEntry("chat", Text.translatable("phone.tzz_mod.app.chat"), iconOverrides.getOrDefault("chat", CHAT_ICON), PhoneChatAppScreen::new));
+        canonical.add(new PhoneAppEntry("task", Text.translatable("phone.tzz_mod.app.task"), iconOverrides.getOrDefault("task", TASK_ICON), PhoneTaskAppScreen::new));
+        canonical.add(new PhoneAppEntry("call_admin", Text.translatable("phone.tzz_mod.app.call_admin"), iconOverrides.getOrDefault("call_admin", CALL_ADMIN_ICON), PhoneCallAdminScreen::new));
+        canonical.add(new PhoneAppEntry("compass", Text.translatable("phone.tzz_mod.app.compass"), iconOverrides.getOrDefault("compass", COMPASS_ICON), CompassAppScreen::new));
+        canonical.add(new PhoneAppEntry("admin", Text.translatable("phone.tzz_mod.app.admin"), iconOverrides.getOrDefault("admin", ADMIN_ICON), PhoneAdminAppScreen::new));
 
         List<PhoneAppEntry> entries = new ArrayList<>();
-        entries.add(new PhoneAppEntry(
-                "map",
-                Text.translatable("phone.tzz_mod.app.map"),
-                iconOverrides.getOrDefault("map", MAP_ICON),
-                MapAppScreen::new
-        ));
-
-        // Settings app (always available)
-        entries.add(new PhoneAppEntry(
-                "settings",
-                Text.translatable("phone.tzz_mod.app.settings"),
-                iconOverrides.getOrDefault("settings", SETTINGS_ICON),
-                PhoneSettingsAppScreen::new
-        ));
-
-        if (PhoneChatClient.isEnabled()) {
-            entries.add(new PhoneAppEntry(
-                    "chat",
-                    Text.translatable("phone.tzz_mod.app.chat"),
-                    iconOverrides.getOrDefault("chat", CHAT_ICON),
-                    PhoneChatAppScreen::new
-            ));
-        }
-
-        entries.add(new PhoneAppEntry(
-                "task",
-                Text.translatable("phone.tzz_mod.app.task"),
-                iconOverrides.getOrDefault("task", TASK_ICON),
-                PhoneTaskAppScreen::new
-        ));
-
-        // Call Admin app (always available)
-        entries.add(new PhoneAppEntry(
-                "call_admin",
-                Text.translatable("phone.tzz_mod.app.call_admin"),
-                iconOverrides.getOrDefault("call_admin", CALL_ADMIN_ICON),
-                PhoneCallAdminScreen::new
-        ));
-
-        entries.add(new PhoneAppEntry(
-                "compass",
-                Text.translatable("phone.tzz_mod.app.compass"),
-                iconOverrides.getOrDefault("compass", COMPASS_ICON),
-                CompassAppScreen::new
-        ));
-
-        // Admin app (OP only)
-        try {
-            if (PhoneChatClient.isOp()) {
-                entries.add(new PhoneAppEntry(
-                        "admin",
-                        Text.translatable("phone.tzz_mod.app.admin"),
-                        iconOverrides.getOrDefault("admin", ADMIN_ICON),
-                        PhoneAdminAppScreen::new
-                ));
+        for (PhoneAppEntry e : canonical) {
+            String vis = com.zcpu.tzzmod.client.phone.PhoneAppsClient.getVisibility(e.id());
+            boolean allowed;
+            switch (vis) {
+                case "true" -> allowed = true;
+                case "false" -> allowed = false;
+                case "op" -> allowed = PhoneChatClient.isOp();
+                default -> allowed = true;
             }
-        } catch (Throwable ignored) {
+            if (allowed) entries.add(e);
         }
 
         return entries;

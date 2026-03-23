@@ -17,15 +17,145 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
     private final List<AppSlot> appSlots = new ArrayList<>();
 
+    // listener to refresh apps when server bootstrap/app_state arrives
+    private Runnable bootstrapListener = null;
+    private boolean waitingForBootstrap = false;
+    // persistent listener while phone open to react to dynamic state changes (isOp/apps)
+    private Runnable stateListener = null;
+    // when true, init() should not request bootstrap (used by refresh to rebuild UI without network calls)
+    private boolean suppressBootstrapOnInit = false;
+    // debounce to avoid frequent UI rebuilds
+    private volatile long lastRefreshMs = 0L;
+
     public PhoneHomeScreen() {
         super(Text.translatable("phone.tzz_mod.home"), null);
+    }
+
+    /**
+     * Create a PhoneHomeScreen which can optionally skip requesting bootstrap during init.
+     * This is used when we want to immediately rebuild the UI from cached state (no network round-trip).
+     */
+    public PhoneHomeScreen(boolean suppressBootstrap) {
+        this();
+        this.suppressBootstrapOnInit = suppressBootstrap;
     }
 
     @Override
     protected void init() {
         super.init();
+        // If connected to a remote server, request bootstrap and wait for server response before building apps.
+        // This ensures we use up-to-date OP status and app visibility (handles OP being revoked mid-session).
         appSlots.clear();
+        // honor suppress flag
+        if (suppressBootstrapOnInit) {
+            suppressBootstrapOnInit = false;
+            waitingForBootstrap = false;
+            buildAppSlots();
+            return;
+        }
+        try {
+            if (client != null && client.getNetworkHandler() != null) {
+                waitingForBootstrap = true;
+                // request quick whoami to update OP status asap, and bootstrap for full app state
+                PhoneChatClient.requestWhoAmI();
+                PhoneChatClient.requestBootstrap();
+                // register a one-time listener to refresh the app list when server responds
+                if (bootstrapListener == null) {
+                    bootstrapListener = () -> {
+                        try {
+                            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+                            if (mc != null) {
+                                mc.execute(() -> {
+                                    if (mc.currentScreen instanceof PhoneHomeScreen) {
+                                        ((PhoneHomeScreen) mc.currentScreen).onBootstrapArrived();
+                                    }
+                                });
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    };
+                    PhoneChatClient.addListener(bootstrapListener);
+                }
+                // register a persistent state listener to react to any server-provided state changes
+                if (stateListener == null) {
+                    stateListener = () -> {
+                        try {
+                            long now = System.currentTimeMillis();
+                            if (now - lastRefreshMs < 150L) {
+                                return; // debounce: ignore too-frequent updates
+                            }
+                            lastRefreshMs = now;
 
+                            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+                            if (mc != null) {
+                                mc.execute(() -> {
+                                    if (mc.currentScreen instanceof PhoneHomeScreen) {
+                                        ((PhoneHomeScreen) mc.currentScreen).refreshApps();
+                                    }
+                                });
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    };
+                    PhoneChatClient.addListener(stateListener);
+                }
+                // do not build slots now; onBootstrapArrived() will call refreshApps()
+            } else {
+                // singleplayer or offline: build immediately
+                waitingForBootstrap = false;
+                buildAppSlots();
+            }
+        } catch (Throwable ignored) {
+            waitingForBootstrap = false;
+            buildAppSlots();
+        }
+    }
+
+    private void onBootstrapArrived() {
+        try {
+            waitingForBootstrap = false;
+            refreshApps();
+        } finally {
+            // remove listener after first use
+            try {
+                if (bootstrapListener != null) {
+                    PhoneChatClient.removeListener(bootstrapListener);
+                    bootstrapListener = null;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        super.close();
+        // clean up listener to avoid leaking
+        try {
+            if (bootstrapListener != null) {
+                PhoneChatClient.removeListener(bootstrapListener);
+                bootstrapListener = null;
+            }
+            if (stateListener != null) {
+                PhoneChatClient.removeListener(stateListener);
+                stateListener = null;
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    // Helper used to rebuild the displayed app slots (keeps same layout logic)
+    private void refreshApps() {
+        try {
+            // Recreate the screen so all previous widget instances are removed and layout is rebuilt
+            if (client != null) {
+                client.setScreen(new PhoneHomeScreen(true));
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void buildAppSlots() {
         List<PhoneAppEntry> entries = PhoneAppRegistry.getAppEntries();
         int visibleCount = Math.min(MAX_APPS, entries.size());
 

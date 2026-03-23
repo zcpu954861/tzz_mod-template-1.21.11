@@ -41,8 +41,6 @@ public class PhoneAdminAppScreen extends AbstractPhoneScreen {
         // initialize from client-side forced flag
         knobTarget = ForcedHudClient.isForceShowHead();
         knobProgress = knobTarget ? 1.0f : 0.0f;
-
-        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(70), s(20), button -> close());
     }
 
     @Override

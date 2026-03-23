@@ -53,6 +53,13 @@ public final class PhoneChatService {
 
         result.addProperty("selfUuid", player.getUuidAsString());
         result.addProperty("isOp", player.isCreativeLevelTwoOp());
+        // include app visibility map so clients get server-side visibility on bootstrap
+        com.zcpu.tzzmod.phone.PhoneAppsConfig appsConfig = com.zcpu.tzzmod.phone.PhoneAppsConfig.get(server);
+        JsonObject apps = new JsonObject();
+        for (Map.Entry<String, String> e : appsConfig.apps.entrySet()) {
+            apps.addProperty(e.getKey(), e.getValue());
+        }
+        result.add("apps", apps);
         return result;
     }
 

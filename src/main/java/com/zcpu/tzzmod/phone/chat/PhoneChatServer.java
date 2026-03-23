@@ -58,6 +58,7 @@ public final class PhoneChatServer {
         JsonObject body = parse(payload.bodyJson());
         switch (payload.action()) {
             case "bootstrap" -> handleBootstrap(server, player);
+            case "whoami" -> handleWhoAmI(server, player);
             case "open" -> handleOpenConversation(server, player, body);
             case "send_direct" -> handleSendDirect(server, player, body, config);
             case "send_group" -> handleSendGroup(server, player, body, config);
@@ -372,5 +373,11 @@ public final class PhoneChatServer {
             return "";
         }
         return raw;
+    }
+
+    private static void handleWhoAmI(MinecraftServer server, ServerPlayerEntity player) {
+        JsonObject body = new JsonObject();
+        body.addProperty("isOp", player.isCreativeLevelTwoOp());
+        PhoneChatService.sendResponse(player, "whoami", body);
     }
 }

@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.ModBlock;
 
 import com.zcpu.tzzmod.ModBlock.custom.CatcherChestBlock;
+import com.zcpu.tzzmod.ModBlock.custom.PasswordMachineBlock;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.Tzz_mod;
 import net.minecraft.block.AbstractBlock;
@@ -21,6 +22,12 @@ public class ModBlocks {
             "catcher_chest",
             CatcherChestBlock::new,
             AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).nonOpaque()
+    );
+
+    public static final Block PASSWORD_MACHINE = registerBlock(
+            "password_machine",
+            PasswordMachineBlock::new,
+            AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
     );
 
     /**

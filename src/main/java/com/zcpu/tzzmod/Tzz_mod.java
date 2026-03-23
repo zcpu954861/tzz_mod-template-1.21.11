@@ -2,6 +2,7 @@ package com.zcpu.tzzmod;
 
 import com.zcpu.tzzmod.ModItem.ModItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItems;
+import com.zcpu.tzzmod.ModBlock.ModBlockEntities;
 import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.AdminPayloads;
@@ -12,8 +13,11 @@ import com.zcpu.tzzmod.command.TaskCommand;
 import com.zcpu.tzzmod.network.TaskPayloads;
 import com.zcpu.tzzmod.task.TaskServer;
 import com.zcpu.tzzmod.network.AdminSyncServer;
+import com.zcpu.tzzmod.network.PasswordPayloads;
+import com.zcpu.tzzmod.password.PasswordServer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +42,7 @@ public class Tzz_mod implements ModInitializer {
 		ModItemGroup.inialize();
 		// Ensure blocks are registered by forcing ModBlocks static initialization
 		ModBlocks.init();
+		ModBlockEntities.init();
 
 		DeathStatusPayload.register();
 		DeathSyncServer.register();
@@ -45,14 +50,27 @@ public class Tzz_mod implements ModInitializer {
 		PhoneChatServer.register();
 		TaskPayloads.register();
 		TaskServer.register();
+		PasswordPayloads.register();
+		PasswordServer.register();
 
 		AdminPayloads.register();
 		AdminSyncServer.register();
+		// ensure death spectator payloads are registered via AdminPayloads
+
+		// Ensure phone apps config file exists when the server starts (writes defaults if missing)
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			try {
+				com.zcpu.tzzmod.phone.PhoneAppsConfig.get(server);
+			} catch (Throwable t) {
+				LOGGER.warn("Failed to initialize phone apps config: {}", t.getMessage());
+			}
+		});
 
 		// Register server commands
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SendMsgCommand.register(dispatcher);
 			TaskCommand.register(dispatcher);
+			//DeathSpectatorCommand.register(dispatcher);
 		});
 
 		LOGGER.info("Hello Fabric world!");

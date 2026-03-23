@@ -33,7 +33,9 @@ public final class ModItemGroup {
                 entries.add(ModItems.PURPLE_BLOCKING_CARD);
                 entries.add(ModItems.MAGENTA_BLOCKING_CARD);
                 entries.add(ModItems.PINK_BLOCKING_CARD);
+                entries.add(ModItems.PASSWORD_CONFIG_CARD);
                 entries.add(ModBlocks.CATCHER_CHEST);
+                entries.add(ModBlocks.PASSWORD_MACHINE);
             })
             .build();
 

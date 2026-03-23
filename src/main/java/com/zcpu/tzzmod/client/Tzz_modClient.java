@@ -4,11 +4,17 @@ import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatHudOverlay;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.PhoneLockScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PasswordCardScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PasswordMachineScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.TaskConfiguratorScreen;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
+import com.zcpu.tzzmod.client.password.PasswordClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
+import com.zcpu.tzzmod.ModItem.custom.PasswordConfigCardItem;
 import com.zcpu.tzzmod.phone.PhoneClientAccess;
+import com.zcpu.tzzmod.password.PasswordCardClientAccess;
+import com.zcpu.tzzmod.password.PasswordMachineClientAccess;
 import com.zcpu.tzzmod.task.TaskConfiguratorClientAccess;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -36,6 +42,29 @@ public class Tzz_modClient implements ClientModInitializer {
                 Tzz_mod.LOGGER.error("Failed to open task configurator", exception);
             }
         });
+        PasswordMachineClientAccess.setOpener(pos -> {
+            try {
+                MinecraftClient client = MinecraftClient.getInstance();
+                client.setScreen(new PasswordMachineScreen(client.currentScreen, pos));
+            } catch (Exception exception) {
+                Tzz_mod.LOGGER.error("Failed to open password machine screen", exception);
+            }
+        });
+        PasswordCardClientAccess.setOpener(hand -> {
+            try {
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.player == null) {
+                    return;
+                }
+                var stack = client.player.getStackInHand(hand);
+                String initialCode = PasswordConfigCardItem.hasConfiguredPassword(stack)
+                        ? PasswordConfigCardItem.getStoredPassword(stack)
+                        : "";
+                client.setScreen(new PasswordCardScreen(client.currentScreen, hand, initialCode));
+            } catch (Exception exception) {
+                Tzz_mod.LOGGER.error("Failed to open password card screen", exception);
+            }
+        });
         PhoneSettingsClient.load();
 
         // register client-side death status receiver
@@ -44,6 +73,8 @@ public class Tzz_modClient implements ClientModInitializer {
         com.zcpu.tzzmod.client.ForcedHudClient.register();
         com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.register();
         TaskClient.register();
+        PasswordClient.register();
+        com.zcpu.tzzmod.client.phone.PhoneAppsClient.register();
         HudRenderCallback.EVENT.register((context, tickCounter) -> {
             // render the player's head and ID in the top-left
             com.zcpu.tzzmod.client.PlayerHeadHudOverlay.render(context);
