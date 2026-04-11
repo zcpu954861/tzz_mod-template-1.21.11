@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.network;
 
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -40,6 +41,6 @@ public final class DeathSyncServer {
     }
 
     private static void sendStatus(ServerPlayerEntity player, boolean hasDeath) {
-        ServerPlayNetworking.send(player, new DeathStatusPayload(hasDeath));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new DeathStatusPayload(hasDeath));
     }
 }

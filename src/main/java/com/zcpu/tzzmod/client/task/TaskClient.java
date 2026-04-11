@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.network.TaskC2SPayload;
 import com.zcpu.tzzmod.network.TaskS2CPayload;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.Registries;
@@ -106,7 +107,13 @@ public final class TaskClient {
             if (parts.length < 2 || parts[0].isBlank()) {
                 continue;
             }
-            counts.merge(parts[0], 1, Integer::sum);
+            counts.merge(
+                    parts[0],
+                    1,
+                    (left, right) -> Integer.valueOf(
+                            NullSafety.requireNonNull(left).intValue() + NullSafety.requireNonNull(right).intValue()
+                    )
+            );
         }
         return counts;
     }
@@ -260,13 +267,18 @@ public final class TaskClient {
         if (id != null && Registries.SOUND_EVENT.containsId(id)) {
             event = Registries.SOUND_EVENT.get(id);
         }
-        client.player.playSound(event, 0.8F, 1.2F);
+        var player = client.player;
+        if (player == null) {
+            return;
+        }
+        player.playSound(event, 0.8F, 1.2F);
     }
 
     private static void showError(MinecraftClient client, JsonObject body) {
-        String message = getString(body, "message");
-        if (client.player != null && !message.isBlank()) {
-            client.player.sendMessage(Text.literal("[Task] " + message), false);
+        String message = NullSafety.requireNonNull(getString(body, "message"));
+        var player = client.player;
+        if (player != null && !message.isBlank()) {
+            player.sendMessage(Text.literal("[Task] " + message), false);
         }
     }
 

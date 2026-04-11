@@ -67,7 +67,10 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
                 }
                 if (!found) {
                     // prepend local player so they appear at top
-                    contactsList.add(0, new PhoneChatClient.ContactData(selfUuid, mc.player.getName().getString()));
+                    var player = mc.player;
+                    if (player != null) {
+                        contactsList.add(0, new PhoneChatClient.ContactData(selfUuid, player.getName().getString()));
+                    }
                 }
             }
         } catch (Exception ignored) {

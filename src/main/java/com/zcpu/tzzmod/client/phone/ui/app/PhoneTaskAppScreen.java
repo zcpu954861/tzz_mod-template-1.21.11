@@ -283,7 +283,11 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
     private void playCharSound() {
         if (client == null || client.player == null) return;
         try {
-            client.player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
+            var player = client.player;
+            if (player == null) {
+                return;
+            }
+            player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
         } catch (Exception ignored) {}
     }
 
@@ -310,28 +314,5 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
 
     private boolean looksLikeJsonComponent(String value) {
         return value != null && (value.startsWith("{") || value.startsWith("[") || value.startsWith("\""));
-    }
-
-    private List<String> wrapStringToWidth(String str, int maxWidth) {
-        List<String> lines = new ArrayList<>();
-        StringBuilder cur = new StringBuilder();
-        for (int i = 0; i < str.length(); ) {
-            int cp = str.codePointAt(i);
-            int charLen = Character.charCount(cp);
-            cur.appendCodePoint(cp);
-            if (textRenderer.getWidth(cur.toString()) > maxWidth) {
-                cur.setLength(cur.length() - charLen);
-                if (cur.length() == 0) {
-                    cur.appendCodePoint(cp);
-                    i += charLen;
-                }
-                lines.add(cur.toString());
-                cur = new StringBuilder();
-                continue;
-            }
-            i += charLen;
-        }
-        if (cur.length() > 0) lines.add(cur.toString());
-        return lines;
     }
 }

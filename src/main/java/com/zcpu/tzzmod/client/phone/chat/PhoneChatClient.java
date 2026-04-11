@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.network.PhoneChatC2SPayload;
 import com.zcpu.tzzmod.network.PhoneChatS2CPayload;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.Registries;
@@ -452,7 +453,13 @@ public final class PhoneChatClient {
             return;
         }
 
-        UNREAD_COUNTS.merge(key, 1, Integer::sum);
+    UNREAD_COUNTS.merge(
+        key,
+        1,
+        (left, right) -> Integer.valueOf(
+            NullSafety.requireNonNull(left).intValue() + NullSafety.requireNonNull(right).intValue()
+        )
+    );
         unreadNotificationExpireAtMs = System.currentTimeMillis() + 15_000L;
         if (PhoneSettingsClient.isAlertModeEnabled()) {
             AlertSubtitleOverlay.enqueue(Text.translatable("phone.tzz_mod.alert.chat_subtitle"));
@@ -471,24 +478,30 @@ public final class PhoneChatClient {
         if (id != null && Registries.SOUND_EVENT.containsId(id)) {
             event = Registries.SOUND_EVENT.get(id);
         }
-        client.player.playSound(event, 0.8F, 1.2F);
+        var player = client.player;
+        if (player == null) {
+            return;
+        }
+        player.playSound(event, 0.8F, 1.2F);
     }
 
     private static void showError(MinecraftClient client, JsonObject body) {
-        String message = getString(body, "message");
+        String message = NullSafety.requireNonNull(getString(body, "message"));
         // Suppress the known benign server-side message when client probes 'whoami'
         if (message != null && message.contains("Unknown chat action: whoami")) {
             return;
         }
-        if (client.player != null && !message.isBlank()) {
-            client.player.sendMessage(Text.literal("[Phone Chat] " + message), false);
+        var player = client.player;
+        if (player != null && !message.isBlank()) {
+            player.sendMessage(Text.literal("[Phone Chat] " + message), false);
         }
     }
 
     private static void showNotice(MinecraftClient client, JsonObject body) {
-        String message = getString(body, "message");
-        if (client.player != null && !message.isBlank()) {
-            client.player.sendMessage(Text.literal("[Phone Chat] " + message), false);
+        String message = NullSafety.requireNonNull(getString(body, "message"));
+        var player = client.player;
+        if (player != null && !message.isBlank()) {
+            player.sendMessage(Text.literal("[Phone Chat] " + message), false);
         }
     }
 

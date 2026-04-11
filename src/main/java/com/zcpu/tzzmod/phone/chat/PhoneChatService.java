@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.phone.chat;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.zcpu.tzzmod.network.PhoneChatS2CPayload;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -206,7 +207,7 @@ public final class PhoneChatService {
             }
             ServerPlayerEntity target = server.getPlayerManager().getPlayer(UUID.fromString(uuidText));
             if (target != null) {
-                ServerPlayNetworking.send(target, new PhoneChatS2CPayload("message", envelope.toString()));
+                ServerPlayNetworking.send(NullSafety.requireNonNull(target), new PhoneChatS2CPayload("message", envelope.toString()));
             }
         }
     }
@@ -250,7 +251,7 @@ public final class PhoneChatService {
     }
 
     public static void sendResponse(ServerPlayerEntity player, String action, JsonObject body) {
-        ServerPlayNetworking.send(player, new PhoneChatS2CPayload(action, body.toString()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new PhoneChatS2CPayload(action, body.toString()));
     }
 
     public static void sendError(ServerPlayerEntity player, String message) {

@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.network;
 
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
@@ -41,12 +42,12 @@ public final class AdminSyncServer {
 
     private static void broadcastState(MinecraftServer server, boolean state) {
         for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(online, new AdminModePayload(state));
+            ServerPlayNetworking.send(NullSafety.requireNonNull(online), new AdminModePayload(state));
         }
     }
 
     private static void sendStateToPlayer(MinecraftServer server, ServerPlayerEntity player) {
-        ServerPlayNetworking.send(player, new AdminModePayload(recordingMode.get()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new AdminModePayload(recordingMode.get()));
     }
 
     public static boolean isRecordingMode() {

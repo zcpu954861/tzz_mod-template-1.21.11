@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.client;
 
+import com.zcpu.tzzmod.util.NullSafety;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
@@ -39,7 +40,7 @@ public final class PlayerHeadHudOverlay {
             if (client.options.hudHidden) return;
         }
 
-        var player = client.player;
+        var player = NullSafety.requireNonNull(client.player);
         boolean drawn = false;
         try {
             drawLayeredHead(context, player.getSkin());

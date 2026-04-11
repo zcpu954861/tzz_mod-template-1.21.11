@@ -27,7 +27,7 @@ import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldView;
 import net.minecraft.world.tick.ScheduledTickView;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class SilentSensorPlateBlock extends BlockWithEntity {
     public static final MapCodec<SilentSensorPlateBlock> CODEC = createCodec(SilentSensorPlateBlock::new);

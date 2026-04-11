@@ -19,7 +19,6 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
     // listener to refresh apps when server bootstrap/app_state arrives
     private Runnable bootstrapListener = null;
-    private boolean waitingForBootstrap = false;
     // persistent listener while phone open to react to dynamic state changes (isOp/apps)
     private Runnable stateListener = null;
     // when true, init() should not request bootstrap (used by refresh to rebuild UI without network calls)
@@ -49,13 +48,11 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         // honor suppress flag
         if (suppressBootstrapOnInit) {
             suppressBootstrapOnInit = false;
-            waitingForBootstrap = false;
             buildAppSlots();
             return;
         }
         try {
             if (client != null && client.getNetworkHandler() != null) {
-                waitingForBootstrap = true;
                 // request quick whoami to update OP status asap, and bootstrap for full app state
                 PhoneChatClient.requestWhoAmI();
                 PhoneChatClient.requestBootstrap();
@@ -102,18 +99,15 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 // do not build slots now; onBootstrapArrived() will call refreshApps()
             } else {
                 // singleplayer or offline: build immediately
-                waitingForBootstrap = false;
                 buildAppSlots();
             }
         } catch (Throwable ignored) {
-            waitingForBootstrap = false;
             buildAppSlots();
         }
     }
 
     private void onBootstrapArrived() {
         try {
-            waitingForBootstrap = false;
             refreshApps();
         } finally {
             // remove listener after first use

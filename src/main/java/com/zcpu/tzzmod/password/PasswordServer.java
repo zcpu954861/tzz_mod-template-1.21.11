@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.ModItem.custom.PasswordConfigCardItem;
 import com.zcpu.tzzmod.network.PasswordC2SPayload;
 import com.zcpu.tzzmod.network.PasswordS2CPayload;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -91,7 +92,7 @@ public final class PasswordServer {
         body.addProperty("success", success);
         body.addProperty("message", message.getString());
         body.addProperty("close", closeScreen);
-        ServerPlayNetworking.send(player, new PasswordS2CPayload(action, body.toString()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new PasswordS2CPayload(action, body.toString()));
     }
 
     private static JsonObject parse(String body) {

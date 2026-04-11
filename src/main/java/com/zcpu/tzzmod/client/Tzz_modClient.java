@@ -16,11 +16,18 @@ import com.zcpu.tzzmod.phone.PhoneClientAccess;
 import com.zcpu.tzzmod.password.PasswordCardClientAccess;
 import com.zcpu.tzzmod.password.PasswordMachineClientAccess;
 import com.zcpu.tzzmod.task.TaskConfiguratorClientAccess;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.Identifier;
+import org.jspecify.annotations.NonNull;
 
 public class Tzz_modClient implements ClientModInitializer {
+    private static final @NonNull Identifier MAIN_HUD_LAYER_ID =
+            NullSafety.requireNonNull(Identifier.of(Tzz_mod.MOD_ID, "main_hud_overlay"));
+
     @Override
     public void onInitializeClient() {
         Tzz_mod.LOGGER.info("Client initializer loaded.");
@@ -75,7 +82,7 @@ public class Tzz_modClient implements ClientModInitializer {
         TaskClient.register();
         PasswordClient.register();
         com.zcpu.tzzmod.client.phone.PhoneAppsClient.register();
-        HudRenderCallback.EVENT.register((context, tickCounter) -> {
+        HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, MAIN_HUD_LAYER_ID, (context, tickCounter) -> {
             // render the player's head and ID in the top-left
             com.zcpu.tzzmod.client.PlayerHeadHudOverlay.render(context);
 

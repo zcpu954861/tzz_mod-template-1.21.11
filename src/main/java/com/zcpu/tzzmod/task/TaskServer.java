@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.network.TaskC2SPayload;
 import com.zcpu.tzzmod.network.TaskS2CPayload;
+import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
@@ -68,7 +69,7 @@ public final class TaskServer {
     private static void sendBootstrap(ServerPlayerEntity player, MinecraftServer server) {
         TaskDataStore.TaskSnapshot snapshot = TaskDataStore.getSnapshot(server);
         JsonObject body = buildBootstrap(snapshot);
-        ServerPlayNetworking.send(player, new TaskS2CPayload("bootstrap", body.toString()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new TaskS2CPayload("bootstrap", body.toString()));
     }
 
     private static JsonObject buildBootstrap(TaskDataStore.TaskSnapshot snapshot) {
@@ -155,7 +156,7 @@ public final class TaskServer {
     private static void sendError(ServerPlayerEntity player, String message) {
         JsonObject body = new JsonObject();
         body.addProperty("message", message);
-        ServerPlayNetworking.send(player, new TaskS2CPayload("error", body.toString()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new TaskS2CPayload("error", body.toString()));
     }
 }
 

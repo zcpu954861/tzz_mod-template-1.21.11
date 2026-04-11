@@ -102,12 +102,4 @@ public class TaskDetailScreen extends AbstractPhoneScreen {
     private boolean looksLikeJsonComponent(String value) {
         return value != null && (value.startsWith("{") || value.startsWith("[") || value.startsWith("\""));
     }
-
-    private String titleJson() {
-        return titleJson == null ? "" : titleJson;
-    }
-
-    private String contentJson() {
-        return contentJson == null ? "" : contentJson;
-    }
 }

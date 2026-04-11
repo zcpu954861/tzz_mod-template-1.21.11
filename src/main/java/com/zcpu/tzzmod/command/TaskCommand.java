@@ -139,7 +139,7 @@ public final class TaskCommand {
         triggeredPayload.addProperty("lineName", lineName);
         triggeredPayload.addProperty("taskIndex", taskIndex);
         for (ServerPlayerEntity p : source.getServer().getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(p, new TaskS2CPayload("triggered", triggeredPayload.toString()));
+            ServerPlayNetworking.send(com.zcpu.tzzmod.util.NullSafety.requireNonNull(p), new TaskS2CPayload("triggered", triggeredPayload.toString()));
         }
         // full sync to clients
         TaskServer.syncAll(source.getServer());

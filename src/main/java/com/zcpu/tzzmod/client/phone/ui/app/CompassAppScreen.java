@@ -163,7 +163,11 @@ public class CompassAppScreen extends AbstractPhoneScreen {
     private float getPlayerYaw() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.player == null) return 0f;
-        float yaw = client.player.getYaw() % 360f;
+        var player = client.player;
+        if (player == null) {
+            return 0f;
+        }
+        float yaw = player.getYaw() % 360f;
         if (yaw < 0) yaw += 360f;
         return yaw;
     }

@@ -259,7 +259,11 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
     private void playCharSound() {
         if (client == null || client.player == null) return;
         try {
-            client.player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
+            var player = client.player;
+            if (player == null) {
+                return;
+            }
+            player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
         } catch (Exception ignored) {}
     }
 
