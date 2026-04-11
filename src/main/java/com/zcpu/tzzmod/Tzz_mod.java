@@ -8,14 +8,17 @@ import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.AdminPayloads;
 import com.zcpu.tzzmod.network.DeathSyncServer;
+import com.zcpu.tzzmod.network.MapPayloads;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
+import com.zcpu.tzzmod.command.MapCommand;
 import com.zcpu.tzzmod.command.TaskCommand;
 import com.zcpu.tzzmod.network.TaskPayloads;
 import com.zcpu.tzzmod.task.TaskServer;
 import com.zcpu.tzzmod.network.AdminSyncServer;
 import com.zcpu.tzzmod.network.PasswordPayloads;
 import com.zcpu.tzzmod.password.PasswordServer;
+import com.zcpu.tzzmod.map.MapServer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -50,6 +53,8 @@ public class Tzz_mod implements ModInitializer {
 		DeathSyncServer.register();
 		PhoneChatPayloads.register();
 		PhoneChatServer.register();
+		MapPayloads.register();
+		MapServer.register();
 		TaskPayloads.register();
 		TaskServer.register();
 		PasswordPayloads.register();
@@ -71,6 +76,7 @@ public class Tzz_mod implements ModInitializer {
 		// Register server commands
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SendMsgCommand.register(dispatcher);
+			MapCommand.register(dispatcher);
 			TaskCommand.register(dispatcher);
 			//DeathSpectatorCommand.register(dispatcher);
 		});

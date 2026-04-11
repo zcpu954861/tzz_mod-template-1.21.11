@@ -10,6 +10,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import java.util.List;
+import java.util.Locale;
 
 public final class SendMsgCommand {
     private SendMsgCommand() {}
@@ -17,7 +18,32 @@ public final class SendMsgCommand {
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
                 CommandManager.literal("sendmsg")
+            .then(CommandManager.literal("player")
+                .then(CommandManager.argument("player", StringArgumentType.string())
+                    .suggests((context, builder) -> CommandSuggestionUtil.suggestOnlinePlayerNames(context.getSource(), builder))
+                    .then(CommandManager.argument("text", StringArgumentType.greedyString())
+                        .executes(context -> executeDirect(
+                            context.getSource(),
+                            StringArgumentType.getString(context, "player"),
+                            StringArgumentType.getString(context, "text")
+                        ))
+                    )
+                )
+            )
+            .then(CommandManager.literal("group")
+                .then(CommandManager.argument("group", StringArgumentType.string())
+                    .suggests((context, builder) -> CommandSuggestionUtil.suggestGroupTargets(builder))
+                    .then(CommandManager.argument("text", StringArgumentType.greedyString())
+                        .executes(context -> executeGroup(
+                            context.getSource(),
+                            StringArgumentType.getString(context, "group"),
+                            StringArgumentType.getString(context, "text")
+                        ))
+                    )
+                )
+            )
                         .then(CommandManager.argument("target", StringArgumentType.string())
+                .suggests((context, builder) -> CommandSuggestionUtil.suggestSendMsgTargets(context.getSource(), builder))
                                 .then(CommandManager.argument("text", StringArgumentType.greedyString())
                                         .executes(context -> execute(context.getSource(), StringArgumentType.getString(context, "target"), StringArgumentType.getString(context, "text")))
                                 )
@@ -70,9 +96,10 @@ public final class SendMsgCommand {
         }
 
         // Otherwise treat as direct (target should be UUID)
-        var envelope = PhoneChatService.sendDirect(source.getServer(), sender, target, text, config);
+        String targetUuid = resolvePlayerTargetUuid(source, target);
+        var envelope = targetUuid.isBlank() ? null : PhoneChatService.sendDirect(source.getServer(), sender, targetUuid, text, config);
         if (envelope == null) {
-            source.sendFeedback(() -> Text.literal("目标玩家无效（请使用玩家的 UUID 或确保玩家在线）。"), false);
+            source.sendFeedback(() -> Text.literal("目标玩家无效（可使用在线玩家名字或 UUID）。"), false);
             return 0;
         }
 
@@ -81,9 +108,36 @@ public final class SendMsgCommand {
         var receiverEnvelope = envelope.deepCopy();
         receiverEnvelope.addProperty("targetId", sender.getUuidAsString());
         receiverEnvelope.addProperty("title", sender.getName().getString());
-        PhoneChatService.deliverToParticipants(source.getServer(), receiverEnvelope, List.of(target));
+        PhoneChatService.deliverToParticipants(source.getServer(), receiverEnvelope, List.of(targetUuid));
 
         source.sendFeedback(() -> Text.literal("已向 '" + target + "' 发送消息。"), false);
         return 1;
+    }
+
+    private static int executeDirect(ServerCommandSource source, String target, String text) {
+        return execute(source, target, text);
+    }
+
+    private static int executeGroup(ServerCommandSource source, String target, String text) {
+        return execute(source, target, text);
+    }
+
+    private static String resolvePlayerTargetUuid(ServerCommandSource source, String target) {
+        if (target == null || target.isBlank() || source.getServer() == null) {
+            return "";
+        }
+        String trimmed = target.trim();
+        try {
+            java.util.UUID.fromString(trimmed);
+            return trimmed;
+        } catch (Exception ignored) {
+        }
+
+        for (ServerPlayerEntity online : source.getServer().getPlayerManager().getPlayerList()) {
+            if (online.getName().getString().equalsIgnoreCase(trimmed)) {
+                return online.getUuidAsString();
+            }
+        }
+        return "";
     }
 }

@@ -237,6 +237,26 @@ public final class PhoneChatService {
         return group == null || group.name == null ? "" : group.name;
     }
 
+    public static List<String> getAllGroupNames() {
+        List<String> result = new ArrayList<>();
+        for (ChatGroup group : GROUPS.values()) {
+            if (group.name != null && !group.name.isBlank()) {
+                result.add(group.name);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public static List<String> getAllGroupIds() {
+        List<String> result = new ArrayList<>();
+        for (ChatGroup group : GROUPS.values()) {
+            if (group.id != null && !group.id.isBlank()) {
+                result.add(group.id);
+            }
+        }
+        return List.copyOf(result);
+    }
+
     // Find a group id by its (case-insensitive) name. Returns empty string if not found.
     public static String findGroupIdByName(String name) {
         if (name == null) return "";

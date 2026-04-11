@@ -23,8 +23,8 @@ public final class TaskCommand {
         dispatcher.register(
                 CommandManager.literal("task")
                         .then(CommandManager.literal("run")
-                                .then(CommandManager.argument("lineName", StringArgumentType.string())
-                                        .then(CommandManager.argument("taskIndex", IntegerArgumentType.integer(1))
+                    .then(buildLineNameArgument()
+                        .then(buildTaskIndexArgument("lineName")
                                                 .executes(context -> executeRun(
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "lineName"),
@@ -35,8 +35,8 @@ public final class TaskCommand {
                         )
                         .then(buildDelSubcommands())
                         .then(CommandManager.literal("cancel")
-                                .then(CommandManager.argument("lineName", StringArgumentType.string())
-                                        .then(CommandManager.argument("taskIndex", IntegerArgumentType.integer(1))
+                            .then(buildLineNameArgument()
+                                .then(buildTaskIndexArgument("lineName")
                                                 .executes(context -> executeCancel(
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "lineName"),
@@ -47,8 +47,8 @@ public final class TaskCommand {
 
     private static LiteralArgumentBuilder<ServerCommandSource> buildDelSubcommands() {
         // /task del task <lineName> <taskIndex>
-        RequiredArgumentBuilder<ServerCommandSource, String> delTaskLineArg = CommandManager.argument("lineName", StringArgumentType.string());
-        RequiredArgumentBuilder<ServerCommandSource, Integer> delTaskIndexArg = CommandManager.argument("taskIndex", IntegerArgumentType.integer(1));
+        RequiredArgumentBuilder<ServerCommandSource, String> delTaskLineArg = buildLineNameArgument();
+        RequiredArgumentBuilder<ServerCommandSource, Integer> delTaskIndexArg = buildTaskIndexArgument("lineName");
 
         LiteralArgumentBuilder<ServerCommandSource> delTask = CommandManager.literal("task")
                 .then(delTaskLineArg.then(delTaskIndexArg.executes(context -> executeDeleteTask(
@@ -59,7 +59,7 @@ public final class TaskCommand {
 
         // /task del taskline <lineName>
         LiteralArgumentBuilder<ServerCommandSource> delTaskline = CommandManager.literal("taskline")
-                .then(CommandManager.argument("lineName", StringArgumentType.string())
+            .then(buildLineNameArgument()
                         .executes(context -> executeDeleteLine(
                                 context.getSource(),
                                 StringArgumentType.getString(context, "lineName")
@@ -67,6 +67,16 @@ public final class TaskCommand {
 
         return CommandManager.literal("del").then(delTask).then(delTaskline);
     }
+
+        private static RequiredArgumentBuilder<ServerCommandSource, String> buildLineNameArgument() {
+        return CommandManager.argument("lineName", StringArgumentType.string())
+            .suggests((context, builder) -> CommandSuggestionUtil.suggestTaskLineNames(context.getSource(), builder));
+        }
+
+        private static RequiredArgumentBuilder<ServerCommandSource, Integer> buildTaskIndexArgument(String lineArgumentName) {
+        return CommandManager.argument("taskIndex", IntegerArgumentType.integer(1))
+            .suggests((context, builder) -> CommandSuggestionUtil.suggestTaskIndexes(context, builder, lineArgumentName));
+        }
 
     private static int executeDeleteTask(ServerCommandSource source, String lineName, int taskIndex) {
         if (source == null || source.getServer() == null) return 0;
