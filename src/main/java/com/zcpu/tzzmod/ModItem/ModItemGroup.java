@@ -8,6 +8,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import com.zcpu.tzzmod.Tzz_mod;
 
 public final class ModItemGroup {
     public static final ItemGroup ITEM_GROUP = FabricItemGroup.builder()
@@ -33,13 +34,12 @@ public final class ModItemGroup {
                 entries.add(ModItems.PURPLE_BLOCKING_CARD);
                 entries.add(ModItems.MAGENTA_BLOCKING_CARD);
                 entries.add(ModItems.PINK_BLOCKING_CARD);
-                entries.add(ModItems.PASSWORD_CONFIG_CARD);
                 entries.add(ModBlocks.CATCHER_CHEST);
-                entries.add(ModBlocks.PASSWORD_MACHINE);
             })
             .build();
 
     public static void inialize() {
         Registry.register(Registries.ITEM_GROUP, Identifier.of("tzz_mod", "main"), ITEM_GROUP);
+        Tzz_mod.LOGGER.info("Registered item group: {}:{}", Tzz_mod.MOD_ID, "main");
     }
 }

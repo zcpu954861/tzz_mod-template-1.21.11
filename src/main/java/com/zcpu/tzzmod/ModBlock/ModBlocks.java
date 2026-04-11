@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.ModBlock;
 
 import com.zcpu.tzzmod.ModBlock.custom.CatcherChestBlock;
 import com.zcpu.tzzmod.ModBlock.custom.PasswordMachineBlock;
+import com.zcpu.tzzmod.ModBlock.custom.SilentSensorPlateBlock;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.Tzz_mod;
 import net.minecraft.block.AbstractBlock;
@@ -28,6 +29,12 @@ public class ModBlocks {
             "password_machine",
             PasswordMachineBlock::new,
             AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
+    );
+
+    public static final Block SILENT_SENSOR_PLATE = registerBlock(
+            "silent_sensor_plate",
+            SilentSensorPlateBlock::new,
+            AbstractBlock.Settings.copy(Blocks.HEAVY_WEIGHTED_PRESSURE_PLATE).nonOpaque()
     );
 
     /**

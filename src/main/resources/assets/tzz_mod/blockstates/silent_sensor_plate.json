@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "powered=false": { "model": "minecraft:block/heavy_weighted_pressure_plate" },
+    "powered=true": { "model": "minecraft:block/heavy_weighted_pressure_plate_down" }
+  }
+}
+

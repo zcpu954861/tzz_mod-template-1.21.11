@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod;
 
+import com.zcpu.tzzmod.ModItem.ModFunctionItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.ModBlock.ModBlockEntities;
@@ -40,6 +41,7 @@ public class Tzz_mod implements ModInitializer {
 
 		ModItems.initialize();
 		ModItemGroup.inialize();
+		ModFunctionItemGroup.inialize();
 		// Ensure blocks are registered by forcing ModBlocks static initialization
 		ModBlocks.init();
 		ModBlockEntities.init();
