@@ -13,7 +13,8 @@ import java.util.List;
 public class MapMarkerListScreen extends AbstractPhoneScreen {
     private final List<MapClient.MapMarker> rows = new ArrayList<>();
     private Runnable stateListener;
-    private int scrollOffset;
+    private double scrollOffset;
+    private double targetScroll;
 
     public MapMarkerListScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.marker.title"), parent);
@@ -60,11 +61,15 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
     }
 
     private void clampScroll() {
-        scrollOffset = Math.max(0, Math.min(scrollOffset, getMaxScroll()));
+        double maxScroll = getMaxScroll();
+        targetScroll = Math.max(0.0D, Math.min(targetScroll, maxScroll));
+        scrollOffset = Math.max(0.0D, Math.min(scrollOffset, maxScroll));
     }
 
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
+        scrollOffset += (targetScroll - scrollOffset) * 0.35D;
+        clampScroll();
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.marker.title"), contentX + contentWidth / 2, contentY + s(8));
 
         if (rows.isEmpty()) {
@@ -76,10 +81,12 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         int bottom = getListBottom();
         int rowHeight = getRowHeight();
         int gap = getRowGap();
+        int currentScroll = (int) Math.round(scrollOffset);
 
+        context.enableScissor(contentX, top, contentX + contentWidth, bottom);
         for (int index = 0; index < rows.size(); index++) {
             MapClient.MapMarker marker = rows.get(index);
-            int drawY = top + index * (rowHeight + gap) - scrollOffset;
+            int drawY = top + index * (rowHeight + gap) - currentScroll;
             if (drawY + rowHeight < top || drawY > bottom) {
                 continue;
             }
@@ -88,9 +95,12 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
             context.fill(contentX + s(4), drawY + s(5), contentX + s(12), drawY + s(13), marker.color() | 0xFF000000);
 
             String pos = marker.x() + ", " + marker.y() + ", " + marker.z();
-            context.drawTextWithShadow(textRenderer, Text.literal(marker.name()), contentX + s(16), drawY + s(3), 0xFFECECEC);
+            context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(marker.name(), contentWidth - s(22))), contentX + s(16), drawY + s(3), 0xFFECECEC);
             context.drawTextWithShadow(textRenderer, Text.literal(pos), contentX + s(16), drawY + s(12), 0xFFB7C7D8);
         }
+        context.disableScissor();
+
+        renderScrollbar(context, top, bottom, rows.size() * rowHeight + Math.max(0, rows.size() - 1) * gap, currentScroll);
     }
 
     @Override
@@ -107,8 +117,9 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         if (mx < contentX || mx > contentX + contentWidth || my < top || my > bottom) {
             return false;
         }
+        int currentScroll = (int) Math.round(scrollOffset);
         for (int index = 0; index < rows.size(); index++) {
-            int drawY = top + index * (rowHeight + gap) - scrollOffset;
+            int drawY = top + index * (rowHeight + gap) - currentScroll;
             if (my >= drawY && my <= drawY + rowHeight && client != null) {
                 client.setScreen(new MapMarkerDetailScreen(this, rows.get(index).id()));
                 return true;
@@ -122,7 +133,7 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         int mx = (int) mouseX;
         int my = (int) mouseY;
         if (mx >= contentX && mx <= contentX + contentWidth && my >= getListTop() && my <= getListBottom()) {
-            scrollOffset = Math.max(0, Math.min(scrollOffset - (int) Math.round(verticalAmount * s(12)), getMaxScroll()));
+            targetScroll = Math.max(0.0D, Math.min(targetScroll - verticalAmount * s(12), getMaxScroll()));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -135,5 +146,18 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
             MapClient.removeListener(stateListener);
             stateListener = null;
         }
+    }
+
+    private void renderScrollbar(DrawContext context, int top, int bottom, int totalHeight, int currentScroll) {
+        int visibleHeight = Math.max(1, bottom - top);
+        if (totalHeight <= visibleHeight) {
+            return;
+        }
+        int trackX = contentX + contentWidth - s(2);
+        context.fill(trackX, top, trackX + 1, bottom, 0x335F7489);
+        int thumbHeight = Math.max(s(18), Math.round(visibleHeight * (visibleHeight / (float) totalHeight)));
+        int maxThumbTravel = Math.max(1, visibleHeight - thumbHeight);
+        int thumbY = top + Math.round((currentScroll / (float) Math.max(1, totalHeight - visibleHeight)) * maxThumbTravel);
+        context.fill(trackX - 1, thumbY, trackX + 2, thumbY + thumbHeight, 0xAACFE8F9);
     }
 }

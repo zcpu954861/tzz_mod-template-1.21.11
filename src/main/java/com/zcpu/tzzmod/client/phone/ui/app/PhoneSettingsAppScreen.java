@@ -10,12 +10,13 @@ import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
-    // animation state for the rounded toggle
-    private float knobProgress = 0f; // 0.0 = off (left), 1.0 = on (right)
-    private boolean knobTarget = false;
-    private static final float TOGGLE_ANIM_SPEED = 6.0f; // progress units per second
+    private static final float TOGGLE_ANIM_SPEED = 6.0F;
+
+    private final List<ToggleRow> rows = new ArrayList<>();
 
     public PhoneSettingsAppScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.settings"), parent);
@@ -25,132 +26,163 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
     @Override
     protected void init() {
         super.init();
-        // Leave extra vertical space so the app title above is clearly visible
-        int topStart = contentY + s(40);
+        rows.clear();
+        rows.add(new ToggleRow(
+                Text.translatable("phone.tzz_mod.settings.alert_mode"),
+                Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle"),
+                PhoneSettingsClient::isAlertModeEnabled,
+                PhoneSettingsClient::setAlertModeEnabled
+        ));
+        rows.add(new ToggleRow(
+                Text.translatable("phone.tzz_mod.settings.always_show_region_title"),
+                Text.translatable("phone.tzz_mod.settings.always_show_region_title.subtitle"),
+                PhoneSettingsClient::isAlwaysShowRegionTitleEnabled,
+                PhoneSettingsClient::setAlwaysShowRegionTitleEnabled
+        ));
+
+        int currentY = contentY + s(40);
         int rowHeight = s(22);
-
-        // Layout for labeled row with a capsule-style toggle on the right
+        int rowWidth = contentWidth - s(16);
         int rowX = contentX + s(8);
-        int rowY = topStart;
-        int rowW = contentWidth - s(16);
+        for (ToggleRow row : rows) {
+            row.subtitleLines = wrap(row.subtitle.getString(), rowWidth - s(12));
+            row.rowX = rowX;
+            row.rowY = currentY;
+            row.rowWidth = rowWidth;
+            row.rowHeight = rowHeight;
+            row.target = row.getter.getAsBoolean();
+            row.progress = row.target ? 1.0F : 0.0F;
+            ButtonWidget button = addDrawableChild(ButtonWidget.builder(Text.empty(), ignored -> toggleRow(row))
+                    .dimensions(rowX, currentY, rowWidth, rowHeight + row.subtitleLines.size() * (textRenderer.fontHeight + s(2)) + s(8))
+                    .build());
+            button.setAlpha(0.0F);
+            currentY += rowHeight + row.subtitleLines.size() * (textRenderer.fontHeight + s(2)) + s(14);
+        }
 
-        // Invisible button covers the entire row so clicks toggle the setting
-        ButtonWidget toggleButton = addDrawableChild(ButtonWidget.builder(Text.empty(), button -> {
-            boolean next = !PhoneSettingsClient.isAlertModeEnabled();
-            PhoneSettingsClient.setAlertModeEnabled(next);
-            knobTarget = next; // animate towards the new target
-        }).dimensions(rowX, rowY, rowW, rowHeight).build());
-        toggleButton.setAlpha(0.0F);
-
-        // initialize animation progress from current saved state
-        knobTarget = PhoneSettingsClient.isAlertModeEnabled();
-        knobProgress = knobTarget ? 1.0f : 0.0f;
-
-        // Back button at bottom
         addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(70), s(20), button -> close());
     }
 
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Title
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.settings"), contentX + contentWidth / 2, contentY + s(8));
 
-        int topStart = contentY + s(40);
-        int rowHeight = s(22);
-        int rowX = contentX + s(8);
-        int rowY = topStart;
-        int rowW = contentWidth - s(16);
+        for (ToggleRow row : rows) {
+            row.target = row.getter.getAsBoolean();
+            float direction = row.target ? 1.0F : -1.0F;
+            row.progress = clamp01(row.progress + direction * TOGGLE_ANIM_SPEED * delta);
 
-        // Draw label at left
-        Text label = Text.translatable("phone.tzz_mod.settings.alert_mode");
-        int labelY = rowY + Math.max(0, (rowHeight - textRenderer.fontHeight) / 2);
-        context.drawTextWithShadow(textRenderer, label, rowX + s(6), labelY, 0xFFECECEC);
+            int labelY = row.rowY + Math.max(0, (row.rowHeight - textRenderer.fontHeight) / 2);
+            context.drawTextWithShadow(textRenderer, row.label, row.rowX + s(6), labelY, 0xFFECECEC);
 
-        // Draw animated capsule toggle at right
-        int switchW = s(36);
-        int switchH = s(14);
-        int switchX = rowX + rowW - switchW - s(6);
-        int switchY = rowY + Math.max(0, (rowHeight - switchH) / 2);
+            int switchW = s(36);
+            int switchH = s(14);
+            int switchX = row.rowX + row.rowWidth - switchW - s(6);
+            int switchY = row.rowY + Math.max(0, (row.rowHeight - switchH) / 2);
+            int capsuleColor = lerpColor(0x55333333, 0xFF3FC47F, row.progress);
+            int knobColor = row.target ? 0xFFFFFFFF : 0xFFCCCCCC;
 
-        // animate knobProgress towards target
-        float dir = knobTarget ? 1.0f : -1.0f;
-        knobProgress += dir * TOGGLE_ANIM_SPEED * delta;
-        if (knobProgress < 0f) knobProgress = 0f;
-        if (knobProgress > 1f) knobProgress = 1f;
+            RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
+            int knobSize = Math.max(1, switchH - s(2));
+            float leftCenter = switchX + s(2) + knobSize / 2.0F;
+            float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
+            int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
+            RoundedRectRenderer.fillRoundedRect(
+                    context,
+                    knobCenter - knobSize / 2,
+                    switchY + (switchH - knobSize) / 2,
+                    knobSize,
+                    knobSize,
+                    knobSize / 2,
+                    knobColor
+            );
 
-        // colors for off/on states
-        int offColor = 0x55333333;
-        int onColor = 0xFF3FC47F;
-        int capsuleColor = lerpColor(offColor, onColor, knobProgress);
-        int knobColor = PhoneSettingsClient.isAlertModeEnabled() ? 0xFFFFFFFF : 0xFFCCCCCC;
+            int subtitleY = row.rowY + row.rowHeight + s(6);
+            for (int index = 0; index < row.subtitleLines.size(); index++) {
+                context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(row.subtitleLines.get(index)),
+                        row.rowX + s(6),
+                        subtitleY + index * (textRenderer.fontHeight + s(2)),
+                        0xFFB8C7D4
+                );
+            }
+        }
+    }
 
-        // draw rounded capsule background
-        RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
+    private void toggleRow(ToggleRow row) {
+        boolean next = !row.getter.getAsBoolean();
+        row.setter.accept(next);
+        row.target = next;
+    }
 
-        // Knob (rounded) - interpolate center X
-        int knobRadius = Math.max(1, switchH - s(2));
-        float leftCX = switchX + s(2) + knobRadius / 2f;
-        float rightCX = switchX + switchW - s(2) - knobRadius / 2f;
-        int knobCX = Math.round(lerp(leftCX, rightCX, knobProgress));
-        int knobLeft = knobCX - knobRadius / 2;
-        int knobTop = switchY + (switchH - knobRadius) / 2;
-        RoundedRectRenderer.fillRoundedRect(context, knobLeft, knobTop, knobRadius, knobRadius, knobRadius / 2, knobColor);
-
-        // Subtitle below row (ensure no overlap) with wrapping
-        String subtitleStr = Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle").getString();
-        int maxWidth = rowW - s(12);
+    private List<String> wrap(String text, int maxWidth) {
         List<String> lines = new ArrayList<>();
-        StringBuilder cur = new StringBuilder();
-        for (int i = 0; i < subtitleStr.length(); ) {
-            int cp = subtitleStr.codePointAt(i);
-            int charLen = Character.charCount(cp);
-            cur.appendCodePoint(cp);
-            if (textRenderer.getWidth(cur.toString()) > maxWidth) {
-                // remove last appended char and push line
-                cur.setLength(cur.length() - charLen);
-                if (cur.isEmpty()) {
-                    // single char too wide; force include
-                    cur.appendCodePoint(cp);
-                    i += charLen;
+        StringBuilder current = new StringBuilder();
+        for (int index = 0; index < text.length(); ) {
+            int codePoint = text.codePointAt(index);
+            int charLength = Character.charCount(codePoint);
+            current.appendCodePoint(codePoint);
+            if (textRenderer.getWidth(current.toString()) > maxWidth) {
+                current.setLength(current.length() - charLength);
+                if (current.isEmpty()) {
+                    current.appendCodePoint(codePoint);
+                    index += charLength;
                 }
-                lines.add(cur.toString());
-                cur = new StringBuilder();
+                lines.add(current.toString());
+                current = new StringBuilder();
                 continue;
             }
-            i += charLen;
+            index += charLength;
         }
-        if (!cur.isEmpty()) lines.add(cur.toString());
-
-        int subStartY = rowY + rowHeight + s(6);
-        for (int li = 0; li < lines.size(); li++) {
-            String line = lines.get(li);
-            context.drawTextWithShadow(textRenderer, Text.literal(line), rowX + s(6), subStartY + li * (textRenderer.fontHeight + s(2)), 0xFFB8C7D4);
+        if (!current.isEmpty()) {
+            lines.add(current.toString());
         }
+        return lines;
     }
 
-    // linear interpolation helper
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * Math.max(0f, Math.min(1f, t));
+    private static float lerp(float start, float end, float progress) {
+        return start + (end - start) * clamp01(progress);
     }
 
-    // color lerp for ARGB ints
-    private static int lerpColor(int a, int b, float t) {
-        t = Math.max(0f, Math.min(1f, t));
-        int aa = (a >> 24) & 0xFF;
-        int ar = (a >> 16) & 0xFF;
-        int ag = (a >> 8) & 0xFF;
-        int ab = a & 0xFF;
+    private static float clamp01(float value) {
+        return Math.max(0.0F, Math.min(1.0F, value));
+    }
 
-        int ba = (b >> 24) & 0xFF;
-        int br = (b >> 16) & 0xFF;
-        int bg = (b >> 8) & 0xFF;
-        int bb = b & 0xFF;
+    private static int lerpColor(int start, int end, float progress) {
+        float clamped = clamp01(progress);
+        int sa = (start >> 24) & 0xFF;
+        int sr = (start >> 16) & 0xFF;
+        int sg = (start >> 8) & 0xFF;
+        int sb = start & 0xFF;
+        int ea = (end >> 24) & 0xFF;
+        int er = (end >> 16) & 0xFF;
+        int eg = (end >> 8) & 0xFF;
+        int eb = end & 0xFF;
+        int a = Math.round(sa + (ea - sa) * clamped);
+        int r = Math.round(sr + (er - sr) * clamped);
+        int g = Math.round(sg + (eg - sg) * clamped);
+        int b = Math.round(sb + (eb - sb) * clamped);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
 
-        int ra = Math.round(aa + (ba - aa) * t);
-        int rr = Math.round(ar + (br - ar) * t);
-        int rg = Math.round(ag + (bg - ag) * t);
-        int rb = Math.round(ab + (bb - ab) * t);
+    private static final class ToggleRow {
+        private final Text label;
+        private final Text subtitle;
+        private final BooleanSupplier getter;
+        private final Consumer<Boolean> setter;
+        private List<String> subtitleLines = List.of();
+        private float progress;
+        private boolean target;
+        private int rowX;
+        private int rowY;
+        private int rowWidth;
+        private int rowHeight;
 
-        return (ra << 24) | (rr << 16) | (rg << 8) | rb;
+        private ToggleRow(Text label, Text subtitle, BooleanSupplier getter, Consumer<Boolean> setter) {
+            this.label = label;
+            this.subtitle = subtitle;
+            this.getter = getter;
+            this.setter = setter;
+        }
     }
 }

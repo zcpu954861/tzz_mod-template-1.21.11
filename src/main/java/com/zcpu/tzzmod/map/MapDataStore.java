@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,7 +42,7 @@ public final class MapDataStore {
         int maxZ = Math.max(z1, z2);
         state.region = new MapRegionData(safeDimensionId(dimensionId), minX, minY, minZ, maxX, maxY, maxZ);
         state.regionVersion++;
-        state.markers.removeIf(marker -> !state.region.contains(marker.x, marker.y, marker.z) || !state.region.dimensionId.equals(marker.dimensionId));
+        state.markers.removeIf(marker -> !state.region.containsHorizontal(marker.x, marker.z) || !state.region.dimensionId.equals(marker.dimensionId));
         state.writeToDisk();
         return true;
     }
@@ -57,7 +58,7 @@ public final class MapDataStore {
             return new AddMarkerResult(AddMarkerStatus.WRONG_DIMENSION, null);
         }
 
-        if (!state.region.contains(pos.getX(), pos.getY(), pos.getZ())) {
+        if (!state.region.containsHorizontal(pos.getX(), pos.getZ())) {
             return new AddMarkerResult(AddMarkerStatus.OUTSIDE_REGION, null);
         }
 
@@ -83,6 +84,113 @@ public final class MapDataStore {
             state.writeToDisk();
         }
         return removed;
+    }
+
+    public static synchronized PlannerRegionResult addPlannerRegion(MinecraftServer server, String dimensionId, List<RegionGeometry.Point> points, int color) {
+        MapState state = getState(server);
+        String cleanDimensionId = safeDimensionId(dimensionId);
+        List<RegionGeometry.Point> normalized = normalizePolygon(points);
+        if (normalized.size() < 3) {
+            return new PlannerRegionResult(PlannerRegionStatus.TOO_FEW_POINTS, null);
+        }
+        if (!RegionGeometry.isSimplePolygon(normalized)) {
+            return new PlannerRegionResult(PlannerRegionStatus.INVALID_SHAPE, null);
+        }
+        if (state.overlapsPlannerRegion(cleanDimensionId, normalized, null)) {
+            return new PlannerRegionResult(PlannerRegionStatus.OVERLAP, null);
+        }
+
+        PlannerRegionData region = new PlannerRegionData(
+                UUID.randomUUID().toString(),
+                state.nextDefaultRegionName(),
+                cleanDimensionId,
+            List.copyOf(normalized),
+            sanitizeRegionColor(color, state.plannerRegions.size())
+        );
+        state.plannerRegions.add(region);
+        state.sortPlannerRegions();
+        state.writeToDisk();
+        return new PlannerRegionResult(PlannerRegionStatus.OK, region);
+    }
+
+    public static synchronized PlannerRegionResult renamePlannerRegion(MinecraftServer server, String regionId, String name) {
+        MapState state = getState(server);
+        for (int index = 0; index < state.plannerRegions.size(); index++) {
+            PlannerRegionData region = state.plannerRegions.get(index);
+            if (!region.id().equals(regionId)) {
+                continue;
+            }
+            String cleanName = sanitizeRegionName(name, "");
+            if (cleanName.isBlank()) {
+                return new PlannerRegionResult(PlannerRegionStatus.INVALID_NAME, null);
+            }
+            if (state.hasPlannerRegionName(cleanName, regionId)) {
+                return new PlannerRegionResult(PlannerRegionStatus.DUPLICATE_NAME, null);
+            }
+            PlannerRegionData updated = new PlannerRegionData(region.id(), cleanName, region.dimensionId(), region.points(), region.color());
+            state.plannerRegions.set(index, updated);
+            state.sortPlannerRegions();
+            state.writeToDisk();
+            return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
+        }
+        return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
+    }
+
+    public static synchronized PlannerRegionResult setPlannerRegionColor(MinecraftServer server, String regionId, int color) {
+        MapState state = getState(server);
+        for (int index = 0; index < state.plannerRegions.size(); index++) {
+            PlannerRegionData region = state.plannerRegions.get(index);
+            if (!region.id().equals(regionId)) {
+                continue;
+            }
+            PlannerRegionData updated = new PlannerRegionData(
+                    region.id(),
+                    region.name(),
+                    region.dimensionId(),
+                    region.points(),
+                    sanitizeRegionColor(color, index)
+            );
+            state.plannerRegions.set(index, updated);
+            state.sortPlannerRegions();
+            state.writeToDisk();
+            return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
+        }
+        return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
+    }
+
+    public static synchronized boolean deletePlannerRegion(MinecraftServer server, String regionId) {
+        MapState state = getState(server);
+        boolean removed = state.plannerRegions.removeIf(region -> region.id().equals(regionId));
+        if (removed) {
+            state.writeToDisk();
+        }
+        return removed;
+    }
+
+    public static synchronized PlannerRegionData getPlannerRegion(MinecraftServer server, String regionId) {
+        MapState state = getState(server);
+        for (PlannerRegionData region : state.plannerRegions) {
+            if (region.id().equals(regionId)) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    public static synchronized PlannerRegionData findPlannerRegionContaining(MinecraftServer server, String dimensionId, double x, double z) {
+        MapState state = getState(server);
+        String cleanDimensionId = safeDimensionId(dimensionId);
+        int blockX = (int) Math.floor(x);
+        int blockZ = (int) Math.floor(z);
+        for (PlannerRegionData region : state.plannerRegions) {
+            if (!cleanDimensionId.equals(region.dimensionId())) {
+                continue;
+            }
+            if (region.containsBlock(blockX, blockZ)) {
+                return region;
+            }
+        }
+        return null;
     }
 
     public static synchronized boolean setMarkerColor(MinecraftServer server, String markerId, int color) {
@@ -140,6 +248,11 @@ public final class MapDataStore {
             case "show_other_players" -> {
                 boolean previous = state.showOtherPlayers;
                 state.showOtherPlayers = enabled;
+                yield previous != enabled;
+            }
+            case "show_region_titles" -> {
+                boolean previous = state.showRegionTitles;
+                state.showRegionTitles = enabled;
                 yield previous != enabled;
             }
             default -> false;
@@ -200,6 +313,54 @@ public final class MapDataStore {
         return clean;
     }
 
+    private static String sanitizeRegionName(String name, String fallback) {
+        if (name == null || name.isBlank()) {
+            return fallback;
+        }
+        String clean = name.trim();
+        if (clean.length() > 48) {
+            return clean.substring(0, 48);
+        }
+        return clean;
+    }
+
+    private static int sanitizeRegionColor(int color, int fallbackIndex) {
+        int rgb = color & 0xFFFFFF;
+        if (rgb == 0) {
+            rgb = MapColors.paletteColor(fallbackIndex) & 0xFFFFFF;
+        }
+        return 0xFF000000 | rgb;
+    }
+
+    private static List<RegionGeometry.Point> normalizePolygon(List<RegionGeometry.Point> points) {
+        List<RegionGeometry.Point> normalized = new ArrayList<>();
+        if (points == null) {
+            return normalized;
+        }
+
+        RegionGeometry.Point previous = null;
+        for (RegionGeometry.Point point : points) {
+            if (point == null) {
+                continue;
+            }
+            RegionGeometry.Point cleanPoint = new RegionGeometry.Point(point.x(), point.z());
+            if (previous != null && previous.x() == cleanPoint.x() && previous.z() == cleanPoint.z()) {
+                continue;
+            }
+            normalized.add(cleanPoint);
+            previous = cleanPoint;
+        }
+
+        if (normalized.size() > 1) {
+            RegionGeometry.Point first = normalized.get(0);
+            RegionGeometry.Point last = normalized.get(normalized.size() - 1);
+            if (first.x() == last.x() && first.z() == last.z()) {
+                normalized.remove(normalized.size() - 1);
+            }
+        }
+        return normalized;
+    }
+
     public enum AddMarkerStatus {
         OK,
         NO_REGION,
@@ -210,7 +371,20 @@ public final class MapDataStore {
     public record AddMarkerResult(AddMarkerStatus status, MapMarkerData marker) {
     }
 
-    public record MapSnapshot(MapRegionData region, MapVisibilitySettings settings, List<MapMarkerData> markers, int regionVersion) {
+    public enum PlannerRegionStatus {
+        OK,
+        TOO_FEW_POINTS,
+        INVALID_SHAPE,
+        OVERLAP,
+        DUPLICATE_NAME,
+        INVALID_NAME,
+        NOT_FOUND
+    }
+
+    public record PlannerRegionResult(PlannerRegionStatus status, PlannerRegionData region) {
+    }
+
+    public record MapSnapshot(MapRegionData region, MapVisibilitySettings settings, List<MapMarkerData> markers, List<PlannerRegionData> plannerRegions, int regionVersion) {
     }
 
     public record MapRegionData(String dimensionId, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -236,16 +410,28 @@ public final class MapDataStore {
     public record MapMarkerData(String id, String name, String dimensionId, int x, int y, int z, int color) {
     }
 
-    public record MapVisibilitySettings(boolean showSelfPosition, boolean showMarkers, boolean showOtherPlayers) {
+    public record PlannerRegionData(String id, String name, String dimensionId, List<RegionGeometry.Point> points, int color) {
+        public RegionGeometry.Bounds bounds() {
+            return RegionGeometry.bounds(points);
+        }
+
+        public boolean containsBlock(int blockX, int blockZ) {
+            return RegionGeometry.containsBlock(points, blockX, blockZ);
+        }
+    }
+
+    public record MapVisibilitySettings(boolean showSelfPosition, boolean showMarkers, boolean showOtherPlayers, boolean showRegionTitles) {
     }
 
     private static final class MapState {
         private final Path path;
         private MapRegionData region;
         private final List<MapMarkerData> markers = new ArrayList<>();
+        private final List<PlannerRegionData> plannerRegions = new ArrayList<>();
         private boolean showSelfPosition = true;
         private boolean showMarkers = true;
         private boolean showOtherPlayers = true;
+        private boolean showRegionTitles = true;
         private int regionVersion = 0;
 
         private MapState(Path path) {
@@ -287,17 +473,50 @@ public final class MapDataStore {
                 }
             }
 
+            plannerRegions.clear();
+            if (persisted.plannerRegions != null) {
+                for (PersistedPlannerRegion persistedRegion : persisted.plannerRegions) {
+                    if (persistedRegion == null || persistedRegion.id == null || persistedRegion.id.isBlank()) {
+                        continue;
+                    }
+                    List<RegionGeometry.Point> points = new ArrayList<>();
+                    if (persistedRegion.points != null) {
+                        for (PersistedRegionPoint persistedPoint : persistedRegion.points) {
+                            if (persistedPoint == null) {
+                                continue;
+                            }
+                            points.add(new RegionGeometry.Point(persistedPoint.x, persistedPoint.z));
+                        }
+                    }
+                    List<RegionGeometry.Point> normalized = normalizePolygon(points);
+                    if (normalized.size() < 3 || !RegionGeometry.isSimplePolygon(normalized)) {
+                        continue;
+                    }
+                    String fallbackName = "区域" + (plannerRegions.size() + 1);
+                    plannerRegions.add(new PlannerRegionData(
+                            persistedRegion.id,
+                            sanitizeRegionName(persistedRegion.name, fallbackName),
+                            safeDimensionId(persistedRegion.dimensionId),
+                            List.copyOf(normalized),
+                            sanitizeRegionColor(persistedRegion.color, plannerRegions.size())
+                    ));
+                }
+                sortPlannerRegions();
+            }
+
             showSelfPosition = persisted.showSelfPosition;
             showMarkers = persisted.showMarkers;
             showOtherPlayers = persisted.showOtherPlayers;
+            showRegionTitles = persisted.showRegionTitles;
             regionVersion = Math.max(0, persisted.regionVersion);
         }
 
         private MapSnapshot toSnapshot() {
             return new MapSnapshot(
                     region,
-                    new MapVisibilitySettings(showSelfPosition, showMarkers, showOtherPlayers),
+                    new MapVisibilitySettings(showSelfPosition, showMarkers, showOtherPlayers, showRegionTitles),
                     List.copyOf(markers),
+                    List.copyOf(plannerRegions),
                     regionVersion
             );
         }
@@ -320,6 +539,49 @@ public final class MapDataStore {
             }
         }
 
+        private String nextDefaultRegionName() {
+            int index = 1;
+            while (true) {
+                String candidate = "区域" + index;
+                if (!hasPlannerRegionName(candidate, null)) {
+                    return candidate;
+                }
+                index++;
+            }
+        }
+
+        private boolean hasPlannerRegionName(String candidate, String ignoreRegionId) {
+            for (PlannerRegionData region : plannerRegions) {
+                if (ignoreRegionId != null && ignoreRegionId.equals(region.id())) {
+                    continue;
+                }
+                if (region.name().equalsIgnoreCase(candidate)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean overlapsPlannerRegion(String dimensionId, List<RegionGeometry.Point> points, String ignoreRegionId) {
+            for (PlannerRegionData region : plannerRegions) {
+                if (ignoreRegionId != null && ignoreRegionId.equals(region.id())) {
+                    continue;
+                }
+                if (!dimensionId.equals(region.dimensionId())) {
+                    continue;
+                }
+                if (RegionGeometry.polygonsOverlap(region.points(), points)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void sortPlannerRegions() {
+            plannerRegions.sort(Comparator.comparing(PlannerRegionData::name, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(PlannerRegionData::id));
+        }
+
         private void writeToDisk() {
             try {
                 Files.createDirectories(path.getParent());
@@ -337,6 +599,7 @@ public final class MapDataStore {
                 persisted.showSelfPosition = showSelfPosition;
                 persisted.showMarkers = showMarkers;
                 persisted.showOtherPlayers = showOtherPlayers;
+                persisted.showRegionTitles = showRegionTitles;
                 persisted.regionVersion = regionVersion;
                 persisted.markers = new ArrayList<>();
                 for (MapMarkerData marker : markers) {
@@ -350,6 +613,22 @@ public final class MapDataStore {
                     persistedMarker.color = marker.color;
                     persisted.markers.add(persistedMarker);
                 }
+                persisted.plannerRegions = new ArrayList<>();
+                for (PlannerRegionData regionData : plannerRegions) {
+                    PersistedPlannerRegion persistedRegion = new PersistedPlannerRegion();
+                    persistedRegion.id = regionData.id();
+                    persistedRegion.name = regionData.name();
+                    persistedRegion.dimensionId = regionData.dimensionId();
+                    persistedRegion.color = regionData.color();
+                    persistedRegion.points = new ArrayList<>();
+                    for (RegionGeometry.Point point : regionData.points()) {
+                        PersistedRegionPoint persistedPoint = new PersistedRegionPoint();
+                        persistedPoint.x = point.x();
+                        persistedPoint.z = point.z();
+                        persistedRegion.points.add(persistedPoint);
+                    }
+                    persisted.plannerRegions.add(persistedRegion);
+                }
                 try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
                     GSON.toJson(persisted, writer);
                 }
@@ -362,9 +641,11 @@ public final class MapDataStore {
     private static final class PersistedState {
         private PersistedRegion region;
         private List<PersistedMarker> markers = new ArrayList<>();
+        private List<PersistedPlannerRegion> plannerRegions = new ArrayList<>();
         private boolean showSelfPosition = true;
         private boolean showMarkers = true;
         private boolean showOtherPlayers = true;
+        private boolean showRegionTitles = true;
         private int regionVersion = 0;
     }
 
@@ -386,5 +667,18 @@ public final class MapDataStore {
         private int y;
         private int z;
         private int color;
+    }
+
+    private static final class PersistedPlannerRegion {
+        private String id = "";
+        private String name = "区域";
+        private String dimensionId = "minecraft:overworld";
+        private int color = 0;
+        private List<PersistedRegionPoint> points = new ArrayList<>();
+    }
+
+    private static final class PersistedRegionPoint {
+        private int x;
+        private int z;
     }
 }

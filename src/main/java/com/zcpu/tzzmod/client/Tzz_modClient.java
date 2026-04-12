@@ -5,6 +5,8 @@ import com.zcpu.tzzmod.client.phone.chat.PhoneChatHudOverlay;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.PhoneLockScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.MapMarkerListScreen;
+import com.zcpu.tzzmod.client.phone.ui.RegionTitleOverlay;
+import com.zcpu.tzzmod.client.phone.ui.app.RegionPlannerListScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PasswordCardScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PasswordMachineScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.TaskConfiguratorScreen;
@@ -15,6 +17,7 @@ import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
 import com.zcpu.tzzmod.ModItem.custom.PasswordConfigCardItem;
 import com.zcpu.tzzmod.map.MapMarkerClientAccess;
+import com.zcpu.tzzmod.map.RegionPlannerClientAccess;
 import com.zcpu.tzzmod.phone.PhoneClientAccess;
 import com.zcpu.tzzmod.password.PasswordCardClientAccess;
 import com.zcpu.tzzmod.password.PasswordMachineClientAccess;
@@ -83,6 +86,14 @@ public class Tzz_modClient implements ClientModInitializer {
                 Tzz_mod.LOGGER.error("Failed to open map marker screen", exception);
             }
         });
+        RegionPlannerClientAccess.setOpener(() -> {
+            try {
+                MinecraftClient client = MinecraftClient.getInstance();
+                client.setScreen(new RegionPlannerListScreen(client.currentScreen));
+            } catch (Exception exception) {
+                Tzz_mod.LOGGER.error("Failed to open region planner screen", exception);
+            }
+        });
         PhoneSettingsClient.load();
 
         // register client-side death status receiver
@@ -101,6 +112,7 @@ public class Tzz_modClient implements ClientModInitializer {
             PhoneChatHudOverlay.render(context);
             TaskHudOverlay.render(context);
             AlertSubtitleOverlay.render(context);
+            RegionTitleOverlay.render(context);
         });
     }
 }
