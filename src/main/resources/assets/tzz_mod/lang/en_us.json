@@ -76,6 +76,8 @@
   "phone.tzz_mod.task.popup.line_count": "%s: %s new tasks",
   "phone.tzz_mod.task.popup.more": "%s more lines...",
   "phone.tzz_mod.app.settings": "Settings",
+  "phone.tzz_mod.settings.animations": "Animations",
+  "phone.tzz_mod.settings.animations.subtitle": "Controls all UI motion, including region title transitions, phone open/unlock animations, and typing-style prompts. When disabled they fall back to static display. Enabled by default.",
   "phone.tzz_mod.settings.alert_mode": "Alert mode",
   "phone.tzz_mod.settings.alert_mode.subtitle": "When enabled, new messages and tasks appear as a green subtitle-style typing alert near the center of the screen, with a vanilla sound per character.",
   "phone.tzz_mod.settings.always_show_region_title": "Always Show Region Name",

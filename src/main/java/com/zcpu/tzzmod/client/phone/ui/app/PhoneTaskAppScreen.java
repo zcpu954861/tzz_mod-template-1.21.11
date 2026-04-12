@@ -18,11 +18,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PhoneTaskAppScreen extends AbstractPhoneScreen {
+    private static final long STATIC_SUBTITLE_MS = 1_200L;
+
     private boolean showFlowTab;
     private Runnable stateListener;
     // dynamic per-task detail buttons (store bounds and target payload)
     private final List<DetailButtonData> detailButtons = new ArrayList<>();
     private TypingSubtitleAnimator subtitleAnimator;
+    private Text staticSubtitle = Text.empty();
+    private long staticSubtitleExpiresAtMs;
     private int lastTotalUnread = 0;
     private int currentScrollOffset;
     private int flowScrollOffset;
@@ -48,8 +52,7 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
 
         lastTotalUnread = TaskClient.getTotalUnreadCount();
         if (PhoneSettingsClient.isAlertModeEnabled() && lastTotalUnread > 0) {
-            subtitleAnimator = new TypingSubtitleAnimator("收到新任务", 14, s -> playCharSound());
-            subtitleAnimator.start();
+            showTransientSubtitle(Text.literal("收到新任务"));
         }
     }
 
@@ -104,14 +107,7 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
         // App header (keeps at top)
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.task"), contentX + contentWidth / 2, contentY + s(8));
 
-        if (subtitleAnimator != null) {
-            subtitleAnimator.tick(delta);
-            Text sub = subtitleAnimator.getRenderedText();
-            if (!sub.getString().isEmpty()) {
-                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
-            }
-            if (subtitleAnimator.isFinished()) subtitleAnimator = null;
-        }
+        renderTransientSubtitle(context, delta);
 
         // draw divider under the tab buttons area so the content area is visually separated
         // leave a bit more breathing room between tabs and divider
@@ -289,6 +285,46 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
             }
             player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.0F);
         } catch (Exception ignored) {}
+    }
+
+    private void showTransientSubtitle(Text text) {
+        if (PhoneSettingsClient.isAnimationsEnabled()) {
+            subtitleAnimator = new TypingSubtitleAnimator(text.getString(), 14, ignored -> playCharSound());
+            subtitleAnimator.start();
+            staticSubtitle = Text.empty();
+            staticSubtitleExpiresAtMs = 0L;
+            return;
+        }
+
+        subtitleAnimator = null;
+        staticSubtitle = text;
+        staticSubtitleExpiresAtMs = System.currentTimeMillis() + STATIC_SUBTITLE_MS;
+    }
+
+    private void renderTransientSubtitle(DrawContext context, float delta) {
+        if (subtitleAnimator != null) {
+            subtitleAnimator.tick(delta);
+            Text sub = subtitleAnimator.getRenderedText();
+            if (!sub.getString().isEmpty()) {
+                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+            }
+            if (subtitleAnimator.isFinished()) {
+                subtitleAnimator = null;
+            }
+            return;
+        }
+
+        if (staticSubtitle.getString().isEmpty()) {
+            return;
+        }
+
+        if (System.currentTimeMillis() >= staticSubtitleExpiresAtMs) {
+            staticSubtitle = Text.empty();
+            staticSubtitleExpiresAtMs = 0L;
+            return;
+        }
+
+        context.drawCenteredTextWithShadow(textRenderer, staticSubtitle, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
     }
 
     private static final class DetailButtonData {

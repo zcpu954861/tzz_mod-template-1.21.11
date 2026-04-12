@@ -28,6 +28,12 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
         super.init();
         rows.clear();
         rows.add(new ToggleRow(
+            Text.translatable("phone.tzz_mod.settings.animations"),
+            Text.translatable("phone.tzz_mod.settings.animations.subtitle"),
+            PhoneSettingsClient::isAnimationsEnabled,
+            PhoneSettingsClient::setAnimationsEnabled
+        ));
+        rows.add(new ToggleRow(
                 Text.translatable("phone.tzz_mod.settings.alert_mode"),
                 Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle"),
                 PhoneSettingsClient::isAlertModeEnabled,
@@ -65,11 +71,16 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.settings"), contentX + contentWidth / 2, contentY + s(8));
+        boolean animateToggles = PhoneSettingsClient.isAnimationsEnabled();
 
         for (ToggleRow row : rows) {
             row.target = row.getter.getAsBoolean();
-            float direction = row.target ? 1.0F : -1.0F;
-            row.progress = clamp01(row.progress + direction * TOGGLE_ANIM_SPEED * delta);
+            if (animateToggles) {
+                float direction = row.target ? 1.0F : -1.0F;
+                row.progress = clamp01(row.progress + direction * TOGGLE_ANIM_SPEED * delta);
+            } else {
+                row.progress = row.target ? 1.0F : 0.0F;
+            }
 
             int labelY = row.rowY + Math.max(0, (row.rowHeight - textRenderer.fontHeight) / 2);
             context.drawTextWithShadow(textRenderer, row.label, row.rowX + s(6), labelY, 0xFFECECEC);

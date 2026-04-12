@@ -17,7 +17,9 @@ import net.minecraft.text.Text;
 import net.minecraft.text.TextCodecs;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class PhoneChatConversationScreen extends AbstractPhoneScreen {
@@ -35,6 +37,10 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     private TextFieldWidget inputField;
     private int messageScrollOffset;
     private boolean manageButtonVisible = false;
+    private final List<MessageLayout> cachedLayouts = new ArrayList<>();
+    private final Map<String, Identifier> skinTextureCache = new HashMap<>();
+    private int cachedTotalHeight;
+    private boolean messageLayoutsDirty = true;
 
     public PhoneChatConversationScreen(Screen parent, String type, String targetId, String title) {
         super(Text.translatable("phone.tzz_mod.chat.conversation"), parent);
@@ -46,6 +52,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     @Override
     protected void init() {
         super.init();
+        invalidateMessageLayouts();
 
         addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(60), s(20), button -> close());
 
@@ -93,6 +100,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         } else {
             manageButtonVisible = false;
         }
+        invalidateMessageLayouts();
         clampMessageScroll();
     }
 
@@ -131,8 +139,17 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         return s(Math.max(10, textRenderer.fontHeight + 2));
     }
 
-    private List<MessageLayout> buildMessageLayouts() {
-        List<MessageLayout> layouts = new ArrayList<>();
+    private List<MessageLayout> getMessageLayouts() {
+        if (messageLayoutsDirty) {
+            rebuildMessageLayouts();
+        }
+        return cachedLayouts;
+    }
+
+    private void rebuildMessageLayouts() {
+        cachedLayouts.clear();
+        cachedTotalHeight = 0;
+
         int avatarSize = s(12);
         int bubblePaddingX = s(6);
         int bubblePaddingY = s(4);
@@ -173,10 +190,16 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
                 labelX = bubbleX;
             }
 
-            layouts.add(new MessageLayout(message, self, senderId, wrappedLines, avatarX, labelX, bubbleX, bubbleY, bubbleWidth, bubbleHeight, totalHeight));
+            cachedLayouts.add(new MessageLayout(message, self, senderId, wrappedLines, avatarX, labelX, bubbleX, bubbleY, bubbleWidth, bubbleHeight, totalHeight));
+            cachedTotalHeight += totalHeight;
         }
 
-        return layouts;
+        messageLayoutsDirty = false;
+    }
+
+    private void invalidateMessageLayouts() {
+        messageLayoutsDirty = true;
+        cachedTotalHeight = 0;
     }
 
     private Text parseComponentOrLiteral(String raw) {
@@ -203,11 +226,8 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
 
     private int getMaxMessageScroll() {
         int visibleHeight = Math.max(1, getMessagesBottom() - getMessagesTop());
-        int totalHeight = 0;
-        for (MessageLayout layout : buildMessageLayouts()) {
-            totalHeight += layout.totalHeight();
-        }
-        return Math.max(0, totalHeight - visibleHeight);
+        getMessageLayouts();
+        return Math.max(0, cachedTotalHeight - visibleHeight);
     }
 
     private void clampMessageScroll() {
@@ -229,11 +249,8 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         int bubblePaddingX = s(6);
         int bubblePaddingY = s(4);
         int avatarSize = s(12);
-        List<MessageLayout> layouts = buildMessageLayouts();
-        int totalHeight = 0;
-        for (MessageLayout layout : layouts) {
-            totalHeight += layout.totalHeight();
-        }
+        List<MessageLayout> layouts = getMessageLayouts();
+        int totalHeight = cachedTotalHeight;
         int visibleHeight = Math.max(1, bottom - top);
         int maxScroll = Math.max(0, totalHeight - visibleHeight);
         if (messageScrollOffset > maxScroll) {
@@ -318,7 +335,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     }
 
     private void drawAvatar(DrawContext context, String senderUuid, boolean self, int x, int y, int size, int fallbackColor) {
-        Identifier skinTexture = resolveSkinTexture(senderUuid, self);
+        Identifier skinTexture = getCachedSkinTexture(senderUuid, self);
         context.fill(x, y, x + size, y + size, 0x66000000);
         if (skinTexture == null) {
             drawAvatarFallback(context, x, y, size, fallbackColor);
@@ -326,6 +343,26 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         }
         drawSkinRegion(context, skinTexture, x, y, size, FACE_U, FACE_V);
         drawSkinRegion(context, skinTexture, x, y, size, HAT_U, HAT_V);
+    }
+
+    private Identifier getCachedSkinTexture(String senderUuid, boolean self) {
+        if (self) {
+            return resolveSkinTexture(senderUuid, true);
+        }
+        if (senderUuid == null || senderUuid.isBlank()) {
+            return null;
+        }
+
+        Identifier cached = skinTextureCache.get(senderUuid);
+        if (cached != null) {
+            return cached;
+        }
+
+        Identifier resolved = resolveSkinTexture(senderUuid, false);
+        if (resolved != null) {
+            skinTextureCache.put(senderUuid, resolved);
+        }
+        return resolved;
     }
 
     private Identifier resolveSkinTexture(String senderUuid, boolean self) {

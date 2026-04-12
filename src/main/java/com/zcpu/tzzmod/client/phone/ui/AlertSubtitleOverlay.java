@@ -13,6 +13,7 @@ import java.util.Deque;
 public final class AlertSubtitleOverlay {
     // reveal duration (total time used to type the text) — adjusted previously to ~2100ms
     private static final long REVEAL_DURATION_MS = 2_100L;
+    private static final long STATIC_DISPLAY_MS = 1_000L;
     // wait this long AFTER typing completes before starting blinking
     private static final long PRE_BLINK_HOLD_MS = 500L; // 0.5s before blink
     // after the final "show" of blinking, keep visible for this many ms (includes fade window)
@@ -88,11 +89,43 @@ public final class AlertSubtitleOverlay {
         }
 
         long now = System.currentTimeMillis();
+        boolean animationsEnabled = PhoneSettingsClient.isAnimationsEnabled();
         if (animator == null) {
             startNext(now);
             if (animator == null) {
                 return;
             }
+        }
+
+        if (!animationsEnabled) {
+            if (!animator.isFinished()) {
+                animator.revealAll();
+            }
+            blinking = false;
+            blinkToggleIndex = 0;
+            visibleDuringBlink = true;
+            nextBlinkChangeMs = 0L;
+            preBlinkHoldUntilMs = 0L;
+            if (holdUntilMs <= 0L) {
+                holdUntilMs = now + STATIC_DISPLAY_MS;
+            } else if (now >= holdUntilMs) {
+                animator = null;
+                current = null;
+                holdUntilMs = 0L;
+                startNext(now);
+                if (animator == null) {
+                    return;
+                }
+                animator.revealAll();
+                holdUntilMs = now + STATIC_DISPLAY_MS;
+            }
+
+            Text rendered = animator.getRenderedText();
+            if (rendered.getString().isEmpty()) {
+                return;
+            }
+            drawRenderedText(context, client, rendered, 0xFF);
+            return;
         }
 
         if (lastRenderMs > 0L) {
@@ -180,17 +213,7 @@ public final class AlertSubtitleOverlay {
             }
         }
 
-        Text styled = rendered.copy().formatted(Formatting.GREEN);
-        int color = (alpha << 24) | BASE_RGB;
-        int centerX = context.getScaledWindowWidth() / 2;
-        int baseY = context.getScaledWindowHeight() / 2 + 18;
-        int textWidth = client.textRenderer.getWidth(styled);
-
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate((float) centerX, (float) baseY);
-        context.getMatrices().scale(SCALE, SCALE);
-        context.drawTextWithShadow(client.textRenderer, styled, -textWidth / 2, 0, color);
-        context.getMatrices().popMatrix();
+        drawRenderedText(context, client, rendered, alpha);
     }
 
     public static void clear() {
@@ -223,9 +246,30 @@ public final class AlertSubtitleOverlay {
             return;
         }
 
+        if (!PhoneSettingsClient.isAnimationsEnabled()) {
+            animator = new TypingSubtitleAnimator(current.text, 1.0F, ignored -> {});
+            animator.revealAll();
+            holdUntilMs = now + STATIC_DISPLAY_MS;
+            return;
+        }
+
         float charsPerSecond = Math.max(2.0F, current.codePointLength / (REVEAL_DURATION_MS / 1000.0F));
         animator = new TypingSubtitleAnimator(current.text, charsPerSecond, ignored -> playCharSound());
         animator.start();
+    }
+
+    private static void drawRenderedText(DrawContext context, MinecraftClient client, Text rendered, int alpha) {
+        Text styled = rendered.copy().formatted(Formatting.GREEN);
+        int color = (alpha << 24) | BASE_RGB;
+        int centerX = context.getScaledWindowWidth() / 2;
+        int baseY = context.getScaledWindowHeight() / 2 + 18;
+        int textWidth = client.textRenderer.getWidth(styled);
+
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate((float) centerX, (float) baseY);
+        context.getMatrices().scale(SCALE, SCALE);
+        context.drawTextWithShadow(client.textRenderer, styled, -textWidth / 2, 0, color);
+        context.getMatrices().popMatrix();
     }
 
     private static void playCharSound() {

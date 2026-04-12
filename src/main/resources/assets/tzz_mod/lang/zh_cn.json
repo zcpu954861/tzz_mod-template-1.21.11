@@ -76,6 +76,8 @@
   "phone.tzz_mod.task.popup.line_count": "%s: %s 条新任务",
   "phone.tzz_mod.task.popup.more": "还有 %s 条任务线...",
   "phone.tzz_mod.app.settings": "设置",
+  "phone.tzz_mod.settings.animations": "动画效果",
+  "phone.tzz_mod.settings.animations.subtitle": "控制所有界面动画是否启用,例如区域名称淡入淡出、手机开关/解锁动画和逐字提示。关闭后改为静态显示,默认开启。",
   "phone.tzz_mod.settings.alert_mode": "醒目提醒模式",
   "phone.tzz_mod.settings.alert_mode.subtitle": "收到新消息或新任务时,在准星偏下位置显示绿色逐字提醒,并为每个字播放提示音,以提醒你注意新消息(可能会破坏部分沉浸感)",
   "phone.tzz_mod.settings.always_show_region_title": "区域名常显",

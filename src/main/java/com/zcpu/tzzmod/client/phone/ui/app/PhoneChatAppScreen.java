@@ -14,12 +14,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PhoneChatAppScreen extends AbstractPhoneScreen {
+    private static final long STATIC_SUBTITLE_MS = 1_200L;
+
     private final List<RowEntry> rows = new ArrayList<>();
     private Runnable stateListener;
     private int conversationCount;
     private int scrollOffset;
 
     private TypingSubtitleAnimator subtitleAnimator;
+    private Text staticSubtitle = Text.empty();
+    private long staticSubtitleExpiresAtMs;
     private int lastTotalUnread = 0;
 
     public PhoneChatAppScreen(Screen parent) {
@@ -81,8 +85,7 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
         // Check unread change to trigger subtitle
         int totalUnread = PhoneChatClient.getTotalUnreadCount();
         if (PhoneSettingsClient.isAlertModeEnabled() && totalUnread > lastTotalUnread) {
-            subtitleAnimator = new TypingSubtitleAnimator("你有新消息", 14, s -> playCharSound());
-            subtitleAnimator.start();
+            showTransientSubtitle(Text.literal("你有新消息"));
         }
         lastTotalUnread = totalUnread;
     }
@@ -119,6 +122,8 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             return;
         }
 
+        renderTransientSubtitle(context, delta);
+
         if (conversationCount == 0) {
             // Ensure the empty-state hint is drawn below the "Create Group" button so it isn't obscured.
             int defaultY = contentY + s(38);
@@ -134,19 +139,6 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
                     emptyY,
                     0xFFECECEC);
             return;
-        }
-
-        // advance subtitle animator
-        if (subtitleAnimator != null) {
-            subtitleAnimator.tick(delta);
-            Text sub = subtitleAnimator.getRenderedText();
-            if (!sub.getString().isEmpty()) {
-                // draw subtitle below title
-                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
-            }
-            if (subtitleAnimator.isFinished()) {
-                subtitleAnimator = null;
-            }
         }
 
         int top = getListTop();
@@ -254,6 +246,46 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             PhoneChatClient.removeListener(stateListener);
             stateListener = null;
         }
+    }
+
+    private void showTransientSubtitle(Text text) {
+        if (PhoneSettingsClient.isAnimationsEnabled()) {
+            subtitleAnimator = new TypingSubtitleAnimator(text.getString(), 14, ignored -> playCharSound());
+            subtitleAnimator.start();
+            staticSubtitle = Text.empty();
+            staticSubtitleExpiresAtMs = 0L;
+            return;
+        }
+
+        subtitleAnimator = null;
+        staticSubtitle = text;
+        staticSubtitleExpiresAtMs = System.currentTimeMillis() + STATIC_SUBTITLE_MS;
+    }
+
+    private void renderTransientSubtitle(DrawContext context, float delta) {
+        if (subtitleAnimator != null) {
+            subtitleAnimator.tick(delta);
+            Text sub = subtitleAnimator.getRenderedText();
+            if (!sub.getString().isEmpty()) {
+                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+            }
+            if (subtitleAnimator.isFinished()) {
+                subtitleAnimator = null;
+            }
+            return;
+        }
+
+        if (staticSubtitle.getString().isEmpty()) {
+            return;
+        }
+
+        if (System.currentTimeMillis() >= staticSubtitleExpiresAtMs) {
+            staticSubtitle = Text.empty();
+            staticSubtitleExpiresAtMs = 0L;
+            return;
+        }
+
+        context.drawCenteredTextWithShadow(textRenderer, staticSubtitle, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
     }
 
     private void playCharSound() {

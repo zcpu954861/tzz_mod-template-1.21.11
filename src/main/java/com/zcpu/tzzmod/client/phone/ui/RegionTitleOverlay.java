@@ -44,6 +44,7 @@ public final class RegionTitleOverlay {
 
         long now = System.currentTimeMillis();
         boolean transientVisible = shownAtMs >= 0L && !current.getString().isBlank();
+        boolean animationsEnabled = PhoneSettingsClient.isAnimationsEnabled();
         float alphaFactor = 1.0F;
         float scale = 1.0F;
         float lift = 0.0F;
@@ -55,6 +56,9 @@ public final class RegionTitleOverlay {
             if (elapsed >= DISPLAY_MS) {
                 clear();
                 transientVisible = false;
+            } else if (!animationsEnabled) {
+                title = current;
+                color = currentColor;
             } else {
                 float enter = clamp(elapsed / (float) ANIMATE_IN_MS);
                 float remaining = DISPLAY_MS - elapsed;

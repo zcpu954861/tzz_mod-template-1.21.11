@@ -16,10 +16,12 @@ public class TypingSubtitleAnimator {
     private final int[] codePoints;
     private final float secondsPerChar;
     private final Consumer<String> onCharRendered;
+    private final StringBuilder renderedBuilder = new StringBuilder();
 
     private int revealedCount = 0; // number of codepoints revealed
     private float acc = 0f;
     private boolean running = false;
+    private Text renderedText = Text.empty();
 
     public TypingSubtitleAnimator(String fullString, int charsPerSecond, Consumer<String> onCharRendered) {
         this(fullString, (float) charsPerSecond, onCharRendered);
@@ -36,6 +38,8 @@ public class TypingSubtitleAnimator {
         this.revealedCount = 0;
         this.acc = 0f;
         this.running = true;
+        this.renderedBuilder.setLength(0);
+        this.renderedText = Text.empty();
     }
 
     public void stop() {
@@ -54,6 +58,8 @@ public class TypingSubtitleAnimator {
             // reveal next codepoint
             int cp = codePoints[revealedCount++];
             String s = new String(Character.toChars(cp));
+            renderedBuilder.appendCodePoint(cp);
+            renderedText = Text.literal(renderedBuilder.toString());
             try {
                 onCharRendered.accept(s);
             } catch (Exception ignored) {}
@@ -64,16 +70,19 @@ public class TypingSubtitleAnimator {
     }
 
     public Text getRenderedText() {
-        if (revealedCount <= 0) return Text.empty();
-        // build string from first revealedCount codepoints
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < revealedCount && i < codePoints.length; i++) {
-            sb.appendCodePoint(codePoints[i]);
-        }
-        return Text.literal(sb.toString());
+        return renderedText;
     }
 
     public boolean isFinished() {
         return revealedCount >= codePoints.length;
+    }
+
+    public void revealAll() {
+        revealedCount = codePoints.length;
+        acc = 0f;
+        running = false;
+        renderedBuilder.setLength(0);
+        renderedBuilder.append(fullString);
+        renderedText = fullString.isEmpty() ? Text.empty() : Text.literal(fullString);
     }
 }

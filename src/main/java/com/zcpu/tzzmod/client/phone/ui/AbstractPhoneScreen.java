@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.client.phone.ui;
 
+import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -107,7 +108,10 @@ public abstract class AbstractPhoneScreen extends Screen {
         contentWidth = Math.max(1, phoneWidth - horizontalInset * 2);
         contentHeight = Math.max(1, phoneHeight - topInset - s(STATUS_BAR_HEIGHT) - statusGap - bottomInset);
 
-        if (appLaunchAnimation != null && appLaunchAnimationStartedAtMs < 0L) {
+        if (!areAnimationsEnabled()) {
+            appLaunchAnimation = null;
+            appLaunchAnimationStartedAtMs = -1L;
+        } else if (appLaunchAnimation != null && appLaunchAnimationStartedAtMs < 0L) {
             appLaunchAnimationStartedAtMs = System.currentTimeMillis();
         }
         closeAnimationStartedAtMs = -1L;
@@ -122,11 +126,15 @@ public abstract class AbstractPhoneScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        boolean animatingOpen = hasAppLaunchAnimation();
-        boolean animatingClose = isClosingToParent();
-        if ((animatingOpen || animatingClose) && parent != null) {
-            parent.render(context, Integer.MIN_VALUE, Integer.MIN_VALUE, delta);
+        boolean animationsEnabled = areAnimationsEnabled();
+        if (!animationsEnabled) {
+            appLaunchAnimation = null;
+            appLaunchAnimationStartedAtMs = -1L;
+            closeAnimationStartedAtMs = -1L;
         }
+
+        boolean animatingOpen = animationsEnabled && hasAppLaunchAnimation();
+        boolean animatingClose = animationsEnabled && isClosingToParent();
 
         float openProgress = getOpenAnimationProgress();
         float closeProgress = getCloseAnimationProgress();
@@ -282,17 +290,12 @@ public abstract class AbstractPhoneScreen extends Screen {
     private void drawCornerArc(DrawContext context, int centerX, int centerY, int radius, int thickness, int xDir, int yDir) {
         if (radius <= 0 || thickness <= 0) return;
         int innerR = Math.max(0, radius - thickness);
+        int[] outerSpans = RoundedRectRenderer.getCornerSpans(radius);
+        int[] innerSpans = innerR > 0 ? RoundedRectRenderer.getCornerSpans(innerR) : null;
 
         for (int dy = 0; dy <= radius; dy++) {
-            double rr = radius * radius - dy * dy;
-            if (rr < 0) rr = 0;
-            int dxOuter = (int) Math.floor(Math.sqrt(rr));
-
-            int dxInner = 0;
-            if (innerR > 0) {
-                double ri = innerR * innerR - dy * dy;
-                if (ri > 0) dxInner = (int) Math.floor(Math.sqrt(ri));
-            }
+            int dxOuter = outerSpans[dy];
+            int dxInner = innerSpans != null && dy < innerSpans.length ? innerSpans[dy] : 0;
 
             int drawY = centerY + (yDir < 0 ? -dy : dy);
 
@@ -438,6 +441,10 @@ public abstract class AbstractPhoneScreen extends Screen {
             client.setScreen(null);
             return;
         }
+        if (!areAnimationsEnabled()) {
+            client.setScreen(parent);
+            return;
+        }
         if (!isClosingToParent()) {
             closeAnimationStartedAtMs = System.currentTimeMillis();
         }
@@ -456,12 +463,24 @@ public abstract class AbstractPhoneScreen extends Screen {
     }
 
     public void setAppLaunchAnimation(int x, int y, int width, int height) {
+        if (!areAnimationsEnabled()) {
+            appLaunchAnimation = null;
+            appLaunchAnimationStartedAtMs = -1L;
+            return;
+        }
         appLaunchAnimation = new AppLaunchAnimation(x, y, Math.max(1, width), Math.max(1, height));
         appLaunchAnimationStartedAtMs = -1L;
     }
 
     protected boolean isTransitionBlockingInteraction() {
+        if (!areAnimationsEnabled()) {
+            return false;
+        }
         return hasAppLaunchAnimation() || isClosingToParent();
+    }
+
+    protected final boolean areAnimationsEnabled() {
+        return PhoneSettingsClient.isAnimationsEnabled();
     }
 
     private boolean hasAppLaunchAnimation() {

@@ -175,6 +175,12 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
 
     public boolean mouseClicked(Click click, boolean doubleClick) {
         if (isUnlockReady() && isInsideUnlockButton(click.x(), click.y())) {
+            if (!areAnimationsEnabled()) {
+                if (client != null) {
+                    client.setScreen(new PhoneHomeScreen());
+                }
+                return true;
+            }
             // Start unlock animation instead of immediately switching screens
             if (!unlocking) {
                 unlocking = true;
@@ -293,10 +299,16 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
     }
 
     private float getShellRiseProgress() {
+        if (!areAnimationsEnabled()) {
+            return 1.0F;
+        }
         return easeOutCubic(getClampedProgress(0L, SHELL_RISE_MS));
     }
 
     private float getScreenWakeProgress() {
+        if (!areAnimationsEnabled()) {
+            return 1.0F;
+        }
         return smoothStep(getClampedProgress(SCREEN_WAKE_DELAY_MS, SCREEN_WAKE_MS));
     }
 
@@ -322,6 +334,7 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
     // --- Unlock animation helpers ---
     private float getUnlockProgressRaw() {
         if (!unlocking) return 0.0F;
+        if (!areAnimationsEnabled()) return 1.0F;
         long elapsed = Math.max(0L, System.currentTimeMillis() - unlockingStartedAtMs);
         return MathHelper.clamp(elapsed / (float) UNLOCK_ANIM_MS, 0.0F, 1.0F);
     }
