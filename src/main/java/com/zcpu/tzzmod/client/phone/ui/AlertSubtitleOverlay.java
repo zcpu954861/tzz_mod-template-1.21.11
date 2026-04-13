@@ -259,11 +259,31 @@ public final class AlertSubtitleOverlay {
     }
 
     private static void drawRenderedText(DrawContext context, MinecraftClient client, Text rendered, int alpha) {
-        Text styled = rendered.copy().formatted(Formatting.GREEN);
-        int color = (alpha << 24) | BASE_RGB;
+        boolean techUi = PhoneSettingsClient.isExperimentalUiEnabled();
+        Text styled = techUi ? rendered.copy() : rendered.copy().formatted(Formatting.GREEN);
+        int baseColor = techUi ? 0x00FFE0 : BASE_RGB;
+        int color = (alpha << 24) | baseColor;
         int centerX = context.getScaledWindowWidth() / 2;
         int baseY = context.getScaledWindowHeight() / 2 + 18;
         int textWidth = client.textRenderer.getWidth(styled);
+
+        if (techUi) {
+            // Tech-themed: chamfered background bar with scanline accent
+            int scaledW = Math.round(textWidth * SCALE);
+            int bgPadX = 12;
+            int bgPadY = 4;
+            int bgX = centerX - scaledW / 2 - bgPadX;
+            int bgY = baseY - bgPadY;
+            int bgW = scaledW + bgPadX * 2;
+            int bgH = Math.round(client.textRenderer.fontHeight * SCALE) + bgPadY * 2;
+            int bgAlpha = Math.round(alpha * 0.35F);
+            // Background bar
+            context.fill(bgX + 4, bgY, bgX + bgW - 4, bgY + bgH, (bgAlpha << 24) | 0x0A0F1A);
+            // Accent lines top/bottom
+            int lineAlpha = Math.round(alpha * 0.6F);
+            context.fill(bgX + 4, bgY, bgX + bgW - 4, bgY + 1, (lineAlpha << 24) | 0x00FFE0);
+            context.fill(bgX + 4, bgY + bgH - 1, bgX + bgW - 4, bgY + bgH, (lineAlpha << 24) | 0x00B4A0);
+        }
 
         context.getMatrices().pushMatrix();
         context.getMatrices().translate((float) centerX, (float) baseY);

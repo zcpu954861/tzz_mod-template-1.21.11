@@ -91,21 +91,58 @@ public final class RegionTitleOverlay {
         int x = context.getScaledWindowWidth() / 2 - boxWidth / 2;
         int y = Math.max(10, Math.round(18.0F - lift));
         int alpha = Math.max(0, Math.min(255, Math.round(alphaFactor * 255.0F)));
-        int lineRgb = mixColor(color & 0xFFFFFF, 0xFFFFFF, 0.18F);
-        int backgroundRgb = mixColor(color & 0xFFFFFF, 0x08110B, 0.82F);
-        int background = (Math.round(alpha * 0.82F) << 24) | backgroundRgb;
-        int border = (Math.round(alpha * 0.94F) << 24) | lineRgb;
-        int textColor = (alpha << 24) | 0xF5FFF7;
 
-        context.fill(x, y, x + boxWidth, y + boxHeight, background);
-        context.fill(x, y, x + boxWidth, y + 1, border);
-        context.fill(x, y + boxHeight - 1, x + boxWidth, y + boxHeight, border);
+        boolean techUi = PhoneSettingsClient.isExperimentalUiEnabled();
+        if (techUi) {
+            // Tech-themed region title: dark angular box with cyan accent
+            int bgAlpha = Math.round(alpha * 0.75F);
+            int lineAlpha = Math.round(alpha * 0.85F);
+            int techBg = (bgAlpha << 24) | 0x0A0F1A;
+            int techBorder = (lineAlpha << 24) | 0x00D4BE;
+            int techAccent = (lineAlpha << 24) | 0x00FFE0;
+            int techText = (alpha << 24) | 0xE0F7FF;
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate((float) (context.getScaledWindowWidth() / 2), (float) (y + paddingY));
-        context.getMatrices().scale(scale, scale);
-        context.drawTextWithShadow(client.textRenderer, Text.literal(display), -textWidth / 2, 0, textColor);
-        context.getMatrices().popMatrix();
+            // Chamfered background (approximate with clipped corners)
+            int chamfer = 4;
+            context.fill(x + chamfer, y, x + boxWidth - chamfer, y + boxHeight, techBg);
+            context.fill(x, y + chamfer, x + boxWidth, y + boxHeight - chamfer, techBg);
+            for (int i = 0; i < chamfer; i++) {
+                int offset = chamfer - i;
+                context.fill(x + offset, y + i, x + boxWidth - offset, y + i + 1, techBg);
+                context.fill(x + offset, y + boxHeight - 1 - i, x + boxWidth - offset, y + boxHeight - i, techBg);
+            }
+
+            // Top accent line
+            context.fill(x + chamfer, y, x + boxWidth - chamfer, y + 1, techAccent);
+            // Bottom border
+            context.fill(x + chamfer, y + boxHeight - 1, x + boxWidth - chamfer, y + boxHeight, techBorder);
+            // Small corner accents
+            int accentLen = Math.max(4, chamfer + 2);
+            context.fill(x + chamfer, y - 1, x + chamfer + accentLen, y, techAccent);
+            context.fill(x + boxWidth - chamfer - accentLen, y - 1, x + boxWidth - chamfer, y, techAccent);
+
+            context.getMatrices().pushMatrix();
+            context.getMatrices().translate((float) (context.getScaledWindowWidth() / 2), (float) (y + paddingY));
+            context.getMatrices().scale(scale, scale);
+            context.drawTextWithShadow(client.textRenderer, Text.literal(display), -textWidth / 2, 0, techText);
+            context.getMatrices().popMatrix();
+        } else {
+            int lineRgb = mixColor(color & 0xFFFFFF, 0xFFFFFF, 0.18F);
+            int backgroundRgb = mixColor(color & 0xFFFFFF, 0x08110B, 0.82F);
+            int background = (Math.round(alpha * 0.82F) << 24) | backgroundRgb;
+            int border = (Math.round(alpha * 0.94F) << 24) | lineRgb;
+            int textColor = (alpha << 24) | 0xF5FFF7;
+
+            context.fill(x, y, x + boxWidth, y + boxHeight, background);
+            context.fill(x, y, x + boxWidth, y + 1, border);
+            context.fill(x, y + boxHeight - 1, x + boxWidth, y + boxHeight, border);
+
+            context.getMatrices().pushMatrix();
+            context.getMatrices().translate((float) (context.getScaledWindowWidth() / 2), (float) (y + paddingY));
+            context.getMatrices().scale(scale, scale);
+            context.drawTextWithShadow(client.textRenderer, Text.literal(display), -textWidth / 2, 0, textColor);
+            context.getMatrices().popMatrix();
+        }
     }
 
     private static float clamp(float value) {

@@ -170,7 +170,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         int totalGroupWidth = iconSize * MAX_COLUMNS + spacingX * (MAX_COLUMNS + 1);
         int extraOffset = Math.max(0, (contentWidth - totalGroupWidth) / 2);
         // ensure labels under icons have space: compute minimal row height to fit icon + label
-        int labelHeight = Math.max(1, textRenderer.fontHeight);
+        int labelHeight = Math.max(1, scaledFontHeight());
         int rowHeight = Math.max(Math.min(s(58), (contentHeight - s(70)) / MAX_ROWS), iconSize + labelHeight + s(8));
         int startY = contentY + s(20); // bring icons a bit lower so title and first-row labels are visible
 
@@ -199,7 +199,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         if (isExperimentalUi()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.home"),
+            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.home"),
                     contentX + contentWidth / 2, contentY + s(8), 0xFF00FFE0);
         } else {
             drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
@@ -209,17 +209,20 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         int taskUnread = TaskClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
-            // Tech UI: draw a subtle chamfered frame behind each icon
+            // Tech UI: draw a subtle thin border around each icon with a faint glow
             if (isExperimentalUi()) {
-                int framePad = s(2);
+                int framePad = s(1);
                 int frameX = slot.x - framePad;
                 int frameY = slot.y - framePad;
                 int frameW = slot.size + framePad * 2;
                 int frameH = slot.size + framePad * 2;
-                int frameChamfer = Math.max(2, s(3));
-                fillChamferedRect(context, frameX, frameY, frameW, frameH, frameChamfer, 0x441A4A6C);
+                int frameChamfer = Math.max(2, s(2));
+                // Outer subtle glow
+                fillChamferedRect(context, frameX - 1, frameY - 1, frameW + 2, frameH + 2, frameChamfer + 1, 0x1800FFE0);
+                // Thin border line
+                fillChamferedRect(context, frameX, frameY, frameW, frameH, frameChamfer, 0x551A4A6C);
                 fillChamferedRect(context, frameX + 1, frameY + 1, Math.max(1, frameW - 2), Math.max(1, frameH - 2),
-                        Math.max(1, frameChamfer - 1), 0x220A1825);
+                        Math.max(1, frameChamfer - 1), 0x00000000);
             }
 
             // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
@@ -231,7 +234,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 context.drawTexturedQuad(slot.entry.iconTexture(), x1, y1, x1 + iconSize, y1 + iconSize,
                         0.0F, 1.0F, 0.0F, 1.0F);
             } else {
-                context.drawCenteredTextWithShadow(textRenderer, Text.literal("?"), slot.x + slot.size / 2, slot.y + slot.size / 2 - s(4), 0xFF1A1A1A);
+                drawScaledCenteredText(context, Text.literal("?"), slot.x + slot.size / 2, slot.y + slot.size / 2 - s(4), 0xFF1A1A1A);
             }
 
             // Special overlay: if this is call_admin and it's cooling down, draw a small lock badge
@@ -262,13 +265,13 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             if (appName == null || appName.isEmpty()) {
                 appName = slot.entry.id();
             }
-            String shownName = textRenderer.trimToWidth(appName, Math.max(s(10), slot.size + s(8)));
+            String shownName = textRenderer.trimToWidth(appName, Math.max(s(10), Math.round((slot.size + s(8)) / getTextScale())));
             if (shownName == null || shownName.isEmpty()) {
                 shownName = appName == null || appName.isEmpty() ? slot.entry.id() : appName;
             }
             // Draw label text directly without a background so it appears over the game's blur.
             if (isExperimentalUi()) {
-                context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4), 0xFFE0F7FF);
+                drawScaledCenteredText(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4), 0xFFE0F7FF);
             } else {
                 drawPhoneTextCenteredFixed(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4));
             }
@@ -293,8 +296,8 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         }
 
         String badge = unreadCount > 99 ? "99+" : Integer.toString(unreadCount);
-        int textWidth = textRenderer.getWidth(badge);
-        context.drawTextWithShadow(textRenderer, badge, centerX - textWidth / 2, centerY - s(3), 0xFFFFFFFF);
+        int textWidth = scaledTextWidth(badge);
+        drawScaledText(context, Text.literal(badge), centerX - textWidth / 2, centerY - s(3), 0xFFFFFFFF);
     }
 
     private void drawCircle(DrawContext context, int centerX, int centerY, int radius, int color) {

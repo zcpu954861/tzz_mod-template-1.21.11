@@ -66,6 +66,7 @@ public abstract class AbstractPhoneScreen extends Screen {
     protected int contentHeight;
 
     private float uiScale = 1.0F;
+    private float textScale = 1.0F;
     private final List<PhoneButtonRenderData> phoneButtons = new ArrayList<>();
     private AppLaunchAnimation appLaunchAnimation;
     private long appLaunchAnimationStartedAtMs = -1L;
@@ -109,6 +110,10 @@ public abstract class AbstractPhoneScreen extends Screen {
                 (this.height - margin * 2) / (float) targetHeight
         ));
         uiScale = Math.max(0.35F, fitScale);
+
+        // When the phone is smaller than the reference size, scale text down proportionally
+        // so text doesn't become disproportionately large at high GUI scales.
+        textScale = Math.min(1.0F, uiScale);
 
         phoneWidth = Math.max(1, Math.round(targetWidth * uiScale));
         phoneHeight = Math.max(1, Math.round(targetHeight * uiScale));
@@ -195,22 +200,76 @@ public abstract class AbstractPhoneScreen extends Screen {
         if (animatingOpen || animatingClose) {
             context.getMatrices().pushMatrix();
             if (isExperimentalUi()) {
-                // Tech UI: horizontal wipe / alpha-based transition
+                // Tech UI: digital-reveal open / glitch-dissolve close
                 if (animatingOpen) {
-                    float alpha = openProgress;
+                    // Phase 1 (0-0.3): content alpha fades in
+                    // Phase 2 (0.0-1.0): scale transition + scanline sweep
                     context.getMatrices().translate(translateX, translateY);
                     context.getMatrices().scale(scaleX, scaleY);
                     renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
-                    // Scanline wipe overlay: bright line sweeping down
+
+                    // Digital reveal overlay - multiple scan lines sweeping
+                    int insetX = s(4);
+                    int left = phoneX + insetX;
+                    int right = phoneX + phoneWidth - insetX;
+
+                    // Primary bright scanline sweeping down
                     int wipeY = phoneY + Math.round(openProgress * phoneHeight);
                     if (wipeY > phoneY && wipeY < phoneY + phoneHeight) {
-                        context.fill(phoneX + s(4), wipeY - s(1), phoneX + phoneWidth - s(4), wipeY + s(1), 0x6600FFE0);
+                        context.fill(left, wipeY - s(1), right, wipeY, 0x9900FFE0);
+                        context.fill(left, wipeY, right, wipeY + s(1), 0x5500FFE0);
+                        // Trailing glow
+                        context.fill(left, wipeY - s(3), right, wipeY - s(1), 0x2200FFE0);
+                    }
+
+                    // Secondary scanlines at different speeds for depth
+                    int wipeY2 = phoneY + Math.round(Math.min(1.0F, openProgress * 1.4F) * phoneHeight);
+                    if (wipeY2 > phoneY && wipeY2 < phoneY + phoneHeight) {
+                        context.fill(left + (right - left) / 4, wipeY2, right - (right - left) / 4, wipeY2 + 1, 0x3300FFE0);
+                    }
+
+                    // Horizontal glitch bars during early transition
+                    if (openProgress < 0.6F) {
+                        float glitchIntensity = 1.0F - (openProgress / 0.6F);
+                        int glitchAlpha = Math.round(50.0F * glitchIntensity);
+                        // a few random-ish bars based on progress
+                        int barCount = Math.min(4, Math.round(glitchIntensity * 5));
+                        for (int i = 0; i < barCount; i++) {
+                            int barY = phoneY + (phoneHeight * ((i * 37 + 13) % 100)) / 100;
+                            int barH = Math.max(1, s(1 + i % 2));
+                            int barLeft = left + ((i * 53) % (Math.max(1, (right - left) / 3)));
+                            int barRight = Math.min(right, barLeft + (right - left) / 3 + ((i * 29) % (Math.max(1, (right - left) / 4))));
+                            context.fill(barLeft, barY, barRight, barY + barH, (glitchAlpha << 24) | 0x0A0F1A);
+                        }
                     }
                 } else {
+                    // Close animation: glitch-dissolve effect
                     context.getMatrices().translate(translateX, translateY);
                     context.getMatrices().scale(scaleX, scaleY);
                     renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+
+                    // Digital dissolve veil
                     renderClosingRevealVeil(context, closeProgress);
+
+                    // Glitch bars appearing during close
+                    int insetX = s(4);
+                    int left = phoneX + insetX;
+                    int right = phoneX + phoneWidth - insetX;
+                    if (closeProgress > 0.2F) {
+                        float glitchIntensity = (closeProgress - 0.2F) / 0.8F;
+                        int barCount = Math.min(6, Math.round(glitchIntensity * 6));
+                        for (int i = 0; i < barCount; i++) {
+                            int barY = phoneY + (phoneHeight * ((i * 41 + 7) % 100)) / 100;
+                            int barH = Math.max(1, s(1));
+                            context.fill(left, barY, right, barY + barH, (Math.round(40.0F * glitchIntensity) << 24) | 0x00FFE0);
+                        }
+                    }
+
+                    // Fade-out scanline sweeping upward
+                    int scanY = phoneY + phoneHeight - Math.round(closeProgress * phoneHeight);
+                    if (scanY > phoneY && scanY < phoneY + phoneHeight) {
+                        context.fill(left, scanY, right, scanY + s(1), 0x6600FFE0);
+                    }
                 }
             } else {
                 context.getMatrices().translate(translateX, translateY);
@@ -258,20 +317,20 @@ public abstract class AbstractPhoneScreen extends Screen {
                 ? client.player.getName().getString()
                 : "Player";
 
-        context.drawTextWithShadow(textRenderer, Text.literal(timeText), statusX + s(6), statusY + s(4), 0xFFECECEC);
+        drawScaledText(context, Text.literal(timeText), statusX + s(6), statusY + s(4), 0xFFECECEC);
 
-        String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), statusWidth - s(40)));
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), 0xFFECECEC);
+        String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), Math.round((statusWidth - s(40)) / textScale)));
+        drawScaledCenteredText(context, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), 0xFFECECEC);
 
         boolean hasDeathTag = com.zcpu.tzzmod.client.DeathSyncClient.isLocalPlayerDead();
         Text statusText = hasDeathTag ? Text.literal("死亡") : Text.literal("存活");
         int statusColor = hasDeathTag ? 0xFFFF6666 : 0xFF66FF66;
-        int textWidth = textRenderer.getWidth(statusText);
+        int textWidth = scaledTextWidth(statusText.getString());
         int rightPadding = s(6);
         int drawX = statusX + statusWidth - rightPadding - textWidth;
         int drawY = statusY + s(4);
         if (drawX < statusX + s(6)) drawX = statusX + s(6);
-        context.drawTextWithShadow(textRenderer, statusText, drawX, drawY, statusColor);
+        drawScaledText(context, statusText, drawX, drawY, statusColor);
 
         int dividerY = statusY + statusHeight + s(1);
         context.fill(statusX + s(2), dividerY, statusX + statusWidth - s(2), dividerY + 1, STATUS_DIVIDER_COLOR);
@@ -286,13 +345,67 @@ public abstract class AbstractPhoneScreen extends Screen {
         return Math.max(1, Math.round(value * uiScale));
     }
 
+    /**
+     * Returns the text scale factor for the phone UI. Text is scaled proportionally
+     * to the phone size so it doesn't become too large at high GUI scale values.
+     */
+    protected float getTextScale() {
+        return textScale;
+    }
+
+    /**
+     * Returns the effective scaled font height considering the text scale factor.
+     */
+    protected int scaledFontHeight() {
+        return Math.max(1, Math.round(textRenderer.fontHeight * textScale));
+    }
+
+    /**
+     * Returns the effective scaled text width considering the text scale factor.
+     */
+    protected int scaledTextWidth(String text) {
+        return Math.max(1, Math.round(textRenderer.getWidth(text) * textScale));
+    }
+
+    /**
+     * Draw text with shadow, applying the phone text scale factor.
+     */
+    protected void drawScaledText(DrawContext context, Text text, int x, int y, int color) {
+        if (textScale >= 0.99F) {
+            context.drawTextWithShadow(textRenderer, text, x, y, color);
+            return;
+        }
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate(x, y);
+        context.getMatrices().scale(textScale, textScale);
+        context.drawTextWithShadow(textRenderer, text, 0, 0, color);
+        context.getMatrices().popMatrix();
+    }
+
+    /**
+     * Draw centered text with shadow, applying the phone text scale factor.
+     */
+    protected void drawScaledCenteredText(DrawContext context, Text text, int centerX, int y, int color) {
+        if (textScale >= 0.99F) {
+            context.drawCenteredTextWithShadow(textRenderer, text, centerX, y, color);
+            return;
+        }
+        int textWidth = textRenderer.getWidth(text);
+        float scaledHalfWidth = textWidth * textScale / 2.0F;
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate(centerX - scaledHalfWidth, y);
+        context.getMatrices().scale(textScale, textScale);
+        context.drawTextWithShadow(textRenderer, text, 0, 0, color);
+        context.getMatrices().popMatrix();
+    }
+
     protected boolean hasResource(net.minecraft.util.Identifier identifier) {
         return client != null && client.getResourceManager().getResource(identifier).isPresent();
     }
 
     protected void drawPhoneTextCenteredFixed(DrawContext context, Text text, int centerX, int y) {
         int color = isExperimentalUi() ? TECH_TEXT : 0xFFECECEC;
-        context.drawCenteredTextWithShadow(textRenderer, text, centerX, y, color);
+        drawScaledCenteredText(context, text, centerX, y, color);
     }
 
     protected void drawLineBorder(DrawContext context, int x, int y, int width, int height) {
@@ -522,23 +635,23 @@ public abstract class AbstractPhoneScreen extends Screen {
                 : "Player";
 
         // Time on left with accent color
-        context.drawTextWithShadow(textRenderer, Text.literal(timeText), statusX + s(6), statusY + s(4), TECH_ACCENT);
+        drawScaledText(context, Text.literal(timeText), statusX + s(6), statusY + s(4), TECH_ACCENT);
 
         // Player name centered
-        String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), statusWidth - s(40)));
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), TECH_TEXT);
+        String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), Math.round((statusWidth - s(40)) / textScale)));
+        drawScaledCenteredText(context, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), TECH_TEXT);
 
         // Death/alive status on right
         boolean hasDeathTag = com.zcpu.tzzmod.client.DeathSyncClient.isLocalPlayerDead();
         Text statusText = hasDeathTag ? Text.literal("死亡") : Text.literal("存活");
         int statusColor = hasDeathTag ? 0xFFFF4444 : TECH_ACCENT;
-        int textWidth = textRenderer.getWidth(statusText);
+        int textWidth = scaledTextWidth(statusText.getString());
         int rightPadding = s(6);
         int drawX = statusX + statusWidth - rightPadding - textWidth;
         if (drawX < statusX + s(6)) drawX = statusX + s(6);
-        context.drawTextWithShadow(textRenderer, statusText, drawX, statusY + s(4), statusColor);
+        drawScaledText(context, statusText, drawX, statusY + s(4), statusColor);
 
-        // Geometric divider: accent line with small diamond in center
+        // Geometric divider
         int dividerY = statusY + statusHeight + s(1);
         int divW = statusWidth - s(4);
         int divX = statusX + s(2);
@@ -622,8 +735,8 @@ public abstract class AbstractPhoneScreen extends Screen {
         String label = data.message().getString();
         if (!label.isBlank()) {
             int textColor = getPhoneButtonTextColor(data.variant(), button.active, selected);
-            int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
-            context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, textColor);
+            int textY = y + Math.max(0, (height - scaledFontHeight()) / 2);
+            drawScaledCenteredText(context, data.message(), x + width / 2, textY, textColor);
         }
     }
 
@@ -675,14 +788,14 @@ public abstract class AbstractPhoneScreen extends Screen {
         int width = data.width();
         int height = data.height();
         boolean active = data.button().active;
-        int chamfer = Math.max(2, Math.min(height / 3, s(4)));
+        int chamfer = Math.max(2, Math.min(height / 4, s(3)));
 
         if (data.variant() == PhoneButtonWidget.Variant.GHOST && !hovered && !focused && !selected) {
             // Ghost buttons: only show label
             String label = data.message().getString();
             if (!label.isBlank()) {
-                int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
-                context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, active ? TECH_TEXT_DIM : 0xFF3A4A5A);
+                int textY = y + Math.max(0, (height - scaledFontHeight()) / 2);
+                drawScaledCenteredText(context, data.message(), x + width / 2, textY, active ? TECH_TEXT_DIM : 0xFF3A4A5A);
             }
             return;
         }
@@ -690,8 +803,8 @@ public abstract class AbstractPhoneScreen extends Screen {
         // Determine colors
         int borderColor, fillColor, textColor;
         if (!active) {
-            borderColor = 0x55334455;
-            fillColor = 0x440A1018;
+            borderColor = 0x44334455;
+            fillColor = 0x330A1018;
             textColor = 0xFF3A4A5A;
         } else if (data.variant() == PhoneButtonWidget.Variant.PRIMARY) {
             borderColor = hovered ? TECH_ACCENT : TECH_BTN_BORDER;
@@ -708,16 +821,34 @@ public abstract class AbstractPhoneScreen extends Screen {
         }
 
         // Draw chamfered button
-        fillChamferedRect(context, x, y, width, height, chamfer, borderColor);
-        fillChamferedRect(context, x + 1, y + 1, Math.max(1, width - 2), Math.max(1, height - 2), Math.max(1, chamfer - 1), fillColor);
+        fillChamferedRect(context, x, y, width, height, chamfer, fillColor);
 
-        // Scanline highlight at top
-        if (active) {
-            int hlH = Math.max(1, height / 5);
-            fillChamferedRect(context, x + 1, y + 1, Math.max(1, width - 2), hlH, Math.max(1, chamfer - 1), 0x18FFFFFF);
+        // Draw border as thin edges (1px), not a full outer chamfered rect
+        // Top edge
+        context.fill(x + chamfer, y, x + width - chamfer, y + 1, borderColor);
+        // Bottom edge
+        context.fill(x + chamfer, y + height - 1, x + width - chamfer, y + height, borderColor);
+        // Left edge
+        context.fill(x, y + chamfer, x + 1, y + height - chamfer, borderColor);
+        // Right edge
+        context.fill(x + width - 1, y + chamfer, x + width, y + height - chamfer, borderColor);
+        // Chamfer diagonals
+        for (int i = 0; i < chamfer; i++) {
+            int off = chamfer - i;
+            context.fill(x + off, y + i, x + off + 1, y + i + 1, borderColor);
+            context.fill(x + width - off - 1, y + i, x + width - off, y + i + 1, borderColor);
+            context.fill(x + off, y + height - 1 - i, x + off + 1, y + height - i, borderColor);
+            context.fill(x + width - off - 1, y + height - 1 - i, x + width - off, y + height - i, borderColor);
         }
 
-        // Focused: extra bright border
+        // Subtle top accent line for PRIMARY or hovered
+        if (active && (data.variant() == PhoneButtonWidget.Variant.PRIMARY || hovered)) {
+            int accentLen = Math.max(8, width / 3);
+            int accentX = x + (width - accentLen) / 2;
+            context.fill(accentX, y, accentX + accentLen, y + 1, 0x8800FFE0);
+        }
+
+        // Focused: outer glow
         if (focused) {
             fillChamferedRect(context, x - 1, y - 1, width + 2, height + 2, chamfer + 1, TECH_ACCENT_GLOW);
         }
@@ -725,8 +856,8 @@ public abstract class AbstractPhoneScreen extends Screen {
         // Label
         String label = data.message().getString();
         if (!label.isBlank()) {
-            int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
-            context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, textColor);
+            int textY = y + Math.max(0, (height - scaledFontHeight()) / 2);
+            drawScaledCenteredText(context, data.message(), x + width / 2, textY, textColor);
         }
     }
 

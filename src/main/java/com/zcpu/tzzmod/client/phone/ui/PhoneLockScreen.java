@@ -268,7 +268,7 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         RoundedRectRenderer.fillRoundedRect(context, buttonX, buttonY, buttonWidth, buttonHeight, radius, borderColor);
         RoundedRectRenderer.fillRoundedRect(context, buttonX + 1, buttonY + 1, Math.max(1, buttonWidth - 2), Math.max(1, buttonHeight - 2), Math.max(1, radius - 1), fillColor);
         RoundedRectRenderer.fillRoundedRect(context, buttonX + 2, buttonY + 2, Math.max(1, buttonWidth - 4), Math.max(1, buttonHeight / 3), Math.max(1, radius - 2), withAlpha(0xFFFFFFFF, unlocking ? 26 : 70));
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"), buttonX + buttonWidth / 2, buttonY + (buttonHeight - textRenderer.fontHeight) / 2, textColor);
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"), buttonX + buttonWidth / 2, buttonY + (buttonHeight - scaledFontHeight()) / 2, textColor);
     }
 
     private void renderLockGlyph(DrawContext context, int centerX, int centerY, int alpha) {
@@ -292,10 +292,11 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
     }
 
     private void renderScaledCenteredText(DrawContext context, Text text, int centerX, int y, float scale, int color) {
+        float effectiveScale = scale * getTextScale();
         int textWidth = textRenderer.getWidth(text);
         context.getMatrices().pushMatrix();
-        context.getMatrices().translate(centerX - (textWidth * scale) / 2.0F, (float) y);
-        context.getMatrices().scale(scale, scale);
+        context.getMatrices().translate(centerX - (textWidth * effectiveScale) / 2.0F, (float) y);
+        context.getMatrices().scale(effectiveScale, effectiveScale);
         context.drawTextWithShadow(textRenderer, text, 0, 0, color);
         context.getMatrices().popMatrix();
     }
@@ -460,7 +461,7 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         }
 
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"),
-                buttonX + buttonWidth / 2, buttonY + (buttonHeight - textRenderer.fontHeight) / 2, textColor);
+                buttonX + buttonWidth / 2, buttonY + (buttonHeight - scaledFontHeight()) / 2, textColor);
     }
 
     private boolean isInsideUnlockButton(double mouseX, double mouseY) {
