@@ -31,19 +31,19 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
             Text.translatable("phone.tzz_mod.settings.animations"),
             Text.translatable("phone.tzz_mod.settings.animations.subtitle"),
             PhoneSettingsClient::isAnimationsEnabled,
-            PhoneSettingsClient::setAnimationsEnabled
+            value -> PhoneSettingsClient.setAnimationsEnabled(Boolean.TRUE.equals(value))
         ));
         rows.add(new ToggleRow(
                 Text.translatable("phone.tzz_mod.settings.alert_mode"),
                 Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle"),
                 PhoneSettingsClient::isAlertModeEnabled,
-                PhoneSettingsClient::setAlertModeEnabled
+            value -> PhoneSettingsClient.setAlertModeEnabled(Boolean.TRUE.equals(value))
         ));
         rows.add(new ToggleRow(
                 Text.translatable("phone.tzz_mod.settings.always_show_region_title"),
                 Text.translatable("phone.tzz_mod.settings.always_show_region_title.subtitle"),
                 PhoneSettingsClient::isAlwaysShowRegionTitleEnabled,
-                PhoneSettingsClient::setAlwaysShowRegionTitleEnabled
+            value -> PhoneSettingsClient.setAlwaysShowRegionTitleEnabled(Boolean.TRUE.equals(value))
         ));
 
         int currentY = contentY + s(40);

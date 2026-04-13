@@ -5,8 +5,11 @@ import com.zcpu.tzzmod.ModItem.ModItemGroup;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.ModBlock.ModBlockEntities;
 import com.zcpu.tzzmod.ModBlock.ModBlocks;
+import com.zcpu.tzzmod.blocking.BlockingCardServer;
+import com.zcpu.tzzmod.blocking.BlockingCardUseHandler;
 import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.AdminPayloads;
+import com.zcpu.tzzmod.network.BlockingCardPayloads;
 import com.zcpu.tzzmod.network.DeathSyncServer;
 import com.zcpu.tzzmod.network.MapPayloads;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
@@ -59,6 +62,9 @@ public class Tzz_mod implements ModInitializer {
 		TaskServer.register();
 		PasswordPayloads.register();
 		PasswordServer.register();
+		BlockingCardPayloads.register();
+		BlockingCardServer.register();
+		BlockingCardUseHandler.register();
 
 		AdminPayloads.register();
 		AdminSyncServer.register();

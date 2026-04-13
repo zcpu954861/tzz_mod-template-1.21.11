@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.ModItem;
 
 import com.zcpu.tzzmod.ModItem.custom.PhoneItem;
+import com.zcpu.tzzmod.ModItem.custom.BlockingCardConfiguratorItem;
 import com.zcpu.tzzmod.ModItem.custom.PasswordConfigCardItem;
 import com.zcpu.tzzmod.ModItem.custom.RegionPlannerItem;
 import com.zcpu.tzzmod.ModItem.custom.TaskConfiguratorItem;
@@ -34,6 +35,7 @@ public final class ModItems {
     public static final Item MAGENTA_BLOCKING_CARD = register("magenta_blocking_card", com.zcpu.tzzmod.ModItem.custom.BlockingCardItem::new, new Item.Settings().maxCount(64));
     public static final Item PINK_BLOCKING_CARD = register("pink_blocking_card", com.zcpu.tzzmod.ModItem.custom.BlockingCardItem::new, new Item.Settings().maxCount(64));
     public static final Item TASK_CONFIGURATOR = register("task_configurator", TaskConfiguratorItem::new, new Item.Settings().maxCount(1));
+    public static final Item BLOCKING_CARD_CONFIGURATOR = register("blocking_card_configurator", BlockingCardConfiguratorItem::new, new Item.Settings().maxCount(1));
     public static final Item PASSWORD_CONFIG_CARD = register("password_config_card", PasswordConfigCardItem::new, new Item.Settings().maxCount(1));
     public static final Item MAP_MARKER = register("map_marker", MapMarkerItem::new, new Item.Settings().maxCount(1));
     public static final Item REGION_PLANNER = register("region_planner", RegionPlannerItem::new, new Item.Settings().maxCount(1));

@@ -377,7 +377,11 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
             return null;
         }
         try {
-            var entry = client.getNetworkHandler().getPlayerListEntry(UUID.fromString(senderUuid));
+            var networkHandler = client.getNetworkHandler();
+            if (networkHandler == null) {
+                return null;
+            }
+            var entry = networkHandler.getPlayerListEntry(UUID.fromString(senderUuid));
             if (entry == null) {
                 return null;
             }

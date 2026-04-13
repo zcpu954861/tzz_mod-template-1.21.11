@@ -1,9 +1,13 @@
 package com.zcpu.tzzmod.client;
 
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.blocking.BlockingCardConfiguratorClientAccess;
+import com.zcpu.tzzmod.blocking.BlockingCardConfiguratorState;
+import com.zcpu.tzzmod.client.blocking.BlockingCardClient;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatHudOverlay;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.PhoneLockScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.BlockingCardConfiguratorScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.MapMarkerListScreen;
 import com.zcpu.tzzmod.client.phone.ui.RegionTitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.app.RegionPlannerListScreen;
@@ -55,6 +59,18 @@ public class Tzz_modClient implements ClientModInitializer {
                 Tzz_mod.LOGGER.error("Failed to open task configurator", exception);
             }
         });
+        BlockingCardConfiguratorClientAccess.setOpener(hand -> {
+            try {
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.player == null) {
+                    return;
+                }
+                var stack = client.player.getStackInHand(hand);
+                client.setScreen(new BlockingCardConfiguratorScreen(client.currentScreen, hand, BlockingCardConfiguratorState.read(stack)));
+            } catch (Exception exception) {
+                Tzz_mod.LOGGER.error("Failed to open blocking card configurator", exception);
+            }
+        });
         PasswordMachineClientAccess.setOpener(pos -> {
             try {
                 MinecraftClient client = MinecraftClient.getInstance();
@@ -104,6 +120,7 @@ public class Tzz_modClient implements ClientModInitializer {
         com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.register();
         TaskClient.register();
         PasswordClient.register();
+        BlockingCardClient.register();
         com.zcpu.tzzmod.client.phone.PhoneAppsClient.register();
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, MAIN_HUD_LAYER_ID, (context, tickCounter) -> {
             // render the player's head and ID in the top-left

@@ -20,6 +20,7 @@ public final class ModItemGroup {
                 entries.add(ModItems.MAP_MARKER);
                 entries.add(ModItems.REGION_PLANNER);
                 entries.add(ModItems.TASK_CONFIGURATOR);
+                entries.add(ModItems.BLOCKING_CARD_CONFIGURATOR);
                 entries.add(ModItems.WHITE_BLOCKING_CARD);
                 entries.add(ModItems.LIGHT_GRAY_BLOCKING_CARD);
                 entries.add(ModItems.GRAY_BLOCKING_CARD);

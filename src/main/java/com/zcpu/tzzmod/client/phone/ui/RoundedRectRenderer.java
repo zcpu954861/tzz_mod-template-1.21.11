@@ -37,7 +37,7 @@ public final class RoundedRectRenderer {
 
     public static int[] getCornerSpans(int radius) {
         int safeRadius = Math.max(0, radius);
-        return RADIUS_SPANS.computeIfAbsent(safeRadius, RoundedRectRenderer::buildCornerSpans);
+        return RADIUS_SPANS.computeIfAbsent(safeRadius, value -> buildCornerSpans(value.intValue()));
     }
 
     private static int[] buildCornerSpans(int radius) {

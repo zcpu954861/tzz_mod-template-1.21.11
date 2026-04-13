@@ -135,12 +135,14 @@ public final class MapClient {
 
     public static PlannerRegion getCurrentRegion() {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.world == null) {
+        var player = client.player;
+        var world = client.world;
+        if (player == null || world == null) {
             return null;
         }
-        String dimensionId = client.world.getRegistryKey().getValue().toString();
-        int blockX = client.player.getBlockX();
-        int blockZ = client.player.getBlockZ();
+        String dimensionId = world.getRegistryKey().getValue().toString();
+        int blockX = player.getBlockX();
+        int blockZ = player.getBlockZ();
         for (PlannerRegion region : state.plannerRegions()) {
             if (!dimensionId.equals(region.dimensionId())) {
                 continue;
@@ -473,12 +475,13 @@ public final class MapClient {
     }
 
     private static void showError(MinecraftClient client, JsonObject body) {
-        if (client.player == null) {
+        var player = client.player;
+        if (player == null) {
             return;
         }
         String message = getString(body, "message");
         if (!message.isBlank()) {
-            client.player.sendMessage(Text.literal("[Map] " + message), false);
+            player.sendMessage(Text.literal("[Map] " + message), false);
         }
     }
 
@@ -490,22 +493,24 @@ public final class MapClient {
     }
 
     private static void spawnMarkerParticles(MinecraftClient client) {
-        if (client.world == null || client.player == null || client.world.getTime() % 2L != 0L) {
+        var world = client.world;
+        var player = client.player;
+        if (world == null || player == null || world.getTime() % 2L != 0L) {
             return;
         }
-        if (!client.player.getMainHandStack().isOf(ModItems.MAP_MARKER) && !client.player.getOffHandStack().isOf(ModItems.MAP_MARKER)) {
+        if (!player.getMainHandStack().isOf(ModItems.MAP_MARKER) && !player.getOffHandStack().isOf(ModItems.MAP_MARKER)) {
             return;
         }
-        String dimensionId = client.world.getRegistryKey().getValue().toString();
-        long worldTime = client.world.getTime();
+        String dimensionId = world.getRegistryKey().getValue().toString();
+        long worldTime = world.getTime();
         for (int index = 0; index < state.markers().size(); index++) {
             MapMarker marker = state.markers().get(index);
             if (!dimensionId.equals(marker.dimensionId())) {
                 continue;
             }
-            double dx = marker.x() + 0.5D - client.player.getX();
-            double dy = marker.y() + 0.5D - client.player.getY();
-            double dz = marker.z() + 0.5D - client.player.getZ();
+            double dx = marker.x() + 0.5D - player.getX();
+            double dy = marker.y() + 0.5D - player.getY();
+            double dz = marker.z() + 0.5D - player.getZ();
             if (dx * dx + dy * dy + dz * dz > 256.0D * 256.0D) {
                 continue;
             }
@@ -519,16 +524,18 @@ public final class MapClient {
     }
 
     private static void spawnRegionParticles(MinecraftClient client) {
-        if (client.world == null || client.player == null || client.world.getTime() % 2L != 0L) {
+        var world = client.world;
+        var player = client.player;
+        if (world == null || player == null || world.getTime() % 2L != 0L) {
             return;
         }
-        if (!client.player.getMainHandStack().isOf(ModItems.REGION_PLANNER) && !client.player.getOffHandStack().isOf(ModItems.REGION_PLANNER)) {
+        if (!player.getMainHandStack().isOf(ModItems.REGION_PLANNER) && !player.getOffHandStack().isOf(ModItems.REGION_PLANNER)) {
             return;
         }
 
-        String dimensionId = client.world.getRegistryKey().getValue().toString();
+        String dimensionId = world.getRegistryKey().getValue().toString();
         double baseY = -63.0D;
-        double topY = Math.max(baseY, client.player.getY());
+        double topY = Math.max(baseY, player.getY());
 
         for (PlannerRegion region : state.plannerRegions()) {
             if (!dimensionId.equals(region.dimensionId()) || !VISIBLE_REGION_IDS.contains(region.id())) {
@@ -612,16 +619,18 @@ public final class MapClient {
     }
 
     private static void spawnDustSafe(MinecraftClient client, double x, double y, double z, int color, float scale) {
-        if (client.player == null || client.world == null) {
+        var player = client.player;
+        var world = client.world;
+        if (player == null || world == null) {
             return;
         }
-        double dx = x - client.player.getX();
-        double dz = z - client.player.getZ();
+        double dx = x - player.getX();
+        double dz = z - player.getZ();
         if (dx * dx + dz * dz > PARTICLE_RANGE_SQ) {
             return;
         }
         BlockPos pos = BlockPos.ofFloored(x, y, z);
-        var blockState = client.world.getBlockState(pos);
+        var blockState = world.getBlockState(pos);
         if (!blockState.isAir() && !blockState.getFluidState().isIn(FluidTags.WATER)) {
             return;
         }

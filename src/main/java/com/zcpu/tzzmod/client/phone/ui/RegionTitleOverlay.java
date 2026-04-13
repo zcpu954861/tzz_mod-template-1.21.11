@@ -71,7 +71,7 @@ public final class RegionTitleOverlay {
             }
         }
 
-        if (!transientVisible && alwaysShow) {
+        if (!transientVisible && alwaysShow && activeRegion != null) {
             title = Text.literal(activeRegion.name());
             color = activeRegion.color();
         } else if (!transientVisible) {

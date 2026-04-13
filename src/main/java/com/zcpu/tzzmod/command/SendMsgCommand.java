@@ -10,7 +10,6 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
 import java.util.List;
-import java.util.Locale;
 
 public final class SendMsgCommand {
     private SendMsgCommand() {}
