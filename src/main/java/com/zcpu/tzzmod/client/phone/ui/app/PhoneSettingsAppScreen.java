@@ -28,6 +28,18 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
         super.init();
         rows.clear();
         rows.add(new ToggleRow(
+            Text.translatable("phone.tzz_mod.settings.experimental_ui"),
+            Text.translatable("phone.tzz_mod.settings.experimental_ui.subtitle"),
+            PhoneSettingsClient::isExperimentalUiEnabled,
+            value -> {
+                PhoneSettingsClient.setExperimentalUiEnabled(Boolean.TRUE.equals(value));
+                // Hot-switch: rebuild screen immediately so the new theme takes effect
+                if (client != null) {
+                    client.setScreen(new PhoneSettingsAppScreen(parent));
+                }
+            }
+        ));
+        rows.add(new ToggleRow(
             Text.translatable("phone.tzz_mod.settings.animations"),
             Text.translatable("phone.tzz_mod.settings.animations.subtitle"),
             PhoneSettingsClient::isAnimationsEnabled,
@@ -70,7 +82,13 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
 
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
-        drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.settings"), contentX + contentWidth / 2, contentY + s(8));
+        if (isExperimentalUi()) {
+            // Tech themed title: centered with accent color
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.app.settings"),
+                    contentX + contentWidth / 2, contentY + s(8), 0xFF00FFE0);
+        } else {
+            drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.settings"), contentX + contentWidth / 2, contentY + s(8));
+        }
         boolean animateToggles = PhoneSettingsClient.isAnimationsEnabled();
 
         for (ToggleRow row : rows) {
@@ -83,30 +101,49 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
             }
 
             int labelY = row.rowY + Math.max(0, (row.rowHeight - textRenderer.fontHeight) / 2);
-            context.drawTextWithShadow(textRenderer, row.label, row.rowX + s(6), labelY, 0xFFECECEC);
+            int labelColor = isExperimentalUi() ? 0xFFE0F7FF : 0xFFECECEC;
+            context.drawTextWithShadow(textRenderer, row.label, row.rowX + s(6), labelY, labelColor);
 
             int switchW = s(36);
             int switchH = s(14);
             int switchX = row.rowX + row.rowWidth - switchW - s(6);
             int switchY = row.rowY + Math.max(0, (row.rowHeight - switchH) / 2);
-            int capsuleColor = lerpColor(0x55333333, 0xFF3FC47F, row.progress);
-            int knobColor = row.target ? 0xFFFFFFFF : 0xFFCCCCCC;
 
-            RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
-            int knobSize = Math.max(1, switchH - s(2));
-            float leftCenter = switchX + s(2) + knobSize / 2.0F;
-            float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
-            int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
-            RoundedRectRenderer.fillRoundedRect(
-                    context,
-                    knobCenter - knobSize / 2,
-                    switchY + (switchH - knobSize) / 2,
-                    knobSize,
-                    knobSize,
-                    knobSize / 2,
-                    knobColor
-            );
+            if (isExperimentalUi()) {
+                // Tech-themed toggle: angular capsule with cyan accent
+                int capsuleColor = lerpColor(0x550A1A2C, 0xFF00B4A0, row.progress);
+                int knobColor = row.target ? 0xFF00FFE0 : 0xFF6B8A9E;
+                int chamfer = Math.max(2, switchH / 4);
 
+                fillChamferedRect(context, switchX, switchY, switchW, switchH, chamfer, lerpColor(0xAA1A4A6C, 0xCC00D4BE, row.progress));
+                fillChamferedRect(context, switchX + 1, switchY + 1, Math.max(1, switchW - 2), Math.max(1, switchH - 2), Math.max(1, chamfer - 1), capsuleColor);
+
+                int knobSize = Math.max(1, switchH - s(2));
+                float leftCenter = switchX + s(2) + knobSize / 2.0F;
+                float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
+                int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
+                fillChamferedRect(context, knobCenter - knobSize / 2, switchY + (switchH - knobSize) / 2, knobSize, knobSize, Math.max(1, knobSize / 4), knobColor);
+            } else {
+                int capsuleColor = lerpColor(0x55333333, 0xFF3FC47F, row.progress);
+                int knobColor = row.target ? 0xFFFFFFFF : 0xFFCCCCCC;
+
+                RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
+                int knobSize = Math.max(1, switchH - s(2));
+                float leftCenter = switchX + s(2) + knobSize / 2.0F;
+                float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
+                int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
+                RoundedRectRenderer.fillRoundedRect(
+                        context,
+                        knobCenter - knobSize / 2,
+                        switchY + (switchH - knobSize) / 2,
+                        knobSize,
+                        knobSize,
+                        knobSize / 2,
+                        knobColor
+                );
+            }
+
+            int subtitleColor = isExperimentalUi() ? 0xFF5A8A9E : 0xFFB8C7D4;
             int subtitleY = row.rowY + row.rowHeight + s(6);
             for (int index = 0; index < row.subtitleLines.size(); index++) {
                 context.drawTextWithShadow(
@@ -114,7 +151,7 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
                         Text.literal(row.subtitleLines.get(index)),
                         row.rowX + s(6),
                         subtitleY + index * (textRenderer.fontHeight + s(2)),
-                        0xFFB8C7D4
+                        subtitleColor
                 );
             }
         }

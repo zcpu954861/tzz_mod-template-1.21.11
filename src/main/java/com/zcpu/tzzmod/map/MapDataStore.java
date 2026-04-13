@@ -32,6 +32,17 @@ public final class MapDataStore {
         return getState(server).toSnapshot();
     }
 
+    public static synchronized void flushDirty(MinecraftServer server) {
+        MapState state = CACHE.get(server);
+        if (state != null) {
+            state.flushDirty();
+        }
+    }
+
+    public static synchronized void clearCache(MinecraftServer server) {
+        CACHE.remove(server);
+    }
+
     public static synchronized boolean setRegion(MinecraftServer server, String dimensionId, int x1, int y1, int z1, int x2, int y2, int z2) {
         MapState state = getState(server);
         int minX = Math.min(x1, x2);
@@ -43,7 +54,7 @@ public final class MapDataStore {
         state.region = new MapRegionData(safeDimensionId(dimensionId), minX, minY, minZ, maxX, maxY, maxZ);
         state.regionVersion++;
         state.markers.removeIf(marker -> !state.region.containsHorizontal(marker.x, marker.z) || !state.region.dimensionId.equals(marker.dimensionId));
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -73,7 +84,7 @@ public final class MapDataStore {
                 MapColors.paletteColor(state.markers.size())
         );
         state.markers.add(marker);
-        state.writeToDisk();
+        state.markDirty();
         return new AddMarkerResult(AddMarkerStatus.OK, marker);
     }
 
@@ -81,7 +92,7 @@ public final class MapDataStore {
         MapState state = getState(server);
         boolean removed = state.markers.removeIf(marker -> marker.id.equals(markerId));
         if (removed) {
-            state.writeToDisk();
+            state.markDirty();
         }
         return removed;
     }
@@ -109,7 +120,7 @@ public final class MapDataStore {
         );
         state.plannerRegions.add(region);
         state.sortPlannerRegions();
-        state.writeToDisk();
+        state.markDirty();
         return new PlannerRegionResult(PlannerRegionStatus.OK, region);
     }
 
@@ -130,7 +141,7 @@ public final class MapDataStore {
             PlannerRegionData updated = new PlannerRegionData(region.id(), cleanName, region.dimensionId(), region.points(), region.color());
             state.plannerRegions.set(index, updated);
             state.sortPlannerRegions();
-            state.writeToDisk();
+            state.markDirty();
             return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
         }
         return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
@@ -152,7 +163,7 @@ public final class MapDataStore {
             );
             state.plannerRegions.set(index, updated);
             state.sortPlannerRegions();
-            state.writeToDisk();
+            state.markDirty();
             return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
         }
         return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
@@ -162,7 +173,7 @@ public final class MapDataStore {
         MapState state = getState(server);
         boolean removed = state.plannerRegions.removeIf(region -> region.id().equals(regionId));
         if (removed) {
-            state.writeToDisk();
+            state.markDirty();
         }
         return removed;
     }
@@ -201,7 +212,7 @@ public final class MapDataStore {
                 continue;
             }
             state.markers.set(i, new MapMarkerData(marker.id, marker.name, marker.dimensionId, marker.x, marker.y, marker.z, color));
-            state.writeToDisk();
+            state.markDirty();
             return true;
         }
         return false;
@@ -216,7 +227,7 @@ public final class MapDataStore {
             }
             String cleanName = sanitizeMarkerName(name, marker.name);
             state.markers.set(i, new MapMarkerData(marker.id, cleanName, marker.dimensionId, marker.x, marker.y, marker.z, marker.color));
-            state.writeToDisk();
+            state.markDirty();
             return true;
         }
         return false;
@@ -258,7 +269,7 @@ public final class MapDataStore {
             default -> false;
         };
         if (changed) {
-            state.writeToDisk();
+            state.markDirty();
         }
         return changed;
     }
@@ -433,6 +444,7 @@ public final class MapDataStore {
         private boolean showOtherPlayers = true;
         private boolean showRegionTitles = true;
         private int regionVersion = 0;
+        private boolean dirty;
 
         private MapState(Path path) {
             this.path = path;
@@ -582,7 +594,20 @@ public final class MapDataStore {
                     .thenComparing(PlannerRegionData::id));
         }
 
-        private void writeToDisk() {
+        private void markDirty() {
+            dirty = true;
+        }
+
+        private void flushDirty() {
+            if (!dirty) {
+                return;
+            }
+            if (writeToDisk()) {
+                dirty = false;
+            }
+        }
+
+        private boolean writeToDisk() {
             try {
                 Files.createDirectories(path.getParent());
                 PersistedState persisted = new PersistedState();
@@ -632,8 +657,10 @@ public final class MapDataStore {
                 try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
                     GSON.toJson(persisted, writer);
                 }
+                return true;
             } catch (Exception exception) {
                 Tzz_mod.LOGGER.warn("Failed to write map state: {}", exception.getMessage());
+                return false;
             }
         }
     }

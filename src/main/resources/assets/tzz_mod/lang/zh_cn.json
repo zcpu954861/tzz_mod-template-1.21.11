@@ -106,6 +106,8 @@
   "phone.tzz_mod.settings.alert_mode.subtitle": "收到新消息或新任务时,在准星偏下位置显示绿色逐字提醒,并为每个字播放提示音,以提醒你注意新消息(可能会破坏部分沉浸感)",
   "phone.tzz_mod.settings.always_show_region_title": "区域名常显",
   "phone.tzz_mod.settings.always_show_region_title.subtitle": "开启后,只要你位于某个已规划区域内,屏幕上方就会一直显示该区域名称。",
+  "phone.tzz_mod.settings.experimental_ui": "全新的测试版UI",
+  "phone.tzz_mod.settings.experimental_ui.subtitle": "切换为科技简约风格界面,使用棱角几何线条与青色主题。可随时切换,默认关闭。",
   "phone.tzz_mod.alert.chat_subtitle": "接收到新的消息",
   "phone.tzz_mod.alert.task_subtitle": "接收到新的任务",
   "phone.tzz_mod.chat.manage_members": "管理成员",

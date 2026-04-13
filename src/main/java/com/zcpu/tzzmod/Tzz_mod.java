@@ -18,13 +18,16 @@ import com.zcpu.tzzmod.command.MapCommand;
 import com.zcpu.tzzmod.command.TaskCommand;
 import com.zcpu.tzzmod.network.TaskPayloads;
 import com.zcpu.tzzmod.task.TaskServer;
+import com.zcpu.tzzmod.task.TaskDataStore;
 import com.zcpu.tzzmod.network.AdminSyncServer;
 import com.zcpu.tzzmod.network.PasswordPayloads;
 import com.zcpu.tzzmod.password.PasswordServer;
 import com.zcpu.tzzmod.map.MapServer;
+import com.zcpu.tzzmod.map.MapDataStore;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +82,23 @@ public class Tzz_mod implements ModInitializer {
 			}
 		});
 
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			MapDataStore.flushDirty(server);
+			TaskDataStore.flushDirty(server);
+		});
+
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			MapDataStore.flushDirty(server);
+			TaskDataStore.flushDirty(server);
+			MapServer.clearServerState();
+		});
+
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+			MapDataStore.clearCache(server);
+			TaskDataStore.clearCache(server);
+			MapServer.clearServerState();
+		});
+
 		// Register server commands
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			SendMsgCommand.register(dispatcher);
@@ -87,6 +107,6 @@ public class Tzz_mod implements ModInitializer {
 			//DeathSpectatorCommand.register(dispatcher);
 		});
 
-		LOGGER.info("Hello Fabric world!");
+		LOGGER.info("Tzz_mod initialized successfully.");
 	}
 }

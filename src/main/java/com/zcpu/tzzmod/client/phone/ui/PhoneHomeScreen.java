@@ -198,12 +198,30 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
-        drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
+        if (isExperimentalUi()) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.home"),
+                    contentX + contentWidth / 2, contentY + s(8), 0xFF00FFE0);
+        } else {
+            drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
+        }
 
         int chatUnread = PhoneChatClient.getTotalUnreadCount();
         int taskUnread = TaskClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
+            // Tech UI: draw a subtle chamfered frame behind each icon
+            if (isExperimentalUi()) {
+                int framePad = s(2);
+                int frameX = slot.x - framePad;
+                int frameY = slot.y - framePad;
+                int frameW = slot.size + framePad * 2;
+                int frameH = slot.size + framePad * 2;
+                int frameChamfer = Math.max(2, s(3));
+                fillChamferedRect(context, frameX, frameY, frameW, frameH, frameChamfer, 0x441A4A6C);
+                fillChamferedRect(context, frameX + 1, frameY + 1, Math.max(1, frameW - 2), Math.max(1, frameH - 2),
+                        Math.max(1, frameChamfer - 1), 0x220A1825);
+            }
+
             // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
             if (hasResource(slot.entry.iconTexture())) {
                 int iconPadding = s(0);
@@ -249,7 +267,11 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 shownName = appName == null || appName.isEmpty() ? slot.entry.id() : appName;
             }
             // Draw label text directly without a background so it appears over the game's blur.
-            drawPhoneTextCenteredFixed(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4));
+            if (isExperimentalUi()) {
+                context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4), 0xFFE0F7FF);
+            } else {
+                drawPhoneTextCenteredFixed(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4));
+            }
         }
     }
 
@@ -258,8 +280,17 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         int centerY = slot.y + s(4);
         int radius = s(5);
 
-        drawCircle(context, centerX, centerY, radius + 1, 0xCC000000);
-        drawCircle(context, centerX, centerY, radius, 0xFFE64545);
+        if (isExperimentalUi()) {
+            // Tech-themed badge: chamfered diamond-ish shape
+            int badgeSize = radius * 2 + 1;
+            fillChamferedRect(context, centerX - radius - 1, centerY - radius - 1, badgeSize + 2, badgeSize + 2,
+                    Math.max(1, radius / 2), 0xCC000000);
+            fillChamferedRect(context, centerX - radius, centerY - radius, badgeSize, badgeSize,
+                    Math.max(1, radius / 2), 0xFF00B4A0);
+        } else {
+            drawCircle(context, centerX, centerY, radius + 1, 0xCC000000);
+            drawCircle(context, centerX, centerY, radius, 0xFFE64545);
+        }
 
         String badge = unreadCount > 99 ? "99+" : Integer.toString(unreadCount);
         int textWidth = textRenderer.getWidth(badge);

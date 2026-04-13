@@ -20,10 +20,12 @@ public final class PhoneSettingsClient {
     private static final boolean DEFAULT_ALERT_MODE = false;
     private static final boolean DEFAULT_ALWAYS_SHOW_REGION_TITLE = false;
     private static final boolean DEFAULT_ANIMATIONS_ENABLED = true;
+    private static final boolean DEFAULT_EXPERIMENTAL_UI = false;
 
     private static boolean alertMode = DEFAULT_ALERT_MODE;
     private static boolean alwaysShowRegionTitle = DEFAULT_ALWAYS_SHOW_REGION_TITLE;
     private static boolean animationsEnabled = DEFAULT_ANIMATIONS_ENABLED;
+    private static boolean experimentalUi = DEFAULT_EXPERIMENTAL_UI;
     private static String loadedProfileKey;
 
     private PhoneSettingsClient() {
@@ -59,6 +61,17 @@ public final class PhoneSettingsClient {
     public static void setAnimationsEnabled(boolean enabled) {
         ensureLoadedForCurrentProfile();
         animationsEnabled = enabled;
+        save();
+    }
+
+    public static boolean isExperimentalUiEnabled() {
+        ensureLoadedForCurrentProfile();
+        return experimentalUi;
+    }
+
+    public static void setExperimentalUiEnabled(boolean enabled) {
+        ensureLoadedForCurrentProfile();
+        experimentalUi = enabled;
         save();
     }
 
@@ -136,18 +149,23 @@ public final class PhoneSettingsClient {
         if (obj.has("animationsEnabled")) {
             animationsEnabled = obj.get("animationsEnabled").getAsBoolean();
         }
+        if (obj.has("experimentalUi")) {
+            experimentalUi = obj.get("experimentalUi").getAsBoolean();
+        }
     }
 
     private static void writeSettings(JsonObject obj) {
         obj.add("alertMode", new JsonPrimitive(alertMode));
         obj.add("alwaysShowRegionTitle", new JsonPrimitive(alwaysShowRegionTitle));
         obj.add("animationsEnabled", new JsonPrimitive(animationsEnabled));
+        obj.add("experimentalUi", new JsonPrimitive(experimentalUi));
     }
 
     private static void resetToDefaults() {
         alertMode = DEFAULT_ALERT_MODE;
         alwaysShowRegionTitle = DEFAULT_ALWAYS_SHOW_REGION_TITLE;
         animationsEnabled = DEFAULT_ANIMATIONS_ENABLED;
+        experimentalUi = DEFAULT_EXPERIMENTAL_UI;
     }
 
     private static String currentProfileKey() {

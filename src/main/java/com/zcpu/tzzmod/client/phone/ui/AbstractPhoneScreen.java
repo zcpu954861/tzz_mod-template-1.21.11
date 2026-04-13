@@ -29,6 +29,25 @@ public abstract class AbstractPhoneScreen extends Screen {
     private static final int STATUS_DIVIDER_COLOR = 0x88E6EEF7;
     private static final int STATUS_BAR_HEIGHT = 16;
 
+    // --- Experimental tech UI color palette ---
+    private static final int TECH_ACCENT = 0xFF00FFE0;           // cyan accent
+    private static final int TECH_ACCENT_DIM = 0xAA00C8B4;      // dimmed cyan
+    private static final int TECH_ACCENT_GLOW = 0x3300FFE0;     // subtle glow
+    private static final int TECH_BG_DARK = 0xE00A0F1A;         // deep navy background
+    private static final int TECH_BG_PANEL = 0xCC101825;        // panel interior
+    private static final int TECH_BORDER = 0xAA1A4A6C;          // border color
+    private static final int TECH_BORDER_BRIGHT = 0xCC00D4BE;   // bright border accent
+    private static final int TECH_GRID = 0x181A3050;            // grid line color
+    private static final int TECH_TEXT = 0xFFE0F7FF;            // primary text
+    private static final int TECH_TEXT_DIM = 0xFF6B8A9E;        // muted text
+    private static final int TECH_DIVIDER = 0xAA00FFE0;         // status divider
+    private static final int TECH_BTN_FILL = 0x660A1A2C;        // button fill
+    private static final int TECH_BTN_HOVER = 0x8810283C;       // button hover
+    private static final int TECH_BTN_BORDER = 0xAA00D4BE;      // button border
+    private static final int TECH_BTN_PRIMARY_FILL = 0x8800B4A0; // primary button
+    private static final int TECH_BTN_PRIMARY_HOVER = 0xAA00DEC8;
+    private static final int TECH_CHAMFER = 8;                   // corner cut size (in base units)
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private static final long APP_OPEN_ANIMATION_MS = 220L;
@@ -175,11 +194,31 @@ public abstract class AbstractPhoneScreen extends Screen {
 
         if (animatingOpen || animatingClose) {
             context.getMatrices().pushMatrix();
-            context.getMatrices().translate(translateX, translateY);
-            context.getMatrices().scale(scaleX, scaleY);
-            renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
-            if (animatingClose) {
-                renderClosingRevealVeil(context, closeProgress);
+            if (isExperimentalUi()) {
+                // Tech UI: horizontal wipe / alpha-based transition
+                if (animatingOpen) {
+                    float alpha = openProgress;
+                    context.getMatrices().translate(translateX, translateY);
+                    context.getMatrices().scale(scaleX, scaleY);
+                    renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+                    // Scanline wipe overlay: bright line sweeping down
+                    int wipeY = phoneY + Math.round(openProgress * phoneHeight);
+                    if (wipeY > phoneY && wipeY < phoneY + phoneHeight) {
+                        context.fill(phoneX + s(4), wipeY - s(1), phoneX + phoneWidth - s(4), wipeY + s(1), 0x6600FFE0);
+                    }
+                } else {
+                    context.getMatrices().translate(translateX, translateY);
+                    context.getMatrices().scale(scaleX, scaleY);
+                    renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+                    renderClosingRevealVeil(context, closeProgress);
+                }
+            } else {
+                context.getMatrices().translate(translateX, translateY);
+                context.getMatrices().scale(scaleX, scaleY);
+                renderPhoneScreen(context, renderMouseX, renderMouseY, delta);
+                if (animatingClose) {
+                    renderClosingRevealVeil(context, closeProgress);
+                }
             }
             context.getMatrices().popMatrix();
             return;
@@ -189,10 +228,16 @@ public abstract class AbstractPhoneScreen extends Screen {
     }
 
     protected void renderPhoneScreen(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Draw a thin rounded-line border: straight sides + stroked corner arcs (no filled center)
-        drawLineBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
+        if (isExperimentalUi()) {
+            renderTechBackground(context);
+            drawTechBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
+            renderTechStatusBar(context);
+        } else {
+            // Draw a thin rounded-line border: straight sides + stroked corner arcs (no filled center)
+            drawLineBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
+            renderStatusBar(context);
+        }
 
-        renderStatusBar(context);
         renderPhoneContent(context, mouseX, mouseY, delta);
         renderStyledPhoneButtons(context, mouseX, mouseY);
         super.render(context, mouseX, mouseY, delta);
@@ -246,7 +291,8 @@ public abstract class AbstractPhoneScreen extends Screen {
     }
 
     protected void drawPhoneTextCenteredFixed(DrawContext context, Text text, int centerX, int y) {
-        context.drawCenteredTextWithShadow(textRenderer, text, centerX, y, 0xFFECECEC);
+        int color = isExperimentalUi() ? TECH_TEXT : 0xFFECECEC;
+        context.drawCenteredTextWithShadow(textRenderer, text, centerX, y, color);
     }
 
     protected void drawLineBorder(DrawContext context, int x, int y, int width, int height) {
@@ -317,9 +363,194 @@ public abstract class AbstractPhoneScreen extends Screen {
         int screenY = phoneY + inset;
         int screenWidth = Math.max(1, phoneWidth - inset * 2);
         int screenHeight = Math.max(1, phoneHeight - inset * 2);
-        int radius = Math.max(s(10), s(14));
-        int alpha = MathHelper.clamp(Math.round(120.0F * closeProgress), 0, 120);
-        RoundedRectRenderer.fillRoundedRect(context, screenX, screenY, screenWidth, screenHeight, radius, alpha << 24);
+        if (isExperimentalUi()) {
+            int chamfer = s(TECH_CHAMFER);
+            int alpha = MathHelper.clamp(Math.round(140.0F * closeProgress), 0, 140);
+            // Fill center rect
+            context.fill(screenX + chamfer, screenY, screenX + screenWidth - chamfer, screenY + screenHeight, (alpha << 24) | 0x0A0F1A);
+            // Fill side strips
+            context.fill(screenX, screenY + chamfer, screenX + screenWidth, screenY + screenHeight - chamfer, (alpha << 24) | 0x0A0F1A);
+            // Fill diagonal corners
+            for (int i = 0; i < chamfer; i++) {
+                int offset = chamfer - i;
+                int lineAlpha = alpha * (chamfer - i) / chamfer;
+                int c = (lineAlpha << 24) | 0x0A0F1A;
+                context.fill(screenX + offset, screenY + i, screenX + screenWidth - offset, screenY + i + 1, c);
+                context.fill(screenX + offset, screenY + screenHeight - 1 - i, screenX + screenWidth - offset, screenY + screenHeight - i, c);
+            }
+        } else {
+            int radius = Math.max(s(10), s(14));
+            int alpha = MathHelper.clamp(Math.round(120.0F * closeProgress), 0, 120);
+            RoundedRectRenderer.fillRoundedRect(context, screenX, screenY, screenWidth, screenHeight, radius, alpha << 24);
+        }
+    }
+
+    // ===== Experimental Tech UI rendering methods =====
+
+    /**
+     * Draw the tech-style background: dark glass panel with subtle grid pattern.
+     */
+    private void renderTechBackground(DrawContext context) {
+        int inset = s(2);
+        int bgX = phoneX + inset;
+        int bgY = phoneY + inset;
+        int bgW = Math.max(1, phoneWidth - inset * 2);
+        int bgH = Math.max(1, phoneHeight - inset * 2);
+        int chamfer = s(TECH_CHAMFER);
+
+        // Main background fill (chamfered)
+        fillChamferedRect(context, bgX, bgY, bgW, bgH, chamfer, TECH_BG_DARK);
+        // Inner panel slightly inset
+        fillChamferedRect(context, bgX + s(1), bgY + s(1), Math.max(1, bgW - s(2)), Math.max(1, bgH - s(2)), Math.max(1, chamfer - s(1)), TECH_BG_PANEL);
+
+        // Grid lines (horizontal)
+        int gridSpacing = s(18);
+        if (gridSpacing > 0) {
+            for (int gy = bgY + gridSpacing; gy < bgY + bgH - chamfer; gy += gridSpacing) {
+                context.fill(bgX + chamfer, gy, bgX + bgW - chamfer, gy + 1, TECH_GRID);
+            }
+        }
+        // Grid lines (vertical)
+        if (gridSpacing > 0) {
+            for (int gx = bgX + chamfer; gx < bgX + bgW - chamfer; gx += gridSpacing) {
+                context.fill(gx, bgY + chamfer, gx + 1, bgY + bgH - chamfer, TECH_GRID);
+            }
+        }
+
+        // Subtle glow at top edge
+        context.fill(bgX + chamfer, bgY + s(1), bgX + bgW - chamfer, bgY + s(2), TECH_ACCENT_GLOW);
+    }
+
+    /**
+     * Draw the tech-style chamfered border: angled corner cuts with accent lines.
+     */
+    protected void drawTechBorder(DrawContext context, int x, int y, int width, int height) {
+        if (width <= 0 || height <= 0) return;
+        int t = Math.max(1, s(1));
+        int c = s(TECH_CHAMFER);
+
+        // Top edge (between chamfers)
+        context.fill(x + c, y, x + width - c, y + t, TECH_BORDER_BRIGHT);
+        // Bottom edge
+        context.fill(x + c, y + height - t, x + width - c, y + height, TECH_BORDER);
+        // Left edge
+        context.fill(x, y + c, x + t, y + height - c, TECH_BORDER);
+        // Right edge
+        context.fill(x + width - t, y + c, x + width, y + height - c, TECH_BORDER);
+
+        // Chamfered corners (diagonal lines)
+        drawChamferCorner(context, x, y, c, t, -1, -1, TECH_BORDER_BRIGHT);   // top-left
+        drawChamferCorner(context, x + width, y, c, t, 1, -1, TECH_BORDER_BRIGHT);  // top-right
+        drawChamferCorner(context, x, y + height, c, t, -1, 1, TECH_BORDER);  // bottom-left
+        drawChamferCorner(context, x + width, y + height, c, t, 1, 1, TECH_BORDER); // bottom-right
+
+        // Small accent marks at top corners
+        int accentLen = Math.max(s(3), c / 2);
+        // top-left accent horizontal
+        context.fill(x + c, y - s(1), x + c + accentLen, y, TECH_ACCENT);
+        // top-right accent horizontal
+        context.fill(x + width - c - accentLen, y - s(1), x + width - c, y, TECH_ACCENT);
+    }
+
+    private void drawChamferCorner(DrawContext context, int cornerX, int cornerY, int chamfer, int thickness, int xDir, int yDir, int color) {
+        // Draw a diagonal line from (cornerX, cornerY+c*yDir) to (cornerX+c*xDir, cornerY)
+        // xDir/yDir: -1 means extending into the rect, positive means away
+        // For top-left: corner is at (x,y), chamfer goes from (x,y+c) to (x+c,y)
+        for (int i = 0; i < chamfer; i++) {
+            int px, py;
+            if (xDir < 0 && yDir < 0) {
+                // top-left: line from (cornerX, cornerY+chamfer) to (cornerX+chamfer, cornerY)
+                px = cornerX + i;
+                py = cornerY + chamfer - 1 - i;
+            } else if (xDir > 0 && yDir < 0) {
+                // top-right: line from (cornerX-chamfer, cornerY) to (cornerX, cornerY+chamfer)
+                px = cornerX - chamfer + i;
+                py = cornerY + i;
+            } else if (xDir < 0 && yDir > 0) {
+                // bottom-left: line from (cornerX, cornerY-chamfer) to (cornerX+chamfer, cornerY)
+                px = cornerX + i;
+                py = cornerY - chamfer + i;
+            } else {
+                // bottom-right: line from (cornerX-chamfer, cornerY) to (cornerX, cornerY-chamfer)
+                px = cornerX - chamfer + i;
+                py = cornerY - 1 - i;
+            }
+            for (int dt = 0; dt < thickness; dt++) {
+                context.fill(px, py + dt, px + 1, py + dt + 1, color);
+            }
+        }
+    }
+
+    /**
+     * Fill a rectangle with chamfered (angled) corners.
+     */
+    protected void fillChamferedRect(DrawContext context, int x, int y, int width, int height, int chamfer, int color) {
+        int c = Math.min(chamfer, Math.min(width, height) / 2);
+        if (c <= 0) {
+            context.fill(x, y, x + width, y + height, color);
+            return;
+        }
+        // Center rectangle
+        context.fill(x + c, y, x + width - c, y + height, color);
+        // Left/right strips (between chamfers)
+        context.fill(x, y + c, x + c, y + height - c, color);
+        context.fill(x + width - c, y + c, x + width, y + height - c, color);
+        // Fill chamfer triangles with diagonal fill
+        for (int i = 0; i < c; i++) {
+            int offset = c - i;
+            // Top-left and top-right
+            context.fill(x + offset, y + i, x + c, y + i + 1, color);
+            context.fill(x + width - c, y + i, x + width - offset, y + i + 1, color);
+            // Bottom-left and bottom-right
+            context.fill(x + offset, y + height - 1 - i, x + c, y + height - i, color);
+            context.fill(x + width - c, y + height - 1 - i, x + width - offset, y + height - i, color);
+        }
+    }
+
+    /**
+     * Draw the tech-style status bar with geometric dividers.
+     */
+    private void renderTechStatusBar(DrawContext context) {
+        int statusX = contentX;
+        int statusY = phoneY + s(8);
+        int statusWidth = contentWidth;
+        int statusHeight = s(STATUS_BAR_HEIGHT);
+
+        String timeText = LocalTime.now().format(TIME_FORMATTER);
+        String playerName = client != null && client.player != null
+                ? client.player.getName().getString()
+                : "Player";
+
+        // Time on left with accent color
+        context.drawTextWithShadow(textRenderer, Text.literal(timeText), statusX + s(6), statusY + s(4), TECH_ACCENT);
+
+        // Player name centered
+        String shownName = textRenderer.trimToWidth(playerName, Math.max(s(10), statusWidth - s(40)));
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal(shownName), statusX + statusWidth / 2, statusY + s(4), TECH_TEXT);
+
+        // Death/alive status on right
+        boolean hasDeathTag = com.zcpu.tzzmod.client.DeathSyncClient.isLocalPlayerDead();
+        Text statusText = hasDeathTag ? Text.literal("死亡") : Text.literal("存活");
+        int statusColor = hasDeathTag ? 0xFFFF4444 : TECH_ACCENT;
+        int textWidth = textRenderer.getWidth(statusText);
+        int rightPadding = s(6);
+        int drawX = statusX + statusWidth - rightPadding - textWidth;
+        if (drawX < statusX + s(6)) drawX = statusX + s(6);
+        context.drawTextWithShadow(textRenderer, statusText, drawX, statusY + s(4), statusColor);
+
+        // Geometric divider: accent line with small diamond in center
+        int dividerY = statusY + statusHeight + s(1);
+        int divW = statusWidth - s(4);
+        int divX = statusX + s(2);
+        context.fill(divX, dividerY, divX + divW, dividerY + 1, TECH_DIVIDER);
+
+        // Small diamond accent at center of divider
+        int diamondCx = statusX + statusWidth / 2;
+        int diamondR = s(2);
+        for (int dy = -diamondR; dy <= diamondR; dy++) {
+            int dxSpan = diamondR - Math.abs(dy);
+            context.fill(diamondCx - dxSpan, dividerY + dy, diamondCx + dxSpan + 1, dividerY + dy + 1, TECH_ACCENT);
+        }
     }
 
     protected ButtonWidget addPhoneButton(Text message, int x, int y, int width, int height, PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
@@ -359,10 +590,16 @@ public abstract class AbstractPhoneScreen extends Screen {
         int y = data.y();
         int width = data.width();
         int height = data.height();
-        int radius = Math.max(3, Math.min(height / 2, s(7)));
         boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
         boolean focused = button.isFocused();
         boolean selected = data.selectedSupplier().getAsBoolean();
+
+        if (isExperimentalUi()) {
+            renderTechStyledButton(context, data, hovered, focused, selected);
+            return;
+        }
+
+        int radius = Math.max(3, Math.min(height / 2, s(7)));
 
         if (data.variant() != PhoneButtonWidget.Variant.GHOST || hovered || focused || selected) {
             int borderColor = getPhoneButtonBorderColor(data.variant(), button.active, selected, focused);
@@ -432,6 +669,67 @@ public abstract class AbstractPhoneScreen extends Screen {
         return PHONE_BUTTON_SUBTLE_TEXT_COLOR;
     }
 
+    private void renderTechStyledButton(DrawContext context, PhoneButtonRenderData data, boolean hovered, boolean focused, boolean selected) {
+        int x = data.x();
+        int y = data.y();
+        int width = data.width();
+        int height = data.height();
+        boolean active = data.button().active;
+        int chamfer = Math.max(2, Math.min(height / 3, s(4)));
+
+        if (data.variant() == PhoneButtonWidget.Variant.GHOST && !hovered && !focused && !selected) {
+            // Ghost buttons: only show label
+            String label = data.message().getString();
+            if (!label.isBlank()) {
+                int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
+                context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, active ? TECH_TEXT_DIM : 0xFF3A4A5A);
+            }
+            return;
+        }
+
+        // Determine colors
+        int borderColor, fillColor, textColor;
+        if (!active) {
+            borderColor = 0x55334455;
+            fillColor = 0x440A1018;
+            textColor = 0xFF3A4A5A;
+        } else if (data.variant() == PhoneButtonWidget.Variant.PRIMARY) {
+            borderColor = hovered ? TECH_ACCENT : TECH_BTN_BORDER;
+            fillColor = hovered ? TECH_BTN_PRIMARY_HOVER : TECH_BTN_PRIMARY_FILL;
+            textColor = TECH_TEXT;
+        } else if (selected) {
+            borderColor = TECH_ACCENT;
+            fillColor = hovered ? 0x8800806A : 0x66005A4A;
+            textColor = TECH_TEXT;
+        } else {
+            borderColor = hovered ? TECH_BTN_BORDER : TECH_BORDER;
+            fillColor = hovered ? TECH_BTN_HOVER : TECH_BTN_FILL;
+            textColor = hovered ? TECH_TEXT : 0xFFB0D0E0;
+        }
+
+        // Draw chamfered button
+        fillChamferedRect(context, x, y, width, height, chamfer, borderColor);
+        fillChamferedRect(context, x + 1, y + 1, Math.max(1, width - 2), Math.max(1, height - 2), Math.max(1, chamfer - 1), fillColor);
+
+        // Scanline highlight at top
+        if (active) {
+            int hlH = Math.max(1, height / 5);
+            fillChamferedRect(context, x + 1, y + 1, Math.max(1, width - 2), hlH, Math.max(1, chamfer - 1), 0x18FFFFFF);
+        }
+
+        // Focused: extra bright border
+        if (focused) {
+            fillChamferedRect(context, x - 1, y - 1, width + 2, height + 2, chamfer + 1, TECH_ACCENT_GLOW);
+        }
+
+        // Label
+        String label = data.message().getString();
+        if (!label.isBlank()) {
+            int textY = y + Math.max(0, (height - textRenderer.fontHeight) / 2);
+            context.drawCenteredTextWithShadow(textRenderer, data.message(), x + width / 2, textY, textColor);
+        }
+    }
+
     @Override
     public void close() {
         if (client == null) {
@@ -481,6 +779,10 @@ public abstract class AbstractPhoneScreen extends Screen {
 
     protected final boolean areAnimationsEnabled() {
         return PhoneSettingsClient.isAnimationsEnabled();
+    }
+
+    protected final boolean isExperimentalUi() {
+        return PhoneSettingsClient.isExperimentalUiEnabled();
     }
 
     private boolean hasAppLaunchAnimation() {

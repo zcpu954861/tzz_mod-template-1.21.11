@@ -44,6 +44,21 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
 
         int basePhoneY = phoneY;
         int baseContentY = contentY;
+
+        if (isExperimentalUi()) {
+            renderTechLockScreen(context, mouseX, mouseY, delta);
+            phoneY = basePhoneY;
+            contentY = baseContentY;
+            // Safety: if unlocking finished but switch hasn't been performed yet, do it here.
+            if (unlocking && getUnlockProgressRaw() >= 1.0F && !unlockSwitchPerformed) {
+                if (client != null) {
+                    client.setScreen(new PhoneHomeScreen());
+                }
+                unlockSwitchPerformed = true;
+            }
+            return;
+        }
+
         int offsetY = Math.round((1.0F - getShellRiseProgress()) * (phoneHeight + s(40)));
 
         // Do NOT move the whole phone frame during unlock. Only the internal lock overlay will slide.
@@ -287,6 +302,165 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
 
     private boolean isUnlockReady() {
         return getScreenWakeProgress() >= 0.98F;
+    }
+
+    // ===== Tech-themed lock screen =====
+    private void renderTechLockScreen(DrawContext context, int mouseX, int mouseY, float delta) {
+        float bootProgress = getShellRiseProgress();
+        float screenWake = getScreenWakeProgress();
+
+        int inset = s(2);
+        int bgX = phoneX + inset;
+        int bgY = phoneY + inset;
+        int bgW = Math.max(1, phoneWidth - inset * 2);
+        int bgH = Math.max(1, phoneHeight - inset * 2);
+        int chamfer = s(8);
+
+        // Phase 1: Panel appearance with alpha fade-in
+        int panelAlpha = Math.max(0, Math.min(255, Math.round(255.0F * bootProgress)));
+
+        // Dark background
+        fillChamferedRect(context, bgX, bgY, bgW, bgH, chamfer, withAlpha(0xFF0A0F1A, panelAlpha));
+        fillChamferedRect(context, bgX + s(1), bgY + s(1), Math.max(1, bgW - s(2)), Math.max(1, bgH - s(2)),
+                Math.max(1, chamfer - s(1)), withAlpha(0xFF101825, Math.max(0, panelAlpha - 20)));
+
+        // Tech border with glow
+        drawTechBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
+
+        // Boot-up glow at top
+        if (bootProgress > 0.3F) {
+            float glowIntensity = Math.min(1.0F, (bootProgress - 0.3F) / 0.4F);
+            int glowAlpha = Math.round(40.0F * glowIntensity);
+            context.fill(bgX + chamfer, bgY, bgX + bgW - chamfer, bgY + s(2), withAlpha(0xFF00FFE0, glowAlpha));
+        }
+
+        // Grid overlay (fades in during boot)
+        if (bootProgress > 0.5F) {
+            float gridAlpha = Math.min(1.0F, (bootProgress - 0.5F) / 0.3F);
+            int gridColor = withAlpha(0xFF1A3050, Math.round(24.0F * gridAlpha));
+            int gridSpacing = s(18);
+            if (gridSpacing > 0) {
+                for (int gy = bgY + gridSpacing; gy < bgY + bgH - chamfer; gy += gridSpacing) {
+                    context.fill(bgX + chamfer, gy, bgX + bgW - chamfer, gy + 1, gridColor);
+                }
+                for (int gx = bgX + chamfer; gx < bgX + bgW - chamfer; gx += gridSpacing) {
+                    context.fill(gx, bgY + chamfer, gx + 1, bgY + bgH - chamfer, gridColor);
+                }
+            }
+        }
+
+        // Scanline sweep effect during boot
+        if (bootProgress > 0.2F && bootProgress < 0.95F) {
+            float scanlinePos = (bootProgress - 0.2F) / 0.75F;
+            int scanY = bgY + Math.round(scanlinePos * bgH);
+            if (scanY > bgY && scanY < bgY + bgH) {
+                context.fill(bgX + s(4), scanY - s(1), bgX + bgW - s(4), scanY, withAlpha(0xFF00FFE0, 80));
+                context.fill(bgX + s(4), scanY, bgX + bgW - s(4), scanY + s(1), withAlpha(0xFF00FFE0, 40));
+            }
+        }
+
+        // Content only renders after screen wake
+        if (screenWake <= 0.0F) {
+            return;
+        }
+
+        int contentAlpha = Math.max(0, Math.min(255, Math.round(255.0F * screenWake)));
+        int centerX = contentX + contentWidth / 2;
+        int upperMidY = contentY + Math.max(s(26), contentHeight / 7);
+
+        if (!unlocking) {
+            // Time display - tech style
+            renderScaledCenteredText(context, Text.literal(LocalTime.now().format(LOCK_TIME_FORMATTER)),
+                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(0xFF00FFE0, contentAlpha));
+
+            // Date display
+            renderScaledCenteredText(context, Text.literal(LocalDate.now().format(LOCK_DATE_FORMATTER)),
+                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(0xFF6B8A9E, Math.max(110, contentAlpha - 35)));
+
+            // Geometric lock icon
+            renderTechLockGlyph(context, centerX, upperMidY + s(96), contentAlpha);
+
+            // Hint text
+            Text hint = Text.translatable("phone.tzz_mod.lock_screen.hint");
+            context.drawCenteredTextWithShadow(textRenderer, hint, centerX,
+                    upperMidY + s(96) + s(20), withAlpha(0xFF5A8A9E, Math.max(96, contentAlpha - 64)));
+
+            // Unlock button - tech style
+            renderTechUnlockButton(context, mouseX, mouseY, contentAlpha, 0);
+        } else {
+            // Unlock animation: digital dissolve effect
+            float unlockEase = getUnlockEase();
+            int fadeAlpha = Math.max(0, Math.round(contentAlpha * (1.0F - unlockEase)));
+
+            // Content fades out with digital noise
+            renderScaledCenteredText(context, Text.literal(LocalTime.now().format(LOCK_TIME_FORMATTER)),
+                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(0xFF00FFE0, fadeAlpha));
+            renderScaledCenteredText(context, Text.literal(LocalDate.now().format(LOCK_DATE_FORMATTER)),
+                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(0xFF6B8A9E, Math.max(0, fadeAlpha - 35)));
+
+            // Horizontal wipe lines during dissolve
+            int wipeCount = Math.round(unlockEase * 8);
+            for (int i = 0; i < wipeCount; i++) {
+                int lineY = bgY + (bgH * (i + 1)) / 9;
+                int lineAlpha = Math.max(0, Math.round(60.0F * (1.0F - unlockEase)));
+                context.fill(bgX + chamfer, lineY, bgX + bgW - chamfer, lineY + 1, withAlpha(0xFF00FFE0, lineAlpha));
+            }
+        }
+    }
+
+    private void renderTechLockGlyph(DrawContext context, int centerX, int centerY, int alpha) {
+        // Geometric diamond-shaped lock icon
+        int size = s(12);
+        // Outer diamond
+        for (int dy = -size; dy <= size; dy++) {
+            int dxSpan = size - Math.abs(dy);
+            // Draw only the outline
+            if (Math.abs(dy) == size || dxSpan <= 1) {
+                context.fill(centerX - dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
+            } else {
+                context.fill(centerX - dxSpan, centerY + dy, centerX - dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
+                context.fill(centerX + dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
+            }
+        }
+        // Inner dot
+        context.fill(centerX - 1, centerY - 1, centerX + 2, centerY + 2, withAlpha(0xFF00FFE0, Math.max(0, alpha - 40)));
+    }
+
+    private void renderTechUnlockButton(DrawContext context, int mouseX, int mouseY, int alpha, int yOffset) {
+        int buttonWidth = Math.min(contentWidth - s(18), s(128));
+        int buttonHeight = s(28);
+        int buttonX = contentX + (contentWidth - buttonWidth) / 2;
+        int buttonY = phoneY + phoneHeight - s(54) + yOffset;
+        int chamfer = Math.max(s(4), buttonHeight / 4);
+        boolean hovered = mouseX >= buttonX && mouseX <= buttonX + buttonWidth && mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
+        boolean ready = isUnlockReady();
+
+        int borderColor, fillColor, textColor;
+        if (unlocking) {
+            borderColor = withAlpha(0xFF1A4A6C, Math.min(alpha, 120));
+            fillColor = withAlpha(0xFF0A1A2C, Math.min(alpha, 120));
+            textColor = withAlpha(0xFF5A8A9E, Math.min(alpha, 120));
+        } else if (ready) {
+            borderColor = withAlpha(hovered ? 0xFF00FFE0 : 0xFF00D4BE, alpha);
+            fillColor = withAlpha(hovered ? 0xFF00463E : 0xFF002A26, Math.max(180, alpha));
+            textColor = withAlpha(0xFF00FFE0, alpha);
+        } else {
+            borderColor = withAlpha(0xFF1A4A6C, Math.min(alpha, 150));
+            fillColor = withAlpha(0xFF0A1A2C, Math.min(alpha, 150));
+            textColor = withAlpha(0xFF5A8A9E, Math.min(alpha, 170));
+        }
+
+        fillChamferedRect(context, buttonX, buttonY, buttonWidth, buttonHeight, chamfer, borderColor);
+        fillChamferedRect(context, buttonX + 1, buttonY + 1, Math.max(1, buttonWidth - 2), Math.max(1, buttonHeight - 2), Math.max(1, chamfer - 1), fillColor);
+
+        // Highlight strip
+        if (ready && !unlocking) {
+            fillChamferedRect(context, buttonX + 2, buttonY + 2, Math.max(1, buttonWidth - 4), Math.max(1, buttonHeight / 4),
+                    Math.max(1, chamfer - 2), withAlpha(0xFF00FFE0, 30));
+        }
+
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"),
+                buttonX + buttonWidth / 2, buttonY + (buttonHeight - textRenderer.fontHeight) / 2, textColor);
     }
 
     private boolean isInsideUnlockButton(double mouseX, double mouseY) {

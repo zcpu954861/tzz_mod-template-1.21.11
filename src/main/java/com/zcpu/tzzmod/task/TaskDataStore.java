@@ -34,6 +34,17 @@ public final class TaskDataStore {
         return getState(server).toSnapshot();
     }
 
+    public static synchronized void flushDirty(MinecraftServer server) {
+        TaskState state = CACHE.get(server);
+        if (state != null) {
+            state.flushDirty();
+        }
+    }
+
+    public static synchronized void clearCache(MinecraftServer server) {
+        CACHE.remove(server);
+    }
+
     public static synchronized boolean upsertTask(MinecraftServer server, String lineName, int indexOneBased, String titleJson, String contentJson) {
         String cleanLineName = sanitizeLineName(lineName);
         if (cleanLineName.isEmpty() || indexOneBased < 1 || indexOneBased > 512) {
@@ -46,7 +57,7 @@ public final class TaskDataStore {
             tasks.add(new TaskNode("{\"text\":\"\"}", "{\"text\":\"\"}"));
         }
         tasks.set(indexOneBased - 1, new TaskNode(normalizeJsonText(titleJson), normalizeJsonText(contentJson)));
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -66,7 +77,7 @@ public final class TaskDataStore {
         state.currentLine = cleanLineName;
         state.currentIndex = indexOneBased;
         state.currentTriggeredAt = System.currentTimeMillis();
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -101,7 +112,7 @@ public final class TaskDataStore {
             state.currentTriggeredAt = 0L;
         }
 
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -150,7 +161,7 @@ public final class TaskDataStore {
             state.currentIndex = Math.max(0, state.currentIndex - 1);
         }
 
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -171,7 +182,7 @@ public final class TaskDataStore {
             state.currentTriggeredAt = 0L;
         }
 
-        state.writeToDisk();
+        state.markDirty();
         return true;
     }
 
@@ -310,6 +321,14 @@ public final class TaskDataStore {
         }
     }
 
+    private static String toSafeLineFileName(String lineName) {
+        String safeName = lineName.replaceAll("[^a-zA-Z0-9-_\\. ]", "_");
+        if (safeName.isBlank()) {
+            safeName = "line_" + Math.abs(lineName.hashCode());
+        }
+        return safeName + ".json";
+    }
+
     public record TaskNode(String titleJson, String contentJson) {
     }
 
@@ -330,6 +349,7 @@ public final class TaskDataStore {
         private String currentLine = "";
         private int currentIndex = 0;
         private long currentTriggeredAt = 0L;
+        private boolean dirty;
 
         private TaskState(Path dirPath, Path legacyPath) {
             this.dirPath = dirPath;
@@ -408,7 +428,20 @@ public final class TaskDataStore {
             );
         }
 
-        private void writeToDisk() {
+        private void markDirty() {
+            dirty = true;
+        }
+
+        private void flushDirty() {
+            if (!dirty) {
+                return;
+            }
+            if (writeToDisk()) {
+                dirty = false;
+            }
+        }
+
+        private boolean writeToDisk() {
             try {
                 // ensure parent dir for legacy exists
                 Files.createDirectories(legacyPath.getParent());
@@ -444,6 +477,11 @@ public final class TaskDataStore {
                 // also write per-line files and meta
                 Files.createDirectories(dirPath);
 
+                Set<String> activeLineFiles = new LinkedHashSet<>();
+                for (String lineName : lines.keySet()) {
+                    activeLineFiles.add(toSafeLineFileName(lineName));
+                }
+
                 // Clean up any stale per-line files that no longer correspond to in-memory lines.
                 try {
                     if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
@@ -451,18 +489,7 @@ public final class TaskDataStore {
                             for (Path p : stream) {
                                 String fileName = p.getFileName().toString();
                                 if ("_meta.json".equals(fileName)) continue; // keep meta (will be rewritten)
-                                // compute allowed safe names for current lines
-                                boolean keep = false;
-                                for (Map.Entry<String, List<TaskNode>> entry2 : lines.entrySet()) {
-                                    String name = entry2.getKey();
-                                    String safeName = name.replaceAll("[^a-zA-Z0-9-_\\\\. ]", "_");
-                                    if (safeName.isBlank()) safeName = "line_" + Math.abs(name.hashCode());
-                                    if ((safeName + ".json").equals(fileName)) {
-                                        keep = true;
-                                        break;
-                                    }
-                                }
-                                if (!keep) {
+                                if (!activeLineFiles.contains(fileName)) {
                                     try {
                                         Files.deleteIfExists(p);
                                     } catch (Exception ignored) {
@@ -476,9 +503,7 @@ public final class TaskDataStore {
 
                 for (Map.Entry<String, List<TaskNode>> entry : lines.entrySet()) {
                     String name = entry.getKey();
-                    String safeName = name.replaceAll("[^a-zA-Z0-9-_\\. ]", "_");
-                    if (safeName.isBlank()) safeName = "line_" + Math.abs(name.hashCode());
-                    Path file = dirPath.resolve(safeName + ".json");
+                    Path file = dirPath.resolve(toSafeLineFileName(name));
 
                     JsonObject obj = new JsonObject();
                     obj.addProperty("name", name);
@@ -509,8 +534,11 @@ public final class TaskDataStore {
                     GSON.toJson(persisted, writer);
                 }
 
+                return true;
+
             } catch (Exception exception) {
                 Tzz_mod.LOGGER.warn("Failed to write task config: {}", exception.getMessage());
+                return false;
             }
         }
     }

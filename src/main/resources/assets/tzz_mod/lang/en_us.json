@@ -106,6 +106,8 @@
   "phone.tzz_mod.settings.alert_mode.subtitle": "When enabled, new messages and tasks appear as a green subtitle-style typing alert near the center of the screen, with a vanilla sound per character.",
   "phone.tzz_mod.settings.always_show_region_title": "Always Show Region Name",
   "phone.tzz_mod.settings.always_show_region_title.subtitle": "When enabled, the current region name stays visible at the top of the screen while you remain inside a planned region.",
+  "phone.tzz_mod.settings.experimental_ui": "New Experimental UI",
+  "phone.tzz_mod.settings.experimental_ui.subtitle": "Switches to a tech-minimalist UI with angular geometry and cyan accents. Can be toggled at any time. Disabled by default.",
   "phone.tzz_mod.alert.chat_subtitle": "Received a new message",
   "phone.tzz_mod.alert.task_subtitle": "Received a new task",
   "phone.tzz_mod.chat.manage_members": "Manage Members",

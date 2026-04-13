@@ -57,6 +57,11 @@ public final class MapServer {
         );
     }
 
+    public static void clearServerState() {
+        PLANNER_DRAFTS.clear();
+        REGION_TRACKERS.clear();
+    }
+
     public static void broadcastState(MinecraftServer server) {
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             sendStateToPlayer(server, player);
