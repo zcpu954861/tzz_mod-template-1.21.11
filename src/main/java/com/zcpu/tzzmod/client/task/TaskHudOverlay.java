@@ -1,6 +1,5 @@
 package com.zcpu.tzzmod.client.task;
 
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -59,26 +58,21 @@ public final class TaskHudOverlay {
         int x = context.getScaledWindowWidth() - width - 12;
         int y = context.getScaledWindowHeight() - height - 12;
 
-        boolean techUi = PhoneSettingsClient.isExperimentalUiEnabled();
-        if (techUi) {
-            int chamfer = 4;
-            int bg = 0xE00A0F1A;
-            context.fill(x + chamfer, y, x + width - chamfer, y + height, bg);
-            context.fill(x, y + chamfer, x + width, y + height - chamfer, bg);
-            for (int i = 0; i < chamfer; i++) {
-                int offset = chamfer - i;
-                context.fill(x + offset, y + i, x + width - offset, y + i + 1, bg);
-                context.fill(x + offset, y + height - 1 - i, x + width - offset, y + height - i, bg);
-            }
-            context.fill(x + chamfer, y, x + width - chamfer, y + 1, 0xCC00FFE0);
-            context.fill(x + chamfer, y + height - 1, x + width - chamfer, y + height, 0x881A4A6C);
-        } else {
-            RoundedRectRenderer.fillRoundedRect(context, x, y, width, height, 8, 0xD9181F2A);
-            RoundedRectRenderer.fillRoundedRect(context, x + 1, y + 1, width - 2, 2, 1, 0xA0FFFFFF);
+        boolean lightMode = PhoneSettingsClient.isLightModeEnabled();
+        int chamfer = 4;
+        int bg = lightMode ? 0xE0E8EDF4 : 0xE00A0F1A;
+        context.fill(x + chamfer, y, x + width - chamfer, y + height, bg);
+        context.fill(x, y + chamfer, x + width, y + height - chamfer, bg);
+        for (int i = 0; i < chamfer; i++) {
+            int offset = chamfer - i;
+            context.fill(x + offset, y + i, x + width - offset, y + i + 1, bg);
+            context.fill(x + offset, y + height - 1 - i, x + width - offset, y + height - i, bg);
         }
+        context.fill(x + chamfer, y, x + width - chamfer, y + 1, lightMode ? 0xCC0099CC : 0xCC00FFE0);
+        context.fill(x + chamfer, y + height - 1, x + width - chamfer, y + height, lightMode ? 0x88B0C0D0 : 0x881A4A6C);
 
         int drawY = y + 6;
-        context.drawTextWithShadow(client.textRenderer, title, x + 10, drawY, techUi ? 0xFF00FFE0 : 0xFFF6F7FA);
+        context.drawText(client.textRenderer, title, x + 10, drawY, lightMode ? 0xFF0099CC : 0xFF00FFE0, !lightMode);
         drawY += lineHeight;
 
         for (int i = 0; i < shownRows; i++) {
@@ -86,13 +80,13 @@ public final class TaskHudOverlay {
             String line = entry.count() > 1
                     ? Text.translatable("phone.tzz_mod.task.popup.line_count", entry.title(), entry.count()).getString()
                     : Text.translatable("phone.tzz_mod.task.popup.line_single", entry.title()).getString();
-            context.drawTextWithShadow(client.textRenderer, line, x + 10, drawY, techUi ? 0xFFE0F7FF : 0xFFE9EBF1);
+            context.drawText(client.textRenderer, line, x + 10, drawY, lightMode ? 0xFF1A2A3A : 0xFFE0F7FF, !lightMode);
             drawY += lineHeight;
         }
 
         if (hiddenRows > 0) {
             String more = Text.translatable("phone.tzz_mod.task.popup.more", hiddenRows).getString();
-            context.drawTextWithShadow(client.textRenderer, more, x + 10, drawY, techUi ? 0xFF6B8A9E : 0xFFD3D8E6);
+            context.drawText(client.textRenderer, more, x + 10, drawY, lightMode ? 0xFF6A7A8A : 0xFF6B8A9E, !lightMode);
         }
     }
 }

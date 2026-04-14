@@ -16,6 +16,7 @@ public final class ModItemGroup {
             .displayName(Text.translatable("itemGroup.tzz_mod.main"))
             .entries((displayContext, entries) -> {
                 entries.add(ModItems.PHONE);
+                entries.add(ModItems.AR_HEADSET);
                 entries.add(ModItems.ATTENTION);
                 entries.add(ModItems.MAP_MARKER);
                 entries.add(ModItems.REGION_PLANNER);

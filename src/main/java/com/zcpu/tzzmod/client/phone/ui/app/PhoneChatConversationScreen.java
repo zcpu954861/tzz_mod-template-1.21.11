@@ -58,6 +58,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
 
         inputField = new TextFieldWidget(textRenderer, contentX + s(64), contentY + contentHeight - s(24), contentWidth - s(132), s(20), Text.empty());
         inputField.setMaxLength(net.minecraft.util.math.MathHelper.clamp(com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.getMaxMessageLength(), 16, 25600));
+        styleTextField(inputField);
         addDrawableChild(inputField);
 
         addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.send"), contentX + contentWidth - s(64), contentY + contentHeight - s(24), s(64), s(20), button -> sendMessage());
@@ -242,6 +243,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.literal(title), contentX + contentWidth / 2, contentY + s(8));
+        renderStyledTextFieldBackground(context, inputField);
 
         int top = getMessagesTop();
         int bottom = getMessagesBottom();

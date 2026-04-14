@@ -1,12 +1,10 @@
 package com.zcpu.tzzmod.client.phone.ui.app;
 
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -16,10 +14,15 @@ import java.util.function.Consumer;
 
 public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
     private static final float TOGGLE_ANIM_SPEED = 6.0F;
+    private static final long SCAN_DURATION_MS = 500L;
 
     private final List<ToggleRow> rows = new ArrayList<>();
     private double scrollOffset;
     private double targetScroll;
+
+    // Theme scan animation (#1)
+    private long scanStartMs = -1L;
+    private boolean scanTargetLightMode = false;
 
     public PhoneSettingsAppScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.settings"), parent);
@@ -31,15 +34,15 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
         super.init();
         rows.clear();
         rows.add(new ToggleRow(
-            Text.translatable("phone.tzz_mod.settings.experimental_ui"),
-            Text.translatable("phone.tzz_mod.settings.experimental_ui.subtitle"),
-            PhoneSettingsClient::isExperimentalUiEnabled,
+            Text.translatable("phone.tzz_mod.settings.light_mode"),
+            Text.translatable("phone.tzz_mod.settings.light_mode.subtitle"),
+            PhoneSettingsClient::isLightModeEnabled,
             value -> {
-                PhoneSettingsClient.setExperimentalUiEnabled(Boolean.TRUE.equals(value));
-                // Hot-switch: rebuild screen immediately so the new theme takes effect
-                if (client != null) {
-                    client.setScreen(new PhoneSettingsAppScreen(parent));
-                }
+                boolean newValue = Boolean.TRUE.equals(value);
+                // Start scan animation (#1): apply setting but animate the transition
+                PhoneSettingsClient.setLightModeEnabled(newValue);
+                scanTargetLightMode = newValue;
+                scanStartMs = System.currentTimeMillis();
             }
         ));
         rows.add(new ToggleRow(
@@ -68,6 +71,36 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
         }
 
         addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(70), s(20), button -> close());
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        super.render(context, mouseX, mouseY, delta);
+
+        // Theme scan animation overlay (#1)
+        if (scanStartMs > 0) {
+            long elapsed = System.currentTimeMillis() - scanStartMs;
+            float progress = Math.min(1.0f, elapsed / (float) SCAN_DURATION_MS);
+
+            // Scan line sweeps from phoneY to phoneY+phoneHeight
+            int scanY = phoneY + (int) ((phoneY + phoneHeight - phoneY) * progress);
+            int scanColor = scanTargetLightMode ? 0xFF0099CC : 0xFF00FFE0;
+
+            // Bright scan line (2px high)
+            context.fill(phoneX, scanY - 1, phoneX + phoneWidth, scanY + 1, scanColor);
+            // Faint glow above scan line (area that has "switched")
+            int glowAlpha = 0x22;
+            context.fill(phoneX, phoneY, phoneX + phoneWidth, scanY,
+                    (glowAlpha << 24) | (scanColor & 0x00FFFFFF));
+
+            if (progress >= 1.0f) {
+                scanStartMs = -1L;
+                // Rebuild the screen to apply new theme
+                if (client != null) {
+                    client.setScreen(new PhoneSettingsAppScreen(parent));
+                }
+            }
+        }
     }
 
     private int getListTop() {
@@ -106,13 +139,9 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
         scrollOffset += (targetScroll - scrollOffset) * 0.35D;
         clampScroll();
 
-        if (isExperimentalUi()) {
-            // Tech themed title: centered with accent color
-            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.app.settings"),
-                    contentX + contentWidth / 2, contentY + s(8), 0xFF00FFE0);
-        } else {
-            drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.settings"), contentX + contentWidth / 2, contentY + s(8));
-        }
+        // Tech themed title: centered with accent color
+        drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.app.settings"),
+                contentX + contentWidth / 2, contentY + s(8), themeAccent());
         boolean animateToggles = PhoneSettingsClient.isAnimationsEnabled();
 
         int rowX = contentX + s(8);
@@ -132,50 +161,56 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
                     row.progress = row.target ? 1.0F : 0.0F;
                 }
 
+                // Row background + left accent bar (like admin screen, issue #1)
+                boolean hovered = mouseX >= rowX && mouseX <= rowX + rowWidth
+                        && mouseY >= currentY && mouseY <= currentY + rowHeight
+                        && mouseY >= getListTop() && mouseY <= listBottom;
+                int chamfer = Math.max(2, s(3));
+                int rowBg = hovered
+                        ? (isLightMode() ? 0x44D8E4F0 : 0x44101825)
+                        : (isLightMode() ? 0x33D8E4F0 : 0x33101825);
+                fillChamferedRect(context, rowX, currentY, rowWidth, rowHeight, chamfer, rowBg);
+                context.fill(rowX, currentY + chamfer, rowX + 1, currentY + rowHeight - chamfer,
+                        row.target ? themeAccent() : themeBorder());
+
                 int labelY = currentY + Math.max(0, (s(22) - scaledFontHeight()) / 2);
-                int labelColor = isExperimentalUi() ? 0xFFE0F7FF : 0xFFECECEC;
+                int labelColor = themeText();
                 drawScaledText(context, row.label, rowX + s(6), labelY, labelColor);
 
-                int switchW = s(36);
-                int switchH = s(14);
+                int switchW = s(28);
+                int switchH = s(12);
                 int switchX = rowX + rowWidth - switchW - s(6);
                 int switchY = currentY + Math.max(0, (s(22) - switchH) / 2);
 
-                if (isExperimentalUi()) {
-                    // Tech-themed toggle: angular capsule with cyan accent
-                    int capsuleColor = lerpColor(0x550A1A2C, 0xFF00B4A0, row.progress);
-                    int knobColor = row.target ? 0xFF00FFE0 : 0xFF6B8A9E;
-                    int chamfer = Math.max(2, switchH / 4);
-
-                    fillChamferedRect(context, switchX, switchY, switchW, switchH, chamfer, lerpColor(0xAA1A4A6C, 0xCC00D4BE, row.progress));
-                    fillChamferedRect(context, switchX + 1, switchY + 1, Math.max(1, switchW - 2), Math.max(1, switchH - 2), Math.max(1, chamfer - 1), capsuleColor);
-
-                    int knobSize = Math.max(1, switchH - s(2));
-                    float leftCenter = switchX + s(2) + knobSize / 2.0F;
-                    float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
-                    int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
-                    fillChamferedRect(context, knobCenter - knobSize / 2, switchY + (switchH - knobSize) / 2, knobSize, knobSize, Math.max(1, knobSize / 4), knobColor);
-                } else {
-                    int capsuleColor = lerpColor(0x55333333, 0xFF3FC47F, row.progress);
-                    int knobColor = row.target ? 0xFFFFFFFF : 0xFFCCCCCC;
-
-                    RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
-                    int knobSize = Math.max(1, switchH - s(2));
-                    float leftCenter = switchX + s(2) + knobSize / 2.0F;
-                    float rightCenter = switchX + switchW - s(2) - knobSize / 2.0F;
-                    int knobCenter = Math.round(lerp(leftCenter, rightCenter, row.progress));
-                    RoundedRectRenderer.fillRoundedRect(
-                            context,
-                            knobCenter - knobSize / 2,
-                            switchY + (switchH - knobSize) / 2,
-                            knobSize,
-                            knobSize,
-                            knobSize / 2,
-                            knobColor
-                    );
+                // Angular tech toggle: 4-line style (#8), white knob (#7)
+                int cut = Math.max(1, switchH / 3);
+                int trackFill = lerpColor(isLightMode() ? 0x33C0C8D0 : 0x331A2A3C,
+                        isLightMode() ? 0x330099CC : 0x3300FFE0, row.progress);
+                fillChamferedRect(context, switchX, switchY, switchW, switchH, cut, trackFill);
+                // 4-line border (angular tech frame via manual drawing)
+                int borderCol = row.target ? themeAccent() : themeBorder();
+                // top edge
+                context.fill(switchX + cut, switchY, switchX + switchW, switchY + 1, borderCol);
+                // bottom edge
+                context.fill(switchX, switchY + switchH - 1, switchX + switchW - cut, switchY + switchH, borderCol);
+                // top-left diagonal
+                for (int di = 0; di < cut; di++) {
+                    context.fill(switchX + cut - di, switchY + di, switchX + cut - di + 1, switchY + di + 1, borderCol);
                 }
+                // bottom-right diagonal
+                for (int di = 0; di < cut; di++) {
+                    context.fill(switchX + switchW - cut + di, switchY + switchH - 1 - di,
+                            switchX + switchW - cut + di + 1, switchY + switchH - di, borderCol);
+                }
+                // White circle knob (#7 / #8)
+                int knobSize = Math.max(4, switchH - s(4));
+                int knobTravel = switchW - knobSize - s(4);
+                int knobX = switchX + s(2) + Math.round(row.progress * knobTravel);
+                int knobY = switchY + (switchH - knobSize) / 2;
+                fillChamferedRect(context, knobX, knobY, knobSize, knobSize,
+                        Math.max(1, knobSize / 2), 0xFFFFFFFF);
 
-                int subtitleColor = isExperimentalUi() ? 0xFF5A8A9E : 0xFFB8C7D4;
+                int subtitleColor = themeTextDim();
                 int subtitleY = currentY + s(22) + s(6);
                 for (int index = 0; index < row.subtitleLines.size(); index++) {
                     drawScaledText(
@@ -266,10 +301,6 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
             lines.add(current.toString());
         }
         return lines;
-    }
-
-    private static float lerp(float start, float end, float progress) {
-        return start + (end - start) * clamp01(progress);
     }
 
     private static float clamp01(float value) {

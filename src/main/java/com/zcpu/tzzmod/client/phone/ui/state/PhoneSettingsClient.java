@@ -21,11 +21,15 @@ public final class PhoneSettingsClient {
     private static final boolean DEFAULT_ALWAYS_SHOW_REGION_TITLE = false;
     private static final boolean DEFAULT_ANIMATIONS_ENABLED = true;
     private static final boolean DEFAULT_EXPERIMENTAL_UI = false;
+    private static final boolean DEFAULT_LIGHT_MODE = false;
+    private static final boolean DEFAULT_AR_MASK_ENABLED = false;
 
     private static boolean alertMode = DEFAULT_ALERT_MODE;
     private static boolean alwaysShowRegionTitle = DEFAULT_ALWAYS_SHOW_REGION_TITLE;
     private static boolean animationsEnabled = DEFAULT_ANIMATIONS_ENABLED;
     private static boolean experimentalUi = DEFAULT_EXPERIMENTAL_UI;
+    private static boolean lightMode = DEFAULT_LIGHT_MODE;
+    private static boolean arMaskEnabled = DEFAULT_AR_MASK_ENABLED;
     private static String loadedProfileKey;
 
     private PhoneSettingsClient() {
@@ -75,6 +79,28 @@ public final class PhoneSettingsClient {
         save();
     }
 
+    public static boolean isLightModeEnabled() {
+        ensureLoadedForCurrentProfile();
+        return lightMode;
+    }
+
+    public static void setLightModeEnabled(boolean enabled) {
+        ensureLoadedForCurrentProfile();
+        lightMode = enabled;
+        save();
+    }
+
+    public static boolean isARMaskEnabled() {
+        ensureLoadedForCurrentProfile();
+        return arMaskEnabled;
+    }
+
+    public static void setARMaskEnabled(boolean enabled) {
+        ensureLoadedForCurrentProfile();
+        arMaskEnabled = enabled;
+        save();
+    }
+
     public static void load() {
         loadForProfile(currentProfileKey());
     }
@@ -110,7 +136,8 @@ public final class PhoneSettingsClient {
             if (!parent.exists()) parent.mkdirs();
 
             JsonObject obj = readConfigRoot();
-            writeSettings(obj);
+            // Do NOT write to root — only write to the per-player profile section
+            // to avoid overwriting another client's settings when sharing run/
 
             JsonObject profiles = obj.has(PROFILES_KEY) && obj.get(PROFILES_KEY).isJsonObject()
                     ? obj.getAsJsonObject(PROFILES_KEY)
@@ -152,6 +179,12 @@ public final class PhoneSettingsClient {
         if (obj.has("experimentalUi")) {
             experimentalUi = obj.get("experimentalUi").getAsBoolean();
         }
+        if (obj.has("lightMode")) {
+            lightMode = obj.get("lightMode").getAsBoolean();
+        }
+        if (obj.has("arMaskEnabled")) {
+            arMaskEnabled = obj.get("arMaskEnabled").getAsBoolean();
+        }
     }
 
     private static void writeSettings(JsonObject obj) {
@@ -159,6 +192,8 @@ public final class PhoneSettingsClient {
         obj.add("alwaysShowRegionTitle", new JsonPrimitive(alwaysShowRegionTitle));
         obj.add("animationsEnabled", new JsonPrimitive(animationsEnabled));
         obj.add("experimentalUi", new JsonPrimitive(experimentalUi));
+        obj.add("lightMode", new JsonPrimitive(lightMode));
+        obj.add("arMaskEnabled", new JsonPrimitive(arMaskEnabled));
     }
 
     private static void resetToDefaults() {
@@ -166,6 +201,8 @@ public final class PhoneSettingsClient {
         alwaysShowRegionTitle = DEFAULT_ALWAYS_SHOW_REGION_TITLE;
         animationsEnabled = DEFAULT_ANIMATIONS_ENABLED;
         experimentalUi = DEFAULT_EXPERIMENTAL_UI;
+        lightMode = DEFAULT_LIGHT_MODE;
+        arMaskEnabled = DEFAULT_AR_MASK_ENABLED;
     }
 
     private static String currentProfileKey() {

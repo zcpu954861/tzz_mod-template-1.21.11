@@ -1,11 +1,14 @@
 package com.zcpu.tzzmod.client.phone.ui.app;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +50,7 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
     }
 
     private int getRowHeight() {
-        return s(22);
+        return s(30);
     }
 
     private int getRowGap() {
@@ -67,13 +70,24 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
     }
 
     @Override
+    protected boolean hasInitScanAnimation() {
+        return true;
+    }
+
+    @Override
+    protected boolean hasDefaultLaunchAnimation() {
+        return true;
+    }
+
+    @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         scrollOffset += (targetScroll - scrollOffset) * 0.35D;
         clampScroll();
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.marker.title"), contentX + contentWidth / 2, contentY + s(8));
 
         if (rows.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.marker.empty"), contentX + contentWidth / 2, contentY + s(42), 0xFFECECEC);
+            Text emptyText = Text.translatable("phone.tzz_mod.marker.empty");
+            context.drawText(textRenderer, emptyText, contentX + contentWidth / 2 - textRenderer.getWidth(emptyText) / 2, contentY + s(42), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
             return;
         }
 
@@ -92,11 +106,40 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
             }
             boolean hovered = mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= drawY && mouseY <= drawY + rowHeight;
             context.fill(contentX, drawY, contentX + contentWidth, drawY + rowHeight, hovered ? 0x33445D78 : 0x22333333);
-            context.fill(contentX + s(4), drawY + s(5), contentX + s(12), drawY + s(13), marker.color() | 0xFF000000);
+            context.fill(contentX + s(6), drawY + s(7), contentX + s(12), drawY + s(23), marker.color() | 0xFF000000);
 
-            String pos = marker.x() + ", " + marker.y() + ", " + marker.z();
-            context.drawTextWithShadow(textRenderer, Text.literal(textRenderer.trimToWidth(marker.name(), contentWidth - s(22))), contentX + s(16), drawY + s(3), 0xFFECECEC);
-            context.drawTextWithShadow(textRenderer, Text.literal(pos), contentX + s(16), drawY + s(12), 0xFFB7C7D8);
+            int switchW = s(28);
+            int switchH = s(12);
+            int switchX = contentX + contentWidth - s(32);
+            int switchY = drawY + (rowHeight - switchH) / 2;
+            boolean visible = MapClient.isMarkerParticleEnabled(marker.id());
+            float progress = visible ? 1.0F : 0.0F;
+            int cut = Math.max(1, switchH / 3);
+            int trackFill = isLightMode()
+                    ? (visible ? 0x330099CC : 0x33C0C8D0)
+                    : (visible ? 0x3300FFE0 : 0x331A2A3C);
+            fillChamferedRect(context, switchX, switchY, switchW, switchH, cut, trackFill);
+            int borderCol = visible ? themeAccent() : themeBorder();
+            context.fill(switchX + cut, switchY, switchX + switchW, switchY + 1, borderCol);
+            context.fill(switchX, switchY + switchH - 1, switchX + switchW - cut, switchY + switchH, borderCol);
+            for (int d = 0; d < cut; d++) {
+                context.fill(switchX + cut - d, switchY + d, switchX + cut - d + 1, switchY + d + 1, borderCol);
+            }
+            for (int d = 0; d < cut; d++) {
+                context.fill(switchX + switchW - cut + d, switchY + switchH - 1 - d,
+                        switchX + switchW - cut + d + 1, switchY + switchH - d, borderCol);
+            }
+            int knobSize = Math.max(4, switchH - s(4));
+            int knobTravel = Math.max(0, switchW - knobSize - s(4));
+            int knobX = switchX + s(2) + Math.round(progress * knobTravel);
+            int knobY = switchY + (switchH - knobSize) / 2;
+            fillChamferedRect(context, knobX, knobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
+
+            String pos = "X: " + marker.x() + "  Z: " + marker.z();
+            Text displayName = tryParseJsonText(marker.name());
+            String trimmedName = textRenderer.trimToWidth(displayName, contentWidth - s(52)).getString();
+            context.drawText(textRenderer, trimmedName.length() < displayName.getString().length() ? Text.literal(trimmedName + "...") : displayName, contentX + s(16), drawY + s(5), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+            context.drawText(textRenderer, Text.literal(pos), contentX + s(16), drawY + s(17), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
         }
         context.disableScissor();
 
@@ -110,6 +153,7 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         }
         int mx = (int) click.x();
         int my = (int) click.y();
+
         int top = getListTop();
         int bottom = getListBottom();
         int rowHeight = getRowHeight();
@@ -121,7 +165,18 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         for (int index = 0; index < rows.size(); index++) {
             int drawY = top + index * (rowHeight + gap) - currentScroll;
             if (my >= drawY && my <= drawY + rowHeight && client != null) {
-                client.setScreen(new MapMarkerDetailScreen(this, rows.get(index).id()));
+                int switchW = s(28);
+                int switchH = s(12);
+                int switchX = contentX + contentWidth - s(32);
+                int switchY = drawY + (rowHeight - switchH) / 2;
+                MapClient.MapMarker marker = rows.get(index);
+                if (mx >= switchX && mx <= switchX + switchW && my >= switchY && my <= switchY + switchH) {
+                    MapClient.setMarkerParticleEnabled(marker.id(), !MapClient.isMarkerParticleEnabled(marker.id()));
+                    return true;
+                }
+                MapMarkerDetailScreen detail = new MapMarkerDetailScreen(this, marker.id());
+                detail.setAppLaunchAnimation(contentX, drawY, contentWidth, rowHeight);
+                client.setScreen(detail);
                 return true;
             }
         }
@@ -159,5 +214,19 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         int maxThumbTravel = Math.max(1, visibleHeight - thumbHeight);
         int thumbY = top + Math.round((currentScroll / (float) Math.max(1, totalHeight - visibleHeight)) * maxThumbTravel);
         context.fill(trackX - 1, thumbY, trackX + 2, thumbY + thumbHeight, 0xAACFE8F9);
+    }
+
+    private static Text tryParseJsonText(String raw) {
+        if (raw == null || raw.isBlank()) return Text.literal(raw == null ? "" : raw);
+        if (!raw.startsWith("{") && !raw.startsWith("[") && !raw.startsWith("\"")) {
+            return Text.literal(raw);
+        }
+        try {
+            var element = JsonParser.parseString(raw);
+            var result = TextCodecs.CODEC.parse(JsonOps.INSTANCE, element);
+            Text parsed = result.result().orElse(null);
+            if (parsed != null) return parsed;
+        } catch (Exception ignored) {}
+        return Text.literal(raw);
     }
 }

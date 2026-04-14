@@ -33,31 +33,34 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
 
         int labelGap = s(4);
         int sectionGap = s(10);
-        int fieldHeight = s(18);
-        int wideFieldHeight = s(24);
+        int fieldHeight = textRenderer.fontHeight;
         int y = contentY + s(26);
 
         lineNameField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         lineNameField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.line_name"));
         lineNameField.setMaxLength(64);
+        styleTextField(lineNameField);
         addDrawableChild(lineNameField);
         y = lineNameField.getY() + fieldHeight + sectionGap;
 
         indexField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         indexField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.index"));
         indexField.setMaxLength(6);
+        styleTextField(indexField);
         addDrawableChild(indexField);
         y = indexField.getY() + fieldHeight + sectionGap;
 
         titleJsonField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         titleJsonField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.title_json"));
         titleJsonField.setMaxLength(25600);
+        styleTextField(titleJsonField);
         addDrawableChild(titleJsonField);
         y = titleJsonField.getY() + fieldHeight + sectionGap;
 
-        contentJsonField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, wideFieldHeight, Text.empty());
+        contentJsonField = new TextFieldWidget(textRenderer, contentX, y + textRenderer.fontHeight + labelGap, contentWidth, fieldHeight, Text.empty());
         contentJsonField.setPlaceholder(Text.translatable("phone.tzz_mod.task.config.content_json"));
         contentJsonField.setMaxLength(25600);
+        styleTextField(contentJsonField);
         addDrawableChild(contentJsonField);
 
         stateListener = () -> {
@@ -115,20 +118,30 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
     }
 
     @Override
+    protected boolean hasInitScanAnimation() {
+        return true;
+    }
+
+    @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.task.configurator"), contentX + contentWidth / 2, contentY + s(8));
 
         int labelGap = s(4);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.line_name"), contentX, lineNameField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.index"), contentX, indexField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.title_json"), contentX, titleJsonField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.content_json"), contentX, contentJsonField.getY() - textRenderer.fontHeight - labelGap, 0xFFBFC7D5);
+        int labelColor = isLightMode() ? themeTextDim() : 0xFFBFC7D5;
+        renderStyledTextFieldBackground(context, lineNameField);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.config.line_name"), contentX, lineNameField.getY() - textRenderer.fontHeight - labelGap, labelColor, !isLightMode());
+        renderStyledTextFieldBackground(context, indexField);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.config.index"), contentX, indexField.getY() - textRenderer.fontHeight - labelGap, labelColor, !isLightMode());
+        renderStyledTextFieldBackground(context, titleJsonField);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.config.title_json"), contentX, titleJsonField.getY() - textRenderer.fontHeight - labelGap, labelColor, !isLightMode());
+        renderStyledTextFieldBackground(context, contentJsonField);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.config.content_json"), contentX, contentJsonField.getY() - textRenderer.fontHeight - labelGap, labelColor, !isLightMode());
 
         int previewHeaderY = getPreviewHeaderY();
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.config.preview"), contentX, previewHeaderY, 0xFF8BD6FF);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.config.preview"), contentX, previewHeaderY, isLightMode() ? themeAccent() : 0xFF8BD6FF, !isLightMode());
 
         if (!feedback.isEmpty()) {
-            context.drawTextWithShadow(textRenderer, Text.literal(feedback), contentX, Math.min(previewHeaderY, getPreviewListBottom()) - s(12), 0xFFECECEC);
+            context.drawText(textRenderer, Text.literal(feedback), contentX, Math.min(previewHeaderY, getPreviewListBottom()) - s(12), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
         }
 
         previewScrollOffset = Math.max(0, Math.min(previewScrollOffset, getPreviewMaxScroll()));
@@ -136,13 +149,14 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
         int lineStep = s(Math.max(10, textRenderer.fontHeight + 2));
         int listTop = getPreviewListTop();
         int listBottom = getPreviewListBottom();
+        int taskLineColor = isLightMode() ? themeText() : 0xFFECECEC;
 
         for (TaskClient.TaskLineData line : TaskClient.getLines()) {
             List<net.minecraft.text.OrderedText> wrapped = textRenderer.wrapLines(Text.literal(line.name() + " (" + line.tasks().size() + ")"), Math.max(s(20), contentWidth - s(4)));
             int blockHeight = Math.max(lineStep, wrapped.size() * lineStep);
             if (y + blockHeight >= listTop && y <= listBottom) {
                 for (int i = 0; i < wrapped.size(); i++) {
-                    context.drawTextWithShadow(textRenderer, wrapped.get(i), contentX, y + i * lineStep, 0xFFECECEC);
+                    context.drawText(textRenderer, wrapped.get(i), contentX, y + i * lineStep, taskLineColor, !isLightMode());
                 }
             }
             y += blockHeight + s(4);

@@ -1,11 +1,14 @@
 package com.zcpu.tzzmod.client.phone.ui.app;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import com.zcpu.tzzmod.client.map.MapCanvasRenderer;
 import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
 
 public class MapAppDetailScreen extends AbstractPhoneScreen {
     private int ticksUntilRefresh;
@@ -51,6 +54,8 @@ public class MapAppDetailScreen extends AbstractPhoneScreen {
         } else if (!result.hoveredMarkerName().isBlank()) {
             renderTooltip(context, mouseX, mouseY, result.hoveredMarkerName());
         }
+        // Corner masking (#2)
+        renderMapCornerMask(context, mapX, mapY, mapWidth, mapHeight);
 
         MapClient.MapRegion region = MapClient.getState().region();
         if (region != null) {
@@ -60,12 +65,48 @@ public class MapAppDetailScreen extends AbstractPhoneScreen {
         }
     }
 
+    /** Masks the top-left and bottom-right corners of the map area (#2). */
+    private void renderMapCornerMask(DrawContext context, int mx, int my, int mw, int mh) {
+        int cut = Math.min(s(16), Math.min(mw, mh) / 4);
+        int bg = themeBgDark();
+        int border = themeBorder();
+        for (int i = 0; i < cut; i++) {
+            context.fill(mx, my + i, mx + (cut - i), my + i + 1, bg);
+        }
+        for (int i = 0; i < cut; i++) {
+            context.fill(mx + mw - (cut - i), my + mh - 1 - i, mx + mw, my + mh - i, bg);
+        }
+        context.fill(mx + cut, my, mx + mw, my + 1, border);
+        for (int i = 0; i < cut; i++) {
+            context.fill(mx + cut - i, my + i, mx + cut - i + 1, my + i + 1, border);
+        }
+        context.fill(mx, my + mh - 1, mx + mw - cut, my + mh, border);
+        for (int i = 0; i < cut; i++) {
+            context.fill(mx + mw - cut + i, my + mh - 1 - i, mx + mw - cut + i + 1, my + mh - i, border);
+        }
+    }
+
     private void renderTooltip(DrawContext context, int mouseX, int mouseY, String text) {
+        Text displayText = tryParseJsonText(text);
         int tooltipX = mouseX + s(6);
         int tooltipY = mouseY - s(14);
-        int width = textRenderer.getWidth(text) + s(8);
+        int width = textRenderer.getWidth(displayText) + s(8);
         int height = textRenderer.fontHeight + s(6);
         context.fill(tooltipX, tooltipY, tooltipX + width, tooltipY + height, 0xCC0D1117);
-        context.drawTextWithShadow(textRenderer, Text.literal(text), tooltipX + s(4), tooltipY + s(3), 0xFFFFFFFF);
+        context.drawTextWithShadow(textRenderer, displayText, tooltipX + s(4), tooltipY + s(3), 0xFFFFFFFF);
+    }
+
+    private static Text tryParseJsonText(String raw) {
+        if (raw == null || raw.isBlank()) return Text.literal(raw == null ? "" : raw);
+        if (!raw.startsWith("{") && !raw.startsWith("[") && !raw.startsWith("\"")) {
+            return Text.literal(raw);
+        }
+        try {
+            var element = JsonParser.parseString(raw);
+            var result = TextCodecs.CODEC.parse(JsonOps.INSTANCE, element);
+            Text parsed = result.result().orElse(null);
+            if (parsed != null) return parsed;
+        } catch (Exception ignored) {}
+        return Text.literal(raw);
     }
 }

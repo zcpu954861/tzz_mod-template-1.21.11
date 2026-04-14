@@ -29,6 +29,9 @@ public final class MapClient {
     private static final double PARTICLE_RANGE_SQ = 196.0D * 196.0D;
     private static final Set<Runnable> LISTENERS = new CopyOnWriteArraySet<>();
     private static final Set<String> VISIBLE_REGION_IDS = new CopyOnWriteArraySet<>();
+    private static final Set<String> HIDDEN_MARKER_IDS = new CopyOnWriteArraySet<>();
+    private static final Set<String> PARTICLE_DISABLED_MARKER_IDS = new CopyOnWriteArraySet<>();
+    private static boolean markerParticlesEnabled = true;
     private static MapState state = MapState.empty();
 
     private MapClient() {
@@ -42,6 +45,8 @@ public final class MapClient {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             state = MapState.empty();
             VISIBLE_REGION_IDS.clear();
+            HIDDEN_MARKER_IDS.clear();
+            PARTICLE_DISABLED_MARKER_IDS.clear();
             RegionTitleOverlay.clear();
             MapCanvasRenderer.reset();
             notifyListeners();
@@ -166,6 +171,44 @@ public final class MapClient {
             VISIBLE_REGION_IDS.add(regionId);
         } else {
             VISIBLE_REGION_IDS.remove(regionId);
+        }
+        notifyListeners();
+    }
+
+    public static boolean isMarkerParticlesEnabled() {
+        return markerParticlesEnabled;
+    }
+
+    public static void setMarkerParticlesEnabled(boolean enabled) {
+        markerParticlesEnabled = enabled;
+    }
+
+    public static boolean isMarkerParticleEnabled(String markerId) {
+        return markerId != null && !PARTICLE_DISABLED_MARKER_IDS.contains(markerId);
+    }
+
+    public static void setMarkerParticleEnabled(String markerId, boolean enabled) {
+        if (markerId == null || markerId.isBlank()) return;
+        if (enabled) {
+            PARTICLE_DISABLED_MARKER_IDS.remove(markerId);
+        } else {
+            PARTICLE_DISABLED_MARKER_IDS.add(markerId);
+        }
+        notifyListeners();
+    }
+
+    public static boolean isMarkerVisible(String markerId) {
+        return markerId != null && !HIDDEN_MARKER_IDS.contains(markerId);
+    }
+
+    public static void setMarkerVisible(String markerId, boolean visible) {
+        if (markerId == null || markerId.isBlank()) {
+            return;
+        }
+        if (visible) {
+            HIDDEN_MARKER_IDS.remove(markerId);
+        } else {
+            HIDDEN_MARKER_IDS.add(markerId);
         }
         notifyListeners();
     }
@@ -493,6 +536,9 @@ public final class MapClient {
     }
 
     private static void spawnMarkerParticles(MinecraftClient client) {
+        if (!markerParticlesEnabled) {
+            return;
+        }
         var world = client.world;
         var player = client.player;
         if (world == null || player == null || world.getTime() % 2L != 0L) {
@@ -506,6 +552,9 @@ public final class MapClient {
         for (int index = 0; index < state.markers().size(); index++) {
             MapMarker marker = state.markers().get(index);
             if (!dimensionId.equals(marker.dimensionId())) {
+                continue;
+            }
+            if (!isMarkerParticleEnabled(marker.id())) {
                 continue;
             }
             double dx = marker.x() + 0.5D - player.getX();

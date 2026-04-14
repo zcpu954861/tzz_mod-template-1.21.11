@@ -84,21 +84,31 @@ public class RegionPlannerListScreen extends AbstractPhoneScreen {
     }
 
     @Override
+    protected boolean hasInitScanAnimation() {
+        return true;
+    }
+
+    @Override
+    protected boolean hasDefaultLaunchAnimation() {
+        return true;
+    }
+
+    @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         scrollOffset += (targetScroll - scrollOffset) * 0.35D;
         clampScrollTargets();
 
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.region.title"), contentX + contentWidth / 2, contentY + s(8));
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.hint"), contentX, contentY + s(22), 0xFFBBD1E1);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.hint"), contentX, contentY + s(22), 0xFFBBD1E1, !isLightMode());
 
         List<MapClient.PlannerDraft> remoteDrafts = MapClient.getRemotePlannerDrafts();
         String summary = remoteDrafts.isEmpty()
                 ? Text.translatable("phone.tzz_mod.region.draft_empty").getString()
                 : Text.translatable("phone.tzz_mod.region.remote_drafts", remoteDrafts.size()).getString();
-        context.drawTextWithShadow(textRenderer, Text.literal(summary), contentX, contentY + s(36), 0xFFECECEC);
+        context.drawText(textRenderer, Text.literal(summary), contentX, contentY + s(36), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
 
         if (rows.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.empty"), contentX + contentWidth / 2, contentY + s(84), 0xFFECECEC);
+            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.region.empty"), contentX + contentWidth / 2, contentY + s(84), themeText());
             return;
         }
 
@@ -120,24 +130,42 @@ public class RegionPlannerListScreen extends AbstractPhoneScreen {
             context.fill(contentX, drawY, contentX + contentWidth, drawY + rowHeight, hovered ? 0x334A6075 : 0x22333333);
             context.fill(contentX + s(6), drawY + s(7), contentX + s(12), drawY + s(23), row.color());
 
-            int actionX = contentX + contentWidth - s(30);
+            int switchW = s(28);
+            int switchH = s(12);
+            int switchX = contentX + contentWidth - s(32);
+            int switchY = drawY + (rowHeight - switchH) / 2;
             if (row.draft()) {
-                context.fill(actionX, drawY + s(7), actionX + s(24), drawY + s(21), 0xAA4DABF7);
-                context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.draft_label"), actionX + s(12), drawY + s(10), 0xFFF6FDFF);
+                context.fill(switchX, drawY + s(7), switchX + switchW, drawY + s(21), 0xAA4DABF7);
+                context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.draft_label"), switchX + switchW / 2 - textRenderer.getWidth(Text.translatable("phone.tzz_mod.region.draft_label")) / 2, drawY + s(10), 0xFFF6FDFF, true);
             } else {
-                int toggleWidth = s(24);
-                int toggleHeight = s(14);
-                int toggleY = drawY + s(8);
                 boolean visible = MapClient.isRegionVisible(row.regionId());
-                int toggleColor = visible ? 0xAA3FC47F : 0x66415A73;
-                context.fill(actionX, toggleY, actionX + toggleWidth, toggleY + toggleHeight, toggleColor);
-                context.drawCenteredTextWithShadow(textRenderer, Text.literal(visible ? "开" : "关"), actionX + toggleWidth / 2, toggleY + s(3), 0xFFF4FFFA);
+                float progress = visible ? 1.0F : 0.0F;
+                int cut = Math.max(1, switchH / 3);
+                int trackFill = isLightMode()
+                        ? (visible ? 0x330099CC : 0x33C0C8D0)
+                        : (visible ? 0x3300FFE0 : 0x331A2A3C);
+                fillChamferedRect(context, switchX, switchY, switchW, switchH, cut, trackFill);
+                int borderCol = visible ? themeAccent() : themeBorder();
+                context.fill(switchX + cut, switchY, switchX + switchW, switchY + 1, borderCol);
+                context.fill(switchX, switchY + switchH - 1, switchX + switchW - cut, switchY + switchH, borderCol);
+                for (int d = 0; d < cut; d++) {
+                    context.fill(switchX + cut - d, switchY + d, switchX + cut - d + 1, switchY + d + 1, borderCol);
+                }
+                for (int d = 0; d < cut; d++) {
+                    context.fill(switchX + switchW - cut + d, switchY + switchH - 1 - d,
+                            switchX + switchW - cut + d + 1, switchY + switchH - d, borderCol);
+                }
+                int knobSize = Math.max(4, switchH - s(4));
+                int knobTravel = Math.max(0, switchW - knobSize - s(4));
+                int knobX = switchX + s(2) + Math.round(progress * knobTravel);
+                int knobY = switchY + (switchH - knobSize) / 2;
+                fillChamferedRect(context, knobX, knobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
             }
 
             String title = textRenderer.trimToWidth(row.title(), contentWidth - s(48));
             String subtitle = textRenderer.trimToWidth(row.subtitle(), contentWidth - s(48));
-            context.drawTextWithShadow(textRenderer, Text.literal(title), contentX + s(16), drawY + s(5), 0xFFECECEC);
-            context.drawTextWithShadow(textRenderer, Text.literal(subtitle), contentX + s(16), drawY + s(17), 0xFFB7C7D8);
+            context.drawText(textRenderer, Text.literal(title), contentX + s(16), drawY + s(5), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+            context.drawText(textRenderer, Text.literal(subtitle), contentX + s(16), drawY + s(17), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
         }
         context.disableScissor();
 
@@ -166,18 +194,19 @@ public class RegionPlannerListScreen extends AbstractPhoneScreen {
                 continue;
             }
             RowEntry row = rows.get(index);
-            int actionX = contentX + contentWidth - s(30);
-            if (!row.draft()) {
-                int toggleWidth = s(24);
-                int toggleHeight = s(14);
-                int toggleY = drawY + s(8);
-                if (mouseX >= actionX && mouseX <= actionX + toggleWidth && mouseY >= toggleY && mouseY <= toggleY + toggleHeight) {
-                    MapClient.setRegionVisible(row.regionId(), !MapClient.isRegionVisible(row.regionId()));
-                    return true;
-                }
+            int switchW = s(28);
+            int switchH = s(12);
+            int switchX = contentX + contentWidth - s(32);
+            int switchY = drawY + (rowHeight - switchH) / 2;
+            if (!row.draft() && mouseX >= switchX && mouseX <= switchX + switchW
+                    && mouseY >= switchY && mouseY <= switchY + switchH) {
+                MapClient.setRegionVisible(row.regionId(), !MapClient.isRegionVisible(row.regionId()));
+                return true;
             }
             if (client != null) {
-                client.setScreen(new RegionPlannerDetailScreen(this, row.regionId(), row.draft()));
+                RegionPlannerDetailScreen detail = new RegionPlannerDetailScreen(this, row.regionId(), row.draft());
+                detail.setAppLaunchAnimation(contentX, drawY, contentWidth, rowHeight);
+                client.setScreen(detail);
                 return true;
             }
         }

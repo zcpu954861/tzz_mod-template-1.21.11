@@ -3,7 +3,6 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 import com.zcpu.tzzmod.client.ForcedHudClient;
 import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import com.zcpu.tzzmod.network.AdminModeC2SPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.Click;
@@ -117,7 +116,6 @@ public class PhoneAdminAppScreen extends AbstractPhoneScreen {
         int bottom = getListBottom();
 
         context.enableScissor(contentX, getListTop(), contentX + contentWidth, bottom);
-        boolean techUi = isExperimentalUi();
         for (ToggleRow row : rows) {
             int rowHeight = getRowHeight(row);
             if (currentY + rowHeight >= getListTop() && currentY <= bottom) {
@@ -125,55 +123,50 @@ public class PhoneAdminAppScreen extends AbstractPhoneScreen {
                 boolean enabled = row.stateSupplier().getAsBoolean();
                 row.progress = approach(row.progress, enabled ? 1.0F : 0.0F, 0.18F + delta * 0.12F);
 
-                if (techUi) {
-                    // Tech-themed row: dark panel with chamfer border
-                    int chamfer = Math.max(2, s(3));
-                    int rowBg = hovered ? 0x44101825 : 0x33101825;
-                    fillChamferedRect(context, rowX, currentY, rowWidth, rowHeight, chamfer, rowBg);
-                    // Left accent line
-                    context.fill(rowX, currentY + chamfer, rowX + 1, currentY + rowHeight - chamfer, enabled ? 0xAA00FFE0 : 0x441A4A6C);
-                } else {
-                    context.fill(rowX, currentY, rowX + rowWidth, currentY + rowHeight, hovered ? 0x33445D78 : 0x22333333);
-                }
+                // Tech-themed row: dark panel with chamfer border
+                int chamfer = Math.max(2, s(3));
+                int rowBg = hovered ? (isLightMode() ? 0x44D8E4F0 : 0x44101825) : (isLightMode() ? 0x33D8E4F0 : 0x33101825);
+                fillChamferedRect(context, rowX, currentY, rowWidth, rowHeight, chamfer, rowBg);
+                // Left accent line
+                context.fill(rowX, currentY + chamfer, rowX + 1, currentY + rowHeight - chamfer, enabled ? themeAccent() : themeBorder());
 
-                drawScaledText(context, row.label(), rowX + s(6), currentY + s(6), techUi ? 0xFFE0F7FF : 0xFFECECEC);
+                drawScaledText(context, row.label(), rowX + s(6), currentY + s(6), themeText());
 
                 List<String> wrapped = wrap(row.subtitle().getString(), rowWidth - s(56));
                 for (int line = 0; line < wrapped.size(); line++) {
-                    drawScaledText(context, Text.literal(wrapped.get(line)), rowX + s(6), currentY + s(18) + line * (scaledFontHeight() + s(1)), techUi ? 0xFF6B8A9E : 0xFFB8C7D4);
+                    drawScaledText(context, Text.literal(wrapped.get(line)), rowX + s(6), currentY + s(18) + line * (scaledFontHeight() + s(1)), themeTextDim());
                 }
 
-                int switchW = s(36);
-                int switchH = s(14);
+                int switchW = s(28);
+                int switchH = s(12);
                 int switchX = rowX + rowWidth - switchW - s(6);
                 int switchY = currentY + s(8);
-                if (techUi) {
-                    // Tech toggle: angular capsule with cyan/dim border
-                    int toggleChamfer = Math.max(1, switchH / 4);
-                    int trackColor = lerpColor(0x440A1825, 0x8800806A, row.progress);
-                    int trackBorder = enabled ? 0xAA00FFE0 : 0x551A4A6C;
-                    fillChamferedRect(context, switchX, switchY, switchW, switchH, toggleChamfer, trackBorder);
-                    fillChamferedRect(context, switchX + 1, switchY + 1, switchW - 2, switchH - 2, Math.max(1, toggleChamfer - 1), trackColor);
-                    // Knob
-                    int knobSize = Math.max(3, switchH - s(4));
-                    float leftKnob = switchX + s(2);
-                    float rightKnob = switchX + switchW - s(2) - knobSize;
-                    int knobX = Math.round(leftKnob + (rightKnob - leftKnob) * row.progress);
-                    int knobY = switchY + (switchH - knobSize) / 2;
-                    int knobCol = enabled ? 0xFF00FFE0 : 0xFF4A5A6A;
-                    context.fill(knobX, knobY, knobX + knobSize, knobY + knobSize, knobCol);
-                } else {
-                    int capsuleColor = lerpColor(0x55333333, 0xFF3FC47F, row.progress);
-                    int knobColor = enabled ? 0xFFFFFFFF : 0xFFCCCCCC;
-                    RoundedRectRenderer.fillRoundedRect(context, switchX, switchY, switchW, switchH, switchH / 2, capsuleColor);
-                    int knobRadius = Math.max(1, switchH - s(2));
-                    float leftCX = switchX + s(2) + knobRadius / 2.0F;
-                    float rightCX = switchX + switchW - s(2) - knobRadius / 2.0F;
-                    int knobCX = Math.round(leftCX + (rightCX - leftCX) * row.progress);
-                    int knobLeft = knobCX - knobRadius / 2;
-                    int knobTop = switchY + (switchH - knobRadius) / 2;
-                    RoundedRectRenderer.fillRoundedRect(context, knobLeft, knobTop, knobRadius, knobRadius, knobRadius / 2, knobColor);
+                // Angular tech toggle: 4-line style (#8), white knob (#7)
+                int toggleCut = Math.max(1, switchH / 3);
+                int trackColor = lerpColor(isLightMode() ? 0x33D8E4F0 : 0x330A1825,
+                        isLightMode() ? 0x330088AA : 0x3300806A, row.progress);
+                fillChamferedRect(context, switchX, switchY, switchW, switchH, toggleCut, trackColor);
+                int trackBorder = enabled ? themeAccent() : themeBorder();
+                // Top edge
+                context.fill(switchX + toggleCut, switchY, switchX + switchW, switchY + 1, trackBorder);
+                // Bottom edge
+                context.fill(switchX, switchY + switchH - 1, switchX + switchW - toggleCut, switchY + switchH, trackBorder);
+                // Top-left diagonal
+                for (int di = 0; di < toggleCut; di++) {
+                    context.fill(switchX + toggleCut - di, switchY + di, switchX + toggleCut - di + 1, switchY + di + 1, trackBorder);
                 }
+                // Bottom-right diagonal
+                for (int di = 0; di < toggleCut; di++) {
+                    context.fill(switchX + switchW - toggleCut + di, switchY + switchH - 1 - di,
+                            switchX + switchW - toggleCut + di + 1, switchY + switchH - di, trackBorder);
+                }
+                // White circle knob (same style as PhoneSettingsAppScreen)
+                int knobSize = Math.max(3, switchH - s(4));
+                int knobTravel = switchW - knobSize - s(4);
+                int knobX = switchX + s(2) + Math.round(row.progress * knobTravel);
+                int knobY = switchY + (switchH - knobSize) / 2;
+                fillChamferedRect(context, knobX, knobY, knobSize, knobSize,
+                        Math.max(1, knobSize / 2), 0xFFFFFFFF);
             }
             currentY += rowHeight + s(6);
         }

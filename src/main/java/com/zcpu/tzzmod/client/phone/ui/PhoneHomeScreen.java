@@ -198,32 +198,25 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
     @Override
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
-        if (isExperimentalUi()) {
-            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.home"),
-                    contentX + contentWidth / 2, contentY + s(8), 0xFF00FFE0);
-        } else {
-            drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.home"), contentX + contentWidth / 2, contentY + s(8));
-        }
+        drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.home"),
+                contentX + contentWidth / 2, contentY + s(8), themeAccent());
 
         int chatUnread = PhoneChatClient.getTotalUnreadCount();
         int taskUnread = TaskClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
-            // Tech UI: draw a subtle thin border around each icon with a faint glow
-            if (isExperimentalUi()) {
-                int framePad = s(1);
-                int frameX = slot.x - framePad;
-                int frameY = slot.y - framePad;
-                int frameW = slot.size + framePad * 2;
-                int frameH = slot.size + framePad * 2;
-                int frameChamfer = Math.max(2, s(2));
-                // Outer subtle glow
-                fillChamferedRect(context, frameX - 1, frameY - 1, frameW + 2, frameH + 2, frameChamfer + 1, 0x1800FFE0);
-                // Thin border line
-                fillChamferedRect(context, frameX, frameY, frameW, frameH, frameChamfer, 0x551A4A6C);
-                fillChamferedRect(context, frameX + 1, frameY + 1, Math.max(1, frameW - 2), Math.max(1, frameH - 2),
-                        Math.max(1, frameChamfer - 1), 0x00000000);
-            }
+            // Tech UI: angular chamfered border around each icon using theme accent colors
+            int framePad = s(1);
+            int frameX = slot.x - framePad;
+            int frameY = slot.y - framePad;
+            int frameW = slot.size + framePad * 2;
+            int frameH = slot.size + framePad * 2;
+            // Subtle background fill inside the icon frame
+            int iconBg = isLightMode() ? 0x22C8D4E0 : 0x22060D18;
+            fillChamferedRect(context, frameX + 1, frameY + 1, Math.max(1, frameW - 2), Math.max(1, frameH - 2),
+                    Math.max(1, s(2) - 1), iconBg);
+            // Angular tech border (chamfered corners, bright accent top, accent accents)
+            drawTechBorder(context, frameX, frameY, frameW, frameH);
 
             // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
             if (hasResource(slot.entry.iconTexture())) {
@@ -270,11 +263,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
                 shownName = appName == null || appName.isEmpty() ? slot.entry.id() : appName;
             }
             // Draw label text directly without a background so it appears over the game's blur.
-            if (isExperimentalUi()) {
-                drawScaledCenteredText(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4), 0xFFE0F7FF);
-            } else {
-                drawPhoneTextCenteredFixed(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4));
-            }
+            drawScaledCenteredText(context, Text.literal(shownName), slot.x + slot.size / 2, slot.y + slot.size + s(4), themeText());
         }
     }
 
@@ -283,32 +272,16 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
         int centerY = slot.y + s(4);
         int radius = s(5);
 
-        if (isExperimentalUi()) {
-            // Tech-themed badge: chamfered diamond-ish shape
-            int badgeSize = radius * 2 + 1;
-            fillChamferedRect(context, centerX - radius - 1, centerY - radius - 1, badgeSize + 2, badgeSize + 2,
-                    Math.max(1, radius / 2), 0xCC000000);
-            fillChamferedRect(context, centerX - radius, centerY - radius, badgeSize, badgeSize,
-                    Math.max(1, radius / 2), 0xFF00B4A0);
-        } else {
-            drawCircle(context, centerX, centerY, radius + 1, 0xCC000000);
-            drawCircle(context, centerX, centerY, radius, 0xFFE64545);
-        }
+        // Tech-themed badge: chamfered diamond-ish shape
+        int badgeSize = radius * 2 + 1;
+        fillChamferedRect(context, centerX - radius - 1, centerY - radius - 1, badgeSize + 2, badgeSize + 2,
+                Math.max(1, radius / 2), 0xCC000000);
+        fillChamferedRect(context, centerX - radius, centerY - radius, badgeSize, badgeSize,
+                Math.max(1, radius / 2), isLightMode() ? 0xFF0088BB : 0xFF00B4A0);
 
         String badge = unreadCount > 99 ? "99+" : Integer.toString(unreadCount);
         int textWidth = scaledTextWidth(badge);
         drawScaledText(context, Text.literal(badge), centerX - textWidth / 2, centerY - s(3), 0xFFFFFFFF);
-    }
-
-    private void drawCircle(DrawContext context, int centerX, int centerY, int radius, int color) {
-        int squared = radius * radius;
-        for (int y = -radius; y <= radius; y++) {
-            for (int x = -radius; x <= radius; x++) {
-                if (x * x + y * y <= squared) {
-                    context.fill(centerX + x, centerY + y, centerX + x + 1, centerY + y + 1, color);
-                }
-            }
-        }
     }
 
     private record AppSlot(PhoneAppEntry entry, int x, int y, int size) {

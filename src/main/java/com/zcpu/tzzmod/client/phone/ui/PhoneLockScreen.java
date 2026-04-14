@@ -59,22 +59,8 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
             return;
         }
 
-        int offsetY = Math.round((1.0F - getShellRiseProgress()) * (phoneHeight + s(40)));
-
-        // Do NOT move the whole phone frame during unlock. Only the internal lock overlay will slide.
-        phoneY = basePhoneY + offsetY;
-        contentY = baseContentY + offsetY;
-
-        renderPhoneWakeGlow(context);
-        drawLineBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
-        renderPhoneScreenSurface(context);
-
-        if (getScreenWakeProgress() > 0.18F && !unlocking) {
-            super.renderStatusBar(context);
-        }
-
-        renderPhoneContent(context, mouseX, mouseY, delta);
-
+        // Fallback (should not reach here since isExperimentalUi() always true)
+        renderTechLockScreen(context, mouseX, mouseY, delta);
         phoneY = basePhoneY;
         contentY = baseContentY;
 
@@ -207,38 +193,6 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         return super.mouseClicked(click, doubleClick);
     }
 
-    private void renderPhoneWakeGlow(DrawContext context) {
-        float wake = getScreenWakeProgress();
-        if (wake <= 0.0F) {
-            return;
-        }
-
-        int glowX = phoneX - s(8);
-        int glowY = phoneY + s(18);
-        int glowW = phoneWidth + s(16);
-        int glowH = phoneHeight - s(8);
-        int glowRadius = Math.max(s(12), s(18));
-        RoundedRectRenderer.fillRoundedRect(context, glowX, glowY, glowW, glowH, glowRadius, withAlpha(0xFF46A8FF, Math.round(38.0F * wake)));
-    }
-
-    private void renderPhoneScreenSurface(DrawContext context) {
-        int inset = s(4);
-        int screenX = phoneX + inset;
-        int screenY = phoneY + inset;
-        int screenW = phoneWidth - inset * 2;
-        int screenH = phoneHeight - inset * 2;
-        int radius = Math.max(s(10), s(14));
-        float wake = getScreenWakeProgress();
-
-        RoundedRectRenderer.fillRoundedRect(context, screenX, screenY, screenW, screenH, radius, 0xE00A1017);
-        RoundedRectRenderer.fillRoundedRect(context, screenX + s(1), screenY + s(1), Math.max(1, screenW - s(2)), Math.max(1, screenH - s(2)), Math.max(1, radius - s(1)), withAlpha(0xFF101C28, 200));
-
-        if (wake > 0.0F) {
-            RoundedRectRenderer.fillRoundedRect(context, screenX + s(2), screenY + s(2), Math.max(1, screenW - s(4)), Math.max(1, screenH - s(4)), Math.max(1, radius - s(2)), withAlpha(0xFF274763, Math.round(70.0F * wake)));
-            RoundedRectRenderer.fillRoundedRect(context, screenX + s(3), screenY + s(3), Math.max(1, screenW - s(6)), Math.max(1, screenH - s(6)), Math.max(1, radius - s(3)), withAlpha(0xFFBFE7FF, Math.round(150.0F * (1.0F - wake))));
-        }
-    }
-
     private void renderUnlockButton(DrawContext context, int mouseX, int mouseY, int alpha, int yOffset) {
         int buttonWidth = Math.min(contentWidth - s(18), s(128));
         int buttonHeight = s(28);
@@ -297,7 +251,11 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         context.getMatrices().pushMatrix();
         context.getMatrices().translate(centerX - (textWidth * effectiveScale) / 2.0F, (float) y);
         context.getMatrices().scale(effectiveScale, effectiveScale);
-        context.drawTextWithShadow(textRenderer, text, 0, 0, color);
+        if (isLightMode()) {
+            context.drawText(textRenderer, text, 0, 0, color, false);
+        } else {
+            context.drawTextWithShadow(textRenderer, text, 0, 0, color);
+        }
         context.getMatrices().popMatrix();
     }
 
@@ -320,10 +278,10 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         // Phase 1: Panel appearance with alpha fade-in
         int panelAlpha = Math.max(0, Math.min(255, Math.round(255.0F * bootProgress)));
 
-        // Dark background
-        fillChamferedRect(context, bgX, bgY, bgW, bgH, chamfer, withAlpha(0xFF0A0F1A, panelAlpha));
+        // Background
+        fillChamferedRect(context, bgX, bgY, bgW, bgH, chamfer, withAlpha(themeBgDark() | 0xFF000000, panelAlpha));
         fillChamferedRect(context, bgX + s(1), bgY + s(1), Math.max(1, bgW - s(2)), Math.max(1, bgH - s(2)),
-                Math.max(1, chamfer - s(1)), withAlpha(0xFF101825, Math.max(0, panelAlpha - 20)));
+                Math.max(1, chamfer - s(1)), withAlpha(themeBgPanel() | 0xFF000000, Math.max(0, panelAlpha - 20)));
 
         // Tech border with glow
         drawTechBorder(context, phoneX, phoneY, phoneWidth, phoneHeight);
@@ -332,13 +290,13 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         if (bootProgress > 0.3F) {
             float glowIntensity = Math.min(1.0F, (bootProgress - 0.3F) / 0.4F);
             int glowAlpha = Math.round(40.0F * glowIntensity);
-            context.fill(bgX + chamfer, bgY, bgX + bgW - chamfer, bgY + s(2), withAlpha(0xFF00FFE0, glowAlpha));
+            context.fill(bgX + chamfer, bgY, bgX + bgW - chamfer, bgY + s(2), withAlpha(themeAccent(), glowAlpha));
         }
 
         // Grid overlay (fades in during boot)
         if (bootProgress > 0.5F) {
             float gridAlpha = Math.min(1.0F, (bootProgress - 0.5F) / 0.3F);
-            int gridColor = withAlpha(0xFF1A3050, Math.round(24.0F * gridAlpha));
+            int gridColor = withAlpha(themeGrid() | 0xFF000000, Math.round(24.0F * gridAlpha));
             int gridSpacing = s(18);
             if (gridSpacing > 0) {
                 for (int gy = bgY + gridSpacing; gy < bgY + bgH - chamfer; gy += gridSpacing) {
@@ -355,8 +313,8 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
             float scanlinePos = (bootProgress - 0.2F) / 0.75F;
             int scanY = bgY + Math.round(scanlinePos * bgH);
             if (scanY > bgY && scanY < bgY + bgH) {
-                context.fill(bgX + s(4), scanY - s(1), bgX + bgW - s(4), scanY, withAlpha(0xFF00FFE0, 80));
-                context.fill(bgX + s(4), scanY, bgX + bgW - s(4), scanY + s(1), withAlpha(0xFF00FFE0, 40));
+                context.fill(bgX + s(4), scanY - s(1), bgX + bgW - s(4), scanY, withAlpha(themeAccent(), 80));
+                context.fill(bgX + s(4), scanY, bgX + bgW - s(4), scanY + s(1), withAlpha(themeAccent(), 40));
             }
         }
 
@@ -372,19 +330,25 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         if (!unlocking) {
             // Time display - tech style
             renderScaledCenteredText(context, Text.literal(LocalTime.now().format(LOCK_TIME_FORMATTER)),
-                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(0xFF00FFE0, contentAlpha));
+                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(themeAccent(), contentAlpha));
 
             // Date display
             renderScaledCenteredText(context, Text.literal(LocalDate.now().format(LOCK_DATE_FORMATTER)),
-                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(0xFF6B8A9E, Math.max(110, contentAlpha - 35)));
+                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(themeTextDim(), Math.max(110, contentAlpha - 35)));
 
             // Geometric lock icon
             renderTechLockGlyph(context, centerX, upperMidY + s(96), contentAlpha);
 
             // Hint text
             Text hint = Text.translatable("phone.tzz_mod.lock_screen.hint");
-            context.drawCenteredTextWithShadow(textRenderer, hint, centerX,
-                    upperMidY + s(96) + s(20), withAlpha(0xFF5A8A9E, Math.max(96, contentAlpha - 64)));
+            if (isLightMode()) {
+                int hw = textRenderer.getWidth(hint) / 2;
+                context.drawText(textRenderer, hint, centerX - hw, upperMidY + s(96) + s(20),
+                        withAlpha(themeTextDim(), Math.max(96, contentAlpha - 64)), false);
+            } else {
+                context.drawCenteredTextWithShadow(textRenderer, hint, centerX,
+                        upperMidY + s(96) + s(20), withAlpha(0xFF5A8A9E, Math.max(96, contentAlpha - 64)));
+            }
 
             // Unlock button - tech style
             renderTechUnlockButton(context, mouseX, mouseY, contentAlpha, 0);
@@ -395,16 +359,16 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
 
             // Content fades out with digital noise
             renderScaledCenteredText(context, Text.literal(LocalTime.now().format(LOCK_TIME_FORMATTER)),
-                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(0xFF00FFE0, fadeAlpha));
+                    centerX, upperMidY, LOCK_TIME_SCALE, withAlpha(themeAccent(), fadeAlpha));
             renderScaledCenteredText(context, Text.literal(LocalDate.now().format(LOCK_DATE_FORMATTER)),
-                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(0xFF6B8A9E, Math.max(0, fadeAlpha - 35)));
+                    centerX, upperMidY + s(54), LOCK_DATE_SCALE, withAlpha(themeTextDim(), Math.max(0, fadeAlpha - 35)));
 
             // Horizontal wipe lines during dissolve
             int wipeCount = Math.round(unlockEase * 8);
             for (int i = 0; i < wipeCount; i++) {
                 int lineY = bgY + (bgH * (i + 1)) / 9;
                 int lineAlpha = Math.max(0, Math.round(60.0F * (1.0F - unlockEase)));
-                context.fill(bgX + chamfer, lineY, bgX + bgW - chamfer, lineY + 1, withAlpha(0xFF00FFE0, lineAlpha));
+                context.fill(bgX + chamfer, lineY, bgX + bgW - chamfer, lineY + 1, withAlpha(themeAccent(), lineAlpha));
             }
         }
     }
@@ -412,19 +376,20 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
     private void renderTechLockGlyph(DrawContext context, int centerX, int centerY, int alpha) {
         // Geometric diamond-shaped lock icon
         int size = s(12);
+        int glyphColor = themeAccent();
         // Outer diamond
         for (int dy = -size; dy <= size; dy++) {
             int dxSpan = size - Math.abs(dy);
             // Draw only the outline
             if (Math.abs(dy) == size || dxSpan <= 1) {
-                context.fill(centerX - dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
+                context.fill(centerX - dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(glyphColor, alpha));
             } else {
-                context.fill(centerX - dxSpan, centerY + dy, centerX - dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
-                context.fill(centerX + dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(0xFF00FFE0, alpha));
+                context.fill(centerX - dxSpan, centerY + dy, centerX - dxSpan + 1, centerY + dy + 1, withAlpha(glyphColor, alpha));
+                context.fill(centerX + dxSpan, centerY + dy, centerX + dxSpan + 1, centerY + dy + 1, withAlpha(glyphColor, alpha));
             }
         }
         // Inner dot
-        context.fill(centerX - 1, centerY - 1, centerX + 2, centerY + 2, withAlpha(0xFF00FFE0, Math.max(0, alpha - 40)));
+        context.fill(centerX - 1, centerY - 1, centerX + 2, centerY + 2, withAlpha(glyphColor, Math.max(0, alpha - 40)));
     }
 
     private void renderTechUnlockButton(DrawContext context, int mouseX, int mouseY, int alpha, int yOffset) {
@@ -438,17 +403,17 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
 
         int borderColor, fillColor, textColor;
         if (unlocking) {
-            borderColor = withAlpha(0xFF1A4A6C, Math.min(alpha, 120));
-            fillColor = withAlpha(0xFF0A1A2C, Math.min(alpha, 120));
-            textColor = withAlpha(0xFF5A8A9E, Math.min(alpha, 120));
+            borderColor = withAlpha(themeBorder() | 0xFF000000, Math.min(alpha, 120));
+            fillColor = withAlpha(themeBtnFill() | 0xFF000000, Math.min(alpha, 120));
+            textColor = withAlpha(themeTextDim(), Math.min(alpha, 120));
         } else if (ready) {
-            borderColor = withAlpha(hovered ? 0xFF00FFE0 : 0xFF00D4BE, alpha);
-            fillColor = withAlpha(hovered ? 0xFF00463E : 0xFF002A26, Math.max(180, alpha));
-            textColor = withAlpha(0xFF00FFE0, alpha);
+            borderColor = withAlpha(hovered ? themeAccent() : themeAccentDim() | 0xFF000000, alpha);
+            fillColor = withAlpha(hovered ? themeBtnHover() | 0xFF000000 : themeBtnFill() | 0xFF000000, Math.max(180, alpha));
+            textColor = withAlpha(themeAccent(), alpha);
         } else {
-            borderColor = withAlpha(0xFF1A4A6C, Math.min(alpha, 150));
-            fillColor = withAlpha(0xFF0A1A2C, Math.min(alpha, 150));
-            textColor = withAlpha(0xFF5A8A9E, Math.min(alpha, 170));
+            borderColor = withAlpha(themeBorder() | 0xFF000000, Math.min(alpha, 150));
+            fillColor = withAlpha(themeBtnFill() | 0xFF000000, Math.min(alpha, 150));
+            textColor = withAlpha(themeTextDim(), Math.min(alpha, 170));
         }
 
         fillChamferedRect(context, buttonX, buttonY, buttonWidth, buttonHeight, chamfer, borderColor);
@@ -457,11 +422,17 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
         // Highlight strip
         if (ready && !unlocking) {
             fillChamferedRect(context, buttonX + 2, buttonY + 2, Math.max(1, buttonWidth - 4), Math.max(1, buttonHeight / 4),
-                    Math.max(1, chamfer - 2), withAlpha(0xFF00FFE0, 30));
+                    Math.max(1, chamfer - 2), withAlpha(themeAccent(), 30));
         }
 
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"),
-                buttonX + buttonWidth / 2, buttonY + (buttonHeight - scaledFontHeight()) / 2, textColor);
+        if (isLightMode()) {
+            int hw = textRenderer.getWidth(Text.translatable("phone.tzz_mod.unlock")) / 2;
+            context.drawText(textRenderer, Text.translatable("phone.tzz_mod.unlock"),
+                    buttonX + buttonWidth / 2 - hw, buttonY + (buttonHeight - scaledFontHeight()) / 2, textColor, false);
+        } else {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.unlock"),
+                    buttonX + buttonWidth / 2, buttonY + (buttonHeight - scaledFontHeight()) / 2, textColor);
+        }
     }
 
     private boolean isInsideUnlockButton(double mouseX, double mouseY) {

@@ -2,7 +2,6 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import com.zcpu.tzzmod.client.phone.ui.PhoneButtonWidget;
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import com.zcpu.tzzmod.password.PasswordCodeUtil;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.input.CharInput;
@@ -69,7 +68,8 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
         drawPasswordSlots(context);
 
         if (!statusText.getString().isBlank()) {
-            context.drawCenteredTextWithShadow(textRenderer, statusText, centerX, contentY + s(76), statusColor);
+            int sw = textRenderer.getWidth(statusText);
+            context.drawText(textRenderer, statusText, centerX - sw / 2, contentY + s(76), statusColor, !isLightMode());
         }
     }
 
@@ -187,24 +187,48 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
         onConfirmCode(inputCode);
     }
 
+    @Override
+    protected boolean hasInitScanAnimation() {
+        return true;
+    }
+
     private void drawPasswordSlots(DrawContext context) {
         int boxGap = s(8);
         int boxSize = s(26);
         int totalWidth = boxSize * PasswordCodeUtil.CODE_LENGTH + boxGap * (PasswordCodeUtil.CODE_LENGTH - 1);
         int startX = contentX + (contentWidth - totalWidth) / 2;
         int y = contentY + s(32);
-        int radius = Math.max(4, s(6));
+        int cut = Math.max(s(4), boxSize / 5);
 
         for (int i = 0; i < PasswordCodeUtil.CODE_LENGTH; i++) {
             int x = startX + i * (boxSize + boxGap);
             boolean filled = i < inputCode.length();
-            int borderColor = filled ? 0xCCB8F0FF : 0x88DCE8F5;
-            int fillColor = filled ? 0xAA2F96D4 : 0x4426303C;
-            RoundedRectRenderer.fillRoundedRect(context, x, y, boxSize, boxSize, radius, borderColor);
-            RoundedRectRenderer.fillRoundedRect(context, x + 1, y + 1, Math.max(1, boxSize - 2), Math.max(1, boxSize - 2), Math.max(1, radius - 1), fillColor);
-            String digit = filled ? String.valueOf(inputCode.charAt(i)) : "_";
-            int textColor = filled ? 0xFFFFFFFF : 0xFF93A5B6;
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(digit), x + boxSize / 2, y + MathHelper.floor((boxSize - textRenderer.fontHeight) / 2.0F), textColor);
+            // Background fill
+            int fillColor = isLightMode()
+                    ? (filled ? 0x220099CC : 0x11000000)
+                    : (filled ? 0x3300FFE0 : 0x2A1A2C3C);
+            context.fill(x, y, x + boxSize, y + boxSize, fillColor);
+            // 4-line angular tech border
+            int lineCol = filled ? themeAccent() : themeBorder();
+            // Top edge (from cut to right)
+            context.fill(x + cut, y, x + boxSize, y + 1, lineCol);
+            // Bottom edge (from left to boxSize-cut)
+            context.fill(x, y + boxSize - 1, x + boxSize - cut, y + boxSize, lineCol);
+            // Top-left diagonal
+            for (int d = 0; d < cut; d++) {
+                context.fill(x + cut - d, y + d, x + cut - d + 1, y + d + 1, lineCol);
+            }
+            // Bottom-right diagonal
+            for (int d = 0; d < cut; d++) {
+                context.fill(x + boxSize - cut + d, y + boxSize - 1 - d,
+                        x + boxSize - cut + d + 1, y + boxSize - d, lineCol);
+            }
+            // Digit text
+            String digit = filled ? String.valueOf(inputCode.charAt(i)) : "?";
+            int textColor = filled ? themeText() : themeTextDim();
+            Text digitText = Text.literal(digit);
+            int dw = textRenderer.getWidth(digitText);
+            context.drawText(textRenderer, digitText, x + boxSize / 2 - dw / 2, y + MathHelper.floor((boxSize - textRenderer.fontHeight) / 2.0F), textColor, !isLightMode());
         }
     }
 

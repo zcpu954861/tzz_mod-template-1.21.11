@@ -1,6 +1,5 @@
 package com.zcpu.tzzmod.client.map;
 
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
@@ -33,9 +32,6 @@ public final class MapCanvasRenderer {
     }
 
     public static RenderResult render(DrawContext context, MapClient.MapState state, int x, int y, int width, int height, int mouseX, int mouseY) {
-        int radius = Math.max(4, Math.min(width, height) / 16);
-        RoundedRectRenderer.fillRoundedRect(context, x, y, width, height, radius, 0x4418212B);
-
         if (!state.hasRegion() || state.region() == null || state.imageWidth() <= 0 || state.imageHeight() <= 0 || state.imageColors().length == 0) {
             return new RenderResult(false, "", x, y, width, height);
         }
@@ -47,8 +43,6 @@ public final class MapCanvasRenderer {
         int drawHeight = Math.max(1, Math.round(state.imageHeight() * scale));
         int drawX = x + (width - drawWidth) / 2;
         int drawY = y + (height - drawHeight) / 2;
-
-        context.fill(drawX - 1, drawY - 1, drawX + drawWidth + 1, drawY + drawHeight + 1, 0x88485566);
 
         Identifier textureId = ensureTexture(state);
         if (textureId == null) {
@@ -75,6 +69,9 @@ public final class MapCanvasRenderer {
         if (state.settings().showMarkers()) {
             for (MapClient.MapMarker marker : state.markers()) {
                 if (!region.dimensionId().equals(marker.dimensionId())) {
+                    continue;
+                }
+                if (!MapClient.isMarkerVisible(marker.id())) {
                     continue;
                 }
                 int markerX = drawX + Math.round(((marker.x() - region.minX() + 0.5F) / Math.max(1.0F, region.width())) * drawWidth);

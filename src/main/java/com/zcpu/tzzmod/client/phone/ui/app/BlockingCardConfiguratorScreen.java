@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.blocking.BlockingCardConfiguratorState;
 import com.zcpu.tzzmod.client.blocking.BlockingCardClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import com.zcpu.tzzmod.client.phone.ui.PhoneButtonWidget;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -29,6 +30,7 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
     private String command;
     private String feedback = "";
     private int feedbackColor = 0xFFECECEC;
+    private int actionSectionY;
 
     public BlockingCardConfiguratorScreen(Screen parent, Hand hand, BlockingCardConfiguratorState.StoredCards storedCards) {
         super(Text.translatable("phone.tzz_mod.blocking_card.configurator"), parent);
@@ -63,7 +65,7 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
         int y = contentY + s(72);
         int labelGap = s(4);
         int sectionGap = s(10);
-        int fieldHeight = s(18);
+        int fieldHeight = textRenderer.fontHeight;
 
         addPhoneGhostButton(Text.translatable("phone.tzz_mod.blocking_card.select"), contentX + contentWidth - s(52), y, s(52), s(18), button -> {
             persistStateFromWidgets();
@@ -87,9 +89,11 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
         activationInputField.setText(activationInput);
         activationInputField.setPlaceholder(getActivationPlaceholder());
         activationInputField.active = activationType != BlockingCardConfig.ActivationType.DISABLED;
+        styleTextField(activationInputField);
         addDrawableChild(activationInputField);
         y = activationInputField.getY() + activationInputField.getHeight() + sectionGap;
 
+        actionSectionY = y;
         addPhoneGhostButton(Text.translatable("phone.tzz_mod.blocking_card.select"), contentX + contentWidth - s(52), y, s(52), s(18), button -> {
             persistStateFromWidgets();
             showActionOptions = !showActionOptions;
@@ -111,14 +115,14 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
         commandField.setMaxLength(32767);
         commandField.setText(command);
         commandField.setPlaceholder(Text.translatable("phone.tzz_mod.blocking_card.command_placeholder"));
+        styleTextField(commandField);
         addDrawableChild(commandField);
-        y = commandField.getY() + commandField.getHeight() + sectionGap;
+        // notifyOps is now rendered as a settings-style row at fixed position in renderPhoneContent
+    }
 
-        addPhoneButton(getNotifyOpsText(), contentX, y, contentWidth, s(18), button -> {
-            persistStateFromWidgets();
-            notifyOps = !notifyOps;
-            clearAndInit();
-        });
+    @Override
+    protected boolean hasInitScanAnimation() {
+        return true;
     }
 
     @Override
@@ -127,26 +131,67 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
 
         int y = contentY + s(24);
         for (OrderedText line : textRenderer.wrapLines(Text.translatable("phone.tzz_mod.blocking_card.instructions"), contentWidth)) {
-            context.drawTextWithShadow(textRenderer, line, contentX, y, 0xFFBFC7D5);
+            context.drawText(textRenderer, line, contentX, y, isLightMode() ? themeTextDim() : 0xFFBFC7D5, !isLightMode());
             y += s(Math.max(10, textRenderer.fontHeight + 2));
         }
 
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_stack"), contentX, contentY + s(54), 0xFF8BD6FF);
-        context.drawTextWithShadow(textRenderer, getStoredCardsText(), contentX, contentY + s(64), 0xFFECECEC);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_stack"), contentX, contentY + s(54), isLightMode() ? themeAccent() : 0xFF8BD6FF, !isLightMode());
+        context.drawText(textRenderer, getStoredCardsText(), contentX, contentY + s(64), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
 
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_activation", getActivationSummaryText()), contentX, contentY + s(74), 0xFF8BD6FF);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.activation_input"), contentX, activationInputField.getY() - textRenderer.fontHeight - s(4), 0xFFBFC7D5);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_activation", getActivationSummaryText()), contentX, contentY + s(74), isLightMode() ? themeAccent() : 0xFF8BD6FF, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.activation_input"), contentX, activationInputField.getY() - textRenderer.fontHeight - s(4), isLightMode() ? themeTextDim() : 0xFFBFC7D5, !isLightMode());
+        renderStyledTextFieldBackground(context, activationInputField);
 
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_action", Text.translatable("phone.tzz_mod.blocking_card.action.command")), contentX, commandField.getY() - textRenderer.fontHeight - s(24), 0xFF8BD6FF);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.command_input"), contentX, commandField.getY() - textRenderer.fontHeight - s(4), 0xFFBFC7D5);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.current_action", Text.translatable("phone.tzz_mod.blocking_card.action.command")), contentX, actionSectionY + s(2), isLightMode() ? themeAccent() : 0xFF8BD6FF, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.blocking_card.command_input"), contentX, commandField.getY() - textRenderer.fontHeight - s(4), isLightMode() ? themeTextDim() : 0xFFBFC7D5, !isLightMode());
+        renderStyledTextFieldBackground(context, commandField);
 
         if (!feedback.isEmpty()) {
             int feedbackY = contentY + contentHeight - s(44);
             for (OrderedText line : textRenderer.wrapLines(Text.literal(feedback), contentWidth)) {
-                context.drawTextWithShadow(textRenderer, line, contentX, feedbackY, feedbackColor);
+                context.drawText(textRenderer, line, contentX, feedbackY, feedbackColor, !isLightMode());
                 feedbackY += s(Math.max(10, textRenderer.fontHeight + 1));
             }
         }
+
+        // NotifyOps settings-style toggle row at fixed position
+        int rowH = s(22);
+        int rowY = contentY + contentHeight - s(52);
+        boolean rowHovered = mouseX >= contentX && mouseX <= contentX + contentWidth
+                && mouseY >= rowY && mouseY <= rowY + rowH;
+        int chamfer = Math.max(2, s(3));
+        int rowBg = rowHovered ? (isLightMode() ? 0x44D8E4F0 : 0x44101825) : (isLightMode() ? 0x33D8E4F0 : 0x33101825);
+        fillChamferedRect(context, contentX, rowY, contentWidth, rowH, chamfer, rowBg);
+        context.fill(contentX, rowY + chamfer, contentX + 1, rowY + rowH - chamfer,
+                notifyOps ? themeAccent() : themeBorder());
+        int switchW = s(28);
+        int switchH = s(12);
+        int switchX = contentX + contentWidth - switchW - s(4);
+        int switchY = rowY + (rowH - switchH) / 2;
+        float progress = notifyOps ? 1.0F : 0.0F;
+        int cut = Math.max(1, switchH / 3);
+        int trackFill = isLightMode()
+                ? (notifyOps ? 0x330099CC : 0x33C0C8D0)
+                : (notifyOps ? 0x3300FFE0 : 0x331A2A3C);
+        fillChamferedRect(context, switchX, switchY, switchW, switchH, cut, trackFill);
+        int borderCol = notifyOps ? themeAccent() : themeBorder();
+        context.fill(switchX + cut, switchY, switchX + switchW, switchY + 1, borderCol);
+        context.fill(switchX, switchY + switchH - 1, switchX + switchW - cut, switchY + switchH, borderCol);
+        for (int d = 0; d < cut; d++) {
+            context.fill(switchX + cut - d, switchY + d, switchX + cut - d + 1, switchY + d + 1, borderCol);
+        }
+        for (int d = 0; d < cut; d++) {
+            context.fill(switchX + switchW - cut + d, switchY + switchH - 1 - d,
+                    switchX + switchW - cut + d + 1, switchY + switchH - d, borderCol);
+        }
+        int knobSize = Math.max(4, switchH - s(4));
+        int knobTravel = Math.max(0, switchW - knobSize - s(4));
+        int knobX = switchX + s(2) + Math.round(progress * knobTravel);
+        int knobY = switchY + (switchH - knobSize) / 2;
+        fillChamferedRect(context, knobX, knobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
+        int labelColor = isLightMode() ? themeText() : 0xFFECECEC;
+        context.drawText(textRenderer, getNotifyOpsText(), contentX + s(6),
+                rowY + (rowH - textRenderer.fontHeight) / 2, labelColor, !isLightMode());
     }
 
     public void handleServerResult(boolean success, String message) {
@@ -226,5 +271,20 @@ public class BlockingCardConfiguratorScreen extends AbstractPhoneScreen {
     private Text getNotifyOpsText() {
         String stateKey = notifyOps ? "common.tzz_mod.enabled" : "common.tzz_mod.disabled";
         return Text.translatable("phone.tzz_mod.blocking_card.notify_ops", Text.translatable(stateKey));
+    }
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        int mx = (int) click.x();
+        int my = (int) click.y();
+        int rowH = s(22);
+        int rowY = contentY + contentHeight - s(52);
+        if (mx >= contentX && mx <= contentX + contentWidth && my >= rowY && my <= rowY + rowH) {
+            persistStateFromWidgets();
+            notifyOps = !notifyOps;
+            clearAndInit();
+            return true;
+        }
+        return super.mouseClicked(click, doubleClick);
     }
 }

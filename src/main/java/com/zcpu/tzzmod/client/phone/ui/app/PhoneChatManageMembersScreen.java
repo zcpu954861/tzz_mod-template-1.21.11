@@ -2,24 +2,30 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.entity.player.SkinTextures;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class PhoneChatManageMembersScreen extends AbstractPhoneScreen {
+    private static final int FACE_U = 8, FACE_V = 8, HAT_U = 40, HAT_V = 8, SKIN_TEXTURE_SIZE = 64;
     private final String groupId;
     private Runnable stateListener;
 
     // local selection cache: uuid -> isMember
     private final Map<String, Boolean> selection = new HashMap<>();
+    private final Map<String, Identifier> skinTextureCache = new HashMap<>();
     // no per-row ButtonWidgets; we handle clicks in mouseClicked
     private int scrollOffset = 0;
 
@@ -79,7 +85,7 @@ public class PhoneChatManageMembersScreen extends AbstractPhoneScreen {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.chat.manage_members"), contentX + contentWidth / 2, contentY + s(8));
 
         // draw list header
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.chat.members_hint"), contentX, contentY + s(28), 0xFFBFC7D5);
+        drawScaledText(context, Text.translatable("phone.tzz_mod.chat.members_hint"), contentX, contentY + s(28), themeTextDim());
 
         List<PhoneChatClient.GroupMemberData> entries = PhoneChatClient.getGroupMembersList(groupId);
         int fieldHeight = getRowHeight();
@@ -105,16 +111,22 @@ public class PhoneChatManageMembersScreen extends AbstractPhoneScreen {
             int boxX = contentX + contentWidth - boxPadding - boxSize;
             int boxY = y + Math.max(0, (fieldHeight - boxSize) / 2);
 
-            int maxNameWidth = contentWidth - (boxPadding + boxSize + s(12));
-            String displayName = textRenderer.trimToWidth(entry.name(), Math.max(1, maxNameWidth));
-            context.drawTextWithShadow(textRenderer, Text.literal(displayName), contentX + s(4), y + Math.max(0, (fieldHeight - textRenderer.fontHeight) / 2), 0xFFECECEC);
+            // draw player head avatar
+            int avatarSize = Math.max(4, fieldHeight - s(4));
+            int avatarX = contentX + s(4);
+            int avatarY = y + (fieldHeight - avatarSize) / 2;
+            drawPlayerHead(context, entry.uuid(), avatarX, avatarY, avatarSize);
+            int nameStartX = avatarX + avatarSize + s(4);
+            int nameMaxW = contentX + contentWidth - nameStartX - (boxPadding + boxSize + s(4));
+            String displayName = textRenderer.trimToWidth(entry.name(), Math.max(1, nameMaxW));
+            drawScaledText(context, Text.literal(displayName), nameStartX, y + Math.max(0, (fieldHeight - textRenderer.fontHeight) / 2), themeText());
 
             if (entry.uuid().equals(selfUuid)) {
                 context.fill(boxX, boxY, boxX + boxSize, boxY + boxSize, 0xFF3CB371);
-                context.drawTextWithShadow(textRenderer, Text.literal("✓"), boxX + (boxSize - textRenderer.getWidth("✓")) / 2, boxY + Math.max(0, (boxSize - textRenderer.fontHeight) / 2), 0xFFFFFFFF);
+                context.drawText(textRenderer, Text.literal("✓"), boxX + (boxSize - textRenderer.getWidth("✓")) / 2, boxY + Math.max(0, (boxSize - textRenderer.fontHeight) / 2), 0xFFFFFFFF, false);
             } else if (isMember) {
                 context.fill(boxX, boxY, boxX + boxSize, boxY + boxSize, 0xFF3CB371);
-                context.drawTextWithShadow(textRenderer, Text.literal("✓"), boxX + (boxSize - textRenderer.getWidth("✓")) / 2, boxY + Math.max(0, (boxSize - textRenderer.fontHeight) / 2), 0xFFFFFFFF);
+                context.drawText(textRenderer, Text.literal("✓"), boxX + (boxSize - textRenderer.getWidth("✓")) / 2, boxY + Math.max(0, (boxSize - textRenderer.fontHeight) / 2), 0xFFFFFFFF, false);
             } else {
                 int t = Math.max(1, s(1));
                 context.fill(boxX, boxY, boxX + boxSize, boxY + t, 0xFF7F8A97);
@@ -188,5 +200,45 @@ public class PhoneChatManageMembersScreen extends AbstractPhoneScreen {
             PhoneChatClient.removeListener(stateListener);
             stateListener = null;
         }
+    }
+
+    private void drawPlayerHead(DrawContext context, String uuid, int x, int y, int size) {
+        Identifier skin = getCachedSkin(uuid);
+        context.fill(x, y, x + size, y + size, 0x44000000);
+        if (skin == null) return;
+        drawSkinRegion(context, skin, x, y, size, FACE_U, FACE_V);
+        drawSkinRegion(context, skin, x, y, size, HAT_U, HAT_V);
+    }
+
+    private Identifier getCachedSkin(String uuid) {
+        if (uuid == null || uuid.isBlank()) return null;
+        Identifier cached = skinTextureCache.get(uuid);
+        if (cached != null) return cached;
+        Identifier resolved = resolveSkin(uuid);
+        if (resolved != null) skinTextureCache.put(uuid, resolved);
+        return resolved;
+    }
+
+    private Identifier resolveSkin(String uuid) {
+        if (client == null || uuid == null || uuid.isBlank()) return null;
+        try {
+            var handler = client.getNetworkHandler();
+            if (handler == null) return null;
+            var player = client.player;
+            if (player != null && uuid.equals(player.getUuidAsString())) {
+                SkinTextures skin = player.getSkin();
+                if (skin == null || skin.body() == null) return null;
+                return skin.body().texturePath();
+            }
+            var entry = handler.getPlayerListEntry(UUID.fromString(uuid));
+            if (entry == null) return null;
+            SkinTextures skin = entry.getSkinTextures();
+            if (skin == null || skin.body() == null) return null;
+            return skin.body().texturePath();
+        } catch (Exception e) { return null; }
+    }
+
+    private void drawSkinRegion(DrawContext context, Identifier texture, int x, int y, int size, int u, int v) {
+        context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, (float) u, (float) v, size, size, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, -1);
     }
 }

@@ -37,6 +37,7 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
             nameField = new TextFieldWidget(textRenderer, contentX + s(10), contentY + s(48), contentWidth - s(20), s(18), Text.empty());
             nameField.setMaxLength(48);
             nameField.setPlaceholder(Text.translatable("phone.tzz_mod.region.name_placeholder"));
+            styleTextField(nameField);
             addDrawableChild(nameField);
         } else {
             addPhonePrimaryButton(Text.translatable("phone.tzz_mod.region.clear_draft"), contentX + contentWidth - s(84), bottomY, s(84), s(20), button -> {
@@ -145,13 +146,14 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
         MapClient.PlannerRegion region = MapClient.getPlannerRegion(regionId);
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.region.detail"), contentX + contentWidth / 2, contentY + s(8));
         if (region == null) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.deleted"), contentX + contentWidth / 2, contentY + s(72), 0xFFECECEC);
+            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.region.deleted"), contentX + contentWidth / 2, contentY + s(72), themeText());
             return;
         }
 
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.name"), contentX + s(10), contentY + s(34), 0xFFECECEC);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.points_count", region.points().size()), contentX + s(10), contentY + s(72), 0xFFB7C7D8);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(84), 0xFFECECEC);
+        renderStyledTextFieldBackground(context, nameField);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.name"), contentX + s(10), contentY + s(34), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.points_count", region.points().size()), contentX + s(10), contentY + s(72), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(84), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
         renderColorGrid(context, region.color());
         renderPointsList(context, mouseX, mouseY, region.name(), region.points(), false);
     }
@@ -160,14 +162,14 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
         MapClient.PlannerDraft draft = MapClient.getPlannerDraft();
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.region.draft_detail"), contentX + contentWidth / 2, contentY + s(8));
         if (draft.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.draft_empty"), contentX + contentWidth / 2, contentY + s(72), 0xFFECECEC);
+            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.region.draft_empty"), contentX + contentWidth / 2, contentY + s(72), themeText());
             return;
         }
 
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.draft_entry"), contentX + s(10), contentY + s(34), 0xFFECECEC);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.points_count", draft.points().size()), contentX + s(10), contentY + s(48), 0xFFB7C7D8);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.trim_hint"), contentX + s(10), contentY + s(62), 0xFFB7C7D8);
-        context.drawTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(76), 0xFFECECEC);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.draft_entry"), contentX + s(10), contentY + s(34), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.points_count", draft.points().size()), contentX + s(10), contentY + s(48), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.trim_hint"), contentX + s(10), contentY + s(62), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(76), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
         renderColorGrid(context, draft.color());
         renderPointsList(context, mouseX, mouseY, Text.translatable("phone.tzz_mod.region.draft_label").getString(), draft.points(), true);
     }
@@ -219,15 +221,15 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
                 int trimWidth = s(28);
                 int trimX = teleportX - trimWidth - s(4);
                 context.fill(trimX, buttonY, trimX + trimWidth, buttonY + s(16), 0xAAE86E5A);
-                context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.trim"), trimX + trimWidth / 2, buttonY + s(4), 0xFFFFFBFA);
+                context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.trim"), trimX + trimWidth / 2 - textRenderer.getWidth(Text.translatable("phone.tzz_mod.region.trim")) / 2, buttonY + s(4), 0xFFFFFBFA, true);
             }
             context.fill(teleportX, buttonY, teleportX + teleportWidth, buttonY + s(16), 0xAA2A8FC1);
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.region.teleport"), teleportX + teleportWidth / 2, buttonY + s(4), 0xFFF6FDFF);
+            context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.teleport"), teleportX + teleportWidth / 2 - textRenderer.getWidth(Text.translatable("phone.tzz_mod.region.teleport")) / 2, buttonY + s(4), 0xFFF6FDFF, true);
 
             String pointName = trim(namePrefix + (index + 1), contentWidth - (allowTrim ? s(84) : s(66)));
             String pointPos = "X: " + point.x() + "  Z: " + point.z();
-            context.drawTextWithShadow(textRenderer, Text.literal(pointName), contentX + s(6), drawY + s(4), 0xFFECECEC);
-            context.drawTextWithShadow(textRenderer, Text.literal(pointPos), contentX + s(6), drawY + s(16), 0xFFB7C7D8);
+            context.drawText(textRenderer, Text.literal(pointName), contentX + s(6), drawY + s(4), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+            context.drawText(textRenderer, Text.literal(pointPos), contentX + s(6), drawY + s(16), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
         }
         context.disableScissor();
 

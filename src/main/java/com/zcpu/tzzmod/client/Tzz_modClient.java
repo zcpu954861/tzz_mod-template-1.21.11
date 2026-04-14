@@ -1,8 +1,10 @@
 package com.zcpu.tzzmod.client;
 
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.ar.ARClientAccess;
 import com.zcpu.tzzmod.blocking.BlockingCardConfiguratorClientAccess;
 import com.zcpu.tzzmod.blocking.BlockingCardConfiguratorState;
+import com.zcpu.tzzmod.client.ar.ui.ARHomeScreen;
 import com.zcpu.tzzmod.client.blocking.BlockingCardClient;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatHudOverlay;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
@@ -28,19 +30,46 @@ import com.zcpu.tzzmod.password.PasswordMachineClientAccess;
 import com.zcpu.tzzmod.task.TaskConfiguratorClientAccess;
 import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.util.Identifier;
 import org.jspecify.annotations.NonNull;
+import org.lwjgl.glfw.GLFW;
 
 public class Tzz_modClient implements ClientModInitializer {
     private static final @NonNull Identifier MAIN_HUD_LAYER_ID =
             NullSafety.requireNonNull(Identifier.of(Tzz_mod.MOD_ID, "main_hud_overlay"));
 
+    private static KeyBinding arHeadsetKey;
+
     @Override
     public void onInitializeClient() {
         Tzz_mod.LOGGER.info("Client initializer loaded.");
+
+        // AR Headset keybinding (default: V)
+        arHeadsetKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.tzz_mod.ar_headset",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_V,
+                KeyBinding.Category.MISC
+        ));
+
+        ARClientAccess.setOpener(() -> {
+            try {
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.player != null) {
+                    client.setScreen(new ARHomeScreen());
+                }
+            } catch (Exception exception) {
+                Tzz_mod.LOGGER.error("Failed to open AR headset screen", exception);
+            }
+        });
+
         PhoneClientAccess.setOpener(() -> {
             try {
                 MinecraftClient client = MinecraftClient.getInstance();
@@ -130,6 +159,15 @@ public class Tzz_modClient implements ClientModInitializer {
             TaskHudOverlay.render(context);
             AlertSubtitleOverlay.render(context);
             RegionTitleOverlay.render(context);
+        });
+
+        // AR headset keybind tick
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (arHeadsetKey.wasPressed()) {
+                if (client.player != null && client.currentScreen == null) {
+                    ARClientAccess.openARScreen();
+                }
+            }
         });
     }
 }

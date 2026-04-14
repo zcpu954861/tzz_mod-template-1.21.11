@@ -114,11 +114,11 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.app.chat"), contentX + contentWidth / 2, contentY + s(8));
 
         if (!PhoneChatClient.isEnabled()) {
-            context.drawCenteredTextWithShadow(textRenderer,
+            drawScaledCenteredText(context,
                     Text.translatable("phone.tzz_mod.chat.disabled"),
                     contentX + contentWidth / 2,
                     contentY + s(38),
-                    0xFFFF9999);
+                    isLightMode() ? 0xFFCC4444 : 0xFFFF9999);
             return;
         }
 
@@ -133,11 +133,11 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
                 int createButtonBottom = contentY + s(26) + s(20); // button Y + button height
                 emptyY = Math.max(defaultY, createButtonBottom + s(6));
             }
-            context.drawCenteredTextWithShadow(textRenderer,
+            drawScaledCenteredText(context,
                     Text.translatable("phone.tzz_mod.chat.empty"),
                     contentX + contentWidth / 2,
                     emptyY,
-                    0xFFECECEC);
+                    themeText());
             return;
         }
 
@@ -155,9 +155,11 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
 
             boolean hovered = mouseX >= contentX && mouseX <= contentX + contentWidth
                     && mouseY >= drawY && mouseY <= drawY + rowHeight;
-            int color = hovered ? 0x66FFFFFF : 0x22333333;
+            int color = hovered
+                    ? (isLightMode() ? 0x220099CC : 0x66FFFFFF)
+                    : (isLightMode() ? 0x11000000 : 0x22333333);
             context.fill(contentX, drawY, contentX + contentWidth, drawY + rowHeight, color);
-            context.drawTextWithShadow(textRenderer, Text.literal(row.label), contentX + s(6), drawY + s(4), 0xFFECECEC);
+            drawScaledText(context, Text.literal(row.label), contentX + s(6), drawY + s(4), themeText());
 
             int unread = PhoneChatClient.getUnreadCount(row.type, row.targetId);
             if (unread > 0) {
@@ -267,7 +269,7 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             subtitleAnimator.tick(delta);
             Text sub = subtitleAnimator.getRenderedText();
             if (!sub.getString().isEmpty()) {
-                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+                drawScaledCenteredText(context, sub, contentX + contentWidth / 2, contentY + s(30), isLightMode() ? 0xFF2A8A5A : 0xFFB8FFD4);
             }
             if (subtitleAnimator.isFinished()) {
                 subtitleAnimator = null;
@@ -285,7 +287,7 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             return;
         }
 
-        context.drawCenteredTextWithShadow(textRenderer, staticSubtitle, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+        drawScaledCenteredText(context, staticSubtitle, contentX + contentWidth / 2, contentY + s(30), isLightMode() ? 0xFF2A8A5A : 0xFFB8FFD4);
     }
 
     private void playCharSound() {

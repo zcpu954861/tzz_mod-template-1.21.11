@@ -132,11 +132,44 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
         List<OrderedText> lines = buildCurrentLines();
         int y = top - currentScrollOffset;
 
+        // Track separator position to draw theme divider (#10)
+        // The blank line from buildCurrentLines separates title from body
+        var current = TaskClient.getCurrentTask();
+        int titleLineCount = 0;
+        boolean hasDivider = false;
+        if (current != null) {
+            int wrapWidth = Math.max(s(20), contentWidth - s(8));
+            titleLineCount = textRenderer.wrapLines(parseComponentOrLiteral(current.titleJson()), wrapWidth).size();
+            hasDivider = true;
+        }
+
+        int lineIndex = 0;
+        boolean drewDivider = false;
         for (OrderedText line : lines) {
             if (y + lineStep >= top && y <= bottom) {
-                context.drawTextWithShadow(textRenderer, line, contentX + s(2), y, 0xFFECECEC);
+                // Detect the blank separator line between title and content
+                if (hasDivider && lineIndex == titleLineCount && !drewDivider) {
+                    // Draw theme-color divider (#10)
+                    int divY = y + lineStep / 2;
+                    context.fill(contentX + s(2), divY, contentX + contentWidth - s(2), divY + 1, themeAccent());
+                    drewDivider = true;
+                } else {
+                    // Title lines centered, body left-aligned; no shadow in light mode (#3, #8)
+                    boolean isTitle = hasDivider && lineIndex < titleLineCount;
+                    int color = isTitle ? themeAccent() : themeText();
+                    int textW = textRenderer.getWidth(line);
+                    int xPos = isTitle
+                            ? contentX + contentWidth / 2 - textW / 2  // centered
+                            : contentX + s(4);                          // left-aligned
+                    if (isLightMode()) {
+                        context.drawText(textRenderer, line, xPos, y, color, false);
+                    } else {
+                        context.drawTextWithShadow(textRenderer, line, xPos, y, color);
+                    }
+                }
             }
             y += lineStep;
+            lineIndex++;
         }
     }
 
@@ -194,8 +227,13 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
 
             drewAny = true;
             if (y + lineStep >= top && y <= bottom) {
-                context.drawTextWithShadow(textRenderer, Text.literal(line.name()), contentX + s(2), y, 0xFF8BD6FF);
-            }
+                    int lineNameColor = isLightMode() ? 0xFF005599 : 0xFF8BD6FF;
+                    if (isLightMode()) {
+                        context.drawText(textRenderer, Text.literal(line.name()), contentX + s(2), y, lineNameColor, false);
+                    } else {
+                        context.drawTextWithShadow(textRenderer, Text.literal(line.name()), contentX + s(2), y, lineNameColor);
+                    }
+                }
             y += lineStep + s(4);
 
             for (TaskClient.TaskNodeData node : visibleNodes) {
@@ -210,12 +248,20 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
                     drawDot(context, dotX, rowTop + rowHeight / 2, 0xFF66FF66);
                     for (int i = 0; i < wrappedTitle.size(); i++) {
                         int lineY = rowTop + s(3) + i * lineStep;
-                        context.drawTextWithShadow(textRenderer, wrappedTitle.get(i), textX, lineY, 0xFFECECEC);
+                        int nodeColor = isLightMode() ? themeText() : 0xFFECECEC;
+                        if (isLightMode()) {
+                            context.drawText(textRenderer, wrappedTitle.get(i), textX, lineY, nodeColor, false);
+                        } else {
+                            context.drawTextWithShadow(textRenderer, wrappedTitle.get(i), textX, lineY, nodeColor);
+                        }
                     }
 
                     int btnY = rowTop + Math.max(0, (rowHeight - btnH) / 2);
                     context.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0xAA2A8FC1);
-                    context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.open_subpage"), btnX + btnW / 2, btnY + Math.max(0, (btnH - textRenderer.fontHeight) / 2), 0xFFECECEC);
+                    int btnTextX = btnX + btnW / 2 - textRenderer.getWidth(Text.translatable("phone.tzz_mod.open_subpage")) / 2;
+                    int btnTextY = btnY + Math.max(0, (btnH - textRenderer.fontHeight) / 2);
+                    context.drawText(textRenderer, Text.translatable("phone.tzz_mod.open_subpage"), btnTextX, btnTextY,
+                            isLightMode() ? 0xFF004466 : 0xFFECECEC, !isLightMode());
                     detailButtons.add(new DetailButtonData(btnX, btnY, btnW, btnH, node.titleJson(), node.contentJson()));
                 }
 
@@ -226,7 +272,10 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
         }
 
         if (!drewAny) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.task.flow.empty"), contentX + contentWidth / 2, top, 0xFFECECEC);
+            int emptyColor = isLightMode() ? themeTextDim() : 0xFFECECEC;
+            context.drawText(textRenderer, Text.translatable("phone.tzz_mod.task.flow.empty"),
+                    contentX + contentWidth / 2 - textRenderer.getWidth(Text.translatable("phone.tzz_mod.task.flow.empty")) / 2,
+                    top, emptyColor, !isLightMode());
         }
     }
 
@@ -306,7 +355,10 @@ public class PhoneTaskAppScreen extends AbstractPhoneScreen {
             subtitleAnimator.tick(delta);
             Text sub = subtitleAnimator.getRenderedText();
             if (!sub.getString().isEmpty()) {
-                context.drawCenteredTextWithShadow(textRenderer, sub, contentX + contentWidth / 2, contentY + s(30), 0xFFB8FFD4);
+                context.drawText(textRenderer, sub,
+                        contentX + contentWidth / 2 - textRenderer.getWidth(sub) / 2,
+                        contentY + s(30),
+                        isLightMode() ? 0xFF007744 : 0xFFB8FFD4, !isLightMode());
             }
             if (subtitleAnimator.isFinished()) {
                 subtitleAnimator = null;
