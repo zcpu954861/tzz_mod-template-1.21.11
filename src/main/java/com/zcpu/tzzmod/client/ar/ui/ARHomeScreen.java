@@ -1,6 +1,5 @@
 package com.zcpu.tzzmod.client.ar.ui;
 
-import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.client.ar.ui.app.*;
 import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
@@ -8,12 +7,11 @@ import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * AR Home Screen: centered app grid, no lock screen, Apple Vision Pro style.
@@ -21,17 +19,6 @@ import java.util.Map;
  */
 public class ARHomeScreen extends AbstractARScreen {
     private final List<AppSlot> appSlots = new ArrayList<>();
-
-    /** Maps app ID → registered app-icon ItemStack for 3D rendering */
-    private static final Map<String, ItemStack> APP_ITEMS = Map.of(
-            "map", new ItemStack(ModItems.APP_ICON_MAP),
-            "chat", new ItemStack(ModItems.APP_ICON_CHAT),
-            "task", new ItemStack(ModItems.APP_ICON_TASK),
-            "call_admin", new ItemStack(ModItems.APP_ICON_CALL_ADMIN),
-            "settings", new ItemStack(ModItems.APP_ICON_SETTINGS),
-            "compass", new ItemStack(ModItems.APP_ICON_COMPASS),
-            "admin", new ItemStack(ModItems.APP_ICON_ADMIN)
-    );
 
     public ARHomeScreen() {
         super(Text.translatable("ar.tzz_mod.home"), null);
@@ -106,10 +93,13 @@ public class ARHomeScreen extends AbstractARScreen {
         int taskUnread = TaskClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
-            // --- Real 3D item rendering (like items in invisible item frames) ---
-            ItemStack itemStack = APP_ITEMS.getOrDefault(slot.entry.id(), ItemStack.EMPTY);
+            // --- 2D theme-aware icon rendering ---
             int centerX = slot.x + slot.size / 2;
             int centerY = slot.y + slot.size / 2;
+            String themeFolder = isLightMode() ? "light" : "dark";
+            Identifier themeIcon = Identifier.of(
+                    com.zcpu.tzzmod.Tzz_mod.MOD_ID,
+                    "textures/gui/phone/icons/" + themeFolder + "/" + slot.entry.id() + ".png");
 
             // Static icon rendering (no bobbing animation)
             // 4-line angular tech border around the icon slot
@@ -129,18 +119,10 @@ public class ARHomeScreen extends AbstractARScreen {
             }
             context.fill(slotX, slotY + slotS - 1, slotX + slotS - cut, slotY + slotS, borderColor);
 
-            if (!itemStack.isEmpty()) {
-                // Scale item from 16x16 to slot.size × slot.size
-                float itemScale = slot.size / 16.0F;
-                context.getMatrices().pushMatrix();
-                context.getMatrices().translate(slot.x, slot.y);
-                context.getMatrices().scale(itemScale, itemScale);
-                context.drawItem(itemStack, 0, 0);
-                context.getMatrices().popMatrix();
-            } else if (hasResource(slot.entry.iconTexture())) {
-                // Fallback: 2D texture
+            Identifier iconToUse = hasResource(themeIcon) ? themeIcon : slot.entry.iconTexture();
+            if (hasResource(iconToUse)) {
                 int iconSz = Math.max(1, slot.size);
-                context.drawTexturedQuad(slot.entry.iconTexture(), slot.x, slot.y,
+                context.drawTexturedQuad(iconToUse, slot.x, slot.y,
                         slot.x + iconSz, slot.y + iconSz, 0.0F, 1.0F, 0.0F, 1.0F);
             } else {
                 drawScaledCenteredText(context, Text.literal("?"), centerX,

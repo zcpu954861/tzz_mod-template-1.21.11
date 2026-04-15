@@ -3,7 +3,8 @@
 	"package": "com.zcpu.tzzmod.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
-		"ExampleMixin"
+		"ExampleMixin",
+		"LightModeItemsMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

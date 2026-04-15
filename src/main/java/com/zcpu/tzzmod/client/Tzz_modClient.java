@@ -18,6 +18,7 @@ import com.zcpu.tzzmod.client.phone.ui.app.PasswordMachineScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.TaskConfiguratorScreen;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.client.map.MapClient;
+import com.zcpu.tzzmod.client.map.MapHighlightRenderer;
 import com.zcpu.tzzmod.client.password.PasswordClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
@@ -146,6 +147,7 @@ public class Tzz_modClient implements ClientModInitializer {
         com.zcpu.tzzmod.client.AdminSyncClient.register();
         com.zcpu.tzzmod.client.ForcedHudClient.register();
         MapClient.register();
+        MapHighlightRenderer.register();
         com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.register();
         TaskClient.register();
         PasswordClient.register();

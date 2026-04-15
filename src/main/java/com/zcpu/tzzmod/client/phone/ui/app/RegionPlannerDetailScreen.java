@@ -77,7 +77,7 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
     }
 
     private int getColorGridY() {
-        return draftMode ? contentY + s(88) : contentY + s(96);
+        return draftMode ? contentY + s(88) : contentY + s(112);
     }
 
     private int getColorCellSize() {
@@ -93,7 +93,7 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
     }
 
     private int getListTop() {
-        return draftMode ? contentY + s(158) : contentY + s(166);
+        return draftMode ? contentY + s(158) : contentY + s(182);
     }
 
     private int getListBottom() {
@@ -153,7 +153,37 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
         renderStyledTextFieldBackground(context, nameField);
         context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.name"), contentX + s(10), contentY + s(34), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
         context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.points_count", region.points().size()), contentX + s(10), contentY + s(72), isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
-        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(84), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+
+        // Highlight toggle
+        int switchW = s(28);
+        int switchH = s(12);
+        int hlRowY = contentY + s(84);
+        int switchX = contentX + contentWidth - switchW - s(10);
+        boolean highlighted = MapClient.isRegionHighlighted(regionId);
+        float hlProg = highlighted ? 1.0F : 0.0F;
+        int cut = Math.max(1, switchH / 3);
+        int hlTrackFill = isLightMode()
+                ? (highlighted ? 0x330099CC : 0x33C0C8D0)
+                : (highlighted ? 0x3300FFE0 : 0x331A2A3C);
+        fillChamferedRect(context, switchX, hlRowY, switchW, switchH, cut, hlTrackFill);
+        int hlBorderCol = highlighted ? themeAccent() : themeBorder();
+        context.fill(switchX + cut, hlRowY, switchX + switchW, hlRowY + 1, hlBorderCol);
+        context.fill(switchX, hlRowY + switchH - 1, switchX + switchW - cut, hlRowY + switchH, hlBorderCol);
+        for (int d = 0; d < cut; d++) {
+            context.fill(switchX + cut - d, hlRowY + d, switchX + cut - d + 1, hlRowY + d + 1, hlBorderCol);
+        }
+        for (int d = 0; d < cut; d++) {
+            context.fill(switchX + switchW - cut + d, hlRowY + switchH - 1 - d,
+                    switchX + switchW - cut + d + 1, hlRowY + switchH - d, hlBorderCol);
+        }
+        int knobSize = Math.max(4, switchH - s(4));
+        int knobTravel = Math.max(0, switchW - knobSize - s(4));
+        int hlKnobX = switchX + s(2) + Math.round(hlProg * knobTravel);
+        int hlKnobY = hlRowY + (switchH - knobSize) / 2;
+        fillChamferedRect(context, hlKnobX, hlKnobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.highlight"), contentX + s(10), hlRowY + (switchH - textRenderer.fontHeight) / 2, isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.color"), contentX + s(10), contentY + s(100), isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
         renderColorGrid(context, region.color());
         renderPointsList(context, mouseX, mouseY, region.name(), region.points(), false);
     }
@@ -249,6 +279,19 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
 
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
+
+        // Highlight toggle click (non-draft mode only)
+        if (!draftMode) {
+            int switchW = s(28);
+            int switchH = s(12);
+            int hlRowY = contentY + s(84);
+            int switchX = contentX + contentWidth - switchW - s(10);
+            if (mouseX >= switchX && mouseX <= switchX + switchW && mouseY >= hlRowY && mouseY <= hlRowY + switchH) {
+                MapClient.setRegionHighlighted(regionId, !MapClient.isRegionHighlighted(regionId));
+                return true;
+            }
+        }
+
         int top = getListTop();
         int bottom = getListBottom();
         if (mouseX < contentX || mouseX > contentX + contentWidth || mouseY < top || mouseY > bottom) {

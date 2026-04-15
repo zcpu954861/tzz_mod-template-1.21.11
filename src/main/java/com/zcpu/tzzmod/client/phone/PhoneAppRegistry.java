@@ -18,13 +18,13 @@ import java.util.List;
 import java.util.Map;
 
 public final class PhoneAppRegistry {
-    private static final Identifier MAP_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/map.png");
-    private static final Identifier CHAT_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/chat.png");
-    private static final Identifier CALL_ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/call_admin.png");
-    private static final Identifier TASK_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/task.png");
-    private static final Identifier SETTINGS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/settings.png");
-    private static final Identifier COMPASS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/compass.png");
-    private static final Identifier ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/admin.png");
+    private static final Identifier MAP_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/map.png");
+    private static final Identifier CHAT_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/chat.png");
+    private static final Identifier CALL_ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/call_admin.png");
+    private static final Identifier TASK_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/task.png");
+    private static final Identifier SETTINGS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/settings.png");
+    private static final Identifier COMPASS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/compass.png");
+    private static final Identifier ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/admin.png");
 
     private PhoneAppRegistry() {
     }

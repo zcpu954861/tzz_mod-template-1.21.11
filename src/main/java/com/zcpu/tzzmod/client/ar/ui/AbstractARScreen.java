@@ -139,7 +139,7 @@ public abstract class AbstractARScreen extends Screen {
         int y = field.getY() - s(1);
         int w = field.getWidth() + s(4);
         int h = field.getHeight() + s(2);
-        int bg = isLightMode() ? 0x18000000 : 0x221A2A3C;
+        int bg = isLightMode() ? 0xFFF0F4F8 : 0x221A2A3C;
         int border = field.isFocused() ? themeAccent() : themeBorder();
         context.fill(x, y, x + w, y + h, bg);
         context.fill(x, y, x + w, y + 1, border);

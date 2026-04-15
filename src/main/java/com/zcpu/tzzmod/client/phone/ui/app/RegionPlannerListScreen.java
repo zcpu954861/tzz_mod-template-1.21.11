@@ -101,6 +101,39 @@ public class RegionPlannerListScreen extends AbstractPhoneScreen {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.region.title"), contentX + contentWidth / 2, contentY + s(8));
         context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.hint"), contentX, contentY + s(22), 0xFFBBD1E1, !isLightMode());
 
+        // Off-hand display toggle (right side of the hint row)
+        int offSwitchW = s(24);
+        int offSwitchH = s(10);
+        int offSwitchX = contentX + contentWidth - offSwitchW - s(2);
+        int offSwitchY = contentY + s(21);
+        boolean offHand = MapClient.isRegionOffHandEnabled();
+        {
+            float prog = offHand ? 1.0F : 0.0F;
+            int cut = Math.max(1, offSwitchH / 3);
+            int trackFill = isLightMode()
+                    ? (offHand ? 0x330099CC : 0x33C0C8D0)
+                    : (offHand ? 0x3300FFE0 : 0x331A2A3C);
+            fillChamferedRect(context, offSwitchX, offSwitchY, offSwitchW, offSwitchH, cut, trackFill);
+            int borderCol = offHand ? themeAccent() : themeBorder();
+            context.fill(offSwitchX + cut, offSwitchY, offSwitchX + offSwitchW, offSwitchY + 1, borderCol);
+            context.fill(offSwitchX, offSwitchY + offSwitchH - 1, offSwitchX + offSwitchW - cut, offSwitchY + offSwitchH, borderCol);
+            for (int d = 0; d < cut; d++) {
+                context.fill(offSwitchX + cut - d, offSwitchY + d, offSwitchX + cut - d + 1, offSwitchY + d + 1, borderCol);
+            }
+            for (int d = 0; d < cut; d++) {
+                context.fill(offSwitchX + offSwitchW - cut + d, offSwitchY + offSwitchH - 1 - d,
+                        offSwitchX + offSwitchW - cut + d + 1, offSwitchY + offSwitchH - d, borderCol);
+            }
+            int knobSize = Math.max(3, offSwitchH - s(3));
+            int knobTravel = Math.max(0, offSwitchW - knobSize - s(3));
+            int knobX = offSwitchX + s(2) + Math.round(prog * knobTravel);
+            int knobY = offSwitchY + (offSwitchH - knobSize) / 2;
+            fillChamferedRect(context, knobX, knobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
+        }
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.region.off_hand"),
+                contentX, offSwitchY + (offSwitchH - textRenderer.fontHeight) / 2,
+                isLightMode() ? themeTextDim() : 0xFFB7C7D8, !isLightMode());
+
         List<MapClient.PlannerDraft> remoteDrafts = MapClient.getRemotePlannerDrafts();
         String summary = remoteDrafts.isEmpty()
                 ? Text.translatable("phone.tzz_mod.region.draft_empty").getString()
@@ -179,6 +212,17 @@ public class RegionPlannerListScreen extends AbstractPhoneScreen {
         }
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
+
+        // Off-hand toggle click
+        int offSwitchW = s(24);
+        int offSwitchH = s(10);
+        int offSwitchX = contentX + contentWidth - offSwitchW - s(2);
+        int offSwitchY = contentY + s(21);
+        if (mouseX >= offSwitchX && mouseX <= offSwitchX + offSwitchW && mouseY >= offSwitchY && mouseY <= offSwitchY + offSwitchH) {
+            MapClient.setRegionOffHandEnabled(!MapClient.isRegionOffHandEnabled());
+            return true;
+        }
+
         int top = getListTop();
         int bottom = getListBottom();
         if (mouseX < contentX || mouseX > contentX + contentWidth || mouseY < top || mouseY > bottom) {

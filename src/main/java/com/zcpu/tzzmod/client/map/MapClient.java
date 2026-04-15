@@ -31,7 +31,11 @@ public final class MapClient {
     private static final Set<String> VISIBLE_REGION_IDS = new CopyOnWriteArraySet<>();
     private static final Set<String> HIDDEN_MARKER_IDS = new CopyOnWriteArraySet<>();
     private static final Set<String> PARTICLE_DISABLED_MARKER_IDS = new CopyOnWriteArraySet<>();
+    private static final Set<String> HIGHLIGHT_MARKER_IDS = new CopyOnWriteArraySet<>();
+    private static final Set<String> HIGHLIGHT_REGION_IDS = new CopyOnWriteArraySet<>();
     private static boolean markerParticlesEnabled = true;
+    private static boolean markerOffHandEnabled = false;
+    private static boolean regionOffHandEnabled = false;
     private static MapState state = MapState.empty();
 
     private MapClient() {
@@ -47,6 +51,8 @@ public final class MapClient {
             VISIBLE_REGION_IDS.clear();
             HIDDEN_MARKER_IDS.clear();
             PARTICLE_DISABLED_MARKER_IDS.clear();
+            HIGHLIGHT_MARKER_IDS.clear();
+            HIGHLIGHT_REGION_IDS.clear();
             RegionTitleOverlay.clear();
             MapCanvasRenderer.reset();
             notifyListeners();
@@ -181,6 +187,50 @@ public final class MapClient {
 
     public static void setMarkerParticlesEnabled(boolean enabled) {
         markerParticlesEnabled = enabled;
+    }
+
+    public static boolean isMarkerOffHandEnabled() {
+        return markerOffHandEnabled;
+    }
+
+    public static void setMarkerOffHandEnabled(boolean enabled) {
+        markerOffHandEnabled = enabled;
+    }
+
+    public static boolean isRegionOffHandEnabled() {
+        return regionOffHandEnabled;
+    }
+
+    public static void setRegionOffHandEnabled(boolean enabled) {
+        regionOffHandEnabled = enabled;
+    }
+
+    public static boolean isMarkerHighlighted(String markerId) {
+        return markerId != null && HIGHLIGHT_MARKER_IDS.contains(markerId);
+    }
+
+    public static void setMarkerHighlighted(String markerId, boolean highlighted) {
+        if (markerId == null || markerId.isBlank()) return;
+        if (highlighted) {
+            HIGHLIGHT_MARKER_IDS.add(markerId);
+        } else {
+            HIGHLIGHT_MARKER_IDS.remove(markerId);
+        }
+        notifyListeners();
+    }
+
+    public static boolean isRegionHighlighted(String regionId) {
+        return regionId != null && HIGHLIGHT_REGION_IDS.contains(regionId);
+    }
+
+    public static void setRegionHighlighted(String regionId, boolean highlighted) {
+        if (regionId == null || regionId.isBlank()) return;
+        if (highlighted) {
+            HIGHLIGHT_REGION_IDS.add(regionId);
+        } else {
+            HIGHLIGHT_REGION_IDS.remove(regionId);
+        }
+        notifyListeners();
     }
 
     public static boolean isMarkerParticleEnabled(String markerId) {
@@ -495,6 +545,7 @@ public final class MapClient {
             validIds.add(region.id());
         }
         VISIBLE_REGION_IDS.retainAll(validIds);
+        HIGHLIGHT_REGION_IDS.retainAll(validIds);
     }
 
     private static int[] parseColors(String colorsHex, int imageWidth, int imageHeight) {
@@ -544,7 +595,10 @@ public final class MapClient {
         if (world == null || player == null || world.getTime() % 2L != 0L) {
             return;
         }
-        if (!player.getMainHandStack().isOf(ModItems.MAP_MARKER) && !player.getOffHandStack().isOf(ModItems.MAP_MARKER)) {
+        boolean holdingTool = player.getMainHandStack().isOf(ModItems.MAP_MARKER)
+                || player.getOffHandStack().isOf(ModItems.MAP_MARKER);
+        boolean showAll = holdingTool || markerOffHandEnabled;
+        if (!showAll && HIGHLIGHT_MARKER_IDS.isEmpty()) {
             return;
         }
         String dimensionId = world.getRegistryKey().getValue().toString();
@@ -554,20 +608,26 @@ public final class MapClient {
             if (!dimensionId.equals(marker.dimensionId())) {
                 continue;
             }
+            boolean highlighted = isMarkerHighlighted(marker.id());
+            if (!showAll && !highlighted) {
+                continue;
+            }
             if (!isMarkerParticleEnabled(marker.id())) {
                 continue;
             }
-            double dx = marker.x() + 0.5D - player.getX();
-            double dy = marker.y() + 0.5D - player.getY();
-            double dz = marker.z() + 0.5D - player.getZ();
-            if (dx * dx + dy * dy + dz * dz > 256.0D * 256.0D) {
-                continue;
+            if (!highlighted) {
+                double dx = marker.x() + 0.5D - player.getX();
+                double dy = marker.y() + 0.5D - player.getY();
+                double dz = marker.z() + 0.5D - player.getZ();
+                if (dx * dx + dy * dy + dz * dz > 256.0D * 256.0D) {
+                    continue;
+                }
             }
             for (int step = 0; step < 8; step++) {
                 float hue = ((worldTime * 4L + index * 18L + step * 24L) % 360L) / 360.0F;
                 int rgb = hsvToRgb(hue, 0.85F, 1.0F);
                 double particleY = marker.y() + 0.35D + step * 1.4D;
-                spawnDustSafe(client, marker.x() + 0.5D, particleY, marker.z() + 0.5D, rgb, 1.2F);
+                spawnDustSafe(client, marker.x() + 0.5D, particleY, marker.z() + 0.5D, rgb, 1.2F, highlighted);
             }
         }
     }
@@ -578,21 +638,29 @@ public final class MapClient {
         if (world == null || player == null || world.getTime() % 2L != 0L) {
             return;
         }
-        if (!player.getMainHandStack().isOf(ModItems.REGION_PLANNER) && !player.getOffHandStack().isOf(ModItems.REGION_PLANNER)) {
-            return;
-        }
+        boolean holdingTool = player.getMainHandStack().isOf(ModItems.REGION_PLANNER)
+                || player.getOffHandStack().isOf(ModItems.REGION_PLANNER);
+        boolean showAll = holdingTool || regionOffHandEnabled;
 
         String dimensionId = world.getRegistryKey().getValue().toString();
         double baseY = -63.0D;
         double topY = Math.max(baseY, player.getY());
 
         for (PlannerRegion region : state.plannerRegions()) {
-            if (!dimensionId.equals(region.dimensionId()) || !VISIBLE_REGION_IDS.contains(region.id())) {
+            if (!dimensionId.equals(region.dimensionId())) {
                 continue;
             }
-            spawnWireframe(client, region.toGeometryPoints(), baseY, topY, region.color(), true, Set.of(), true);
+            boolean visible = VISIBLE_REGION_IDS.contains(region.id());
+            boolean highlighted = isRegionHighlighted(region.id());
+            if (!highlighted && !(showAll && visible)) {
+                continue;
+            }
+            spawnWireframe(client, region.toGeometryPoints(), baseY, topY, region.color(), true, Set.of(), true, highlighted);
         }
 
+        if (!showAll) {
+            return;
+        }
         String localPlayerUuid = getLocalPlayerUuid();
         for (PlannerDraft draft : state.plannerDrafts()) {
             if (!dimensionId.equals(draft.dimensionId()) || draft.points().isEmpty()) {
@@ -600,7 +668,7 @@ public final class MapClient {
             }
             boolean localDraft = localPlayerUuid.equals(draft.ownerUuid());
             int draftColor = localDraft ? draft.color() : mixColor(draft.color(), 0xFFFFFF, 0.2F);
-            spawnWireframe(client, toGeometryPoints(draft.points()), baseY, topY, draftColor, false, draft.warningSegments(), localDraft);
+            spawnWireframe(client, toGeometryPoints(draft.points()), baseY, topY, draftColor, false, draft.warningSegments(), localDraft, false);
         }
     }
 
@@ -612,7 +680,8 @@ public final class MapClient {
             int color,
             boolean closed,
             Set<Integer> warningSegments,
-            boolean highlightFirstPoint
+            boolean highlightFirstPoint,
+            boolean forced
     ) {
         if (points.isEmpty()) {
             return;
@@ -622,25 +691,26 @@ public final class MapClient {
         for (int index = 0; index < points.size(); index++) {
             RegionGeometry.Point point = points.get(index);
             int pointColor = index == 0 && highlightFirstPoint ? mixColor(color, 0xFFFFFF, 0.4F) : color;
-            spawnVerticalEdge(client, point.x() + 0.5D, point.z() + 0.5D, baseY, topY, pointColor, index == 0 && highlightFirstPoint ? 1.1F : 0.8F);
+            spawnVerticalEdge(client, point.x() + 0.5D, point.z() + 0.5D, baseY, topY, pointColor,
+                    index == 0 && highlightFirstPoint ? 1.1F : 0.8F, forced);
         }
 
         for (int index = 0; index < edgeCount; index++) {
             RegionGeometry.Point start = points.get(index);
             RegionGeometry.Point end = points.get((index + 1) % points.size());
             int edgeColor = warningSegments.contains(index) ? 0xFFE74C3C : color;
-            spawnHorizontalSegment(client, start.x() + 0.5D, start.z() + 0.5D, end.x() + 0.5D, end.z() + 0.5D, baseY + 0.15D, edgeColor, 0.72F);
+            spawnHorizontalSegment(client, start.x() + 0.5D, start.z() + 0.5D, end.x() + 0.5D, end.z() + 0.5D, baseY + 0.15D, edgeColor, 0.72F, forced);
             if (topY > baseY) {
-                spawnHorizontalSegment(client, start.x() + 0.5D, start.z() + 0.5D, end.x() + 0.5D, end.z() + 0.5D, topY + 0.15D, edgeColor, 0.88F);
+                spawnHorizontalSegment(client, start.x() + 0.5D, start.z() + 0.5D, end.x() + 0.5D, end.z() + 0.5D, topY + 0.15D, edgeColor, 0.88F, forced);
             }
         }
     }
 
-    private static void spawnVerticalEdge(MinecraftClient client, double x, double z, double baseY, double topY, int color, float scale) {
+    private static void spawnVerticalEdge(MinecraftClient client, double x, double z, double baseY, double topY, int color, float scale, boolean forced) {
         double startY = baseY + 0.15D;
         double endY = topY + 0.15D;
         if (endY <= startY) {
-            spawnDustSafe(client, x, startY, z, color, scale);
+            spawnDustSafe(client, x, startY, z, color, scale, forced);
             return;
         }
 
@@ -650,11 +720,11 @@ public final class MapClient {
             double progress = step / (double) steps;
             double y = startY + span * progress;
             float pointScale = step == 0 || step == steps ? scale + 0.08F : scale * 0.82F;
-            spawnDustSafe(client, x, y, z, color, pointScale);
+            spawnDustSafe(client, x, y, z, color, pointScale, forced);
         }
     }
 
-    private static void spawnHorizontalSegment(MinecraftClient client, double startX, double startZ, double endX, double endZ, double y, int color, float scale) {
+    private static void spawnHorizontalSegment(MinecraftClient client, double startX, double startZ, double endX, double endZ, double y, int color, float scale, boolean forced) {
         double deltaX = endX - startX;
         double deltaZ = endZ - startZ;
         double distance = Math.max(0.001D, Math.sqrt(deltaX * deltaX + deltaZ * deltaZ));
@@ -663,25 +733,27 @@ public final class MapClient {
             double progress = step / (double) steps;
             double x = startX + deltaX * progress;
             double z = startZ + deltaZ * progress;
-            spawnDustSafe(client, x, y, z, color, scale);
+            spawnDustSafe(client, x, y, z, color, scale, forced);
         }
     }
 
-    private static void spawnDustSafe(MinecraftClient client, double x, double y, double z, int color, float scale) {
+    private static void spawnDustSafe(MinecraftClient client, double x, double y, double z, int color, float scale, boolean forced) {
         var player = client.player;
         var world = client.world;
         if (player == null || world == null) {
             return;
         }
-        double dx = x - player.getX();
-        double dz = z - player.getZ();
-        if (dx * dx + dz * dz > PARTICLE_RANGE_SQ) {
-            return;
-        }
-        BlockPos pos = BlockPos.ofFloored(x, y, z);
-        var blockState = world.getBlockState(pos);
-        if (!blockState.isAir() && !blockState.getFluidState().isIn(FluidTags.WATER)) {
-            return;
+        if (!forced) {
+            double dx = x - player.getX();
+            double dz = z - player.getZ();
+            if (dx * dx + dz * dz > PARTICLE_RANGE_SQ) {
+                return;
+            }
+            BlockPos pos = BlockPos.ofFloored(x, y, z);
+            var blockState = world.getBlockState(pos);
+            if (!blockState.isAir() && !blockState.getFluidState().isIn(FluidTags.WATER)) {
+                return;
+            }
         }
         client.particleManager.addParticle(new DustParticleEffect(color, scale), x, y, z, 0.0D, 0.0D, 0.0D);
     }

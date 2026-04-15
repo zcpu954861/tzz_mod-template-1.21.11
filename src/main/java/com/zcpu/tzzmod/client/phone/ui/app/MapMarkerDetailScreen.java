@@ -75,7 +75,7 @@ public class MapMarkerDetailScreen extends AbstractPhoneScreen {
     private void rebuildSwatches() {
         swatches.clear();
         int startX = contentX + s(10);
-        int startY = contentY + s(120);
+        int startY = contentY + s(136);
         int size = s(12);
         int gap = s(5);
         for (int index = 0; index < MapColors.MARKER_PALETTE.length; index++) {
@@ -161,7 +161,32 @@ public class MapMarkerDetailScreen extends AbstractPhoneScreen {
         fillChamferedRect(context, knobX, knobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
         context.drawText(textRenderer, Text.translatable("phone.tzz_mod.marker.map_visible"), contentX + s(10), visRowY + (switchH - textRenderer.fontHeight) / 2, isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
 
-        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.marker.color"), contentX + s(10), contentY + s(106) + previewShift, isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+        // Highlight toggle
+        int hlRowY = contentY + s(104) + previewShift;
+        boolean highlighted = MapClient.isMarkerHighlighted(markerId);
+        int hlSwitchX = contentX + contentWidth - switchW - s(10);
+        int hlSwitchY = hlRowY;
+        float hlProg = highlighted ? 1.0F : 0.0F;
+        int hlTrackFill = isLightMode()
+                ? (highlighted ? 0x330099CC : 0x33C0C8D0)
+                : (highlighted ? 0x3300FFE0 : 0x331A2A3C);
+        fillChamferedRect(context, hlSwitchX, hlSwitchY, switchW, switchH, cut, hlTrackFill);
+        int hlBorderCol = highlighted ? themeAccent() : themeBorder();
+        context.fill(hlSwitchX + cut, hlSwitchY, hlSwitchX + switchW, hlSwitchY + 1, hlBorderCol);
+        context.fill(hlSwitchX, hlSwitchY + switchH - 1, hlSwitchX + switchW - cut, hlSwitchY + switchH, hlBorderCol);
+        for (int d = 0; d < cut; d++) {
+            context.fill(hlSwitchX + cut - d, hlSwitchY + d, hlSwitchX + cut - d + 1, hlSwitchY + d + 1, hlBorderCol);
+        }
+        for (int d = 0; d < cut; d++) {
+            context.fill(hlSwitchX + switchW - cut + d, hlSwitchY + switchH - 1 - d,
+                    hlSwitchX + switchW - cut + d + 1, hlSwitchY + switchH - d, hlBorderCol);
+        }
+        int hlKnobX = hlSwitchX + s(2) + Math.round(hlProg * knobTravel);
+        int hlKnobY = hlSwitchY + (switchH - knobSize) / 2;
+        fillChamferedRect(context, hlKnobX, hlKnobY, knobSize, knobSize, Math.max(1, knobSize / 2), 0xFFFFFFFF);
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.marker.highlight"), contentX + s(10), hlRowY + (switchH - textRenderer.fontHeight) / 2, isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
+
+        context.drawText(textRenderer, Text.translatable("phone.tzz_mod.marker.color"), contentX + s(10), contentY + s(122) + previewShift, isLightMode() ? themeText() : 0xFFECECEC, !isLightMode());
 
         for (ColorSwatch swatch : swatches) {
             int sy = swatch.y() + previewShift;
@@ -190,6 +215,12 @@ public class MapMarkerDetailScreen extends AbstractPhoneScreen {
         int switchX = contentX + contentWidth - switchW - s(10);
         if (mx >= switchX && mx <= switchX + switchW && my >= visRowY && my <= visRowY + switchH) {
             MapClient.setMarkerVisible(markerId, !MapClient.isMarkerVisible(markerId));
+            return true;
+        }
+        // Highlight toggle
+        int hlRowY = contentY + s(104) + previewShift;
+        if (mx >= switchX && mx <= switchX + switchW && my >= hlRowY && my <= hlRowY + switchH) {
+            MapClient.setMarkerHighlighted(markerId, !MapClient.isMarkerHighlighted(markerId));
             return true;
         }
         for (ColorSwatch swatch : swatches) {

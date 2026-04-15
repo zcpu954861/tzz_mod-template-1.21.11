@@ -218,13 +218,18 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             // Angular tech border (chamfered corners, bright accent top, accent accents)
             drawTechBorder(context, frameX, frameY, frameW, frameH);
 
-            // Restore icon texture rendering (draw icon if available), otherwise show a text placeholder.
-            if (hasResource(slot.entry.iconTexture())) {
+            // 根据当前主题选择合适版本的图标；如未找到则回退到 entry 中注册的默认图标
+            String themeFolder = isLightMode() ? "light" : "dark";
+            net.minecraft.util.Identifier themeIcon = net.minecraft.util.Identifier.of(
+                    com.zcpu.tzzmod.Tzz_mod.MOD_ID,
+                    "textures/gui/phone/icons/" + themeFolder + "/" + slot.entry.id() + ".png");
+            net.minecraft.util.Identifier iconToUse = hasResource(themeIcon) ? themeIcon : slot.entry.iconTexture();
+            if (hasResource(iconToUse)) {
                 int iconPadding = s(0);
                 int iconSize = Math.max(1, slot.size - iconPadding * 2);
                 int x1 = slot.x + iconPadding;
                 int y1 = slot.y + iconPadding;
-                context.drawTexturedQuad(slot.entry.iconTexture(), x1, y1, x1 + iconSize, y1 + iconSize,
+                context.drawTexturedQuad(iconToUse, x1, y1, x1 + iconSize, y1 + iconSize,
                         0.0F, 1.0F, 0.0F, 1.0F);
             } else {
                 drawScaledCenteredText(context, Text.literal("?"), slot.x + slot.size / 2, slot.y + slot.size / 2 - s(4), 0xFF1A1A1A);
