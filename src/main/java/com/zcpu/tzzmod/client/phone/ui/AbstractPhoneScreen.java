@@ -893,6 +893,19 @@ public abstract class AbstractPhoneScreen extends Screen {
         }
     }
 
+    protected void renderPhoneScrollbar(DrawContext context, int listTop, int listBottom, int totalHeight, int scrollOffset) {
+        int visibleHeight = Math.max(1, listBottom - listTop);
+        if (totalHeight <= visibleHeight) {
+            return;
+        }
+        int trackX = contentX + contentWidth - s(2);
+        context.fill(trackX, listTop, trackX + 1, listBottom, themeBorder());
+        int thumbHeight = Math.max(s(12), Math.round(visibleHeight * (visibleHeight / (float) totalHeight)));
+        int thumbY = listTop + Math.round((scrollOffset / (float) (totalHeight - visibleHeight)) * (visibleHeight - thumbHeight));
+        thumbY = MathHelper.clamp(thumbY, listTop, listBottom - thumbHeight);
+        context.fill(trackX, thumbY, trackX + 1, thumbY + thumbHeight, themeAccentDim());
+    }
+
     @Override
     public void close() {
         if (client == null) {

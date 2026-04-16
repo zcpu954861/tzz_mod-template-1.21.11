@@ -20,8 +20,10 @@ import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.map.MapHighlightRenderer;
 import com.zcpu.tzzmod.client.password.PasswordClient;
+import com.zcpu.tzzmod.client.photo.CameraModeClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
+import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.ModItem.custom.PasswordConfigCardItem;
 import com.zcpu.tzzmod.map.MapMarkerClientAccess;
 import com.zcpu.tzzmod.map.RegionPlannerClientAccess;
@@ -38,6 +40,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import org.jspecify.annotations.NonNull;
 import org.lwjgl.glfw.GLFW;
@@ -152,6 +156,7 @@ public class Tzz_modClient implements ClientModInitializer {
         TaskClient.register();
         PasswordClient.register();
         BlockingCardClient.register();
+        com.zcpu.tzzmod.client.photo.GalleryClient.register();
         com.zcpu.tzzmod.client.phone.PhoneAppsClient.register();
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, MAIN_HUD_LAYER_ID, (context, tickCounter) -> {
             // render the player's head and ID in the top-left
@@ -161,13 +166,21 @@ public class Tzz_modClient implements ClientModInitializer {
             TaskHudOverlay.render(context);
             AlertSubtitleOverlay.render(context);
             RegionTitleOverlay.render(context);
+            CameraModeClient.render(context);
         });
 
         // AR headset keybind tick
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            CameraModeClient.tick(client);
             while (arHeadsetKey.wasPressed()) {
                 if (client.player != null && client.currentScreen == null) {
-                    ARClientAccess.openARScreen();
+                    boolean hasHeadset =
+                            client.player.getEquippedStack(EquipmentSlot.HEAD).isOf(ModItems.AR_HEADSET)
+                            || client.player.getStackInHand(Hand.MAIN_HAND).isOf(ModItems.AR_HEADSET)
+                            || client.player.getStackInHand(Hand.OFF_HAND).isOf(ModItems.AR_HEADSET);
+                    if (hasHeadset) {
+                        ARClientAccess.openARScreen();
+                    }
                 }
             }
         });

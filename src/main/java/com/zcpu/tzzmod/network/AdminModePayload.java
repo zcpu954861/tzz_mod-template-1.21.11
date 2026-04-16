@@ -10,7 +10,7 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 import org.jspecify.annotations.NonNull;
 
-public record AdminModePayload(boolean recording) implements CustomPayload {
+public record AdminModePayload(boolean recording, boolean galleryEnabled) implements CustomPayload {
     public static final CustomPayload.@NonNull Id<AdminModePayload> ID =
         NullSafety.requireNonNull(new CustomPayload.Id<>(Identifier.of(Tzz_mod.MOD_ID, "admin_mode_s2c")));
 
@@ -18,7 +18,9 @@ public record AdminModePayload(boolean recording) implements CustomPayload {
         NullSafety.requireNonNull(PacketCodec.tuple(
             PacketCodecs.BOOLEAN,
             AdminModePayload::recording,
-            value -> new AdminModePayload(NullSafety.requireNonNull(value).booleanValue())
+            PacketCodecs.BOOLEAN,
+            AdminModePayload::galleryEnabled,
+            AdminModePayload::new
         ));
 
     public static void register() {

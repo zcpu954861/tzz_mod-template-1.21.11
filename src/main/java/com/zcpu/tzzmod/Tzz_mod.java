@@ -7,13 +7,16 @@ import com.zcpu.tzzmod.ModBlock.ModBlockEntities;
 import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.blocking.BlockingCardServer;
 import com.zcpu.tzzmod.blocking.BlockingCardUseHandler;
+import com.zcpu.tzzmod.config.PhotoSpeedConfig;
 import com.zcpu.tzzmod.network.DeathStatusPayload;
 import com.zcpu.tzzmod.network.AdminPayloads;
 import com.zcpu.tzzmod.network.BlockingCardPayloads;
 import com.zcpu.tzzmod.network.DeathSyncServer;
 import com.zcpu.tzzmod.network.MapPayloads;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
+import com.zcpu.tzzmod.network.GalleryPayloads;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
+import com.zcpu.tzzmod.gallery.GalleryServer;
 import com.zcpu.tzzmod.command.MapCommand;
 import com.zcpu.tzzmod.command.TaskCommand;
 import com.zcpu.tzzmod.network.TaskPayloads;
@@ -69,16 +72,20 @@ public class Tzz_mod implements ModInitializer {
 		BlockingCardServer.register();
 		BlockingCardUseHandler.register();
 
+		GalleryPayloads.register();
+		GalleryServer.register();
+
 		AdminPayloads.register();
 		AdminSyncServer.register();
 		// ensure death spectator payloads are registered via AdminPayloads
 
-		// Ensure phone apps config file exists when the server starts (writes defaults if missing)
+		// Ensure startup config files exist when the server starts (writes defaults if missing)
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			try {
 				com.zcpu.tzzmod.phone.PhoneAppsConfig.get(server);
+				PhotoSpeedConfig.get(server);
 			} catch (Throwable t) {
-				LOGGER.warn("Failed to initialize phone apps config: {}", t.getMessage());
+				LOGGER.warn("Failed to initialize startup configs: {}", t.getMessage());
 			}
 		});
 
@@ -97,6 +104,7 @@ public class Tzz_mod implements ModInitializer {
 			MapDataStore.clearCache(server);
 			TaskDataStore.clearCache(server);
 			MapServer.clearServerState();
+			PhotoSpeedConfig.clearCache(server);
 		});
 
 		// Register server commands

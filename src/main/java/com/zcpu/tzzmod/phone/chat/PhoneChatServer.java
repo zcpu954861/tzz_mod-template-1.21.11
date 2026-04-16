@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.network.PhoneChatC2SPayload;
+import com.zcpu.tzzmod.util.SharedImageTransferBudget;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
@@ -15,7 +16,11 @@ import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.Formatting;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,8 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class PhoneChatServer {
-    // track last call timestamp per player to enforce cooldown
     private static final Map<UUID, Long> lastCallAt = new ConcurrentHashMap<>();
+    private static final Map<UUID, ImageUploadSession> imageUploads = new ConcurrentHashMap<>();
 
     private PhoneChatServer() {
     }
@@ -45,6 +50,8 @@ public final class PhoneChatServer {
         body.addProperty("enabled", config.enabled);
         body.addProperty("notificationSound", config.notificationSound);
         body.addProperty("maxMessageLength", config.maxMessageLength);
+        body.addProperty("imageUploadBandwidthMbps", config.imageUploadBandwidthMbps);
+        body.addProperty("imageDownloadBandwidthMbps", config.imageDownloadBandwidthMbps);
         PhoneChatService.sendResponse(player, "app_state", body);
     }
 
@@ -62,6 +69,10 @@ public final class PhoneChatServer {
             case "open" -> handleOpenConversation(server, player, body);
             case "send_direct" -> handleSendDirect(server, player, body, config);
             case "send_group" -> handleSendGroup(server, player, body, config);
+            case "image_upload_start" -> handleImageUploadStart(server, player, body, config);
+            case "image_upload_chunk" -> handleImageUploadChunk(player, body, config);
+            case "image_upload_finish" -> handleImageUploadFinish(server, player, config);
+            case "image_download_start" -> handleImageDownloadStart(server, player, body, config);
             case "create_group" -> handleCreateGroup(server, player, body);
             case "add_member" -> handleAddMember(server, player, body);
             case "remove_member" -> handleRemoveMember(server, player, body);
@@ -73,8 +84,7 @@ public final class PhoneChatServer {
     }
 
     private static void handleBootstrap(MinecraftServer server, ServerPlayerEntity player) {
-        JsonObject data = PhoneChatService.buildBootstrap(server, player);
-        PhoneChatService.sendResponse(player, "bootstrap", data);
+        PhoneChatService.sendResponse(player, "bootstrap", PhoneChatService.buildBootstrap(server, player));
     }
 
     private static void handleOpenConversation(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
@@ -107,15 +117,7 @@ public final class PhoneChatServer {
             return;
         }
 
-        // Sender keeps the current target as conversation key.
-        PhoneChatService.deliverToParticipants(server, envelope, List.of(player.getUuidAsString()));
-
-        JsonObject receiverEnvelope = envelope.deepCopy();
-        receiverEnvelope.addProperty("targetId", player.getUuidAsString());
-        receiverEnvelope.addProperty("title", player.getName().getString());
-
-        // Receiver should index this direct chat by sender UUID/name.
-        PhoneChatService.deliverToParticipants(server, receiverEnvelope, List.of(targetUuid));
+        deliverDirectEnvelope(server, player, targetUuid, envelope);
     }
 
     private static void handleSendGroup(MinecraftServer server, ServerPlayerEntity player, JsonObject body, PhoneChatConfig config) {
@@ -133,6 +135,237 @@ public final class PhoneChatServer {
         }
 
         PhoneChatService.deliverToParticipants(server, envelope, PhoneChatService.getGroupMembers(groupId));
+    }
+
+    private static void handleImageUploadStart(MinecraftServer server, ServerPlayerEntity player, JsonObject body, PhoneChatConfig config) {
+        String conversationType = getString(body, "conversationType");
+        String targetId = getString(body, "targetId");
+        String imageId = getString(body, "imageId");
+        int totalSize = getInt(body, "totalSize", 0);
+        int imageWidth = getInt(body, "imageWidth", 0);
+        int imageHeight = getInt(body, "imageHeight", 0);
+
+        if (imageId.isBlank() || totalSize <= 0 || !isValidConversationTarget(player, conversationType, targetId)) {
+            sendImageError(player, "Invalid chat image upload parameters.", imageId, false, true);
+            return;
+        }
+
+        try {
+            PhoneChatImageStore.ensureStorageReady(server);
+            if (PhoneChatImageStore.imageExists(server, imageId)) {
+                PhoneChatImageStore.resolveDownloadFile(server, imageId, true);
+                if (!dispatchImageMessage(server, player, conversationType, targetId, imageId, imageWidth, imageHeight, config)) {
+                    sendImageError(player, "Cannot send image to this conversation.", imageId, false, true);
+                    return;
+                }
+                JsonObject resp = new JsonObject();
+                resp.addProperty("imageId", imageId);
+                resp.addProperty("skippedUpload", true);
+                PhoneChatService.sendResponse(player, "image_upload_complete", resp);
+                return;
+            }
+        } catch (Exception exception) {
+            sendImageError(player, "Server failed to prepare chat image storage.", imageId, false, true);
+            return;
+        }
+
+        SharedImageTransferBudget.TransferLease lease = SharedImageTransferBudget.acquireUpload();
+        ImageUploadSession previous = imageUploads.put(player.getUuid(), new ImageUploadSession(
+                conversationType,
+                targetId,
+                imageId,
+                totalSize,
+                imageWidth,
+                imageHeight,
+                lease
+        ));
+        if (previous != null) {
+            previous.close();
+        }
+
+        JsonObject resp = new JsonObject();
+        resp.addProperty("imageId", imageId);
+        resp.addProperty("chunkSize", currentUploadChunkSize(config.imageUploadBandwidthMbps));
+        PhoneChatService.sendResponse(player, "image_upload_ack", resp);
+    }
+
+    private static void handleImageUploadChunk(ServerPlayerEntity player, JsonObject body, PhoneChatConfig config) {
+        ImageUploadSession session = imageUploads.get(player.getUuid());
+        if (session == null) {
+            sendImageError(player, "No active chat image upload session.", "", false, true);
+            return;
+        }
+
+        String encoded = getString(body, "data");
+        if (encoded.isBlank()) {
+            sendImageError(player, "Empty chat image chunk.", session.imageId, false, true);
+            return;
+        }
+
+        byte[] chunk = Base64.getDecoder().decode(encoded);
+        if (session.receivedBytes + chunk.length > session.totalSize) {
+            imageUploads.remove(player.getUuid());
+            session.close();
+            sendImageError(player, "Chat image upload exceeded declared size.", session.imageId, false, true);
+            return;
+        }
+
+        session.appendData(chunk);
+        JsonObject resp = new JsonObject();
+        resp.addProperty("imageId", session.imageId);
+        resp.addProperty("progress", Math.min(1.0F, (float) session.receivedBytes / session.totalSize));
+        resp.addProperty("chunkSize", currentUploadChunkSize(config.imageUploadBandwidthMbps));
+        PhoneChatService.sendResponse(player, "image_upload_ack", resp);
+    }
+
+    private static void handleImageUploadFinish(MinecraftServer server, ServerPlayerEntity player, PhoneChatConfig config) {
+        ImageUploadSession session = imageUploads.remove(player.getUuid());
+        if (session == null) {
+            sendImageError(player, "No active chat image upload session.", "", false, true);
+            return;
+        }
+
+        try {
+            if (session.receivedBytes != session.totalSize) {
+                sendImageError(player, "Chat image upload is incomplete.", session.imageId, false, true);
+                return;
+            }
+
+            PhoneChatImageStore.StoredChatImage storedImage = PhoneChatImageStore.saveImage(server, session.imageId, session.data.toByteArray());
+            if (!dispatchImageMessage(server, player, session.conversationType, session.targetId,
+                    storedImage.imageId(), storedImage.width(), storedImage.height(), config)) {
+                sendImageError(player, "Cannot send image to this conversation.", session.imageId, false, true);
+                return;
+            }
+
+            JsonObject resp = new JsonObject();
+            resp.addProperty("imageId", storedImage.imageId());
+            PhoneChatService.sendResponse(player, "image_upload_complete", resp);
+        } catch (Exception exception) {
+            sendImageError(player, "Server failed to save chat image.", session.imageId, false, true);
+        } finally {
+            session.close();
+        }
+    }
+
+    private static void handleImageDownloadStart(MinecraftServer server, ServerPlayerEntity player, JsonObject body, PhoneChatConfig config) {
+        String imageId = getString(body, "imageId");
+        boolean thumbnail = getBoolean(body, "thumbnail", false);
+        if (imageId.isBlank()) {
+            sendImageError(player, "Missing imageId.", imageId, thumbnail, false);
+            return;
+        }
+
+        Path downloadFile;
+        try {
+            downloadFile = PhoneChatImageStore.resolveDownloadFile(server, imageId, thumbnail);
+        } catch (Exception exception) {
+            sendImageError(player, "Server failed to prepare chat image.", imageId, thumbnail, false);
+            return;
+        }
+
+        if (!Files.exists(downloadFile)) {
+            sendImageError(player, "Chat image not found.", imageId, thumbnail, false);
+            return;
+        }
+
+        try {
+            byte[] data = Files.readAllBytes(downloadFile);
+            Thread downloadThread = new Thread(
+                    () -> streamImageDownload(server, player, imageId, thumbnail, data, config.imageDownloadBandwidthMbps),
+                    "TzzMod-ChatImageDownload-" + imageId.substring(0, Math.min(8, imageId.length()))
+            );
+            downloadThread.setDaemon(true);
+            downloadThread.start();
+        } catch (Exception exception) {
+            sendImageError(player, "Server failed to read chat image.", imageId, thumbnail, false);
+        }
+    }
+
+    private static boolean dispatchImageMessage(MinecraftServer server, ServerPlayerEntity player,
+                                                String conversationType, String targetId,
+                                                String imageId, int imageWidth, int imageHeight,
+                                                PhoneChatConfig config) {
+        if ("group".equals(conversationType)) {
+            JsonObject envelope = PhoneChatService.sendGroupImage(player, targetId, imageId, imageWidth, imageHeight, config);
+            if (envelope == null) {
+                return false;
+            }
+            PhoneChatService.deliverToParticipants(server, envelope, PhoneChatService.getGroupMembers(targetId));
+            return true;
+        }
+
+        if ("direct".equals(conversationType)) {
+            JsonObject envelope = PhoneChatService.sendDirectImage(server, player, targetId, imageId, imageWidth, imageHeight, config);
+            if (envelope == null) {
+                return false;
+            }
+            deliverDirectEnvelope(server, player, targetId, envelope);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void deliverDirectEnvelope(MinecraftServer server, ServerPlayerEntity sender, String targetUuid, JsonObject envelope) {
+        PhoneChatService.deliverToParticipants(server, envelope, List.of(sender.getUuidAsString()));
+
+        JsonObject receiverEnvelope = envelope.deepCopy();
+        receiverEnvelope.addProperty("targetId", sender.getUuidAsString());
+        receiverEnvelope.addProperty("title", sender.getName().getString());
+        PhoneChatService.deliverToParticipants(server, receiverEnvelope, List.of(targetUuid));
+    }
+
+    private static boolean isValidConversationTarget(ServerPlayerEntity player, String conversationType, String targetId) {
+        if ("group".equals(conversationType)) {
+            return !targetId.isBlank() && PhoneChatService.getGroupMembers(targetId).contains(player.getUuidAsString());
+        }
+        if ("direct".equals(conversationType)) {
+            return isValidUuid(targetId);
+        }
+        return false;
+    }
+
+    private static int currentUploadChunkSize(double bandwidthMbps) {
+        return SharedImageTransferBudget.recommendUploadChunkSize(bandwidthMbps);
+    }
+
+    private static int currentDownloadChunkSize(double bandwidthMbps) {
+        return SharedImageTransferBudget.recommendDownloadChunkSize(bandwidthMbps);
+    }
+
+    private static void streamImageDownload(MinecraftServer server, ServerPlayerEntity player,
+                                            String imageId, boolean thumbnail, byte[] data,
+                                            double bandwidthMbps) {
+        try (SharedImageTransferBudget.TransferLease ignored = SharedImageTransferBudget.acquireDownload()) {
+            int offset = 0;
+            while (offset < data.length) {
+                int chunkSize = currentDownloadChunkSize(bandwidthMbps);
+                int end = Math.min(offset + chunkSize, data.length);
+                byte[] chunk = java.util.Arrays.copyOfRange(data, offset, end);
+                String encoded = Base64.getEncoder().encodeToString(chunk);
+
+                JsonObject resp = new JsonObject();
+                resp.addProperty("imageId", imageId);
+                resp.addProperty("thumbnail", thumbnail);
+                resp.addProperty("data", encoded);
+                resp.addProperty("progress", (float) end / data.length);
+
+                JsonObject payload = resp;
+                server.execute(() -> PhoneChatService.sendResponse(player, "image_download_data", payload));
+                offset = end;
+                if (offset < data.length) {
+                    Thread.sleep(SharedImageTransferBudget.getTransferIntervalMs());
+                }
+            }
+
+            JsonObject complete = new JsonObject();
+            complete.addProperty("imageId", imageId);
+            complete.addProperty("thumbnail", thumbnail);
+            server.execute(() -> PhoneChatService.sendResponse(player, "image_download_complete", complete));
+        } catch (Exception exception) {
+            server.execute(() -> sendImageError(player, "Server failed to send chat image.", imageId, thumbnail, false));
+        }
     }
 
     private static void handleCreateGroup(MinecraftServer server, ServerPlayerEntity player, JsonObject body) {
@@ -167,7 +400,6 @@ public final class PhoneChatServer {
         String groupId = getString(body, "groupId");
         String memberUuid = getString(body, "memberUuid");
 
-        // allow group owner or server OP to manage members
         String ownerUuid = PhoneChatService.getGroupOwner(groupId);
         boolean isOwner = ownerUuid != null && !ownerUuid.isBlank() && ownerUuid.equals(player.getUuidAsString());
         if (!isOwner && !player.isCreativeLevelTwoOp()) {
@@ -197,7 +429,6 @@ public final class PhoneChatServer {
             return;
         }
 
-        // Prevent removing the owner via this path
         if (ownerUuid != null && ownerUuid.equals(memberUuid)) {
             PhoneChatService.sendError(player, "Cannot remove the group owner.");
             return;
@@ -214,9 +445,7 @@ public final class PhoneChatServer {
         refreshAllBootstraps(server);
     }
 
-    // New handler for the call admin action
     private static void handleCallAdmin(MinecraftServer server, ServerPlayerEntity player) {
-        // enforce 5-second cooldown per player
         UUID id = player.getUuid();
         long now = System.currentTimeMillis();
         Long previous = lastCallAt.get(id);
@@ -226,19 +455,16 @@ public final class PhoneChatServer {
         }
         lastCallAt.put(id, now);
 
-        // Build the chat message for OPs: "<playerId>(黄色)在(浅灰色)<x,y,z>(青色#00ffff)呼叫管理员!(黄色)"
         String playerName = player.getName().getString();
-        int x = (int)Math.floor(player.getX());
-        int y = (int)Math.floor(player.getY());
-        int z = (int)Math.floor(player.getZ());
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
         Text partName = Text.literal(playerName).setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.YELLOW)));
         Text partAt = Text.literal(" 在 ").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.GRAY)));
         Text partCoords = Text.literal("<" + x + "," + y + "," + z + ">").setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0x00FFFF)));
         Text partEnd = Text.literal(" 呼叫管理员!").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.YELLOW)));
-
         Text finalMessage = Text.empty().append(partName).append(partAt).append(partCoords).append(partEnd);
 
-        // Play bell sound and send the message to all online OP players
         for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
             if (online.isCreativeLevelTwoOp()) {
                 online.sendMessage(finalMessage, false);
@@ -246,7 +472,6 @@ public final class PhoneChatServer {
             }
         }
 
-        // Feedback to caller: green "已成功呼叫" and experience pick up sound
         player.sendMessage(Text.literal("已成功呼叫").setStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.GREEN))), false);
         player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
     }
@@ -261,15 +486,13 @@ public final class PhoneChatServer {
         JsonObject resp = new JsonObject();
         resp.addProperty("groupId", groupId);
         JsonArray entries = new JsonArray();
-
-        // Build list from online players; mark isMember if group's member set contains uuid
         Set<String> members = PhoneChatService.getGroupMembers(groupId);
         for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            JsonObject e = new JsonObject();
-            e.addProperty("uuid", online.getUuidAsString());
-            e.addProperty("name", online.getName().getString());
-            e.addProperty("isMember", members.contains(online.getUuidAsString()));
-            entries.add(e);
+            JsonObject entry = new JsonObject();
+            entry.addProperty("uuid", online.getUuidAsString());
+            entry.addProperty("name", online.getName().getString());
+            entry.addProperty("isMember", members.contains(online.getUuidAsString()));
+            entries.add(entry);
         }
 
         resp.add("entries", entries);
@@ -290,17 +513,12 @@ public final class PhoneChatServer {
             return;
         }
 
-        // capture members before deletion
         String groupName = PhoneChatService.getGroupName(groupId);
-
-        // perform deletion
         Set<String> deletedMembers = PhoneChatService.deleteGroup(groupId);
-
-        String msg = "群组已被删除: " + (groupName.isBlank() ? groupId : groupName);
+        String message = "群组已被删除: " + (groupName.isBlank() ? groupId : groupName);
         for (String memberUuid : deletedMembers) {
-            sendGroupRemoved(server, memberUuid, groupId, msg);
+            sendGroupRemoved(server, memberUuid, groupId, message);
         }
-
         refreshAllBootstraps(server);
     }
 
@@ -340,6 +558,18 @@ public final class PhoneChatServer {
         PhoneChatService.sendResponse(target, "group_removed", body);
     }
 
+    private static void sendImageError(ServerPlayerEntity player, String message, String imageId, boolean thumbnail, boolean uploadError) {
+        JsonObject error = new JsonObject();
+        error.addProperty("message", message);
+        error.addProperty("chatImage", true);
+        error.addProperty("chatImageUpload", uploadError);
+        if (!imageId.isBlank()) {
+            error.addProperty("imageId", imageId);
+        }
+        error.addProperty("thumbnail", thumbnail);
+        PhoneChatService.sendResponse(player, "error", error);
+    }
+
     private static JsonObject parse(String json) {
         try {
             if (json == null || json.isBlank()) {
@@ -362,22 +592,81 @@ public final class PhoneChatServer {
         }
     }
 
+    private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static int getInt(JsonObject object, String key, int fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
     private static String sanitizeMessage(String raw, int maxLength) {
-        if (raw == null) {
-            return "";
-        }
-        if (raw.isBlank()) {
-            return "";
-        }
-        if (raw.length() > maxLength) {
+        if (raw == null || raw.isBlank() || raw.length() > maxLength) {
             return "";
         }
         return raw;
+    }
+
+    private static boolean isValidUuid(String input) {
+        try {
+            UUID.fromString(input);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static void handleWhoAmI(MinecraftServer server, ServerPlayerEntity player) {
         JsonObject body = new JsonObject();
         body.addProperty("isOp", player.isCreativeLevelTwoOp());
         PhoneChatService.sendResponse(player, "whoami", body);
+    }
+
+    private static final class ImageUploadSession implements AutoCloseable {
+        private final String conversationType;
+        private final String targetId;
+        private final String imageId;
+        private final int totalSize;
+        private final int imageWidth;
+        private final int imageHeight;
+        private final ByteArrayOutputStream data = new ByteArrayOutputStream();
+        private final SharedImageTransferBudget.TransferLease transferLease;
+        private int receivedBytes;
+
+        private ImageUploadSession(String conversationType, String targetId, String imageId,
+                                   int totalSize, int imageWidth, int imageHeight,
+                                   SharedImageTransferBudget.TransferLease transferLease) {
+            this.conversationType = conversationType;
+            this.targetId = targetId;
+            this.imageId = imageId;
+            this.totalSize = totalSize;
+            this.imageWidth = imageWidth;
+            this.imageHeight = imageHeight;
+            this.transferLease = transferLease;
+        }
+
+        private void appendData(byte[] chunk) {
+            data.write(chunk, 0, chunk.length);
+            receivedBytes += chunk.length;
+        }
+
+        @Override
+        public void close() {
+            transferLease.close();
+        }
     }
 }

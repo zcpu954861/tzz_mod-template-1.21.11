@@ -1,9 +1,11 @@
 package com.zcpu.tzzmod.client.phone.ui.app;
 
+import com.zcpu.tzzmod.client.phone.chat.ChatUiUtil;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import com.zcpu.tzzmod.client.phone.ui.TypingSubtitleAnimator;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
+import com.zcpu.tzzmod.client.photo.GalleryAvatarRenderer;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.MinecraftClient;
@@ -72,11 +74,11 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
         rows.clear();
 
         for (PhoneChatClient.ContactData contact : PhoneChatClient.getContacts()) {
-            rows.add(new RowEntry("direct", contact.uuid(), contact.name()));
+            rows.add(new RowEntry("direct", contact.uuid(), contact.name(), contact.name(), contact.uuid()));
         }
 
         for (PhoneChatClient.GroupData group : PhoneChatClient.getGroups()) {
-            rows.add(new RowEntry("group", group.id(), "# " + group.name()));
+            rows.add(new RowEntry("group", group.id(), group.name(), group.name(), null));
         }
 
         conversationCount = rows.size();
@@ -155,17 +157,34 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
 
             boolean hovered = mouseX >= contentX && mouseX <= contentX + contentWidth
                     && mouseY >= drawY && mouseY <= drawY + rowHeight;
-            int color = hovered
-                    ? (isLightMode() ? 0x220099CC : 0x66FFFFFF)
-                    : (isLightMode() ? 0x11000000 : 0x22333333);
-            context.fill(contentX, drawY, contentX + contentWidth, drawY + rowHeight, color);
-            drawScaledText(context, Text.literal(row.label), contentX + s(6), drawY + s(4), themeText());
+            int fill = hovered
+                    ? (isLightMode() ? 0x44DCE7F2 : 0x445A7A92)
+                    : (isLightMode() ? 0x22D2DCE7 : 0x220B1420);
+            int border = "group".equals(row.type) ? themeAccent() : themeBorder();
+            int rowWidth = contentWidth - s(4);
+            ChatUiUtil.drawAngularFrame(context, contentX, drawY, rowWidth, rowHeight, s(3), fill, border);
+
+            int labelX = contentX + s(5);
+            if ("direct".equals(row.type) && row.avatarUuid != null) {
+                GalleryAvatarRenderer.drawAvatar(context, row.avatarUuid, contentX + s(3), drawY + s(2), s(12), themeAccent());
+                labelX += s(16);
+                drawScaledText(context, Text.literal(row.label), labelX, drawY + s(4), themeText());
+            } else {
+                String tag = Text.translatable("phone.tzz_mod.chat.group_tag").getString();
+                drawScaledText(context, Text.literal(tag), labelX, drawY + s(4), themeAccent());
+                labelX += Math.max(s(18), scaledTextWidth(tag) + s(4));
+                drawScaledText(context, Text.literal(row.label), labelX, drawY + s(4), themeText());
+            }
 
             int unread = PhoneChatClient.getUnreadCount(row.type, row.targetId);
             if (unread > 0) {
                 renderUnreadBadge(context, drawY, unread);
             }
         }
+
+        renderPhoneScrollbar(context, top, bottom,
+                conversationCount <= 0 ? 0 : conversationCount * rowHeight + (conversationCount - 1) * gap,
+                scrollOffset);
     }
 
     private void renderUnreadBadge(DrawContext context, int drawY, int unreadCount) {
@@ -217,7 +236,7 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
             RowEntry row = rows.get(i);
             int drawY = top + i * (rowHeight + gap) - scrollOffset;
             if (my >= drawY && my <= drawY + rowHeight && client != null) {
-                client.setScreen(new PhoneChatConversationScreen(this, row.type, row.targetId, row.label));
+                client.setScreen(new PhoneChatConversationScreen(this, row.type, row.targetId, row.title));
                 return true;
             }
         }
@@ -305,11 +324,15 @@ public class PhoneChatAppScreen extends AbstractPhoneScreen {
         private final String type;
         private final String targetId;
         private final String label;
+        private final String title;
+        private final String avatarUuid;
 
-        private RowEntry(String type, String targetId, String label) {
+        private RowEntry(String type, String targetId, String label, String title, String avatarUuid) {
             this.type = type;
             this.targetId = targetId;
             this.label = label;
+            this.title = title;
+            this.avatarUuid = avatarUuid;
         }
     }
 }

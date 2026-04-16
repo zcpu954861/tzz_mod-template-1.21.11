@@ -54,11 +54,10 @@ public final class PhoneChatService {
 
         result.addProperty("selfUuid", player.getUuidAsString());
         result.addProperty("isOp", player.isCreativeLevelTwoOp());
-        // include app visibility map so clients get server-side visibility on bootstrap
         com.zcpu.tzzmod.phone.PhoneAppsConfig appsConfig = com.zcpu.tzzmod.phone.PhoneAppsConfig.get(server);
         JsonObject apps = new JsonObject();
-        for (Map.Entry<String, String> e : appsConfig.apps.entrySet()) {
-            apps.addProperty(e.getKey(), e.getValue());
+        for (Map.Entry<String, String> entry : appsConfig.apps.entrySet()) {
+            apps.addProperty(entry.getKey(), entry.getValue());
         }
         result.add("apps", apps);
         return result;
@@ -142,62 +141,57 @@ public final class PhoneChatService {
         return group.members.remove(memberUuid);
     }
 
-    // Convenience: build and deliver a direct notification message from sender to target
     public static void sendDirectNotification(MinecraftServer server, ServerPlayerEntity sender, String targetUuid, String message, PhoneChatConfig config) {
         JsonObject envelope = sendDirect(server, sender, targetUuid, message, config);
-        if (envelope == null) return;
+        if (envelope == null) {
+            return;
+        }
         deliverToParticipants(server, envelope, List.of(targetUuid));
     }
 
-    public static JsonObject sendDirect(
-            MinecraftServer server,
-            ServerPlayerEntity sender,
-            String targetUuid,
-            String message,
-            PhoneChatConfig config
-    ) {
+    public static JsonObject sendDirect(MinecraftServer server, ServerPlayerEntity sender, String targetUuid, String message, PhoneChatConfig config) {
         if (!isValidUuid(targetUuid)) {
             return null;
         }
 
-        ChatMessage chatMessage = new ChatMessage(sender.getUuidAsString(), sender.getName().getString(), System.currentTimeMillis(), message);
-        String key = directKey(sender.getUuidAsString(), targetUuid);
-        List<ChatMessage> history = DIRECT_MESSAGES.computeIfAbsent(key, ignored -> new ArrayList<>());
-        history.add(chatMessage);
-        trimHistory(history, config.maxHistoryPerConversation);
-
-        ServerPlayerEntity target = server.getPlayerManager().getPlayer(UUID.fromString(targetUuid));
-
-        JsonObject envelope = new JsonObject();
-        envelope.addProperty("type", "direct");
-        envelope.addProperty("targetId", targetUuid);
-        envelope.addProperty("title", target == null ? targetUuid : target.getName().getString());
-        envelope.add("message", chatMessage.toJson());
-
-        return envelope;
+        ChatMessage chatMessage = ChatMessage.text(sender.getUuidAsString(), sender.getName().getString(), System.currentTimeMillis(), message);
+        return appendDirectMessage(server, sender, targetUuid, chatMessage, config);
     }
 
-    public static JsonObject sendGroup(
-            ServerPlayerEntity sender,
-            String groupId,
-            String message,
-            PhoneChatConfig config
-    ) {
-        ChatGroup group = GROUPS.get(groupId);
-        if (group == null || !group.members.contains(sender.getUuidAsString())) {
+    public static JsonObject sendDirectImage(MinecraftServer server, ServerPlayerEntity sender, String targetUuid,
+                                             String imageId, int imageWidth, int imageHeight, PhoneChatConfig config) {
+        if (!isValidUuid(targetUuid)) {
             return null;
         }
 
-        ChatMessage chatMessage = new ChatMessage(sender.getUuidAsString(), sender.getName().getString(), System.currentTimeMillis(), message);
-        group.messages.add(chatMessage);
-        trimHistory(group.messages, config.maxHistoryPerConversation);
+        ChatMessage chatMessage = ChatMessage.image(
+                sender.getUuidAsString(),
+                sender.getName().getString(),
+                System.currentTimeMillis(),
+                imageId,
+                imageWidth,
+                imageHeight
+        );
+        return appendDirectMessage(server, sender, targetUuid, chatMessage, config);
+    }
 
-        JsonObject envelope = new JsonObject();
-        envelope.addProperty("type", "group");
-        envelope.addProperty("targetId", group.id);
-        envelope.addProperty("title", group.name);
-        envelope.add("message", chatMessage.toJson());
-        return envelope;
+    public static JsonObject sendGroup(ServerPlayerEntity sender, String groupId, String message, PhoneChatConfig config) {
+        ChatMessage chatMessage = ChatMessage.text(sender.getUuidAsString(), sender.getName().getString(), System.currentTimeMillis(), message);
+        return appendGroupMessage(sender, groupId, chatMessage, config);
+    }
+
+    public static JsonObject sendGroupImage(ServerPlayerEntity sender, String groupId,
+                                            String imageId, int imageWidth, int imageHeight,
+                                            PhoneChatConfig config) {
+        ChatMessage chatMessage = ChatMessage.image(
+                sender.getUuidAsString(),
+                sender.getName().getString(),
+                System.currentTimeMillis(),
+                imageId,
+                imageWidth,
+                imageHeight
+        );
+        return appendGroupMessage(sender, groupId, chatMessage, config);
     }
 
     public static void deliverToParticipants(MinecraftServer server, JsonObject envelope, Collection<String> targets) {
@@ -222,8 +216,9 @@ public final class PhoneChatService {
 
     public static Set<String> deleteGroup(String groupId) {
         ChatGroup group = GROUPS.remove(groupId);
-        if (group == null) return Set.of();
-        // return a copy of members prior to deletion
+        if (group == null) {
+            return Set.of();
+        }
         return Set.copyOf(group.members);
     }
 
@@ -257,11 +252,14 @@ public final class PhoneChatService {
         return List.copyOf(result);
     }
 
-    // Find a group id by its (case-insensitive) name. Returns empty string if not found.
     public static String findGroupIdByName(String name) {
-        if (name == null) return "";
+        if (name == null) {
+            return "";
+        }
         String trimmed = name.trim();
-        if (trimmed.isEmpty()) return "";
+        if (trimmed.isEmpty()) {
+            return "";
+        }
         for (ChatGroup group : GROUPS.values()) {
             if (group.name != null && group.name.equalsIgnoreCase(trimmed)) {
                 return group.id;
@@ -278,6 +276,41 @@ public final class PhoneChatService {
         JsonObject error = new JsonObject();
         error.addProperty("message", message);
         sendResponse(player, "error", error);
+    }
+
+    private static JsonObject appendDirectMessage(MinecraftServer server, ServerPlayerEntity sender,
+                                                  String targetUuid, ChatMessage chatMessage,
+                                                  PhoneChatConfig config) {
+        String key = directKey(sender.getUuidAsString(), targetUuid);
+        List<ChatMessage> history = DIRECT_MESSAGES.computeIfAbsent(key, ignored -> new ArrayList<>());
+        history.add(chatMessage);
+        trimHistory(history, config.maxHistoryPerConversation);
+
+        ServerPlayerEntity target = server.getPlayerManager().getPlayer(UUID.fromString(targetUuid));
+        JsonObject envelope = new JsonObject();
+        envelope.addProperty("type", "direct");
+        envelope.addProperty("targetId", targetUuid);
+        envelope.addProperty("title", target == null ? targetUuid : target.getName().getString());
+        envelope.add("message", chatMessage.toJson());
+        return envelope;
+    }
+
+    private static JsonObject appendGroupMessage(ServerPlayerEntity sender, String groupId,
+                                                 ChatMessage chatMessage, PhoneChatConfig config) {
+        ChatGroup group = GROUPS.get(groupId);
+        if (group == null || !group.members.contains(sender.getUuidAsString())) {
+            return null;
+        }
+
+        group.messages.add(chatMessage);
+        trimHistory(group.messages, config.maxHistoryPerConversation);
+
+        JsonObject envelope = new JsonObject();
+        envelope.addProperty("type", "group");
+        envelope.addProperty("targetId", group.id);
+        envelope.addProperty("title", group.name);
+        envelope.add("message", chatMessage.toJson());
+        return envelope;
     }
 
     private static void trimHistory(List<ChatMessage> history, int max) {
@@ -314,13 +347,35 @@ public final class PhoneChatService {
         private final List<ChatMessage> messages = new ArrayList<>();
     }
 
-    public record ChatMessage(String senderUuid, String senderName, long timestamp, String content) {
+    public record ChatMessage(
+            String senderUuid,
+            String senderName,
+            long timestamp,
+            String content,
+            String messageType,
+            String imageId,
+            int imageWidth,
+            int imageHeight
+    ) {
+        public static ChatMessage text(String senderUuid, String senderName, long timestamp, String content) {
+            return new ChatMessage(senderUuid, senderName, timestamp, content, "text", "", 0, 0);
+        }
+
+        public static ChatMessage image(String senderUuid, String senderName, long timestamp,
+                                        String imageId, int imageWidth, int imageHeight) {
+            return new ChatMessage(senderUuid, senderName, timestamp, "", "image", imageId, imageWidth, imageHeight);
+        }
+
         private JsonObject toJson() {
             JsonObject result = new JsonObject();
             result.addProperty("senderUuid", senderUuid);
             result.addProperty("senderName", senderName);
             result.addProperty("timestamp", timestamp);
             result.addProperty("content", content);
+            result.addProperty("messageType", messageType);
+            result.addProperty("imageId", imageId);
+            result.addProperty("imageWidth", imageWidth);
+            result.addProperty("imageHeight", imageHeight);
             return result;
         }
     }

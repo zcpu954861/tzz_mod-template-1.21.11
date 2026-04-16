@@ -49,7 +49,9 @@ public class ARCallAdminScreen extends AbstractARScreen {
         int iconY = contentY + contentHeight / 2 - iconSize - s(4);
 
         // Draw icon texture or fallback
-        var iconId = net.minecraft.util.Identifier.of("tzz_mod", "textures/gui/phone/icons/call_admin.png");
+        boolean light = com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient.isLightModeEnabled();
+        var iconId = net.minecraft.util.Identifier.of("tzz_mod",
+                "textures/gui/phone/icons/" + (light ? "light" : "dark") + "/call_admin.png");
         if (hasResource(iconId)) {
             context.drawTexturedQuad(iconId, iconX, iconY,
                     iconX + iconSize, iconY + iconSize, 0.0F, 1.0F, 0.0F, 1.0F);

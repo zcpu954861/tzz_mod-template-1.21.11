@@ -14,15 +14,27 @@ public class PhoneChatConfirmDeleteGroupScreen extends AbstractPhoneScreen {
         this.groupId = groupId;
     }
 
+    public boolean referencesGroup(String removedGroupId) {
+        return groupId.equals(removedGroupId);
+    }
+
+    public Screen getChatHomeScreen() {
+        if (parent instanceof PhoneChatManageMembersScreen manageMembersScreen) {
+            return manageMembersScreen.getChatHomeScreen();
+        }
+        if (parent instanceof PhoneChatConversationScreen conversationScreen) {
+            return conversationScreen.getChatHomeScreen();
+        }
+        return parent;
+    }
+
     @Override
     protected void init() {
         super.init();
         addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(72), s(20), b -> close());
         // Confirm button (red)
         addPhoneButton(Text.translatable("phone.tzz_mod.chat.confirm_delete_confirm"), contentX + contentWidth - s(82), contentY + contentHeight - s(24), s(82), s(20), b -> {
-            // send delete request
             PhoneChatClient.deleteGroup(groupId);
-            close();
         });
     }
 

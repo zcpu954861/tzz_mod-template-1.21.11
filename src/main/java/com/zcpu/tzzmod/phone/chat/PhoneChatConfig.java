@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.phone.chat;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.config.PhotoSpeedConfig;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
@@ -22,6 +23,8 @@ public final class PhoneChatConfig {
     public int maxMessageLength = 25600;
     public int maxHistoryPerConversation = 120;
     public String notificationSound = "minecraft:entity.experience_orb.pickup";
+    public transient double imageUploadBandwidthMbps = 5.0D;
+    public transient double imageDownloadBandwidthMbps = 5.0D;
 
     private PhoneChatConfig() {
     }
@@ -34,25 +37,36 @@ public final class PhoneChatConfig {
         Path configPath = server.getRunDirectory().resolve("config").resolve("tzz_mod-phone-chat.json");
         try {
             Files.createDirectories(configPath.getParent());
+            PhoneChatConfig config = null;
             if (Files.exists(configPath)) {
                 try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
-                    PhoneChatConfig loaded = GSON.fromJson(reader, PhoneChatConfig.class);
-                    if (loaded != null) {
-                        loaded.sanitize();
-                        return loaded;
-                    }
+                    config = GSON.fromJson(reader, PhoneChatConfig.class);
                 }
             }
 
-            PhoneChatConfig defaults = new PhoneChatConfig();
-            defaults.write(configPath);
-            return defaults;
+            if (config == null) {
+                config = new PhoneChatConfig();
+            }
+
+            applySharedPhotoSpeed(server, config);
+            config.sanitize();
+            if (!Files.exists(configPath)) {
+                config.write(configPath);
+            }
+            return config;
         } catch (Exception exception) {
             Tzz_mod.LOGGER.warn("Failed to load phone chat config: {}", exception.getMessage());
             PhoneChatConfig fallback = new PhoneChatConfig();
+            applySharedPhotoSpeed(server, fallback);
             fallback.sanitize();
             return fallback;
         }
+    }
+
+    private static void applySharedPhotoSpeed(MinecraftServer server, PhoneChatConfig config) {
+        PhotoSpeedConfig speedConfig = PhotoSpeedConfig.get(server);
+        config.imageUploadBandwidthMbps = speedConfig.uploadBandwidthMbps;
+        config.imageDownloadBandwidthMbps = speedConfig.downloadBandwidthMbps;
     }
 
     private void write(Path configPath) throws IOException {

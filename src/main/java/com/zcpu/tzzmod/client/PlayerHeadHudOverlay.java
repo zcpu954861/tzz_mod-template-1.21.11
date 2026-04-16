@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.client;
 
+import com.zcpu.tzzmod.client.photo.CameraModeClient;
 import com.zcpu.tzzmod.util.NullSafety;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
@@ -27,7 +28,7 @@ public final class PlayerHeadHudOverlay {
 
     public static void render(DrawContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || client.currentScreen != null) {
+        if (client == null || client.player == null || client.currentScreen != null || CameraModeClient.isActive()) {
             return;
         }
 

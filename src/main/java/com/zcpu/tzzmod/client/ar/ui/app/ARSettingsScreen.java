@@ -40,6 +40,11 @@ public class ARSettingsScreen extends AbstractARScreen {
                 PhoneSettingsClient::isAnimationsEnabled,
                 v -> PhoneSettingsClient.setAnimationsEnabled(v), 0.0F));
         toggleRows.add(new ToggleRow(
+            Text.translatable("phone.tzz_mod.settings.gallery_performance_mode").getString(),
+            Text.translatable("phone.tzz_mod.settings.gallery_performance_mode.subtitle").getString(),
+            PhoneSettingsClient::isGalleryPerformanceModeEnabled,
+            v -> PhoneSettingsClient.setGalleryPerformanceModeEnabled(v), 0.0F));
+        toggleRows.add(new ToggleRow(
                 Text.translatable("phone.tzz_mod.settings.alert_mode").getString(),
                 Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle").getString(),
                 PhoneSettingsClient::isAlertModeEnabled,

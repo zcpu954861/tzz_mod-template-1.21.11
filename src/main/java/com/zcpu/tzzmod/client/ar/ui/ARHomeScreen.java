@@ -198,6 +198,8 @@ public class ARHomeScreen extends AbstractARScreen {
             case "call_admin" -> new ARCallAdminScreen(home);
             case "settings" -> new ARSettingsScreen(home);
             case "compass" -> new ARCompassScreen(home);
+            case "camera" -> new ARCameraScreen(home);
+            case "gallery" -> new ARGalleryScreen(home);
             case "admin" -> new ARAdminScreen(home);
             default -> entry.rootScreenFactory().apply(home);
         };

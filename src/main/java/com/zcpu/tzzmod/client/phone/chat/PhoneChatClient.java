@@ -4,19 +4,28 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.zcpu.tzzmod.client.ar.ui.app.ARChatConfirmDeleteGroupScreen;
+import com.zcpu.tzzmod.client.ar.ui.app.ARChatConversationScreen;
+import com.zcpu.tzzmod.client.ar.ui.app.ARChatManageMembersScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PhoneChatConfirmDeleteGroupScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PhoneChatConversationScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PhoneChatManageMembersScreen;
 import com.zcpu.tzzmod.client.phone.ui.AlertSubtitleOverlay;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.network.PhoneChatC2SPayload;
 import com.zcpu.tzzmod.network.PhoneChatS2CPayload;
 import com.zcpu.tzzmod.util.NullSafety;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -25,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.function.Consumer;
 
 public final class PhoneChatClient {
     private static final Set<Runnable> LISTENERS = new CopyOnWriteArraySet<>();
@@ -33,6 +43,7 @@ public final class PhoneChatClient {
     private static final Map<String, List<ChatMessageData>> HISTORIES = new HashMap<>();
     private static final Map<String, String> TITLES = new HashMap<>();
     private static final Map<String, Integer> UNREAD_COUNTS = new HashMap<>();
+    private static final Map<String, List<GroupMemberData>> GROUP_MEMBERS_MAP = new HashMap<>();
 
     private static boolean enabled = true;
     private static boolean isOp;
@@ -40,7 +51,6 @@ public final class PhoneChatClient {
     private static String notificationSound = "minecraft:entity.experience_orb.pickup";
     private static String activeConversationKey = "";
     private static long unreadNotificationExpireAtMs;
-
     private static int maxMessageLength = 25600;
 
     private PhoneChatClient() {
@@ -50,6 +60,7 @@ public final class PhoneChatClient {
         ClientPlayNetworking.registerGlobalReceiver(PhoneChatS2CPayload.ID, (payload, context) ->
                 context.client().execute(() -> handlePayload(context.client(), payload))
         );
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> resetState());
     }
 
     public static void addListener(Runnable listener) {
@@ -65,8 +76,6 @@ public final class PhoneChatClient {
     }
 
     public static boolean isOp() {
-        // Consider local singleplayer players as OP for client-side UI purposes so features like
-        // Create Group are available in singleplayer. Server will still enforce permissions.
         try {
             MinecraftClient client = MinecraftClient.getInstance();
             boolean isSingleplayer = client != null && (client.isIntegratedServerRunning() || client.getServer() != null);
@@ -107,7 +116,6 @@ public final class PhoneChatClient {
             if (count <= 0) {
                 continue;
             }
-
             String[] parts = entry.getKey().split(":", 2);
             String type = parts.length > 0 ? parts[0] : "";
             String targetId = parts.length > 1 ? parts[1] : "";
@@ -187,6 +195,18 @@ public final class PhoneChatClient {
         send("send_group", body);
     }
 
+    public static void sendDirectImage(String targetUuid, Path photoPath,
+                                       Consumer<Float> progressCallback,
+                                       Consumer<Boolean> completeCallback) {
+        ChatImageClient.uploadImageMessage("direct", targetUuid, photoPath, progressCallback, completeCallback);
+    }
+
+    public static void sendGroupImage(String groupId, Path photoPath,
+                                      Consumer<Float> progressCallback,
+                                      Consumer<Boolean> completeCallback) {
+        ChatImageClient.uploadImageMessage("group", groupId, photoPath, progressCallback, completeCallback);
+    }
+
     public static void createGroup(String name, List<String> members) {
         JsonObject body = new JsonObject();
         body.addProperty("name", name);
@@ -226,8 +246,17 @@ public final class PhoneChatClient {
         send("delete_group", body);
     }
 
+    public static List<GroupMemberData> getGroupMembersList(String groupId) {
+        return List.copyOf(GROUP_MEMBERS_MAP.getOrDefault(groupId, List.of()));
+    }
+
+    public static String getSelfUuid() {
+        return selfUuid;
+    }
+
     private static void send(String action, JsonObject body) {
-        if (MinecraftClient.getInstance().getNetworkHandler() == null) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.getNetworkHandler() == null) {
             return;
         }
         ClientPlayNetworking.send(new PhoneChatC2SPayload(action, body.toString()));
@@ -244,6 +273,9 @@ public final class PhoneChatClient {
             case "notice" -> showNotice(client, body);
             case "error" -> showError(client, body);
             case "group_members" -> applyGroupMembers(body);
+            case "whoami" -> isOp = getBoolean(body, "isOp", isOp);
+            case "image_upload_ack", "image_upload_complete", "image_download_data", "image_download_complete" ->
+                    ChatImageClient.handlePayload(payload.action(), body);
             default -> {
             }
         }
@@ -251,33 +283,23 @@ public final class PhoneChatClient {
         notifyListeners();
     }
 
-    // Client-side cache of server-provided group member lists (per group id)
-    private static final Map<String, List<GroupMemberData>> GROUP_MEMBERS_MAP = new HashMap<>();
-
     private static void applyGroupMembers(JsonObject body) {
         String groupId = getString(body, "groupId");
         List<GroupMemberData> list = new ArrayList<>();
         if (body.has("entries") && body.get("entries").isJsonArray()) {
-            for (JsonElement el : body.getAsJsonArray("entries")) {
-                if (!el.isJsonObject()) continue;
-                JsonObject obj = el.getAsJsonObject();
-                String uuid = getString(obj, "uuid");
-                String name = getString(obj, "name");
-                boolean isMember = getBoolean(obj, "isMember", false);
-                list.add(new GroupMemberData(uuid, name, isMember));
+            for (JsonElement element : body.getAsJsonArray("entries")) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                JsonObject object = element.getAsJsonObject();
+                list.add(new GroupMemberData(
+                        getString(object, "uuid"),
+                        getString(object, "name"),
+                        getBoolean(object, "isMember", false)
+                ));
             }
         }
         GROUP_MEMBERS_MAP.put(groupId, list);
-    }
-
-    public static List<GroupMemberData> getGroupMembersList(String groupId) {
-        return List.copyOf(GROUP_MEMBERS_MAP.getOrDefault(groupId, List.of()));
-    }
-
-    public record GroupMemberData(String uuid, String name, boolean isMember) {}
-
-    public static String getSelfUuid() {
-        return selfUuid;
     }
 
     private static void applyAppState(JsonObject body) {
@@ -286,7 +308,6 @@ public final class PhoneChatClient {
         if (!sound.isBlank()) {
             notificationSound = sound;
         }
-        // read optional maxMessageLength from server config
         try {
             int serverMax = body.has("maxMessageLength") ? body.get("maxMessageLength").getAsInt() : maxMessageLength;
             if (serverMax >= 16 && serverMax <= 25600) {
@@ -320,7 +341,6 @@ public final class PhoneChatClient {
 
         selfUuid = getString(body, "selfUuid");
         isOp = getBoolean(body, "isOp", false);
-        // apply apps visibility mapping if server included it in bootstrap
         try {
             if (body.has("apps") && body.get("apps").isJsonObject()) {
                 com.zcpu.tzzmod.client.phone.PhoneAppsClient.apply(body.getAsJsonObject("apps"));
@@ -335,9 +355,9 @@ public final class PhoneChatClient {
             visibleGroupIds.add(group.id());
         }
 
-        pruneGroupStateMap(HISTORIES.keySet(), visibleGroupIds, key -> HISTORIES.remove(key));
-        pruneGroupStateMap(TITLES.keySet(), visibleGroupIds, key -> TITLES.remove(key));
-        pruneGroupStateMap(UNREAD_COUNTS.keySet(), visibleGroupIds, key -> UNREAD_COUNTS.remove(key));
+        pruneGroupStateMap(HISTORIES.keySet(), visibleGroupIds, HISTORIES::remove);
+        pruneGroupStateMap(TITLES.keySet(), visibleGroupIds, TITLES::remove);
+        pruneGroupStateMap(UNREAD_COUNTS.keySet(), visibleGroupIds, UNREAD_COUNTS::remove);
         GROUP_MEMBERS_MAP.keySet().removeIf(groupId -> !visibleGroupIds.contains(groupId));
 
         if (activeConversationKey.startsWith("group:")) {
@@ -354,13 +374,11 @@ public final class PhoneChatClient {
             if (!key.startsWith("group:")) {
                 continue;
             }
-
             String groupId = key.substring("group:".length());
             if (!visibleGroupIds.contains(groupId)) {
                 staleKeys.add(key);
             }
         }
-
         for (String staleKey : staleKeys) {
             remover.accept(staleKey);
         }
@@ -370,7 +388,6 @@ public final class PhoneChatClient {
         if (groupId == null || groupId.isBlank()) {
             return;
         }
-
         String key = historyKey("group", groupId);
         HISTORIES.remove(key);
         TITLES.remove(key);
@@ -385,6 +402,7 @@ public final class PhoneChatClient {
     private static void applyGroupRemoved(MinecraftClient client, JsonObject body) {
         String groupId = getString(body, "groupId");
         removeGroupConversationState(groupId);
+        navigateAwayFromRemovedGroup(client, groupId);
         showNotice(client, body);
     }
 
@@ -396,19 +414,19 @@ public final class PhoneChatClient {
         List<ChatMessageData> messages = new ArrayList<>();
         if (body.has("messages") && body.get("messages").isJsonArray()) {
             for (JsonElement element : body.getAsJsonArray("messages")) {
-                JsonObject message = element.getAsJsonObject();
-                messages.add(new ChatMessageData(
-                        getString(message, "senderUuid"),
-                        getString(message, "senderName"),
-                        getLong(message, "timestamp"),
-                        getString(message, "content")
-                ));
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                ChatMessageData message = parseMessage(element.getAsJsonObject());
+                messages.add(message);
+                if (message.isImage()) {
+                    ChatImageClient.requestThumbnailIfNeeded(message);
+                }
             }
         }
 
         HISTORIES.put(key, messages);
         TITLES.put(key, getString(body, "title"));
-
         if (key.equals(activeConversationKey)) {
             UNREAD_COUNTS.remove(key);
         }
@@ -421,17 +439,11 @@ public final class PhoneChatClient {
                 ? body.getAsJsonObject("message")
                 : new JsonObject();
 
-        ChatMessageData chatMessage = new ChatMessageData(
-                getString(message, "senderUuid"),
-                getString(message, "senderName"),
-                getLong(message, "timestamp"),
-                getString(message, "content")
-        );
+        ChatMessageData chatMessage = parseMessage(message);
 
         if ("direct".equals(type)
                 && !chatMessage.senderUuid.equals(selfUuid)
                 && targetId.equals(selfUuid)) {
-            // Compatibility fix: recipient-side direct envelope may carry self UUID as target.
             targetId = chatMessage.senderUuid;
         }
 
@@ -444,22 +456,25 @@ public final class PhoneChatClient {
         }
         TITLES.put(key, title);
 
+        if (chatMessage.isImage()) {
+            ChatImageClient.requestThumbnailIfNeeded(chatMessage);
+        }
+
         if (chatMessage.senderUuid.equals(selfUuid)) {
             return;
         }
-
         if (key.equals(activeConversationKey)) {
             UNREAD_COUNTS.remove(key);
             return;
         }
 
-    UNREAD_COUNTS.merge(
-        key,
-        1,
-        (left, right) -> Integer.valueOf(
-            NullSafety.requireNonNull(left).intValue() + NullSafety.requireNonNull(right).intValue()
-        )
-    );
+        UNREAD_COUNTS.merge(
+                key,
+                1,
+                (left, right) -> Integer.valueOf(
+                        NullSafety.requireNonNull(left).intValue() + NullSafety.requireNonNull(right).intValue()
+                )
+        );
         unreadNotificationExpireAtMs = System.currentTimeMillis() + 15_000L;
         if (PhoneSettingsClient.isAlertModeEnabled()) {
             AlertSubtitleOverlay.enqueue(Text.translatable("phone.tzz_mod.alert.chat_subtitle"));
@@ -472,28 +487,56 @@ public final class PhoneChatClient {
         if (client.player == null) {
             return;
         }
-
         SoundEvent event = SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP;
         Identifier id = Identifier.tryParse(notificationSound);
         if (id != null && Registries.SOUND_EVENT.containsId(id)) {
             event = Registries.SOUND_EVENT.get(id);
         }
         var player = client.player;
-        if (player == null) {
-            return;
+        if (player != null) {
+            player.playSound(event, 0.8F, 1.2F);
         }
-        player.playSound(event, 0.8F, 1.2F);
     }
 
     private static void showError(MinecraftClient client, JsonObject body) {
+        ChatImageClient.handleError(body);
         String message = NullSafety.requireNonNull(getString(body, "message"));
-        // Suppress the known benign server-side message when client probes 'whoami'
         if (message != null && message.contains("Unknown chat action: whoami")) {
             return;
+        }
+        if (message != null && message.contains("Unknown chat action: image_upload_start")) {
+            ChatImageClient.abortUpload();
+            message = "当前服务器尚未更新聊天图片协议，请更新并重启服务端模组后再发送群聊图片。";
         }
         var player = client.player;
         if (player != null && !message.isBlank()) {
             player.sendMessage(Text.literal("[Phone Chat] " + message), false);
+        }
+    }
+
+    private static void navigateAwayFromRemovedGroup(MinecraftClient client, String groupId) {
+        if (client == null || groupId == null || groupId.isBlank()) {
+            return;
+        }
+
+        Screen currentScreen = client.currentScreen;
+        Screen replacement = null;
+        if (currentScreen instanceof PhoneChatConversationScreen conversationScreen && conversationScreen.referencesGroup(groupId)) {
+            replacement = conversationScreen.getChatHomeScreen();
+        } else if (currentScreen instanceof PhoneChatManageMembersScreen manageMembersScreen && manageMembersScreen.referencesGroup(groupId)) {
+            replacement = manageMembersScreen.getChatHomeScreen();
+        } else if (currentScreen instanceof PhoneChatConfirmDeleteGroupScreen confirmDeleteGroupScreen && confirmDeleteGroupScreen.referencesGroup(groupId)) {
+            replacement = confirmDeleteGroupScreen.getChatHomeScreen();
+        } else if (currentScreen instanceof ARChatConversationScreen conversationScreen && conversationScreen.referencesGroup(groupId)) {
+            replacement = conversationScreen.getChatHomeScreen();
+        } else if (currentScreen instanceof ARChatManageMembersScreen manageMembersScreen && manageMembersScreen.referencesGroup(groupId)) {
+            replacement = manageMembersScreen.getChatHomeScreen();
+        } else if (currentScreen instanceof ARChatConfirmDeleteGroupScreen confirmDeleteGroupScreen && confirmDeleteGroupScreen.referencesGroup(groupId)) {
+            replacement = confirmDeleteGroupScreen.getChatHomeScreen();
+        }
+
+        if (replacement != null && replacement != currentScreen) {
+            client.setScreen(replacement);
         }
     }
 
@@ -511,29 +554,57 @@ public final class PhoneChatClient {
         if (title != null && !title.isBlank()) {
             return title;
         }
-
         if ("group".equals(type)) {
             for (GroupData group : GROUPS) {
                 if (group.id.equals(targetId)) {
                     return group.name;
                 }
             }
-            return "# " + targetId;
+            return targetId;
         }
-
         for (ContactData contact : CONTACTS) {
             if (contact.uuid.equals(targetId)) {
                 return contact.name;
             }
         }
-
         return targetId;
+    }
+
+    private static ChatMessageData parseMessage(JsonObject message) {
+        return new ChatMessageData(
+                getString(message, "senderUuid"),
+                getString(message, "senderName"),
+                getLong(message, "timestamp"),
+                getString(message, "content"),
+                getString(message, "messageType"),
+                getString(message, "imageId"),
+                getInt(message, "imageWidth", 0),
+                getInt(message, "imageHeight", 0)
+        );
     }
 
     private static void notifyListeners() {
         for (Runnable listener : LISTENERS) {
             listener.run();
         }
+    }
+
+    private static void resetState() {
+        CONTACTS.clear();
+        GROUPS.clear();
+        HISTORIES.clear();
+        TITLES.clear();
+        UNREAD_COUNTS.clear();
+        GROUP_MEMBERS_MAP.clear();
+        enabled = true;
+        isOp = false;
+        selfUuid = "";
+        notificationSound = "minecraft:entity.experience_orb.pickup";
+        activeConversationKey = "";
+        unreadNotificationExpireAtMs = 0L;
+        maxMessageLength = 25600;
+        ChatImageClient.reset();
+        notifyListeners();
     }
 
     private static JsonObject parse(String body) {
@@ -548,7 +619,7 @@ public final class PhoneChatClient {
     }
 
     private static String getString(JsonObject object, String key) {
-        if (!object.has(key)) {
+        if (object == null || !object.has(key)) {
             return "";
         }
         try {
@@ -559,7 +630,7 @@ public final class PhoneChatClient {
     }
 
     private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
-        if (!object.has(key)) {
+        if (object == null || !object.has(key)) {
             return fallback;
         }
         try {
@@ -570,13 +641,24 @@ public final class PhoneChatClient {
     }
 
     private static long getLong(JsonObject object, String key) {
-        if (!object.has(key)) {
+        if (object == null || !object.has(key)) {
             return 0L;
         }
         try {
             return object.get(key).getAsLong();
         } catch (Exception ignored) {
             return 0L;
+        }
+    }
+
+    private static int getInt(JsonObject object, String key, int fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
         }
     }
 
@@ -590,7 +672,22 @@ public final class PhoneChatClient {
     public record GroupData(String id, String name, String ownerUuid) {
     }
 
-    public record ChatMessageData(String senderUuid, String senderName, long timestamp, String content) {
+    public record GroupMemberData(String uuid, String name, boolean isMember) {
+    }
+
+    public record ChatMessageData(
+            String senderUuid,
+            String senderName,
+            long timestamp,
+            String content,
+            String messageType,
+            String imageId,
+            int imageWidth,
+            int imageHeight
+    ) {
+        public boolean isImage() {
+            return "image".equals(messageType) && imageId != null && !imageId.isBlank();
+        }
     }
 
     public record UnreadEntry(String type, String targetId, String title, int count) {

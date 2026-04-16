@@ -1,7 +1,10 @@
 package com.zcpu.tzzmod.client.ar.ui.app;
 
 import com.zcpu.tzzmod.client.ar.ui.AbstractARScreen;
+import com.zcpu.tzzmod.client.phone.chat.ChatUiUtil;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
+import com.zcpu.tzzmod.client.photo.GalleryAvatarRenderer;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -26,7 +29,8 @@ public class ARChatScreen extends AbstractARScreen {
     protected void init() {
         super.init();
         addBackButton();
-        if (PhoneChatClient.isOp()) {
+        boolean isSingleplayer = MinecraftClient.getInstance().isIntegratedServerRunning() || MinecraftClient.getInstance().getServer() != null;
+        if (PhoneChatClient.isOp() || isSingleplayer) {
             int btnW = s(60);
             int btnH = s(18);
             int bx = contentX + contentWidth - btnW - s(2);
@@ -45,12 +49,12 @@ public class ARChatScreen extends AbstractARScreen {
     private void rebuildRows() {
         rows.clear();
         for (PhoneChatClient.ContactData c : PhoneChatClient.getContacts()) {
-            int unread = PhoneChatClient.getUnreadCount("dm", c.uuid());
-            rows.add(new ChatRow(c.name(), c.uuid(), unread, false));
+            int unread = PhoneChatClient.getUnreadCount("direct", c.uuid());
+            rows.add(new ChatRow(c.name(), c.uuid(), unread, false, c.uuid()));
         }
         for (PhoneChatClient.GroupData g : PhoneChatClient.getGroups()) {
             int unread = PhoneChatClient.getUnreadCount("group", g.id());
-            rows.add(new ChatRow(g.name(), g.id(), unread, true));
+            rows.add(new ChatRow(g.name(), g.id(), unread, true, null));
         }
     }
 
@@ -98,14 +102,21 @@ public class ARChatScreen extends AbstractARScreen {
                 int fillColor = hovered ? (isLightMode() ? 0x44C0D4E8 : 0x4410283C)
                         : (isLightMode() ? 0x22D8E4F0 : 0x220A1A2C);
                 int cut = Math.max(1, s(2));
-                drawAngularTechFrame(context, contentX + s(2), y + s(1),
-                        contentWidth - s(4), rowH - s(2), cut, fillColor,
-                        hovered ? themeBorderBright() : themeBorder());
+                int borderColor = row.isGroup ? themeAccent() : (hovered ? themeBorderBright() : themeBorder());
+                ChatUiUtil.drawAngularFrame(context, contentX + s(2), y + s(1),
+                    contentWidth - s(4), rowH - s(2), cut, fillColor, borderColor);
 
-                // Icon: group or DM prefix
-                String prefix = row.isGroup ? "[G] " : "";
-                drawScaledText(context, Text.literal(prefix + row.name),
-                        contentX + s(8), y + s(4), themeText());
+                int textX = contentX + s(8);
+                if (!row.isGroup && row.avatarUuid != null) {
+                    GalleryAvatarRenderer.drawAvatar(context, row.avatarUuid, contentX + s(6), y + s(2), s(14), themeAccent());
+                    textX += s(18);
+                    drawScaledText(context, Text.literal(row.name), textX, y + s(4), themeText());
+                } else {
+                    String prefix = Text.translatable("phone.tzz_mod.chat.group_tag").getString();
+                    drawScaledText(context, Text.literal(prefix), textX, y + s(4), themeAccent());
+                    textX += Math.max(s(16), scaledTextWidth(prefix) + s(4));
+                    drawScaledText(context, Text.literal(row.name), textX, y + s(4), themeText());
+                }
 
                 // Unread badge on right
                 if (row.unread > 0) {
@@ -142,7 +153,7 @@ public class ARChatScreen extends AbstractARScreen {
         if (super.mouseClicked(click, doubleClick)) return true;
         if (hoveredIndex >= 0 && hoveredIndex < rows.size()) {
             ChatRow row = rows.get(hoveredIndex);
-            String type = row.isGroup ? "group" : "dm";
+            String type = row.isGroup ? "group" : "direct";
             String title = PhoneChatClient.getTitle(type, row.id);
             if (client != null)
                 client.setScreen(new ARChatConversationScreen(this, type, row.id, title));
@@ -151,5 +162,5 @@ public class ARChatScreen extends AbstractARScreen {
         return false;
     }
 
-    private record ChatRow(String name, String id, int unread, boolean isGroup) {}
+    private record ChatRow(String name, String id, int unread, boolean isGroup, String avatarUuid) {}
 }

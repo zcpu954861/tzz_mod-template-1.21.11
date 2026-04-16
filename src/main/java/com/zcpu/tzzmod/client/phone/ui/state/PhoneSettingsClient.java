@@ -23,6 +23,7 @@ public final class PhoneSettingsClient {
     private static final boolean DEFAULT_EXPERIMENTAL_UI = false;
     private static final boolean DEFAULT_LIGHT_MODE = false;
     private static final boolean DEFAULT_AR_MASK_ENABLED = false;
+    private static final boolean DEFAULT_GALLERY_PERFORMANCE_MODE = false;
 
     private static boolean alertMode = DEFAULT_ALERT_MODE;
     private static boolean alwaysShowRegionTitle = DEFAULT_ALWAYS_SHOW_REGION_TITLE;
@@ -30,6 +31,7 @@ public final class PhoneSettingsClient {
     private static boolean experimentalUi = DEFAULT_EXPERIMENTAL_UI;
     private static boolean lightMode = DEFAULT_LIGHT_MODE;
     private static boolean arMaskEnabled = DEFAULT_AR_MASK_ENABLED;
+    private static boolean galleryPerformanceMode = DEFAULT_GALLERY_PERFORMANCE_MODE;
     private static String loadedProfileKey;
 
     private PhoneSettingsClient() {
@@ -98,6 +100,17 @@ public final class PhoneSettingsClient {
     public static void setARMaskEnabled(boolean enabled) {
         ensureLoadedForCurrentProfile();
         arMaskEnabled = enabled;
+        save();
+    }
+
+    public static boolean isGalleryPerformanceModeEnabled() {
+        ensureLoadedForCurrentProfile();
+        return galleryPerformanceMode;
+    }
+
+    public static void setGalleryPerformanceModeEnabled(boolean enabled) {
+        ensureLoadedForCurrentProfile();
+        galleryPerformanceMode = enabled;
         save();
     }
 
@@ -185,6 +198,9 @@ public final class PhoneSettingsClient {
         if (obj.has("arMaskEnabled")) {
             arMaskEnabled = obj.get("arMaskEnabled").getAsBoolean();
         }
+        if (obj.has("galleryPerformanceMode")) {
+            galleryPerformanceMode = obj.get("galleryPerformanceMode").getAsBoolean();
+        }
     }
 
     private static void writeSettings(JsonObject obj) {
@@ -194,6 +210,7 @@ public final class PhoneSettingsClient {
         obj.add("experimentalUi", new JsonPrimitive(experimentalUi));
         obj.add("lightMode", new JsonPrimitive(lightMode));
         obj.add("arMaskEnabled", new JsonPrimitive(arMaskEnabled));
+        obj.add("galleryPerformanceMode", new JsonPrimitive(galleryPerformanceMode));
     }
 
     private static void resetToDefaults() {
@@ -203,6 +220,7 @@ public final class PhoneSettingsClient {
         experimentalUi = DEFAULT_EXPERIMENTAL_UI;
         lightMode = DEFAULT_LIGHT_MODE;
         arMaskEnabled = DEFAULT_AR_MASK_ENABLED;
+        galleryPerformanceMode = DEFAULT_GALLERY_PERFORMANCE_MODE;
     }
 
     private static String currentProfileKey() {

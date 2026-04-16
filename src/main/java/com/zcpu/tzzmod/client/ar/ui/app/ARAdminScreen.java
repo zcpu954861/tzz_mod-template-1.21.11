@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.client.ar.ui.app;
 import com.zcpu.tzzmod.client.ForcedHudClient;
 import com.zcpu.tzzmod.client.ar.ui.AbstractARScreen;
 import com.zcpu.tzzmod.client.map.MapClient;
+import com.zcpu.tzzmod.client.photo.GalleryClient;
 import com.zcpu.tzzmod.network.AdminModeC2SPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
@@ -37,8 +38,16 @@ public class ARAdminScreen extends AbstractARScreen {
                 Text.translatable("phone.tzz_mod.admin.record_mode.subtitle").getString(),
                 ForcedHudClient::isForceShowHead,
                 v -> {
-                    ClientPlayNetworking.send(new AdminModeC2SPayload(v));
+                    ClientPlayNetworking.send(new AdminModeC2SPayload("recording", v));
                     ForcedHudClient.setServerEnforcedHud(v);
+                }, 0.0F));
+        toggleRows.add(new AdminToggleRow(
+                Text.translatable("phone.tzz_mod.admin.gallery_enabled").getString(),
+                Text.translatable("phone.tzz_mod.admin.gallery_enabled.subtitle").getString(),
+                GalleryClient::isAdminGalleryEnabled,
+                v -> {
+                    ClientPlayNetworking.send(new AdminModeC2SPayload("gallery_enabled", v));
+                    GalleryClient.setAdminGalleryEnabled(v);
                 }, 0.0F));
         toggleRows.add(new AdminToggleRow(
                 Text.translatable("phone.tzz_mod.admin.show_self_position").getString(),

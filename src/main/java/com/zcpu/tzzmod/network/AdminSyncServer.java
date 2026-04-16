@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class AdminSyncServer {
     private static final AtomicBoolean recordingMode = new AtomicBoolean(false);
+    private static final AtomicBoolean galleryEnabled = new AtomicBoolean(true);
 
     private AdminSyncServer() {
     }
@@ -32,22 +33,32 @@ public final class AdminSyncServer {
             return;
         }
 
-        boolean newState = payload.recording();
-        boolean previous = recordingMode.getAndSet(newState);
-        if (previous != newState) {
-            // broadcast new state to all online players
-            broadcastState(server, newState);
+        boolean changed = false;
+        switch (payload.key()) {
+            case "recording" -> {
+                boolean prev = recordingMode.getAndSet(payload.value());
+                changed = prev != payload.value();
+            }
+            case "gallery_enabled" -> {
+                boolean prev = galleryEnabled.getAndSet(payload.value());
+                changed = prev != payload.value();
+            }
+        }
+        if (changed) {
+            broadcastState(server);
         }
     }
 
-    private static void broadcastState(MinecraftServer server, boolean state) {
+    private static void broadcastState(MinecraftServer server) {
+        AdminModePayload payload = new AdminModePayload(recordingMode.get(), galleryEnabled.get());
         for (ServerPlayerEntity online : server.getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(NullSafety.requireNonNull(online), new AdminModePayload(state));
+            ServerPlayNetworking.send(NullSafety.requireNonNull(online), payload);
         }
     }
 
     private static void sendStateToPlayer(MinecraftServer server, ServerPlayerEntity player) {
-        ServerPlayNetworking.send(NullSafety.requireNonNull(player), new AdminModePayload(recordingMode.get()));
+        ServerPlayNetworking.send(NullSafety.requireNonNull(player),
+                new AdminModePayload(recordingMode.get(), galleryEnabled.get()));
     }
 
     public static boolean isRecordingMode() {

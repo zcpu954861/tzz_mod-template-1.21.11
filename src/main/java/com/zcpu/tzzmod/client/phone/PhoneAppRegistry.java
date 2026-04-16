@@ -9,6 +9,8 @@ import com.zcpu.tzzmod.client.phone.ui.app.PhoneTaskAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneSettingsAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.CompassAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneAdminAppScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.CameraAppScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.GalleryAppScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -25,6 +27,8 @@ public final class PhoneAppRegistry {
     private static final Identifier SETTINGS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/settings.png");
     private static final Identifier COMPASS_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/compass.png");
     private static final Identifier ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/admin.png");
+    private static final Identifier CAMERA_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/camera.png");
+    private static final Identifier GALLERY_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/gallery.png");
 
     private PhoneAppRegistry() {
     }
@@ -44,6 +48,8 @@ public final class PhoneAppRegistry {
         canonical.add(new PhoneAppEntry("task", Text.translatable("phone.tzz_mod.app.task"), iconOverrides.getOrDefault("task", TASK_ICON), PhoneTaskAppScreen::new));
         canonical.add(new PhoneAppEntry("call_admin", Text.translatable("phone.tzz_mod.app.call_admin"), iconOverrides.getOrDefault("call_admin", CALL_ADMIN_ICON), PhoneCallAdminScreen::new));
         canonical.add(new PhoneAppEntry("compass", Text.translatable("phone.tzz_mod.app.compass"), iconOverrides.getOrDefault("compass", COMPASS_ICON), CompassAppScreen::new));
+        canonical.add(new PhoneAppEntry("camera", Text.translatable("phone.tzz_mod.app.camera"), iconOverrides.getOrDefault("camera", CAMERA_ICON), CameraAppScreen::new));
+        canonical.add(new PhoneAppEntry("gallery", Text.translatable("phone.tzz_mod.app.gallery"), iconOverrides.getOrDefault("gallery", GALLERY_ICON), GalleryAppScreen::new));
         canonical.add(new PhoneAppEntry("admin", Text.translatable("phone.tzz_mod.app.admin"), iconOverrides.getOrDefault("admin", ADMIN_ICON), PhoneAdminAppScreen::new));
 
         List<PhoneAppEntry> entries = new ArrayList<>();

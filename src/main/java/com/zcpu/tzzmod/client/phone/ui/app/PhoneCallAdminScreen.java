@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.client.phone.PhoneCallAdminClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
 import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
+import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -15,7 +16,12 @@ public class PhoneCallAdminScreen extends AbstractPhoneScreen {
     // remove per-screen cooldown fields (we'll rely on client helper)
     private ButtonWidget callButton;
 
-    private static final Identifier ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/call_admin.png");
+    private static final Identifier ICON_DARK = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/call_admin.png");
+    private static final Identifier ICON_LIGHT = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/light/call_admin.png");
+
+    private Identifier getIcon() {
+        return PhoneSettingsClient.isLightModeEnabled() ? ICON_LIGHT : ICON_DARK;
+    }
 
     public PhoneCallAdminScreen(Screen parent) {
         super(Text.translatable("phone.tzz_mod.app.call_admin"), parent);
@@ -70,8 +76,9 @@ public class PhoneCallAdminScreen extends AbstractPhoneScreen {
         int iconX = contentX + (contentWidth - iconSize) / 2;
         int iconY = contentY + (int)(contentHeight * 0.55f) - iconSize / 2;
 
-        if (hasResource(ICON)) {
-            context.drawTexturedQuad(ICON, iconX, iconY, iconX + iconSize, iconY + iconSize,
+        Identifier icon = getIcon();
+        if (hasResource(icon)) {
+            context.drawTexturedQuad(icon, iconX, iconY, iconX + iconSize, iconY + iconSize,
                     0.0F, 1.0F, 0.0F, 1.0F);
         } else {
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.app.call_admin"), iconX + iconSize / 2, iconY + iconSize / 2 - s(4), 0xFF1A1A1A);
@@ -102,8 +109,9 @@ public class PhoneCallAdminScreen extends AbstractPhoneScreen {
         int iconX = contentX + (contentWidth - iconSize) / 2;
         int iconY = contentY + (int)(contentHeight * 0.55f) - iconSize / 2;
 
-        if (hasResource(ICON)) {
-            context.drawTexturedQuad(ICON, iconX, iconY, iconX + iconSize, iconY + iconSize,
+        Identifier icon2 = getIcon();
+        if (hasResource(icon2)) {
+            context.drawTexturedQuad(icon2, iconX, iconY, iconX + iconSize, iconY + iconSize,
                     0.0F, 1.0F, 0.0F, 1.0F);
         } else {
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable("phone.tzz_mod.app.call_admin"), iconX + iconSize / 2, iconY + iconSize / 2 - s(4), 0xFF1A1A1A);

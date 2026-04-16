@@ -42,6 +42,17 @@ public class PhoneChatManageMembersScreen extends AbstractPhoneScreen {
         this.groupId = groupId;
     }
 
+    public boolean referencesGroup(String removedGroupId) {
+        return groupId.equals(removedGroupId);
+    }
+
+    public Screen getChatHomeScreen() {
+        if (parent instanceof PhoneChatConversationScreen conversationScreen) {
+            return conversationScreen.getChatHomeScreen();
+        }
+        return parent;
+    }
+
     @Override
     protected void init() {
         super.init();

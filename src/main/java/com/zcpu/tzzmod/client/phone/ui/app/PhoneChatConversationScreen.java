@@ -3,44 +3,39 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
+import com.zcpu.tzzmod.client.phone.chat.ChatImageClient;
+import com.zcpu.tzzmod.client.phone.chat.ChatUiUtil;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
-import com.zcpu.tzzmod.client.phone.ui.RoundedRectRenderer;
-import net.minecraft.client.gl.RenderPipelines;
+import com.zcpu.tzzmod.client.photo.GalleryAvatarRenderer;
+import com.zcpu.tzzmod.client.photo.PhotoManager;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.entity.player.SkinTextures;
-import net.minecraft.util.Identifier;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextCodecs;
+import net.minecraft.util.Identifier;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 public class PhoneChatConversationScreen extends AbstractPhoneScreen {
-    private static final int FACE_U = 8;
-    private static final int FACE_V = 8;
-    private static final int HAT_U = 40;
-    private static final int HAT_V = 8;
-    private static final int SKIN_TEXTURE_SIZE = 64;
-
     private final String type;
     private final String targetId;
+    private final List<MessageLayout> cachedLayouts = new ArrayList<>();
+    private final List<ImageTarget> imageTargets = new ArrayList<>();
+
     private String title;
     private Runnable stateListener;
-
     private TextFieldWidget inputField;
     private int messageScrollOffset;
-    private boolean manageButtonVisible = false;
-    private final List<MessageLayout> cachedLayouts = new ArrayList<>();
-    private final Map<String, Identifier> skinTextureCache = new HashMap<>();
-    private int cachedTotalHeight;
+    private boolean manageButtonVisible;
     private boolean messageLayoutsDirty = true;
+    private int cachedTotalHeight;
 
     public PhoneChatConversationScreen(Screen parent, String type, String targetId, String title) {
         super(Text.translatable("phone.tzz_mod.chat.conversation"), parent);
@@ -52,30 +47,26 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     @Override
     protected void init() {
         super.init();
+        updateOwnerState();
         invalidateMessageLayouts();
 
-        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(60), s(20), button -> close());
+        addPhoneButton(Text.translatable("phone.tzz_mod.back"), contentX, contentY + contentHeight - s(24), s(46), s(20), button -> close());
 
-        inputField = new TextFieldWidget(textRenderer, contentX + s(64), contentY + contentHeight - s(24), contentWidth - s(132), s(20), Text.empty());
-        inputField.setMaxLength(net.minecraft.util.math.MathHelper.clamp(com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.getMaxMessageLength(), 16, 25600));
+        int fieldHeight = textRenderer.fontHeight;
+        inputField = new TextFieldWidget(textRenderer, contentX + s(50), contentY + contentHeight - s(20), contentWidth - s(108), fieldHeight, Text.empty());
+        inputField.setMaxLength(net.minecraft.util.math.MathHelper.clamp(PhoneChatClient.getMaxMessageLength(), 16, 25600));
         styleTextField(inputField);
         addDrawableChild(inputField);
 
-        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.send"), contentX + contentWidth - s(64), contentY + contentHeight - s(24), s(64), s(20), button -> sendMessage());
+        addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.send"), contentX + contentWidth - s(56), contentY + contentHeight - s(24), s(56), s(20), button -> sendMessage());
 
         if ("group".equals(type)) {
-            // Show Manage Members button to the group owner only (using client-side group metadata)
-            boolean isOwner = false;
-            for (PhoneChatClient.GroupData g : PhoneChatClient.getGroups()) {
-                if (g.id().equals(targetId) && g.ownerUuid().equals(PhoneChatClient.getSelfUuid())) {
-                    isOwner = true;
-                    break;
-                }
-            }
-            manageButtonVisible = isOwner;
-            if (isOwner) {
-                // place the Manage Members button up one row so it doesn't overlap the Send button
-                addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.manage_members"), contentX + contentWidth - s(120), contentY + contentHeight - s(48), s(120), s(20), button -> client.setScreen(new PhoneChatManageMembersScreen(this, targetId)));
+            int actionY = contentY + contentHeight - s(46);
+            if (manageButtonVisible) {
+                addPhoneButton(Text.translatable("phone.tzz_mod.chat.send_image"), contentX + contentWidth - s(184), actionY, s(58), s(20), button -> openImagePicker());
+                addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.manage_members"), contentX + contentWidth - s(120), actionY, s(120), s(20), button -> openManageMembers());
+            } else {
+                addPhoneButton(Text.translatable("phone.tzz_mod.chat.send_image"), contentX + contentWidth - s(72), actionY, s(72), s(20), button -> openImagePicker());
             }
         }
 
@@ -86,23 +77,36 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         updateFromState();
     }
 
+    private void updateOwnerState() {
+        manageButtonVisible = PhoneChatClient.getGroups().stream()
+                .anyMatch(group -> group.id().equals(targetId) && group.ownerUuid().equals(PhoneChatClient.getSelfUuid()));
+    }
+
     private void updateFromState() {
         title = PhoneChatClient.getTitle(type, targetId);
-        // recompute whether the Manage Members button should be visible (owner may change)
-        if ("group".equals(type)) {
-            boolean isOwner = false;
-            for (PhoneChatClient.GroupData g : PhoneChatClient.getGroups()) {
-                if (g.id().equals(targetId) && g.ownerUuid().equals(PhoneChatClient.getSelfUuid())) {
-                    isOwner = true;
-                    break;
-                }
-            }
-            manageButtonVisible = isOwner;
-        } else {
-            manageButtonVisible = false;
-        }
+        updateOwnerState();
         invalidateMessageLayouts();
         clampMessageScroll();
+    }
+
+    private void openImagePicker() {
+        if (client != null && "group".equals(type)) {
+            client.setScreen(new PhoneChatImagePickerScreen(this, targetId));
+        }
+    }
+
+    private void openManageMembers() {
+        if (client != null) {
+            client.setScreen(new PhoneChatManageMembersScreen(this, targetId));
+        }
+    }
+
+    public boolean referencesGroup(String groupId) {
+        return "group".equals(type) && targetId.equals(groupId);
+    }
+
+    public Screen getChatHomeScreen() {
+        return parent;
     }
 
     private void sendMessage() {
@@ -129,11 +133,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     }
 
     private int getMessagesBottom() {
-        // If the Manage Members button is visible, reserve extra vertical space so the button doesn't obscure messages.
-        if ("group".equals(type) && manageButtonVisible) {
-            return contentY + contentHeight - s(56);
-        }
-        return contentY + contentHeight - s(30);
+        return contentY + contentHeight - ("group".equals(type) ? s(52) : s(26));
     }
 
     private int getLineStep() {
@@ -153,30 +153,56 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
 
         int avatarSize = s(12);
         int bubblePaddingX = s(6);
-        int bubblePaddingY = s(4);
+        int bubblePaddingY = s(5);
         int bubbleGap = s(8);
-        int maxBubbleWidth = Math.max(s(32), contentWidth - avatarSize - s(22));
+        int maxBubbleWidth = Math.max(s(34), contentWidth - avatarSize - s(24));
         int innerWrapWidth = Math.max(s(20), maxBubbleWidth - bubblePaddingX * 2);
+        int maxImageWidth = Math.max(s(28), innerWrapWidth);
+        int maxImageHeight = s(78);
         int lineStep = getLineStep();
         int smallTextHeight = Math.max(1, Math.round(textRenderer.fontHeight * 0.75F));
-        var messages = PhoneChatClient.getMessages(type, targetId);
         String selfUuid = PhoneChatClient.getSelfUuid();
 
-        for (PhoneChatClient.ChatMessageData message : messages) {
+        for (PhoneChatClient.ChatMessageData message : PhoneChatClient.getMessages(type, targetId)) {
             boolean self = !selfUuid.isBlank() && selfUuid.equals(message.senderUuid());
+            boolean imageMessage = message.isImage() && message.imageId() != null && !message.imageId().isBlank();
             Text content = parseComponentOrLiteral(message.content());
-            List<OrderedText> wrappedLines = textRenderer.wrapLines(content, innerWrapWidth);
+            List<OrderedText> wrappedLines = content.getString().isBlank() ? List.of() : textRenderer.wrapLines(content, innerWrapWidth);
+
             int textWidth = s(20);
             for (OrderedText wrappedLine : wrappedLines) {
                 textWidth = Math.max(textWidth, textRenderer.getWidth(wrappedLine));
             }
 
-            int bubbleWidth = Math.max(s(30), Math.min(maxBubbleWidth, textWidth + bubblePaddingX * 2));
-            int bubbleHeight = Math.max(avatarSize, wrappedLines.size() * lineStep + bubblePaddingY * 2);
+            int imageWidth = 0;
+            int imageHeight = 0;
+            if (imageMessage) {
+                int sourceWidth = message.imageWidth() > 0 ? message.imageWidth() : 4;
+                int sourceHeight = message.imageHeight() > 0 ? message.imageHeight() : 3;
+                int[] fittedSize = ChatUiUtil.fitSize(sourceWidth, sourceHeight, maxImageWidth, maxImageHeight);
+                imageWidth = fittedSize[0];
+                imageHeight = fittedSize[1];
+            }
+
+            int bubbleWidth = imageMessage
+                    ? Math.max(textWidth + bubblePaddingX * 2, imageWidth + bubblePaddingX * 2)
+                    : Math.max(s(30), Math.min(maxBubbleWidth, textWidth + bubblePaddingX * 2));
+            bubbleWidth = Math.min(maxBubbleWidth, bubbleWidth);
+
+            int bubbleHeight = bubblePaddingY * 2;
+            if (imageMessage) {
+                bubbleHeight += imageHeight;
+                if (!wrappedLines.isEmpty()) {
+                    bubbleHeight += s(4) + wrappedLines.size() * lineStep;
+                }
+            } else {
+                bubbleHeight += Math.max(avatarSize - bubblePaddingY * 2, wrappedLines.size() * lineStep);
+            }
+            bubbleHeight = Math.max(avatarSize, bubbleHeight);
+
             String senderId = resolveSenderId(message, self);
             int labelWidth = getSmallTextWidth(senderId);
-            int labelY = 0;
-            int bubbleY = labelY + smallTextHeight + s(2);
+            int bubbleY = smallTextHeight + s(2);
             int totalHeight = bubbleY + bubbleHeight + bubbleGap;
             int avatarX;
             int bubbleX;
@@ -191,7 +217,10 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
                 labelX = bubbleX;
             }
 
-            cachedLayouts.add(new MessageLayout(message, self, senderId, wrappedLines, avatarX, labelX, bubbleX, bubbleY, bubbleWidth, bubbleHeight, totalHeight));
+            int imageX = bubbleX + bubblePaddingX;
+            int imageY = bubblePaddingY;
+            cachedLayouts.add(new MessageLayout(message, self, senderId, wrappedLines, avatarX, labelX, bubbleX, bubbleY,
+                    bubbleWidth, bubbleHeight, totalHeight, imageMessage, imageX, imageY, imageWidth, imageHeight));
             cachedTotalHeight += totalHeight;
         }
 
@@ -201,6 +230,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     private void invalidateMessageLayouts() {
         messageLayoutsDirty = true;
         cachedTotalHeight = 0;
+        imageTargets.clear();
     }
 
     private Text parseComponentOrLiteral(String raw) {
@@ -232,12 +262,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
     }
 
     private void clampMessageScroll() {
-        int maxScroll = getMaxMessageScroll();
-        if (messageScrollOffset < 0) {
-            messageScrollOffset = 0;
-        } else if (messageScrollOffset > maxScroll) {
-            messageScrollOffset = maxScroll;
-        }
+        messageScrollOffset = Math.max(0, Math.min(messageScrollOffset, getMaxMessageScroll()));
     }
 
     @Override
@@ -249,17 +274,18 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         int bottom = getMessagesBottom();
         int lineStep = getLineStep();
         int bubblePaddingX = s(6);
-        int bubblePaddingY = s(4);
-        int avatarSize = s(12);
+        int bubblePaddingY = s(5);
+
+        imageTargets.clear();
         List<MessageLayout> layouts = getMessageLayouts();
-        int totalHeight = cachedTotalHeight;
         int visibleHeight = Math.max(1, bottom - top);
-        int maxScroll = Math.max(0, totalHeight - visibleHeight);
+        int maxScroll = Math.max(0, cachedTotalHeight - visibleHeight);
         if (messageScrollOffset > maxScroll) {
             messageScrollOffset = maxScroll;
         }
 
-        int currentY = bottom - totalHeight + messageScrollOffset;
+        context.enableScissor(contentX, top, contentX + contentWidth, bottom);
+        int currentY = bottom - cachedTotalHeight + messageScrollOffset;
         for (MessageLayout layout : layouts) {
             int blockTop = currentY;
             int blockBottom = blockTop + layout.totalHeight();
@@ -268,21 +294,79 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
                 continue;
             }
 
-            int bubbleColor = layout.self() ? 0xCC2A8FC1 : 0x66313C4B;
-            int avatarY = blockTop + layout.bubbleY();
             int bubbleY = blockTop + layout.bubbleY();
-            drawSmallText(context, layout.senderId(), layout.labelX(), blockTop, 0xFFB7C7D8);
-            drawAvatar(context, layout.message().senderUuid(), layout.self(), layout.avatarX(), avatarY, avatarSize, layout.self() ? 0xFF6EA8FF : 0xFF4D7C9F);
-            RoundedRectRenderer.fillRoundedRect(context, layout.bubbleX(), bubbleY, layout.bubbleWidth(), layout.bubbleHeight(), s(8), bubbleColor);
+            int bubbleFill = layout.self()
+                    ? (isLightMode() ? 0xA6E3F2FB : 0x66307FA7)
+                    : (isLightMode() ? 0x7ADDE6EF : 0x33203042);
+            int bubbleBorder = layout.self() ? themeAccent() : themeBorderBright();
+
+            drawSmallText(context, layout.senderId(), layout.labelX(), blockTop, layout.self() ? themeAccent() : themeTextDim());
+            GalleryAvatarRenderer.drawAvatar(context, layout.message().senderUuid(), layout.avatarX(), bubbleY, s(12), layout.self() ? themeAccent() : themeBorderBright());
+            ChatUiUtil.drawAngularFrame(context, layout.bubbleX(), bubbleY, layout.bubbleWidth(), layout.bubbleHeight(), s(4), bubbleFill, bubbleBorder);
 
             int textY = bubbleY + bubblePaddingY;
+            if (layout.imageMessage()) {
+                renderImageBubble(context, layout, bubbleBorder, bubbleY);
+                textY = bubbleY + bubblePaddingY + layout.imageHeight();
+                if (!layout.lines().isEmpty()) {
+                    textY += s(4);
+                }
+            }
+
             for (OrderedText wrappedLine : layout.lines()) {
-                context.drawTextWithShadow(textRenderer, wrappedLine, layout.bubbleX() + bubblePaddingX, textY, 0xFFF2F5F8);
+                context.drawText(textRenderer, wrappedLine, layout.bubbleX() + bubblePaddingX, textY, themeText(), false);
                 textY += lineStep;
             }
 
             currentY += layout.totalHeight();
         }
+        context.disableScissor();
+
+        renderPhoneScrollbar(context, top, bottom, Math.max(bottom - top, cachedTotalHeight), messageScrollOffset);
+    }
+
+    private void renderImageBubble(DrawContext context, MessageLayout layout, int borderColor, int bubbleY) {
+        int drawX = layout.imageX();
+        int drawY = bubbleY + layout.imageY();
+        int drawWidth = layout.imageWidth();
+        int drawHeight = layout.imageHeight();
+        Identifier textureId = null;
+        Path thumbnailPath = ChatImageClient.getThumbnailSourcePath(layout.message().imageId());
+        if (thumbnailPath != null && Files.exists(thumbnailPath)) {
+            PhotoManager.CachedImage cachedImage = PhotoManager.getThumbnailImage(thumbnailPath, Math.max(drawWidth, drawHeight));
+            if (cachedImage.path() != null) {
+                textureId = PhotoManager.getOrLoadTexture(cachedImage.path());
+            }
+        }
+
+        if (textureId != null) {
+            context.drawTexturedQuad(textureId, drawX, drawY, drawX + drawWidth, drawY + drawHeight, 0.0F, 1.0F, 0.0F, 1.0F);
+        } else {
+            ChatUiUtil.drawAngularFrame(context, drawX, drawY, drawWidth, drawHeight, s(3), isLightMode() ? 0x55E8EDF4 : 0x33091320, borderColor);
+            drawScaledCenteredText(context, Text.translatable("phone.tzz_mod.chat.image_loading"), drawX + drawWidth / 2, drawY + drawHeight / 2 - scaledFontHeight() / 2, themeTextDim());
+        }
+        ChatUiUtil.drawAngularFrame(context, drawX - 1, drawY - 1, drawWidth + 2, drawHeight + 2, s(3), 0x00000000, borderColor);
+        imageTargets.add(new ImageTarget(layout.message(), drawX, drawY, drawWidth, drawHeight));
+    }
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        if (super.mouseClicked(click, doubleClick)) {
+            return true;
+        }
+
+        int mouseX = (int) click.x();
+        int mouseY = (int) click.y();
+        for (ImageTarget target : imageTargets) {
+            if (mouseX >= target.x() && mouseX <= target.x() + target.width()
+                    && mouseY >= target.y() && mouseY <= target.y() + target.height()) {
+                if (client != null) {
+                    client.setScreen(new PhoneChatImageViewScreen(this, target.message()));
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -319,7 +403,7 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
             return message.senderName();
         }
         if (message.senderUuid() == null || message.senderUuid().isBlank()) {
-            return "未知ID";
+            return Text.translatable("phone.tzz_mod.unknown").getString();
         }
         return message.senderUuid().length() > 8 ? message.senderUuid().substring(0, 8) : message.senderUuid();
     }
@@ -332,92 +416,8 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
         float scale = 0.75F;
         context.getMatrices().pushMatrix();
         context.getMatrices().scale(scale, scale);
-        context.drawTextWithShadow(textRenderer, Text.literal(text), Math.round(x / scale), Math.round(y / scale), color);
+        context.drawText(textRenderer, Text.literal(text), Math.round(x / scale), Math.round(y / scale), color, false);
         context.getMatrices().popMatrix();
-    }
-
-    private void drawAvatar(DrawContext context, String senderUuid, boolean self, int x, int y, int size, int fallbackColor) {
-        Identifier skinTexture = getCachedSkinTexture(senderUuid, self);
-        context.fill(x, y, x + size, y + size, 0x66000000);
-        if (skinTexture == null) {
-            drawAvatarFallback(context, x, y, size, fallbackColor);
-            return;
-        }
-        drawSkinRegion(context, skinTexture, x, y, size, FACE_U, FACE_V);
-        drawSkinRegion(context, skinTexture, x, y, size, HAT_U, HAT_V);
-    }
-
-    private Identifier getCachedSkinTexture(String senderUuid, boolean self) {
-        if (self) {
-            return resolveSkinTexture(senderUuid, true);
-        }
-        if (senderUuid == null || senderUuid.isBlank()) {
-            return null;
-        }
-
-        Identifier cached = skinTextureCache.get(senderUuid);
-        if (cached != null) {
-            return cached;
-        }
-
-        Identifier resolved = resolveSkinTexture(senderUuid, false);
-        if (resolved != null) {
-            skinTextureCache.put(senderUuid, resolved);
-        }
-        return resolved;
-    }
-
-    private Identifier resolveSkinTexture(String senderUuid, boolean self) {
-        if (client == null) {
-            return null;
-        }
-        if (self && client.player != null) {
-            SkinTextures skin = client.player.getSkin();
-            return skin.body().texturePath();
-        }
-        if (client.getNetworkHandler() == null || senderUuid == null || senderUuid.isBlank()) {
-            return null;
-        }
-        try {
-            var networkHandler = client.getNetworkHandler();
-            if (networkHandler == null) {
-                return null;
-            }
-            var entry = networkHandler.getPlayerListEntry(UUID.fromString(senderUuid));
-            if (entry == null) {
-                return null;
-            }
-            SkinTextures skin = entry.getSkinTextures();
-            return skin.body().texturePath();
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private void drawAvatarFallback(DrawContext context, int x, int y, int size, int fallbackColor) {
-        context.fill(x, y, x + size, y + size, fallbackColor);
-        String initial = "?";
-        int textX = x + size / 2 - textRenderer.getWidth(initial) / 2;
-        int textY = y + size / 2 - textRenderer.fontHeight / 2;
-        context.drawTextWithShadow(textRenderer, initial, textX, textY, 0xFFFFFFFF);
-    }
-
-    private void drawSkinRegion(DrawContext context, Identifier texture, int x, int y, int size, int u, int v) {
-        context.drawTexture(
-                RenderPipelines.GUI_TEXTURED,
-                texture,
-                x,
-                y,
-                (float) u,
-                (float) v,
-                size,
-                size,
-                8,
-                8,
-                SKIN_TEXTURE_SIZE,
-                SKIN_TEXTURE_SIZE,
-                -1
-        );
     }
 
     private record MessageLayout(
@@ -431,7 +431,15 @@ public class PhoneChatConversationScreen extends AbstractPhoneScreen {
             int bubbleY,
             int bubbleWidth,
             int bubbleHeight,
-            int totalHeight
+            int totalHeight,
+            boolean imageMessage,
+            int imageX,
+            int imageY,
+            int imageWidth,
+            int imageHeight
     ) {
+    }
+
+    private record ImageTarget(PhoneChatClient.ChatMessageData message, int x, int y, int width, int height) {
     }
 }

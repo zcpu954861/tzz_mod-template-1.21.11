@@ -52,6 +52,12 @@ public class PhoneSettingsAppScreen extends AbstractPhoneScreen {
             value -> PhoneSettingsClient.setAnimationsEnabled(Boolean.TRUE.equals(value))
         ));
         rows.add(new ToggleRow(
+            Text.translatable("phone.tzz_mod.settings.gallery_performance_mode"),
+            Text.translatable("phone.tzz_mod.settings.gallery_performance_mode.subtitle"),
+            PhoneSettingsClient::isGalleryPerformanceModeEnabled,
+            value -> PhoneSettingsClient.setGalleryPerformanceModeEnabled(Boolean.TRUE.equals(value))
+        ));
+        rows.add(new ToggleRow(
                 Text.translatable("phone.tzz_mod.settings.alert_mode"),
                 Text.translatable("phone.tzz_mod.settings.alert_mode.subtitle"),
                 PhoneSettingsClient::isAlertModeEnabled,

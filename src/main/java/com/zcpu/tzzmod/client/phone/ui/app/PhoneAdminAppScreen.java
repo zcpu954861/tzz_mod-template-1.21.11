@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.client.phone.ui.app;
 import com.zcpu.tzzmod.client.ForcedHudClient;
 import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.phone.ui.AbstractPhoneScreen;
+import com.zcpu.tzzmod.client.photo.GalleryClient;
 import com.zcpu.tzzmod.network.AdminModeC2SPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.Click;
@@ -35,8 +36,17 @@ public class PhoneAdminAppScreen extends AbstractPhoneScreen {
                 Text.translatable("phone.tzz_mod.admin.record_mode.subtitle"),
                 ForcedHudClient::isForceShowHead,
                 enabled -> {
-                    ClientPlayNetworking.send(new AdminModeC2SPayload(enabled));
+                    ClientPlayNetworking.send(new AdminModeC2SPayload("recording", enabled));
                     ForcedHudClient.setServerEnforcedHud(enabled);
+                }
+        );
+        addRow(
+                Text.translatable("phone.tzz_mod.admin.gallery_enabled"),
+                Text.translatable("phone.tzz_mod.admin.gallery_enabled.subtitle"),
+                GalleryClient::isAdminGalleryEnabled,
+                enabled -> {
+                    ClientPlayNetworking.send(new AdminModeC2SPayload("gallery_enabled", enabled));
+                    GalleryClient.setAdminGalleryEnabled(enabled);
                 }
         );
         addRow(

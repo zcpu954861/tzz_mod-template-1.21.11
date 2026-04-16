@@ -42,7 +42,8 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
         addPhonePrimaryButton(Text.translatable("phone.tzz_mod.chat.create"), contentX + contentWidth - s(82), contentY + contentHeight - s(24), s(82), s(20), button -> createGroup());
 
         // Compute positions so labels are always above fields with enough gap
-        int fieldHeight = s(20);
+        int fieldHeight = textRenderer.fontHeight;
+        int rowHeight = s(20);
         int verticalGapBetweenFields = s(12);
         // extra offset to move members label+field further down to avoid overlap with other UI
         int extraMembersOffset = s(12);
@@ -96,15 +97,14 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
             selectedMembers.put(c.uuid(), c.uuid().equals(selfUuid));
         }
 
-        // reuse fieldHeight for button height
         int rowGap = s(3);
         for (int i = 0; i < contactsList.size(); i++) {
             PhoneChatClient.ContactData contact = contactsList.get(i);
-            int y = listStartY + i * (fieldHeight + rowGap);
+            int y = listStartY + i * (rowHeight + rowGap);
             final String uuid = contact.uuid();
             final boolean isSelf = uuid.equals(selfUuid);
             // create a transparent phone-styled button that captures clicks for the row
-            ButtonWidget btn = addPhoneButton(Text.empty(), contentX, y, contentWidth, fieldHeight,
+            ButtonWidget btn = addPhoneButton(Text.empty(), contentX, y, contentWidth, rowHeight,
                     PhoneButtonWidget.Variant.GHOST,
                     () -> false,
                     button -> {
@@ -143,7 +143,8 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
     protected void renderPhoneContent(DrawContext context, int mouseX, int mouseY, float delta) {
         drawPhoneTextCenteredFixed(context, Text.translatable("phone.tzz_mod.chat.create_group"), contentX + contentWidth / 2, contentY + s(8));
         // Draw labels relative to the fields so text never overlaps input
-        int fieldHeight = s(20);
+        int fieldHeight = textRenderer.fontHeight;
+        int rowHeight = s(20);
         int labelGap = s(8);
         int verticalGapBetweenFields = s(12);
         int extraMembersOffset = s(12);
@@ -167,21 +168,21 @@ public class PhoneChatCreateGroupScreen extends AbstractPhoneScreen {
 
         for (int i = 0; i < contactsList.size(); i++) {
             PhoneChatClient.ContactData contact = contactsList.get(i);
-            int y = listStartY + i * (fieldHeight + rowGap);
+            int y = listStartY + i * (rowHeight + rowGap);
             // draw player head avatar
-            int avatarSize = Math.max(4, fieldHeight - s(4));
+            int avatarSize = Math.max(s(10), rowHeight - s(4));
             int avatarX = contentX + s(4);
-            int avatarY = y + (fieldHeight - avatarSize) / 2;
+            int avatarY = y + (rowHeight - avatarSize) / 2;
             drawPlayerHead(context, contact.uuid(), avatarX, avatarY, avatarSize);
             // draw name left-aligned after avatar and trim if too long so it doesn't overlap the checkbox
             int nameStartX = avatarX + avatarSize + s(4);
             int maxNameWidth = contentX + contentWidth - nameStartX - (boxPadding + boxSize + s(4));
             String displayName = textRenderer.trimToWidth(contact.name(), Math.max(1, maxNameWidth));
-            drawScaledText(context, Text.literal(displayName), nameStartX, y + Math.max(0, (fieldHeight - textRenderer.fontHeight) / 2), themeText());
+            drawScaledText(context, Text.literal(displayName), nameStartX, y + Math.max(0, (rowHeight - textRenderer.fontHeight) / 2), themeText());
 
             // compute checkbox position
             int boxX = contentX + contentWidth - boxPadding - boxSize;
-            int boxY = y + Math.max(0, (fieldHeight - boxSize) / 2);
+            int boxY = y + Math.max(0, (rowHeight - boxSize) / 2);
 
             boolean selected = selectedMembers.getOrDefault(contact.uuid(), false);
             if (selected) {
