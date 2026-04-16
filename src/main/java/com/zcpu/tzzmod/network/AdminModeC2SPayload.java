@@ -13,14 +13,21 @@ public record AdminModeC2SPayload(String key, boolean value) implements CustomPa
     public static final CustomPayload.@NonNull Id<AdminModeC2SPayload> ID =
         NullSafety.requireNonNull(new CustomPayload.Id<>(Identifier.of(Tzz_mod.MOD_ID, "admin_mode_c2s")));
 
-    public static final @NonNull PacketCodec<RegistryByteBuf, AdminModeC2SPayload> CODEC =
-        NullSafety.requireNonNull(PacketCodec.tuple(
+    public static final @NonNull PacketCodec<RegistryByteBuf, AdminModeC2SPayload> CODEC = createCodec();
+
+    private static @NonNull PacketCodec<RegistryByteBuf, AdminModeC2SPayload> createCodec() {
+        return NullSafety.requireNonNull(PacketCodec.tuple(
             PacketCodecs.STRING,
             AdminModeC2SPayload::key,
             PacketCodecs.BOOLEAN,
             AdminModeC2SPayload::value,
-            AdminModeC2SPayload::new
+            AdminModeC2SPayload::create
         ));
+    }
+
+    private static AdminModeC2SPayload create(String key, Boolean value) {
+        return new AdminModeC2SPayload(key, NullSafety.requireNonNull(value).booleanValue());
+    }
 
     public static void register() {
         // registration is handled centrally by a payloads registry caller; kept for symmetry

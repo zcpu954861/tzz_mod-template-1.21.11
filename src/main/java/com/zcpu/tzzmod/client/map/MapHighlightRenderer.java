@@ -47,7 +47,6 @@ public final class MapHighlightRenderer {
             if (world == null || player == null) return;
 
             VertexConsumerProvider consumers = context.consumers();
-            if (consumers == null) return;
 
             String dimensionId = world.getRegistryKey().getValue().toString();
 

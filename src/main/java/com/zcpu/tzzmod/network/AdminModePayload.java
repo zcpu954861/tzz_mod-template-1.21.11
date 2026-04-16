@@ -14,14 +14,24 @@ public record AdminModePayload(boolean recording, boolean galleryEnabled) implem
     public static final CustomPayload.@NonNull Id<AdminModePayload> ID =
         NullSafety.requireNonNull(new CustomPayload.Id<>(Identifier.of(Tzz_mod.MOD_ID, "admin_mode_s2c")));
 
-    public static final @NonNull PacketCodec<RegistryByteBuf, AdminModePayload> CODEC =
-        NullSafety.requireNonNull(PacketCodec.tuple(
+    public static final @NonNull PacketCodec<RegistryByteBuf, AdminModePayload> CODEC = createCodec();
+
+    private static @NonNull PacketCodec<RegistryByteBuf, AdminModePayload> createCodec() {
+        return NullSafety.requireNonNull(PacketCodec.tuple(
             PacketCodecs.BOOLEAN,
             AdminModePayload::recording,
             PacketCodecs.BOOLEAN,
             AdminModePayload::galleryEnabled,
-            AdminModePayload::new
+            AdminModePayload::create
         ));
+    }
+
+    private static AdminModePayload create(Boolean recording, Boolean galleryEnabled) {
+        return new AdminModePayload(
+            NullSafety.requireNonNull(recording).booleanValue(),
+            NullSafety.requireNonNull(galleryEnabled).booleanValue()
+        );
+    }
 
     public static void register() {
         PayloadTypeRegistry.playS2C().register(ID, CODEC);

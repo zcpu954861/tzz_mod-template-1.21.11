@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.config.PhotoSpeedConfig;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.WorldSavePath;
 
@@ -49,7 +50,7 @@ public class GalleryConfig {
         if (Files.exists(path)) {
             try {
                 String json = Files.readString(path, StandardCharsets.UTF_8);
-                GalleryConfig config = GSON.fromJson(json, GalleryConfig.class);
+                GalleryConfig config = JsonNullability.fromJsonNullable(GSON, json, GalleryConfig.class);
                 if (config != null) return config;
             } catch (Exception e) {
                 Tzz_mod.LOGGER.warn("Failed to read gallery config: {}", e.getMessage());

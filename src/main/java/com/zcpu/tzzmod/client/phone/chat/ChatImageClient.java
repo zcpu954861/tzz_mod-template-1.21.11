@@ -140,7 +140,7 @@ public final class ChatImageClient {
             }
 
             Path cachePath = getThumbCacheDir().resolve(imageId + ".png");
-            downloadSessions.put(key, new DownloadSession(imageId, true, cachePath, null, null));
+            downloadSessions.put(key, new DownloadSession(cachePath, null, null));
         }
 
         JsonObject body = new JsonObject();
@@ -194,7 +194,7 @@ public final class ChatImageClient {
             if (downloadSessions.containsKey(key)) {
                 return;
             }
-            downloadSessions.put(key, new DownloadSession(imageId, false, cachePath, progressCallback, completeCallback));
+            downloadSessions.put(key, new DownloadSession(cachePath, progressCallback, completeCallback));
         }
 
         JsonObject body = new JsonObject();
@@ -233,7 +233,19 @@ public final class ChatImageClient {
 
         String data = getString(body, "data");
         if (!data.isBlank()) {
-            byte[] bytes = Base64.getDecoder().decode(data);
+            byte[] bytes;
+            try {
+                bytes = Base64.getDecoder().decode(data);
+            } catch (IllegalArgumentException exception) {
+                pendingThumbnailRequests.remove(imageId);
+                synchronized (downloadSessions) {
+                    downloadSessions.remove(downloadKey(imageId, thumbnail));
+                }
+                if (session.completeCallback != null) {
+                    session.completeCallback.accept(null);
+                }
+                return;
+            }
             session.data.write(bytes, 0, bytes.length);
         }
 
@@ -441,18 +453,14 @@ public final class ChatImageClient {
     }
 
     private static final class DownloadSession {
-        private final String imageId;
-        private final boolean thumbnail;
         private final Path cachePath;
         private final Consumer<Float> progressCallback;
         private final Consumer<Path> completeCallback;
         private final ByteArrayOutputStream data = new ByteArrayOutputStream();
 
-        private DownloadSession(String imageId, boolean thumbnail, Path cachePath,
+        private DownloadSession(Path cachePath,
                                 Consumer<Float> progressCallback,
                                 Consumer<Path> completeCallback) {
-            this.imageId = imageId;
-            this.thumbnail = thumbnail;
             this.cachePath = cachePath;
             this.progressCallback = progressCallback;
             this.completeCallback = completeCallback;

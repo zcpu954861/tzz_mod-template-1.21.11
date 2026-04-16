@@ -335,8 +335,10 @@ public class GalleryImageViewScreen extends AbstractPhoneScreen {
     private boolean isCurrentPlayerUploader() {
         if (onlineEntry == null || onlineEntry.uploaderUuid() == null) return false;
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc == null || mc.player == null) return false;
-        return mc.player.getUuidAsString().equals(onlineEntry.uploaderUuid());
+        if (mc == null) return false;
+        var player = mc.player;
+        if (player == null) return false;
+        return player.getUuidAsString().equals(onlineEntry.uploaderUuid());
     }
 
     private boolean isMultiplayerContext() {

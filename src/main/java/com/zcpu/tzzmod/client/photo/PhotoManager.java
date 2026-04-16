@@ -75,14 +75,16 @@ public final class PhotoManager {
         if (client == null) return "unknown";
 
         // Multiplayer: use server address
-        if (client.getCurrentServerEntry() != null) {
-            String addr = client.getCurrentServerEntry().address;
+        var currentServerEntry = client.getCurrentServerEntry();
+        if (currentServerEntry != null) {
+            String addr = currentServerEntry.address;
             return sanitizeFileName(addr);
         }
 
         // Singleplayer: use world folder name
-        if (client.getServer() != null) {
-            Path worldRoot = client.getServer().getSavePath(net.minecraft.util.WorldSavePath.ROOT);
+        var server = client.getServer();
+        if (server != null) {
+            Path worldRoot = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT);
             Path worldName = worldRoot.getFileName();
             if (worldName != null) {
                 return sanitizeFileName(worldName.toString());
@@ -97,8 +99,11 @@ public final class PhotoManager {
      */
     public static String getServerIp() {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client != null && client.getCurrentServerEntry() != null) {
-            return sanitizeFileName(client.getCurrentServerEntry().address);
+        if (client != null) {
+            var currentServerEntry = client.getCurrentServerEntry();
+            if (currentServerEntry != null) {
+                return sanitizeFileName(currentServerEntry.address);
+            }
         }
         return "local";
     }

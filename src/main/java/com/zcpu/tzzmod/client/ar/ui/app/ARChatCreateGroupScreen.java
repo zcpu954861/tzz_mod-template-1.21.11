@@ -54,11 +54,12 @@ public class ARChatCreateGroupScreen extends AbstractARScreen {
                 contacts.addAll(PhoneChatClient.getContacts());
 
                 MinecraftClient minecraftClient = MinecraftClient.getInstance();
-                if (minecraftClient != null && minecraftClient.player != null) {
-                        selfUuid = minecraftClient.player.getUuidAsString();
+                var player = minecraftClient.player;
+                if (player != null) {
+                        selfUuid = player.getUuidAsString();
                         boolean hasSelf = contacts.stream().anyMatch(contact -> contact.uuid().equals(selfUuid));
                         if (!hasSelf) {
-                                contacts.add(new PhoneChatClient.ContactData(selfUuid, minecraftClient.player.getName().getString()));
+                                contacts.add(new PhoneChatClient.ContactData(selfUuid, player.getName().getString()));
                         }
                 }
 
@@ -91,7 +92,13 @@ public class ARChatCreateGroupScreen extends AbstractARScreen {
         }
 
         private int getListTop() {
-                return nameField.getY() + nameField.getHeight() + scaledFontHeight() + s(8);
+                TextFieldWidget field = nameField;
+                if (field == null) {
+                        int labelH = scaledFontHeight() + s(4);
+                        int fieldY = contentY + s(24) + labelH;
+                        return fieldY + textRenderer.fontHeight + scaledFontHeight() + s(8);
+                }
+                return field.getY() + field.getHeight() + scaledFontHeight() + s(8);
         }
 
         private int getListBottom() {

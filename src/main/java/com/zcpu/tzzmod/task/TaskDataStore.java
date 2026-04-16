@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.Reader;
@@ -250,7 +251,7 @@ public final class TaskDataStore {
                     Path meta = dir.resolve("_meta.json");
                     if (Files.exists(meta)) {
                         try (Reader reader = Files.newBufferedReader(meta, StandardCharsets.UTF_8)) {
-                            PersistedState metaState = GSON.fromJson(reader, PersistedState.class);
+                            PersistedState metaState = JsonNullability.fromJsonNullable(GSON, reader, PersistedState.class);
                             if (metaState != null) {
                                 state.currentLine = sanitizeLineName(metaState.currentLine);
                                 state.currentIndex = Math.max(0, metaState.currentIndex);
@@ -269,7 +270,7 @@ public final class TaskDataStore {
             // fallback to legacy single-file format; if exists, read and migrate
             if (Files.exists(legacy)) {
                 try (Reader reader = Files.newBufferedReader(legacy, StandardCharsets.UTF_8)) {
-                    PersistedState persisted = GSON.fromJson(reader, PersistedState.class);
+                    PersistedState persisted = JsonNullability.fromJsonNullable(GSON, reader, PersistedState.class);
                     state.apply(persisted);
                 }
 

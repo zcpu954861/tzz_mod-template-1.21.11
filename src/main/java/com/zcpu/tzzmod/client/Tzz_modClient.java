@@ -96,10 +96,11 @@ public class Tzz_modClient implements ClientModInitializer {
         BlockingCardConfiguratorClientAccess.setOpener(hand -> {
             try {
                 MinecraftClient client = MinecraftClient.getInstance();
-                if (client.player == null) {
+                var player = client.player;
+                if (player == null) {
                     return;
                 }
-                var stack = client.player.getStackInHand(hand);
+                var stack = player.getStackInHand(hand);
                 client.setScreen(new BlockingCardConfiguratorScreen(client.currentScreen, hand, BlockingCardConfiguratorState.read(stack)));
             } catch (Exception exception) {
                 Tzz_mod.LOGGER.error("Failed to open blocking card configurator", exception);
@@ -116,10 +117,11 @@ public class Tzz_modClient implements ClientModInitializer {
         PasswordCardClientAccess.setOpener(hand -> {
             try {
                 MinecraftClient client = MinecraftClient.getInstance();
-                if (client.player == null) {
+                var player = client.player;
+                if (player == null) {
                     return;
                 }
-                var stack = client.player.getStackInHand(hand);
+                var stack = player.getStackInHand(hand);
                 String initialCode = PasswordConfigCardItem.hasConfiguredPassword(stack)
                         ? PasswordConfigCardItem.getStoredPassword(stack)
                         : "";
@@ -172,12 +174,17 @@ public class Tzz_modClient implements ClientModInitializer {
         // AR headset keybind tick
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             CameraModeClient.tick(client);
-            while (arHeadsetKey.wasPressed()) {
-                if (client.player != null && client.currentScreen == null) {
+            KeyBinding headsetKey = arHeadsetKey;
+            if (headsetKey == null) {
+                return;
+            }
+            while (headsetKey.wasPressed()) {
+                var player = client.player;
+                if (player != null && client.currentScreen == null) {
                     boolean hasHeadset =
-                            client.player.getEquippedStack(EquipmentSlot.HEAD).isOf(ModItems.AR_HEADSET)
-                            || client.player.getStackInHand(Hand.MAIN_HAND).isOf(ModItems.AR_HEADSET)
-                            || client.player.getStackInHand(Hand.OFF_HAND).isOf(ModItems.AR_HEADSET);
+                            player.getEquippedStack(EquipmentSlot.HEAD).isOf(ModItems.AR_HEADSET)
+                            || player.getStackInHand(Hand.MAIN_HAND).isOf(ModItems.AR_HEADSET)
+                            || player.getStackInHand(Hand.OFF_HAND).isOf(ModItems.AR_HEADSET);
                     if (hasHeadset) {
                         ARClientAccess.openARScreen();
                     }

@@ -11,6 +11,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
+import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,10 +56,8 @@ public final class CommandSuggestionUtil {
             return builder.buildFuture();
         }
 
-        String lineName;
-        try {
-            lineName = context.getArgument(lineArgumentName, String.class);
-        } catch (IllegalArgumentException exception) {
+        String lineName = getOptionalStringArgument(context, lineArgumentName);
+        if (lineName == null) {
             return builder.buildFuture();
         }
 
@@ -140,6 +139,16 @@ public final class CommandSuggestionUtil {
             return player.getBlockPos();
         }
         return BlockPos.ofFloored(source.getPosition());
+    }
+
+    private static @Nullable String getOptionalStringArgument(CommandContext<ServerCommandSource> context, String argumentName) {
+        try {
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            Object argument = context.getArgument(argumentName, (Class) String.class);
+            return argument instanceof String value ? value : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private static int extract(Axis axis, BlockPos pos) {

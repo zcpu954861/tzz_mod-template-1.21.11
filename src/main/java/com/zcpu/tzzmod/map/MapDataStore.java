@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.map;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -294,7 +295,7 @@ public final class MapDataStore {
             Files.createDirectories(path.getParent());
             if (Files.exists(path)) {
                 try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-                    PersistedState persisted = GSON.fromJson(reader, PersistedState.class);
+                    PersistedState persisted = JsonNullability.fromJsonNullable(GSON, reader, PersistedState.class);
                     state.apply(persisted);
                     return state;
                 }

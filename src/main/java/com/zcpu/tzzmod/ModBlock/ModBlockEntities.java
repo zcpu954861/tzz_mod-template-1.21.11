@@ -27,7 +27,7 @@ public final class ModBlockEntities {
     private ModBlockEntities() {
     }
 
-        @SuppressWarnings({"unchecked", "null"})
+        @SuppressWarnings("unchecked")
         private static Registry<@NonNull BlockEntityType<?>> blockEntityTypeRegistry() {
                 return (Registry<@NonNull BlockEntityType<?>>) (Registry<?>) NullSafety.requireNonNull(Registries.BLOCK_ENTITY_TYPE);
         }

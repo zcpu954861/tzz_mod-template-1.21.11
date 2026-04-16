@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.WorldSavePath;
 
@@ -46,7 +47,7 @@ public final class PhotoSpeedConfig {
             PhotoSpeedConfig config = null;
             if (Files.exists(configPath)) {
                 try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
-                    config = GSON.fromJson(reader, PhotoSpeedConfig.class);
+                    config = JsonNullability.fromJsonNullable(GSON, reader, PhotoSpeedConfig.class);
                 }
             }
 

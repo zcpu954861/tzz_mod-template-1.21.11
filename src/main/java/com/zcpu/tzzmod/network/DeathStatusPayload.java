@@ -14,12 +14,19 @@ public record DeathStatusPayload(boolean hasDeath) implements CustomPayload {
     public static final CustomPayload.@NonNull Id<DeathStatusPayload> ID =
         NullSafety.requireNonNull(new CustomPayload.Id<>(Identifier.of(Tzz_mod.MOD_ID, "death_status")));
 
-    public static final @NonNull PacketCodec<RegistryByteBuf, DeathStatusPayload> CODEC =
-        NullSafety.requireNonNull(PacketCodec.tuple(
+    public static final @NonNull PacketCodec<RegistryByteBuf, DeathStatusPayload> CODEC = createCodec();
+
+    private static @NonNull PacketCodec<RegistryByteBuf, DeathStatusPayload> createCodec() {
+        return NullSafety.requireNonNull(PacketCodec.tuple(
             PacketCodecs.BOOLEAN,
             DeathStatusPayload::hasDeath,
-            value -> new DeathStatusPayload(NullSafety.requireNonNull(value).booleanValue())
+            DeathStatusPayload::create
         ));
+    }
+
+    private static DeathStatusPayload create(Boolean hasDeath) {
+        return new DeathStatusPayload(NullSafety.requireNonNull(hasDeath).booleanValue());
+    }
 
     public static void register() {
         PayloadTypeRegistry.playS2C().register(ID, CODEC);

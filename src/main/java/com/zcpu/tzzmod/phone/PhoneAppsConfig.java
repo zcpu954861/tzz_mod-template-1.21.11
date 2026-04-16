@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.phone;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ public final class PhoneAppsConfig {
             Files.createDirectories(configPath.getParent());
             if (Files.exists(configPath)) {
                 try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
-                    PhoneAppsConfig loaded = GSON.fromJson(reader, PhoneAppsConfig.class);
+                    PhoneAppsConfig loaded = JsonNullability.fromJsonNullable(GSON, reader, PhoneAppsConfig.class);
                     if (loaded != null) {
                         loaded.sanitize();
                         return loaded;
@@ -76,15 +77,19 @@ public final class PhoneAppsConfig {
         if (apps == null) apps = new LinkedHashMap<>();
         // sanitize values to accepted set {"true","false","op"}
         apps.replaceAll((k, v) -> {
-            if (v == null) return "true";
+            if (v == null) return defaultValueFor(k);
             String s = v.trim().toLowerCase();
             return switch (s) {
                 case "true" -> "true";
                 case "false" -> "false";
                 case "op" -> "op";
-                default -> "true";
+                default -> defaultValueFor(k);
             };
         });
+    }
+
+    private static String defaultValueFor(String appKey) {
+        return "admin".equals(appKey) ? "op" : "true";
     }
 }
 

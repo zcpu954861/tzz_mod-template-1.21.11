@@ -38,6 +38,12 @@ public final class PhoneChatServer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> sendAppState(server, handler.getPlayer()))
         );
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            ImageUploadSession session = imageUploads.remove(handler.getPlayer().getUuid());
+            if (session != null) {
+                session.close();
+            }
+        });
 
         ServerPlayNetworking.registerGlobalReceiver(PhoneChatC2SPayload.ID, (payload, context) ->
                 context.server().execute(() -> handlePayload(context.server(), context.player(), payload))
@@ -202,7 +208,15 @@ public final class PhoneChatServer {
             return;
         }
 
-        byte[] chunk = Base64.getDecoder().decode(encoded);
+        byte[] chunk;
+        try {
+            chunk = Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException exception) {
+            imageUploads.remove(player.getUuid());
+            session.close();
+            sendImageError(player, "Invalid chat image chunk.", session.imageId, false, true);
+            return;
+        }
         if (session.receivedBytes + chunk.length > session.totalSize) {
             imageUploads.remove(player.getUuid());
             session.close();
@@ -641,8 +655,6 @@ public final class PhoneChatServer {
         private final String targetId;
         private final String imageId;
         private final int totalSize;
-        private final int imageWidth;
-        private final int imageHeight;
         private final ByteArrayOutputStream data = new ByteArrayOutputStream();
         private final SharedImageTransferBudget.TransferLease transferLease;
         private int receivedBytes;
@@ -654,8 +666,6 @@ public final class PhoneChatServer {
             this.targetId = targetId;
             this.imageId = imageId;
             this.totalSize = totalSize;
-            this.imageWidth = imageWidth;
-            this.imageHeight = imageHeight;
             this.transferLease = transferLease;
         }
 

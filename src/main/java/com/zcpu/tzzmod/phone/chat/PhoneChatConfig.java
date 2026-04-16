@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.config.PhotoSpeedConfig;
+import com.zcpu.tzzmod.util.JsonNullability;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ public final class PhoneChatConfig {
             PhoneChatConfig config = null;
             if (Files.exists(configPath)) {
                 try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
-                    config = GSON.fromJson(reader, PhoneChatConfig.class);
+                    config = JsonNullability.fromJsonNullable(GSON, reader, PhoneChatConfig.class);
                 }
             }
 

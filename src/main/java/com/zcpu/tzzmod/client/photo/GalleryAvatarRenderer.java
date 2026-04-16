@@ -69,11 +69,13 @@ public final class GalleryAvatarRenderer {
             UUID uuid = parseUuid(uploaderUuid);
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
-                if (client.player != null && client.player.getUuid().equals(uuid)) {
-                    return client.player.getSkin().body().texturePath();
+                var player = client.player;
+                if (player != null && player.getUuid().equals(uuid)) {
+                    return player.getSkin().body().texturePath();
                 }
-                if (client.getNetworkHandler() != null) {
-                    var entry = client.getNetworkHandler().getPlayerListEntry(uuid);
+                var networkHandler = client.getNetworkHandler();
+                if (networkHandler != null) {
+                    var entry = networkHandler.getPlayerListEntry(uuid);
                     if (entry != null) {
                         SkinTextures skin = entry.getSkinTextures();
                         return skin.body().texturePath();

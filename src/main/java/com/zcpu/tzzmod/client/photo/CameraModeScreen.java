@@ -1,8 +1,7 @@
 package com.zcpu.tzzmod.client.photo;
 
-import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import com.zcpu.tzzmod.mixin.KeyBindingAccessor;
-import net.minecraft.client.MinecraftClient;
+import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.Click;
@@ -28,7 +27,6 @@ import org.lwjgl.glfw.GLFW;
  * background darkening and blur effects.
  */
 public class CameraModeScreen extends Screen {
-    private final Screen parentScreen;
     private boolean captureNextFrame = false;
     private boolean captured = false;
     private int frameColor;
@@ -42,7 +40,6 @@ public class CameraModeScreen extends Screen {
 
     public CameraModeScreen(Screen parent) {
         super(Text.empty());
-        this.parentScreen = parent;
     }
 
     @Override
@@ -56,7 +53,6 @@ public class CameraModeScreen extends Screen {
         // Initialize rightMouseWasDown to true so that if RMB is already held
         // when the screen opens, we don't immediately trigger capture.
         rightMouseWasDown = true;
-        System.out.println("[TZZ Camera] CameraModeScreen.init() — width=" + width + " height=" + height);
     }
 
     @Override
@@ -86,7 +82,6 @@ public class CameraModeScreen extends Screen {
 
     @Override
     public void removed() {
-        System.out.println("[TZZ Camera] CameraModeScreen.removed() — ticksOpen=" + ticksOpen);
         if (client != null) {
             client.options.hudHidden = previousHudHidden;
             client.options.forwardKey.setPressed(false);

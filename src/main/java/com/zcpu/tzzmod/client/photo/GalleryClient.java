@@ -177,7 +177,7 @@ public final class GalleryClient {
         }
 
         String downloadKey = downloadKey(photoId, false);
-        DownloadSession session = new DownloadSession(photoId, false, cachePath, progressCallback, completeCallback);
+        DownloadSession session = new DownloadSession(cachePath, progressCallback, completeCallback);
         downloadSessions.put(downloadKey, session);
 
         JsonObject body = new JsonObject();
@@ -269,7 +269,17 @@ public final class GalleryClient {
 
         String base64 = body.has("data") ? body.get("data").getAsString() : "";
         if (!base64.isEmpty()) {
-            byte[] chunk = Base64.getDecoder().decode(base64);
+            byte[] chunk;
+            try {
+                chunk = Base64.getDecoder().decode(base64);
+            } catch (IllegalArgumentException exception) {
+                pendingThumbnailRequests.remove(photoId);
+                DownloadSession failedSession = downloadSessions.remove(downloadKey(photoId, thumbnail));
+                if (failedSession != null && failedSession.completeCallback != null) {
+                    failedSession.completeCallback.accept(null);
+                }
+                return;
+            }
             session.data.write(chunk, 0, chunk.length);
         }
 
@@ -450,7 +460,7 @@ public final class GalleryClient {
             return;
         }
 
-        downloadSessions.put(downloadKey, new DownloadSession(photoId, true, cachePath, null, null));
+        downloadSessions.put(downloadKey, new DownloadSession(cachePath, null, null));
 
         JsonObject body = new JsonObject();
         body.addProperty("photoId", photoId);
@@ -541,16 +551,12 @@ public final class GalleryClient {
     ) {}
 
     private static class DownloadSession {
-        final String photoId;
-        final boolean thumbnail;
         final Path cachePath;
         final Consumer<Float> progressCallback;
         final Consumer<Path> completeCallback;
         final ByteArrayOutputStream data = new ByteArrayOutputStream();
 
-        DownloadSession(String photoId, boolean thumbnail, Path cachePath, Consumer<Float> progressCallback, Consumer<Path> completeCallback) {
-            this.photoId = photoId;
-            this.thumbnail = thumbnail;
+        DownloadSession(Path cachePath, Consumer<Float> progressCallback, Consumer<Path> completeCallback) {
             this.cachePath = cachePath;
             this.progressCallback = progressCallback;
             this.completeCallback = completeCallback;
