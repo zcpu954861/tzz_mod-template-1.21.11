@@ -26,6 +26,7 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
     private int imgW = 1, imgH = 1;
     private Identifier textureId;
     private Path renderedPhotoPath;
+    private Path currentPhotoPath;
 
     private boolean uploading = false;
     private float uploadProgress = 0f;
@@ -42,6 +43,7 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
         this.metadata = metadata;
         this.isOnlineMode = isOnlineMode;
         this.onlineEntry = null;
+        this.currentPhotoPath = photoPath;
     }
 
     public ARGalleryImageViewScreen(Screen parent, GalleryClient.OnlinePhotoEntry onlineEntry, boolean isOnlineMode) {
@@ -50,6 +52,7 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
         this.isOnlineMode = isOnlineMode;
         this.photoPath = onlineEntry.localCachePath();
         this.metadata = onlineEntry.metadata();
+        this.currentPhotoPath = this.photoPath;
     }
 
     @Override
@@ -66,29 +69,45 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
         boolean isMultiplayer = MinecraftClient.getInstance() != null
                 && MinecraftClient.getInstance().getCurrentServerEntry() != null;
         boolean canUpload = !isOnlineMode && isMultiplayer && GalleryClient.isOnlineGalleryEnabled();
+        boolean canDeleteOnline = isOnlineMode && onlineEntry != null && (isCurrentPlayerUploader() || PhoneChatClient.isOp());
+        boolean isOp = PhoneChatClient.isOp();
 
+        int actionCount = 0;
+        if (!isOnlineMode || canDeleteOnline) {
+            actionCount++;
+        }
         if (canUpload) {
-            int btnW = s(80);
-            addARGhostButton(Text.translatable("phone.tzz_mod.gallery.upload"),
-                    contentX + contentWidth / 2 - btnW / 2,
-                    contentY + contentHeight - s(18), btnW, s(14),
-                    button -> startUpload());
+            actionCount++;
         }
 
-        if (isOnlineMode && onlineEntry != null) {
-            boolean isUploader = isCurrentPlayerUploader();
-            boolean isOp = PhoneChatClient.isOp();
-            if (isUploader || isOp) {
-                int btnW = s(80);
-                int btnX = contentX + contentWidth / 2 - btnW / 2;
+        if (actionCount > 0) {
+            int gap = s(6);
+            int buttonWidth = Math.max(s(56), Math.min(s(84), (contentWidth - gap * Math.max(0, actionCount - 1)) / actionCount));
+            int totalWidth = actionCount * buttonWidth + Math.max(0, actionCount - 1) * gap;
+            int buttonX = contentX + (contentWidth - totalWidth) / 2;
+            int buttonY = contentY + contentHeight - s(18);
+
+            if (!isOnlineMode) {
+                addARGhostButton(Text.translatable("phone.tzz_mod.gallery.delete"),
+                        buttonX, buttonY, buttonWidth, s(14),
+                        button -> deleteLocalPhoto());
+                buttonX += buttonWidth + gap;
+            } else if (canDeleteOnline) {
                 addARGhostButton(isOp
                                 ? Text.translatable("phone.tzz_mod.gallery.force_delete")
                                 : Text.translatable("phone.tzz_mod.gallery.cloud_delete"),
-                        btnX, contentY + contentHeight - s(18), btnW, s(14),
+                        buttonX, buttonY, buttonWidth, s(14),
                         button -> {
                             GalleryClient.deleteOnlinePhoto(onlineEntry.photoId(), isOp);
                             close();
                         });
+                buttonX += buttonWidth + gap;
+            }
+
+            if (canUpload) {
+                addARGhostButton(Text.translatable("phone.tzz_mod.gallery.upload"),
+                        buttonX, buttonY, buttonWidth, s(14),
+                        button -> startUpload());
             }
         }
     }
@@ -201,6 +220,7 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
     }
 
     private void loadDisplayImage(Path sourcePath) {
+        currentPhotoPath = sourcePath;
         PhotoManager.CachedImage cachedImage = PhotoManager.getViewerImage(
                 sourcePath,
                 Math.max(1, contentWidth - s(12)),
@@ -211,6 +231,13 @@ public class ARGalleryImageViewScreen extends AbstractARScreen {
         imgH = cachedImage.height();
         textureId = renderedPhotoPath != null ? PhotoManager.getOrLoadTexture(renderedPhotoPath) : null;
         downloaded = textureId != null;
+    }
+
+    private void deleteLocalPhoto() {
+        Path sourcePath = photoPath != null ? photoPath : currentPhotoPath;
+        if (sourcePath != null && PhotoManager.deletePhoto(sourcePath)) {
+            close();
+        }
     }
 
     private boolean isCurrentPlayerUploader() {

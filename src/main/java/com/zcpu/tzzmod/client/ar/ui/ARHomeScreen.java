@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
+import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -61,7 +62,7 @@ public class ARHomeScreen extends AbstractARScreen {
             AppSlot slot = new AppSlot(entry, x, y, iconSize, i);
             appSlots.add(slot);
 
-            addARGhostButton(Text.empty(), x, y, iconSize, iconSize, button -> {
+            addARGhostButton(Text.empty(), x, y, iconSize, iconSize, ScreenHelpText.describeApp(entry.id()), button -> {
                 if (client != null) {
                     Screen nextScreen = createARAppScreen(slot.entry, this);
                     if (nextScreen instanceof AbstractARScreen arScreen) {

@@ -196,6 +196,9 @@ public class ARSettingsScreen extends AbstractARScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         scrollOffset -= (float) (verticalAmount * s(16));
         return true;
     }

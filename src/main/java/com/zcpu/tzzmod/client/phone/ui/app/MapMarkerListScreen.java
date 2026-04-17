@@ -228,6 +228,9 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         int mx = (int) mouseX;
         int my = (int) mouseY;
         if (mx >= contentX && mx <= contentX + contentWidth && my >= getListTop() && my <= getListBottom()) {
@@ -257,6 +260,41 @@ public class MapMarkerListScreen extends AbstractPhoneScreen {
         int maxThumbTravel = Math.max(1, visibleHeight - thumbHeight);
         int thumbY = top + Math.round((currentScroll / (float) Math.max(1, totalHeight - visibleHeight)) * maxThumbTravel);
         context.fill(trackX - 1, thumbY, trackX + 2, thumbY + thumbHeight, 0xAACFE8F9);
+    }
+
+    @Override
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        int offSwitchW = s(24);
+        int offSwitchH = s(10);
+        int offSwitchX = contentX + contentWidth - offSwitchW - s(2);
+        int offSwitchY = contentY + s(21);
+        if (mouseX >= offSwitchX && mouseX <= offSwitchX + offSwitchW && mouseY >= offSwitchY && mouseY <= offSwitchY + offSwitchH) {
+            return Text.translatable("phone.tzz_mod.help.marker_off_hand");
+        }
+
+        int top = getListTop();
+        int bottom = getListBottom();
+        if (mouseX < contentX || mouseX > contentX + contentWidth || mouseY < top || mouseY > bottom) {
+            return Text.empty();
+        }
+        int rowHeight = getRowHeight();
+        int gap = getRowGap();
+        int currentScroll = (int) Math.round(scrollOffset);
+        for (int index = 0; index < rows.size(); index++) {
+            int drawY = top + index * (rowHeight + gap) - currentScroll;
+            if (mouseY < drawY || mouseY > drawY + rowHeight) {
+                continue;
+            }
+            int switchW = s(28);
+            int switchH = s(12);
+            int switchX = contentX + contentWidth - s(32);
+            int switchY = drawY + (rowHeight - switchH) / 2;
+            if (mouseX >= switchX && mouseX <= switchX + switchW && mouseY >= switchY && mouseY <= switchY + switchH) {
+                return Text.translatable("phone.tzz_mod.help.marker_particles");
+            }
+            return Text.translatable("phone.tzz_mod.help.marker_row_open");
+        }
+        return Text.empty();
     }
 
     private static Text tryParseJsonText(String raw) {

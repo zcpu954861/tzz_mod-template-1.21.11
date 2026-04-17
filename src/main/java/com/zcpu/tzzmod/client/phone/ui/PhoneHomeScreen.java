@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
+import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 
@@ -184,7 +185,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             AppSlot slot = new AppSlot(entry, x, y, iconSize);
             appSlots.add(slot);
 
-            addPhoneGhostButton(Text.empty(), x, y, iconSize, iconSize, button -> {
+            addPhoneGhostButton(Text.empty(), x, y, iconSize, iconSize, ScreenHelpText.describeApp(entry.id()), button -> {
                 if (client != null) {
                     net.minecraft.client.gui.screen.Screen nextScreen = slot.entry.rootScreenFactory().apply(this);
                     if (nextScreen instanceof AbstractPhoneScreen) {

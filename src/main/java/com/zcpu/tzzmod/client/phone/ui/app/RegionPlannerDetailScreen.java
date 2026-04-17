@@ -358,6 +358,9 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         int mx = (int) mouseX;
         int my = (int) mouseY;
         if (mx >= contentX && mx <= contentX + contentWidth && my >= getListTop() && my <= getListBottom()) {
@@ -378,6 +381,51 @@ public class RegionPlannerDetailScreen extends AbstractPhoneScreen {
 
     private String trim(String text, int width) {
         return textRenderer.trimToWidth(text, Math.max(s(24), width));
+    }
+
+    @Override
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        if (!draftMode) {
+            int switchW = s(28);
+            int switchH = s(12);
+            int hlRowY = contentY + s(84);
+            int switchX = contentX + contentWidth - switchW - s(10);
+            if (mouseX >= switchX && mouseX <= switchX + switchW && mouseY >= hlRowY && mouseY <= hlRowY + switchH) {
+                return Text.translatable("phone.tzz_mod.help.region_highlight");
+            }
+        }
+
+        int top = getListTop();
+        int bottom = getListBottom();
+        if (mouseX < contentX || mouseX > contentX + contentWidth || mouseY < top || mouseY > bottom) {
+            return Text.empty();
+        }
+        java.util.List<MapClient.RegionPoint> points = draftMode
+                ? MapClient.getPlannerDraft().points()
+                : MapClient.getPlannerRegion(regionId) == null ? java.util.List.of() : MapClient.getPlannerRegion(regionId).points();
+        int rowHeight = getRowHeight();
+        int gap = getRowGap();
+        int currentScroll = (int) Math.round(scrollOffset);
+        for (int index = 0; index < points.size(); index++) {
+            int drawY = top + index * (rowHeight + gap) - currentScroll;
+            if (mouseY < drawY || mouseY > drawY + rowHeight) {
+                continue;
+            }
+            int buttonY = drawY + s(7);
+            int teleportWidth = draftMode ? s(40) : s(52);
+            int teleportX = contentX + contentWidth - teleportWidth - s(6);
+            if (draftMode) {
+                int trimWidth = s(28);
+                int trimX = teleportX - trimWidth - s(4);
+                if (mouseX >= trimX && mouseX <= trimX + trimWidth && mouseY >= buttonY && mouseY <= buttonY + s(16)) {
+                    return Text.translatable("phone.tzz_mod.help.region_trim");
+                }
+            }
+            if (mouseX >= teleportX && mouseX <= teleportX + teleportWidth && mouseY >= buttonY && mouseY <= buttonY + s(16)) {
+                return Text.translatable("phone.tzz_mod.help.region_corner_teleport");
+            }
+        }
+        return Text.empty();
     }
 
     private void renderScrollbar(DrawContext context, int top, int bottom, int totalHeight, int currentScroll) {

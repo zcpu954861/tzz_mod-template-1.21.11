@@ -1,22 +1,28 @@
 package com.zcpu.tzzmod.client.phone.ui;
 
 import com.zcpu.tzzmod.client.DeathSyncClient;
+import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.player.SkinTextures;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 public abstract class AbstractPhoneScreen extends Screen {
     // Reference: 3840x2054 with GUI scale 4 => 960x513.5 logical size.
@@ -95,6 +101,8 @@ public abstract class AbstractPhoneScreen extends Screen {
     private long appLaunchAnimationStartedAtMs = -1L;
     private long closeAnimationStartedAtMs = -1L;
     private boolean launchAnimationFired;
+    private boolean helpModeActive;
+    private PhoneButtonRenderData helpButtonData;
 
     // Init scan animation: triggered when screen is first created
     private final long screenCreatedAtMs = System.currentTimeMillis();
@@ -142,6 +150,8 @@ public abstract class AbstractPhoneScreen extends Screen {
         contentY = phoneY + topInset + s(STATUS_BAR_HEIGHT) + statusGap;
         contentWidth = Math.max(1, phoneWidth - horizontalInset * 2);
         contentHeight = Math.max(1, phoneHeight - topInset - s(STATUS_BAR_HEIGHT) - statusGap - bottomInset);
+
+        addHelpToggleButton();
 
         if (!areAnimationsEnabled()) {
             appLaunchAnimation = null;
@@ -262,6 +272,28 @@ public abstract class AbstractPhoneScreen extends Screen {
         renderInitScanOverlay(context);
     }
 
+    protected boolean shouldShowHelpButton() {
+        return true;
+    }
+
+    protected final boolean isHelpModeActive() {
+        return helpModeActive;
+    }
+
+    protected void onHelpModeChanged(boolean helpModeActive) {
+    }
+
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        return Text.empty();
+    }
+
+    protected final void resetPhoneButtonLayer() {
+        clearChildren();
+        phoneButtons.clear();
+        helpButtonData = null;
+        addHelpToggleButton();
+    }
+
     /** Override and return true to show a one-shot scan line when this screen first opens. */
     protected boolean hasInitScanAnimation() {
         return false;
@@ -296,9 +328,115 @@ public abstract class AbstractPhoneScreen extends Screen {
         renderStyledPhoneButtons(context, mouseX, mouseY);
         super.render(context, mouseX, mouseY, delta);
         renderPhoneOverlay(context, mouseX, mouseY, delta);
+        renderHelpModeOverlay(context, mouseX, mouseY);
     }
 
     protected void renderPhoneOverlay(DrawContext context, int mouseX, int mouseY, float delta) {
+    }
+
+    private void addHelpToggleButton() {
+        if (!shouldShowHelpButton()) {
+            helpButtonData = null;
+            return;
+        }
+        int buttonSize = Math.max(s(14), Math.min(s(18), contentWidth / 6));
+        int buttonX = contentX + s(2);
+        int buttonY = contentY + s(2);
+        ButtonWidget helpButton = addPhoneButton(
+                Text.literal("?"),
+                buttonX,
+                buttonY,
+                buttonSize,
+                buttonSize,
+                PhoneButtonWidget.Variant.SECONDARY,
+                () -> helpModeActive,
+                () -> helpModeActive
+                        ? Text.translatable("phone.tzz_mod.help.exit_mode")
+                        : Text.translatable("phone.tzz_mod.help.enter_mode"),
+                true,
+                true,
+                button -> toggleHelpMode()
+        );
+        helpButtonData = findButtonData(helpButton);
+    }
+
+    private void toggleHelpMode() {
+        helpModeActive = !helpModeActive;
+        onHelpModeChanged(helpModeActive);
+    }
+
+    private void renderHelpModeOverlay(DrawContext context, int mouseX, int mouseY) {
+        if (!helpModeActive) {
+            return;
+        }
+        context.fill(contentX, contentY, contentX + contentWidth, contentY + contentHeight,
+                isLightMode() ? 0x12FFFFFF : 0x22000000);
+        Text tooltip = getHoveredHelpTooltip(mouseX, mouseY);
+        if (tooltip == null || tooltip.getString().isBlank()) {
+            return;
+        }
+        renderHelpTooltip(context, mouseX, mouseY, tooltip);
+    }
+
+    private Text getHoveredHelpTooltip(int mouseX, int mouseY) {
+        for (PhoneButtonRenderData data : phoneButtons) {
+            if (!data.helpEnabled()) {
+                continue;
+            }
+            if (isInside(mouseX, mouseY, data.x(), data.y(), data.width(), data.height())) {
+                Text helpText = data.helpTextSupplier().get();
+                if (!helpText.getString().isBlank()) {
+                    return helpText;
+                }
+            }
+        }
+        Text customTooltip = getCustomHelpTooltip(mouseX, mouseY);
+        return customTooltip.getString().isBlank() ? null : customTooltip;
+    }
+
+    private void renderHelpTooltip(DrawContext context, int mouseX, int mouseY, Text tooltip) {
+        int maxWidth = Math.max(s(84), Math.min(s(152), contentWidth - s(16)));
+        List<OrderedText> lines = textRenderer.wrapLines(tooltip, Math.max(40, maxWidth));
+        if (lines.isEmpty()) {
+            return;
+        }
+        int lineHeight = textRenderer.fontHeight + s(1);
+        int textWidth = 0;
+        for (OrderedText line : lines) {
+            textWidth = Math.max(textWidth, textRenderer.getWidth(line));
+        }
+        int paddingX = s(6);
+        int paddingY = s(5);
+        int boxWidth = textWidth + paddingX * 2;
+        int boxHeight = lines.size() * lineHeight + paddingY * 2 - s(1);
+        int boxX = MathHelper.clamp(mouseX + s(8), phoneX + s(4), phoneX + phoneWidth - boxWidth - s(4));
+        int boxY = MathHelper.clamp(mouseY + s(8), phoneY + s(4), phoneY + phoneHeight - boxHeight - s(4));
+        int cut = Math.max(2, s(4));
+        int fillColor = isLightMode() ? 0xFFF0F4F8 : 0xFF101825;
+        int borderColor = themeAccent();
+
+        for (int row = 0; row < boxHeight; row++) {
+            int leftCut = row < cut ? cut - row : 0;
+            int rightCut = row >= boxHeight - cut ? cut - (boxHeight - 1 - row) : 0;
+            context.fill(boxX + leftCut, boxY + row, boxX + boxWidth - rightCut, boxY + row + 1, fillColor);
+        }
+        context.fill(boxX + cut, boxY, boxX + boxWidth, boxY + 1, borderColor);
+        context.fill(boxX, boxY + boxHeight - 1, boxX + boxWidth - cut, boxY + boxHeight, borderColor);
+        for (int index = 0; index < cut; index++) {
+            context.fill(boxX + cut - index, boxY + index, boxX + cut - index + 1, boxY + index + 1, borderColor);
+            context.fill(boxX + boxWidth - cut + index - 1, boxY + boxHeight - 1 - index,
+                    boxX + boxWidth - cut + index, boxY + boxHeight - index, borderColor);
+        }
+
+        int textY = boxY + paddingY;
+        for (OrderedText line : lines) {
+            context.drawText(textRenderer, line, boxX + paddingX, textY, isLightMode() ? themeText() : 0xFFEAF7FF, false);
+            textY += lineHeight;
+        }
+    }
+
+    private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 
     protected void renderStatusBar(DrawContext context) {
@@ -776,11 +914,18 @@ public abstract class AbstractPhoneScreen extends Screen {
     }
 
     protected ButtonWidget addPhoneButton(Text message, int x, int y, int width, int height, PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
+        return addPhoneButton(message, x, y, width, height, variant, selectedSupplier, () -> ScreenHelpText.describeAction(message), true, false, onPress);
+    }
+
+    protected ButtonWidget addPhoneButton(Text message, int x, int y, int width, int height, PhoneButtonWidget.Variant variant,
+                                          BooleanSupplier selectedSupplier, Supplier<Text> helpTextSupplier,
+                                          boolean helpEnabled, boolean helpControl, ButtonWidget.PressAction onPress) {
         ButtonWidget button = addDrawableChild(ButtonWidget.builder(message, onPress)
                 .dimensions(x, y, width, height)
                 .build());
         button.setAlpha(0.0F);
-        phoneButtons.add(new PhoneButtonRenderData(button, message, x, y, width, height, variant, selectedSupplier));
+        phoneButtons.add(new PhoneButtonRenderData(button, message, x, y, width, height, variant, selectedSupplier,
+                helpTextSupplier, helpEnabled, helpControl));
         return button;
     }
 
@@ -794,6 +939,10 @@ public abstract class AbstractPhoneScreen extends Screen {
 
     protected ButtonWidget addPhoneGhostButton(Text message, int x, int y, int width, int height, ButtonWidget.PressAction onPress) {
         return addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.GHOST, () -> false, onPress);
+    }
+
+    protected ButtonWidget addPhoneGhostButton(Text message, int x, int y, int width, int height, Text helpText, ButtonWidget.PressAction onPress) {
+        return addPhoneButton(message, x, y, width, height, PhoneButtonWidget.Variant.GHOST, () -> false, () -> helpText, true, false, onPress);
     }
 
     protected void addPhoneTabButton(Text message, int x, int y, int width, int height, BooleanSupplier selectedSupplier, ButtonWidget.PressAction onPress) {
@@ -933,7 +1082,37 @@ public abstract class AbstractPhoneScreen extends Screen {
         if (isTransitionBlockingInteraction()) {
             return true;
         }
+        if (helpModeActive) {
+            if (helpButtonData != null && isInside((int) click.x(), (int) click.y(), helpButtonData.x(), helpButtonData.y(), helpButtonData.width(), helpButtonData.height())) {
+                toggleHelpMode();
+            }
+            return true;
+        }
         return super.mouseClicked(click, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (helpModeActive) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean charTyped(CharInput input) {
+        if (helpModeActive) {
+            return true;
+        }
+        return super.charTyped(input);
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput input) {
+        if (helpModeActive && input.key() != GLFW.GLFW_KEY_ESCAPE) {
+            return true;
+        }
+        return super.keyPressed(input);
     }
 
     public void setAppLaunchAnimation(int x, int y, int width, int height) {
@@ -1017,11 +1196,21 @@ public abstract class AbstractPhoneScreen extends Screen {
         return value * value * (3.0F - 2.0F * value);
     }
 
+    private PhoneButtonRenderData findButtonData(ButtonWidget button) {
+        for (PhoneButtonRenderData data : phoneButtons) {
+            if (data.button() == button) {
+                return data;
+            }
+        }
+        return null;
+    }
+
     private record AppLaunchAnimation(int x, int y, int width, int height) {
     }
 
 
     private record PhoneButtonRenderData(ButtonWidget button, Text message, int x, int y, int width, int height,
-                                         PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier) {
+                                         PhoneButtonWidget.Variant variant, BooleanSupplier selectedSupplier,
+                                         Supplier<Text> helpTextSupplier, boolean helpEnabled, boolean helpControl) {
     }
 }

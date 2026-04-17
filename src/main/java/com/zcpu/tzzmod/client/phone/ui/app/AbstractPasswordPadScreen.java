@@ -27,7 +27,7 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
     @Override
     protected void init() {
         super.init();
-        clearChildren();
+        resetPhoneButtonLayer();
 
         int keypadWidth = Math.min(contentWidth - s(8), s(156));
         int buttonHeight = s(26);
@@ -51,9 +51,9 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
         addDigitButton("9", keypadX + (buttonWidth + gap) * 2, startY, buttonWidth, buttonHeight);
 
         startY += buttonHeight + gap;
-        addPhoneButton(Text.literal("C"), keypadX, startY, buttonWidth, buttonHeight, PhoneButtonWidget.Variant.SECONDARY, () -> false, button -> clearCode());
+        addPhoneButton(Text.literal("C"), keypadX, startY, buttonWidth, buttonHeight, PhoneButtonWidget.Variant.SECONDARY, () -> false, Text::empty, false, false, button -> clearCode());
         addDigitButton("0", keypadX + buttonWidth + gap, startY, buttonWidth, buttonHeight);
-        addPhoneButton(Text.literal("←"), keypadX + (buttonWidth + gap) * 2, startY, buttonWidth, buttonHeight, PhoneButtonWidget.Variant.SECONDARY, () -> false, button -> removeLastDigit());
+        addPhoneButton(Text.literal("←"), keypadX + (buttonWidth + gap) * 2, startY, buttonWidth, buttonHeight, PhoneButtonWidget.Variant.SECONDARY, () -> false, Text::empty, false, false, button -> removeLastDigit());
 
         int bottomY = startY + buttonHeight + gap + s(2);
         int halfWidth = (keypadWidth - gap) / 2;
@@ -103,6 +103,9 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean charTyped(CharInput input) {
+        if (isHelpModeActive()) {
+            return super.charTyped(input);
+        }
         char chr = (char) input.codepoint();
         if (chr >= '0' && chr <= '9') {
             appendDigit(chr);
@@ -113,6 +116,9 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean keyPressed(KeyInput input) {
+        if (isHelpModeActive()) {
+            return super.keyPressed(input);
+        }
         int keyCode = input.key();
         if (keyCode >= GLFW.GLFW_KEY_0 && keyCode <= GLFW.GLFW_KEY_9) {
             appendDigit((char) ('0' + (keyCode - GLFW.GLFW_KEY_0)));
@@ -138,7 +144,7 @@ public abstract class AbstractPasswordPadScreen extends AbstractPhoneScreen {
     }
 
     private void addDigitButton(String digit, int x, int y, int width, int height) {
-        addPhoneButton(Text.literal(digit), x, y, width, height, PhoneButtonWidget.Variant.SECONDARY, () -> false, button -> appendDigit(digit.charAt(0)));
+        addPhoneButton(Text.literal(digit), x, y, width, height, PhoneButtonWidget.Variant.SECONDARY, () -> false, Text::empty, false, false, button -> appendDigit(digit.charAt(0)));
     }
 
     private void appendDigit(char digit) {

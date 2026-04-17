@@ -354,6 +354,9 @@ public class ARChatConversationScreen extends AbstractARScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         if (mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= getMessageAreaTop() && mouseY <= getMessageAreaBottom()) {
             messageScrollOffset -= (int) (verticalAmount * s(16));
             return true;

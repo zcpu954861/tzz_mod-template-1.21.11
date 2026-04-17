@@ -212,6 +212,9 @@ public class ARChatImagePickerScreen extends AbstractARScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         if (mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= getGridTop() && mouseY <= getGridBottom()) {
             scrollOffset -= (int) Math.round(verticalAmount * s(18));
             clampScroll();

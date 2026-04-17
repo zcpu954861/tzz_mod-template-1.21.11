@@ -253,6 +253,22 @@ public class MapMarkerDetailScreen extends AbstractPhoneScreen {
     private record ColorSwatch(int x, int y, int size, int color) {
     }
 
+    @Override
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        int switchW = s(28);
+        int switchH = s(12);
+        int switchX = contentX + contentWidth - switchW - s(10);
+        int visRowY = contentY + s(88) + previewShift;
+        if (mouseX >= switchX && mouseX <= switchX + switchW && mouseY >= visRowY && mouseY <= visRowY + switchH) {
+            return Text.translatable("phone.tzz_mod.help.marker_map_visible");
+        }
+        int hlRowY = contentY + s(104) + previewShift;
+        if (mouseX >= switchX && mouseX <= switchX + switchW && mouseY >= hlRowY && mouseY <= hlRowY + switchH) {
+            return Text.translatable("phone.tzz_mod.help.marker_highlight");
+        }
+        return Text.empty();
+    }
+
     private static Text tryParseJsonText(String raw) {
         if (raw == null || raw.isBlank()) return Text.literal(raw == null ? "" : raw);
         if (!raw.startsWith("{") && !raw.startsWith("[") && !raw.startsWith("\"")) {

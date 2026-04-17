@@ -271,12 +271,37 @@ public class ARGalleryScreen extends AbstractARScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double hAmt, double vAmt) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         int mx = (int) mouseX, my = (int) mouseY;
         if (mx >= contentX && mx <= contentX + contentWidth && my >= getGridTop() && my <= getGridBottom()) {
             targetScroll = Math.max(0, Math.min(targetScroll - vAmt * s(16), getMaxScroll()));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, hAmt, vAmt);
+    }
+
+    @Override
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        if (mouseY < getGridTop() || mouseY > getGridBottom()) {
+            return Text.empty();
+        }
+        int cellSize = getCellSize();
+        int spacing = s(3);
+        int extraH = s(12);
+        int baseY = getGridTop() - (int) Math.round(scrollOffset);
+        int count = currentMode == GalleryMode.LOCAL ? localPhotos.size() : onlinePhotos.size();
+        for (int index = 0; index < count; index++) {
+            int col = index % COLS;
+            int row = index / COLS;
+            int cellX = contentX + col * (cellSize + spacing);
+            int cellY = baseY + row * (cellSize + extraH + spacing);
+            if (mouseX >= cellX && mouseX <= cellX + cellSize && mouseY >= cellY && mouseY <= cellY + cellSize) {
+                return Text.translatable("phone.tzz_mod.help.gallery_thumbnail");
+            }
+        }
+        return Text.empty();
     }
 
 }

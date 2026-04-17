@@ -177,6 +177,9 @@ public class ARTaskScreen extends AbstractARScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         if (activeTab == 0) {
             scrollOffsetCurrent -= (float) (verticalAmount * s(16));
         } else {

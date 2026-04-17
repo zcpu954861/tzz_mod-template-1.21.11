@@ -1,20 +1,26 @@
 package com.zcpu.tzzmod.client.ar.ui;
 
 import com.zcpu.tzzmod.client.DeathSyncClient;
+import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import com.zcpu.tzzmod.client.phone.ui.state.PhoneSettingsClient;
 import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * Base class for all AR headset screens.
@@ -74,6 +80,8 @@ public abstract class AbstractARScreen extends Screen {
     private float uiScale = 1.0F;
     private float textScale = 1.0F;
     private final List<ARButtonRenderData> arButtons = new ArrayList<>();
+    private boolean helpModeActive;
+    private ARButtonRenderData helpButtonData;
 
     // HUD info
     private int batteryPercent = 85;
@@ -423,9 +431,96 @@ public abstract class AbstractARScreen extends Screen {
         for (ARButtonRenderData btn : arButtons) {
             renderARButton(context, mouseX, mouseY, btn);
         }
+
+        renderHelpModeOverlay(context, mouseX, mouseY);
     }
 
     protected abstract void renderARContent(DrawContext context, int mouseX, int mouseY, float delta);
+
+    protected final boolean isHelpModeActive() {
+        return helpModeActive;
+    }
+
+    protected void onHelpModeChanged(boolean helpModeActive) {
+    }
+
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        return Text.empty();
+    }
+
+    private void renderHelpModeOverlay(DrawContext context, int mouseX, int mouseY) {
+        if (!helpModeActive) {
+            return;
+        }
+        context.fill(contentX, contentY, contentX + contentWidth, contentY + contentHeight,
+                isLightMode() ? 0x12FFFFFF : 0x22000000);
+        Text tooltip = getHoveredHelpTooltip(mouseX, mouseY);
+        if (tooltip == null || tooltip.getString().isBlank()) {
+            return;
+        }
+        renderHelpTooltip(context, mouseX, mouseY, tooltip);
+    }
+
+    private Text getHoveredHelpTooltip(int mouseX, int mouseY) {
+        for (ARButtonRenderData data : arButtons) {
+            if (!data.helpEnabled()) {
+                continue;
+            }
+            if (isInside(mouseX, mouseY, data.x(), data.y(), data.width(), data.height())) {
+                Text helpText = data.helpTextSupplier().get();
+                if (!helpText.getString().isBlank()) {
+                    return helpText;
+                }
+            }
+        }
+        Text customTooltip = getCustomHelpTooltip(mouseX, mouseY);
+        return customTooltip.getString().isBlank() ? null : customTooltip;
+    }
+
+    private void renderHelpTooltip(DrawContext context, int mouseX, int mouseY, Text tooltip) {
+        int maxWidth = Math.max(s(96), Math.min(s(188), contentWidth - s(20)));
+        List<OrderedText> lines = textRenderer.wrapLines(tooltip, Math.max(48, maxWidth));
+        if (lines.isEmpty()) {
+            return;
+        }
+        int lineHeight = textRenderer.fontHeight + s(1);
+        int textWidth = 0;
+        for (OrderedText line : lines) {
+            textWidth = Math.max(textWidth, textRenderer.getWidth(line));
+        }
+        int paddingX = s(6);
+        int paddingY = s(5);
+        int boxWidth = textWidth + paddingX * 2;
+        int boxHeight = lines.size() * lineHeight + paddingY * 2 - s(1);
+        int boxX = MathHelper.clamp(mouseX + s(10), panelX + s(4), panelX + panelWidth - boxWidth - s(4));
+        int boxY = MathHelper.clamp(mouseY + s(10), panelY + s(4), panelY + panelHeight - boxHeight - s(4));
+        int cut = Math.max(2, s(4));
+        int fillColor = isLightMode() ? 0xFFF0F4F8 : 0xFF101825;
+        int borderColor = themeAccent();
+
+        for (int row = 0; row < boxHeight; row++) {
+            int leftCut = row < cut ? cut - row : 0;
+            int rightCut = row >= boxHeight - cut ? cut - (boxHeight - 1 - row) : 0;
+            context.fill(boxX + leftCut, boxY + row, boxX + boxWidth - rightCut, boxY + row + 1, fillColor);
+        }
+        context.fill(boxX + cut, boxY, boxX + boxWidth, boxY + 1, borderColor);
+        context.fill(boxX, boxY + boxHeight - 1, boxX + boxWidth - cut, boxY + boxHeight, borderColor);
+        for (int index = 0; index < cut; index++) {
+            context.fill(boxX + cut - index, boxY + index, boxX + cut - index + 1, boxY + index + 1, borderColor);
+            context.fill(boxX + boxWidth - cut + index - 1, boxY + boxHeight - 1 - index,
+                    boxX + boxWidth - cut + index, boxY + boxHeight - index, borderColor);
+        }
+
+        int textY = boxY + paddingY;
+        for (OrderedText line : lines) {
+            context.drawText(textRenderer, line, boxX + paddingX, textY, isLightMode() ? themeText() : 0xFFEAF7FF, false);
+            textY += lineHeight;
+        }
+    }
+
+    private boolean isInside(int mouseX, int mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
 
     // --- Bottom Info HUD ---
     private void renderBottomHud(DrawContext context) {
@@ -538,17 +633,25 @@ public abstract class AbstractARScreen extends Screen {
 
     // --- Button system ---
     protected record ARButtonRenderData(ButtonWidget button, int x, int y, int width, int height,
-                                        Text message, ARButtonVariant variant, BooleanSupplier selectedSupplier) {}
+                                        Text message, ARButtonVariant variant, BooleanSupplier selectedSupplier,
+                                        Supplier<Text> helpTextSupplier, boolean helpEnabled, boolean helpControl) {}
 
     public enum ARButtonVariant { DEFAULT, PRIMARY, GHOST }
 
     protected ButtonWidget addARButton(Text label, int x, int y, int w, int h, ARButtonVariant variant,
                                        BooleanSupplier selected, ButtonWidget.PressAction action) {
+        return addARButton(label, x, y, w, h, variant, selected, () -> ScreenHelpText.describeAction(label), true, false, action);
+    }
+
+    protected ButtonWidget addARButton(Text label, int x, int y, int w, int h, ARButtonVariant variant,
+                                       BooleanSupplier selected, Supplier<Text> helpTextSupplier,
+                                       boolean helpEnabled, boolean helpControl, ButtonWidget.PressAction action) {
         ButtonWidget button = ButtonWidget.builder(label, action).dimensions(x, y, w, h).build();
         // Keep visible=true so clicks work (isInteractable checks visible && active).
         // Since render() is fully overridden without super.render(), buttons won't draw vanilla appearance.
         addDrawableChild(button);
-        arButtons.add(new ARButtonRenderData(button, x, y, w, h, label, variant, selected));
+        arButtons.add(new ARButtonRenderData(button, x, y, w, h, label, variant, selected,
+                helpTextSupplier, helpEnabled, helpControl));
         return button;
     }
 
@@ -562,6 +665,10 @@ public abstract class AbstractARScreen extends Screen {
 
     protected ButtonWidget addARGhostButton(Text label, int x, int y, int w, int h, ButtonWidget.PressAction action) {
         return addARButton(label, x, y, w, h, ARButtonVariant.GHOST, () -> false, action);
+    }
+
+    protected ButtonWidget addARGhostButton(Text label, int x, int y, int w, int h, Text helpText, ButtonWidget.PressAction action) {
+        return addARButton(label, x, y, w, h, ARButtonVariant.GHOST, () -> false, () -> helpText, true, false, action);
     }
 
     private void renderARButton(DrawContext context, int mouseX, int mouseY, ARButtonRenderData data) {
@@ -645,6 +752,27 @@ public abstract class AbstractARScreen extends Screen {
         int bx = contentX + s(2);
         int by = contentY + s(2);
         addARGhostButton(Text.translatable("phone.tzz_mod.back"), bx, by, btnW, btnH, btn -> close());
+        ButtonWidget helpButton = addARButton(
+                Text.literal("?"),
+                bx + btnW + s(4),
+                by,
+                btnH,
+                btnH,
+                ARButtonVariant.DEFAULT,
+                () -> helpModeActive,
+                () -> helpModeActive
+                        ? Text.translatable("phone.tzz_mod.help.exit_mode")
+                        : Text.translatable("phone.tzz_mod.help.enter_mode"),
+                true,
+                true,
+                btn -> toggleHelpMode()
+        );
+        helpButtonData = findButtonData(helpButton);
+    }
+
+    private void toggleHelpMode() {
+        helpModeActive = !helpModeActive;
+        onHelpModeChanged(helpModeActive);
     }
 
     // --- Drawing utilities ---
@@ -719,6 +847,50 @@ public abstract class AbstractARScreen extends Screen {
         if (client == null) return false;
         var opt = client.getResourceManager().getResource(id);
         return opt.isPresent();
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubleClick) {
+        if (helpModeActive) {
+            if (helpButtonData != null && isInside((int) click.x(), (int) click.y(), helpButtonData.x(), helpButtonData.y(), helpButtonData.width(), helpButtonData.height())) {
+                toggleHelpMode();
+            }
+            return true;
+        }
+        return super.mouseClicked(click, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (helpModeActive) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean charTyped(CharInput input) {
+        if (helpModeActive) {
+            return true;
+        }
+        return super.charTyped(input);
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput input) {
+        if (helpModeActive && input.key() != GLFW.GLFW_KEY_ESCAPE) {
+            return true;
+        }
+        return super.keyPressed(input);
+    }
+
+    private ARButtonRenderData findButtonData(ButtonWidget button) {
+        for (ARButtonRenderData data : arButtons) {
+            if (data.button() == button) {
+                return data;
+            }
+        }
+        return null;
     }
 
     /**

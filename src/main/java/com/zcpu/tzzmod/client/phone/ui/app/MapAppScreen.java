@@ -44,6 +44,9 @@ public class MapAppScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean keyPressed(KeyInput input) {
+        if (isHelpModeActive()) {
+            return super.keyPressed(input);
+        }
         if (zoomMode && input.key() == 256) { // ESC
             zoomMode = false;
             return true;

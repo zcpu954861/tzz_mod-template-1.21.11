@@ -153,6 +153,9 @@ public class ARChatCreateGroupScreen extends AbstractARScreen {
 
         @Override
         public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+                if (isHelpModeActive()) {
+                        return true;
+                }
                 if (mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= getListTop() && mouseY <= getListBottom()) {
                         scrollOffset -= (int) Math.round(verticalAmount * s(18));
                         clampScroll();

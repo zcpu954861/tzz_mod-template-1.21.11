@@ -346,6 +346,9 @@ public class GalleryAppScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         int mx = (int) mouseX;
         int my = (int) mouseY;
         if (mx >= contentX && mx <= contentX + contentWidth && my >= getGridTop() && my <= getGridBottom()) {
@@ -364,5 +367,29 @@ public class GalleryAppScreen extends AbstractPhoneScreen {
         int maxThumbTravel = Math.max(1, visibleHeight - thumbHeight);
         int thumbY = top + Math.round((currentScroll / (float) Math.max(1, totalHeight - visibleHeight)) * maxThumbTravel);
         context.fill(trackX - 1, thumbY, trackX + 2, thumbY + thumbHeight, 0xAACFE8F9);
+    }
+
+    @Override
+    protected Text getCustomHelpTooltip(int mouseX, int mouseY) {
+        int gridTop = getGridTop();
+        int gridBottom = getGridBottom();
+        if (mouseY < gridTop || mouseY > gridBottom) {
+            return Text.empty();
+        }
+        int cellSize = getCellSize();
+        int spacing = s(4);
+        int extraH = s(14);
+        int currentY = gridTop - (int) Math.round(scrollOffset);
+        int count = currentMode == GalleryMode.LOCAL ? localPhotos.size() : onlinePhotos.size();
+        for (int index = 0; index < count; index++) {
+            int col = index % COLS;
+            int row = index / COLS;
+            int cellX = contentX + col * (cellSize + spacing);
+            int cellY = currentY + row * (cellSize + extraH + spacing);
+            if (mouseX >= cellX && mouseX <= cellX + cellSize && mouseY >= cellY && mouseY <= cellY + cellSize) {
+                return Text.translatable("phone.tzz_mod.help.gallery_thumbnail");
+            }
+        }
+        return Text.empty();
     }
 }

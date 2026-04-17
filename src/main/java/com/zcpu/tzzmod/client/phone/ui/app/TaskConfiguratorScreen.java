@@ -165,6 +165,9 @@ public class TaskConfiguratorScreen extends AbstractPhoneScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (isHelpModeActive()) {
+            return true;
+        }
         int mx = (int) mouseX;
         int my = (int) mouseY;
         int listTop = getPreviewListTop();

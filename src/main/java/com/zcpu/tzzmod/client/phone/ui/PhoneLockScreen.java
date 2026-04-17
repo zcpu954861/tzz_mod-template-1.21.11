@@ -31,6 +31,11 @@ public class PhoneLockScreen extends AbstractPhoneScreen {
     }
 
     @Override
+    protected boolean shouldShowHelpButton() {
+        return false;
+    }
+
+    @Override
     protected void init() {
         super.init();
         openedAtMs = System.currentTimeMillis();
