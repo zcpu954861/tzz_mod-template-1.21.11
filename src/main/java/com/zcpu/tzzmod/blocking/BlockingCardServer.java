@@ -2,16 +2,23 @@ package com.zcpu.tzzmod.blocking;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.StringReader;
 import com.zcpu.tzzmod.ModItem.ModItems;
+import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.action.ActionContext;
+import com.zcpu.tzzmod.action.ActionEngine;
+import com.zcpu.tzzmod.action.ActionExecutionResult;
+import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.network.BlockingCardC2SPayload;
 import com.zcpu.tzzmod.network.BlockingCardS2CPayload;
 import com.zcpu.tzzmod.util.NullSafety;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.command.permission.PermissionPredicate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
+import net.minecraft.command.argument.EntityArgumentType;
+import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
@@ -24,17 +31,12 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.state.property.Property;
-import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 public final class BlockingCardServer {
     private BlockingCardServer() {
@@ -151,7 +153,8 @@ public final class BlockingCardServer {
         if (command.isBlank()) {
             return Text.translatable("item.tzz_mod.blocking_card_configurator.invalid_command");
         }
-        if (!isCommandValid(player, command)) {
+        ActionConfig action = ActionConfig.command(command, false);
+        if (ActionValidator.validateForSave(player, action) != null) {
             return Text.translatable("item.tzz_mod.blocking_card_configurator.invalid_command");
         }
         if (activationType == BlockingCardConfig.ActivationType.ENTITY && !isEntityInputValid(activationInput)) {
@@ -164,18 +167,7 @@ public final class BlockingCardServer {
     }
 
     private static boolean isCommandValid(ServerPlayerEntity player, String command) {
-        try {
-            ServerCommandSource source = player.getCommandSource()
-                    .withPermissions(PermissionPredicate.ALL)
-                    .withSilent();
-            ParseResults<ServerCommandSource> parseResults = source.getServer().getCommandManager().getDispatcher().parse(
-                    command,
-                    source
-            );
-            return parseResults.getReader().getRemaining().isEmpty() && parseResults.getExceptions().isEmpty();
-        } catch (Exception ignored) {
-            return false;
-        }
+        return ActionValidator.isCommandValid(player, command);
     }
 
     private static boolean isEntityInputValid(String rawInput) {
@@ -208,37 +200,24 @@ public final class BlockingCardServer {
             return ActionResult.PASS;
         }
 
-        try {
-            ServerCommandSource source = player.getCommandSource()
-                    .withPermissions(PermissionPredicate.ALL)
-                    .withSilent()
-                    .withWorld(world)
-                    .withPosition(triggerPos);
-            source.getServer().getCommandManager().getDispatcher().execute(command, source);
-            world.playSound(null, BlockPos.ofFloored(triggerPos), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.65F, 1.2F);
-            if (data.notifyOps()) {
-                notifyOperators(player, player.getStackInHand(hand), command);
-            }
-            return ActionResult.CONSUME;
-        } catch (Exception exception) {
-            player.sendMessage(Text.translatable("item.tzz_mod.blocking_card.command_failed", exception.getMessage()), true);
-            return ActionResult.CONSUME;
-        }
-    }
+        ActionContext context = new ActionContext(
+                player,
+                world,
+                triggerPos,
+                ActionSourceType.BLOCKING_CARD,
+                "blocking_card",
+                player.getStackInHand(hand)
+        );
+        ActionConfig action = ActionConfig.command(command, data.notifyOps());
+        ActionExecutionResult result = ActionEngine.execute(context, action);
 
-    private static void notifyOperators(ServerPlayerEntity player, ItemStack stack, String command) {
-        MutableText message = Text.literal("[封锁卡] ").formatted(Formatting.GOLD)
-                .append(Text.literal(player.getName().getString()).formatted(Formatting.YELLOW))
-                .append(Text.literal(" 激活了 ").formatted(Formatting.GOLD))
-                .append(Text.literal(stack.getName().getString()).formatted(Formatting.AQUA))
-                .append(Text.literal(" -> /").formatted(Formatting.GOLD))
-                .append(Text.literal(command).formatted(Formatting.GREEN));
+        world.playSound(null, BlockPos.ofFloored(triggerPos), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.65F, 1.2F);
 
-        for (ServerPlayerEntity onlinePlayer : player.getCommandSource().getServer().getPlayerManager().getPlayerList()) {
-            if (onlinePlayer.isCreativeLevelTwoOp()) {
-                onlinePlayer.sendMessage(message, false);
-            }
+        if (!result.success()) {
+            player.sendMessage(Text.translatable("item.tzz_mod.blocking_card.command_failed", result.message().getString()), true);
         }
+
+        return ActionResult.CONSUME;
     }
 
     private static String normalizeEntitySelector(String rawInput) {

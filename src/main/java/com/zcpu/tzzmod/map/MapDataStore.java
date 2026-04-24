@@ -1,19 +1,12 @@
 package com.zcpu.tzzmod.map;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.zcpu.tzzmod.Tzz_mod;
-import com.zcpu.tzzmod.util.JsonNullability;
+import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.util.math.BlockPos;
 
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,7 +16,6 @@ import java.util.UUID;
 import java.util.WeakHashMap;
 
 public final class MapDataStore {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Map<MinecraftServer, MapState> CACHE = new WeakHashMap<>();
 
     private MapDataStore() {
@@ -116,8 +108,8 @@ public final class MapDataStore {
                 UUID.randomUUID().toString(),
                 state.nextDefaultRegionName(),
                 cleanDimensionId,
-            List.copyOf(normalized),
-            sanitizeRegionColor(color, state.plannerRegions.size())
+                List.copyOf(normalized),
+                sanitizeRegionColor(color, state.plannerRegions.size())
         );
         state.plannerRegions.add(region);
         state.sortPlannerRegions();
@@ -291,19 +283,8 @@ public final class MapDataStore {
     private static MapState load(MinecraftServer server) {
         Path path = server.getSavePath(WorldSavePath.ROOT).resolve("tzz_mod").resolve("map_state.json");
         MapState state = new MapState(path);
-        try {
-            Files.createDirectories(path.getParent());
-            if (Files.exists(path)) {
-                try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-                    PersistedState persisted = JsonNullability.fromJsonNullable(GSON, reader, PersistedState.class);
-                    state.apply(persisted);
-                    return state;
-                }
-            }
-            state.writeToDisk();
-        } catch (Exception exception) {
-            Tzz_mod.LOGGER.warn("Failed to load map state: {}", exception.getMessage());
-        }
+        PersistedState persisted = JsonStoreSupport.readOrDefault(path, PersistedState.class, PersistedState::new, "map state");
+        state.apply(persisted);
         return state;
     }
 
@@ -609,60 +590,58 @@ public final class MapDataStore {
         }
 
         private boolean writeToDisk() {
-            try {
-                Files.createDirectories(path.getParent());
-                PersistedState persisted = new PersistedState();
-                if (region != null) {
-                    persisted.region = new PersistedRegion();
-                    persisted.region.dimensionId = region.dimensionId;
-                    persisted.region.x1 = region.minX;
-                    persisted.region.y1 = region.minY;
-                    persisted.region.z1 = region.minZ;
-                    persisted.region.x2 = region.maxX;
-                    persisted.region.y2 = region.maxY;
-                    persisted.region.z2 = region.maxZ;
-                }
-                persisted.showSelfPosition = showSelfPosition;
-                persisted.showMarkers = showMarkers;
-                persisted.showOtherPlayers = showOtherPlayers;
-                persisted.showRegionTitles = showRegionTitles;
-                persisted.regionVersion = regionVersion;
-                persisted.markers = new ArrayList<>();
-                for (MapMarkerData marker : markers) {
-                    PersistedMarker persistedMarker = new PersistedMarker();
-                    persistedMarker.id = marker.id;
-                    persistedMarker.name = marker.name;
-                    persistedMarker.dimensionId = marker.dimensionId;
-                    persistedMarker.x = marker.x;
-                    persistedMarker.y = marker.y;
-                    persistedMarker.z = marker.z;
-                    persistedMarker.color = marker.color;
-                    persisted.markers.add(persistedMarker);
-                }
-                persisted.plannerRegions = new ArrayList<>();
-                for (PlannerRegionData regionData : plannerRegions) {
-                    PersistedPlannerRegion persistedRegion = new PersistedPlannerRegion();
-                    persistedRegion.id = regionData.id();
-                    persistedRegion.name = regionData.name();
-                    persistedRegion.dimensionId = regionData.dimensionId();
-                    persistedRegion.color = regionData.color();
-                    persistedRegion.points = new ArrayList<>();
-                    for (RegionGeometry.Point point : regionData.points()) {
-                        PersistedRegionPoint persistedPoint = new PersistedRegionPoint();
-                        persistedPoint.x = point.x();
-                        persistedPoint.z = point.z();
-                        persistedRegion.points.add(persistedPoint);
-                    }
-                    persisted.plannerRegions.add(persistedRegion);
-                }
-                try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-                    GSON.toJson(persisted, writer);
-                }
-                return true;
-            } catch (Exception exception) {
-                Tzz_mod.LOGGER.warn("Failed to write map state: {}", exception.getMessage());
-                return false;
+            return JsonStoreSupport.write(path, toPersistedState(), "map state");
+        }
+
+        private PersistedState toPersistedState() {
+            PersistedState persisted = new PersistedState();
+            if (region != null) {
+                persisted.region = new PersistedRegion();
+                persisted.region.dimensionId = region.dimensionId;
+                persisted.region.x1 = region.minX;
+                persisted.region.y1 = region.minY;
+                persisted.region.z1 = region.minZ;
+                persisted.region.x2 = region.maxX;
+                persisted.region.y2 = region.maxY;
+                persisted.region.z2 = region.maxZ;
             }
+
+            persisted.showSelfPosition = showSelfPosition;
+            persisted.showMarkers = showMarkers;
+            persisted.showOtherPlayers = showOtherPlayers;
+            persisted.showRegionTitles = showRegionTitles;
+            persisted.regionVersion = regionVersion;
+            persisted.markers = new ArrayList<>();
+            for (MapMarkerData marker : markers) {
+                PersistedMarker persistedMarker = new PersistedMarker();
+                persistedMarker.id = marker.id;
+                persistedMarker.name = marker.name;
+                persistedMarker.dimensionId = marker.dimensionId;
+                persistedMarker.x = marker.x;
+                persistedMarker.y = marker.y;
+                persistedMarker.z = marker.z;
+                persistedMarker.color = marker.color;
+                persisted.markers.add(persistedMarker);
+            }
+
+            persisted.plannerRegions = new ArrayList<>();
+            for (PlannerRegionData regionData : plannerRegions) {
+                PersistedPlannerRegion persistedRegion = new PersistedPlannerRegion();
+                persistedRegion.id = regionData.id();
+                persistedRegion.name = regionData.name();
+                persistedRegion.dimensionId = regionData.dimensionId();
+                persistedRegion.color = regionData.color();
+                persistedRegion.points = new ArrayList<>();
+                for (RegionGeometry.Point point : regionData.points()) {
+                    PersistedRegionPoint persistedPoint = new PersistedRegionPoint();
+                    persistedPoint.x = point.x();
+                    persistedPoint.z = point.z();
+                    persistedRegion.points.add(persistedPoint);
+                }
+                persisted.plannerRegions.add(persistedRegion);
+            }
+
+            return persisted;
         }
     }
 
