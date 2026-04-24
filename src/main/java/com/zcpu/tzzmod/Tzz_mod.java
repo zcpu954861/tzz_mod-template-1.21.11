@@ -1,41 +1,11 @@
 package com.zcpu.tzzmod;
 
-import com.zcpu.tzzmod.ModBlock.ModBlockEntities;
-import com.zcpu.tzzmod.ModBlock.ModBlocks;
-import com.zcpu.tzzmod.ModItem.ModFunctionItemGroup;
-import com.zcpu.tzzmod.ModItem.ModItemGroup;
-import com.zcpu.tzzmod.ModItem.ModItems;
-import com.zcpu.tzzmod.blocking.BlockingCardServer;
-import com.zcpu.tzzmod.blocking.BlockingCardUseHandler;
-import com.zcpu.tzzmod.command.MapCommand;
-import com.zcpu.tzzmod.command.NoteCommand;
-import com.zcpu.tzzmod.command.SendMsgCommand;
-import com.zcpu.tzzmod.command.TaskCommand;
-import com.zcpu.tzzmod.config.PhotoSpeedConfig;
-import com.zcpu.tzzmod.gallery.GalleryServer;
-import com.zcpu.tzzmod.map.MapDataStore;
-import com.zcpu.tzzmod.map.MapServer;
-import com.zcpu.tzzmod.network.AdminPayloads;
-import com.zcpu.tzzmod.network.AdminSyncServer;
-import com.zcpu.tzzmod.network.BlockingCardPayloads;
-import com.zcpu.tzzmod.network.DeathStatusPayload;
-import com.zcpu.tzzmod.network.DeathSyncServer;
-import com.zcpu.tzzmod.network.GalleryPayloads;
-import com.zcpu.tzzmod.network.MapPayloads;
-import com.zcpu.tzzmod.network.NotePayloads;
-import com.zcpu.tzzmod.network.PasswordPayloads;
-import com.zcpu.tzzmod.network.PhoneChatPayloads;
-import com.zcpu.tzzmod.network.TaskPayloads;
-import com.zcpu.tzzmod.note.NoteDataStore;
-import com.zcpu.tzzmod.note.NoteServer;
-import com.zcpu.tzzmod.password.PasswordServer;
-import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
-import com.zcpu.tzzmod.task.TaskDataStore;
-import com.zcpu.tzzmod.task.TaskServer;
+import com.zcpu.tzzmod.core.bootstrap.TzzCommandBootstrap;
+import com.zcpu.tzzmod.core.bootstrap.TzzContentBootstrap;
+import com.zcpu.tzzmod.core.bootstrap.TzzLifecycleBootstrap;
+import com.zcpu.tzzmod.core.bootstrap.TzzNetworkBootstrap;
+import com.zcpu.tzzmod.core.bootstrap.TzzServerBootstrap;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,79 +19,11 @@ public class Tzz_mod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        // This code runs as soon as Minecraft is in a mod-load-ready state.
-        // However, some things (like resources) may still be uninitialized.
-        // Proceed with mild caution.
-
-        ModItems.initialize();
-        ModItemGroup.inialize();
-        ModFunctionItemGroup.inialize();
-        // Ensure blocks are registered by forcing ModBlocks static initialization
-        ModBlocks.init();
-        ModBlockEntities.init();
-
-        DeathStatusPayload.register();
-        DeathSyncServer.register();
-        PhoneChatPayloads.register();
-        PhoneChatServer.register();
-        MapPayloads.register();
-        MapServer.register();
-        TaskPayloads.register();
-        TaskServer.register();
-        PasswordPayloads.register();
-        PasswordServer.register();
-        BlockingCardPayloads.register();
-        BlockingCardServer.register();
-        BlockingCardUseHandler.register();
-
-        GalleryPayloads.register();
-        GalleryServer.register();
-        NotePayloads.register();
-        NoteServer.register();
-
-        AdminPayloads.register();
-        AdminSyncServer.register();
-        // ensure death spectator payloads are registered via AdminPayloads
-
-        // Ensure startup config files exist when the server starts (writes defaults if missing)
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            try {
-                com.zcpu.tzzmod.phone.PhoneAppsConfig.get(server);
-                PhotoSpeedConfig.get(server);
-            } catch (Throwable t) {
-                LOGGER.warn("Failed to initialize startup configs: {}", t.getMessage());
-            }
-        });
-
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
-            MapDataStore.flushDirty(server);
-            TaskDataStore.flushDirty(server);
-            NoteDataStore.flushDirty(server);
-        });
-
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            MapDataStore.flushDirty(server);
-            TaskDataStore.flushDirty(server);
-            NoteDataStore.flushDirty(server);
-            MapServer.clearServerState();
-        });
-
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-            MapDataStore.clearCache(server);
-            TaskDataStore.clearCache(server);
-            NoteDataStore.clearCache(server);
-            MapServer.clearServerState();
-            PhotoSpeedConfig.clearCache(server);
-        });
-
-        // Register server commands
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            SendMsgCommand.register(dispatcher);
-            MapCommand.register(dispatcher);
-            TaskCommand.register(dispatcher);
-            NoteCommand.register(dispatcher);
-            // DeathSpectatorCommand.register(dispatcher);
-        });
+        TzzContentBootstrap.register();
+        TzzNetworkBootstrap.register();
+        TzzServerBootstrap.register();
+        TzzLifecycleBootstrap.register();
+        TzzCommandBootstrap.register();
 
         LOGGER.info("Tzz_mod initialized successfully.");
     }
