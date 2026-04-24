@@ -138,7 +138,7 @@ public final class BlockingCardServer {
         String command = BlockingCardConfig.normalizeCommand(getString(body, "command"));
         boolean notifyOps = getBoolean(body, "notifyOps", false);
 
-        Text validationError = validateConfiguration(player, activationType, activationInput, command);
+        Text validationError = validateConfiguration(player, activationType, activationInput, command, notifyOps);
         if (validationError != null) {
             sendResult(player, false, validationError);
             return;
@@ -149,11 +149,17 @@ public final class BlockingCardServer {
         sendResult(player, true, Text.translatable("item.tzz_mod.blocking_card_configurator.saved"));
     }
 
-    private static Text validateConfiguration(ServerPlayerEntity player, BlockingCardConfig.ActivationType activationType, String activationInput, String command) {
+    private static Text validateConfiguration(
+            ServerPlayerEntity player,
+            BlockingCardConfig.ActivationType activationType,
+            String activationInput,
+            String command,
+            boolean notifyOps
+    ) {
         if (command.isBlank()) {
             return Text.translatable("item.tzz_mod.blocking_card_configurator.invalid_command");
         }
-        ActionConfig action = ActionConfig.command(command, false);
+        ActionConfig action = ActionConfig.command(command, notifyOps);
         if (ActionValidator.validateForSave(player, action) != null) {
             return Text.translatable("item.tzz_mod.blocking_card_configurator.invalid_command");
         }
@@ -164,10 +170,6 @@ public final class BlockingCardServer {
             return Text.translatable("item.tzz_mod.blocking_card_configurator.invalid_block_condition");
         }
         return null;
-    }
-
-    private static boolean isCommandValid(ServerPlayerEntity player, String command) {
-        return ActionValidator.isCommandValid(player, command);
     }
 
     private static boolean isEntityInputValid(String rawInput) {
