@@ -116,8 +116,8 @@ public final class MapDataStore {
                 UUID.randomUUID().toString(),
                 state.nextDefaultRegionName(),
                 cleanDimensionId,
-            List.copyOf(normalized),
-            sanitizeRegionColor(color, state.plannerRegions.size())
+                List.copyOf(normalized),
+                sanitizeRegionColor(color, state.plannerRegions.size())
         );
         state.plannerRegions.add(region);
         state.sortPlannerRegions();
