@@ -56,6 +56,7 @@ public final class ModItems {
     public static final Item APP_ICON_ADMIN = register("app_icon_admin", Item::new, new Item.Settings());
     public static final Item APP_ICON_CAMERA = register("app_icon_camera", Item::new, new Item.Settings());
     public static final Item APP_ICON_GALLERY = register("app_icon_gallery", Item::new, new Item.Settings());
+    public static final Item APP_ICON_NOTES = register("app_icon_notes", Item::new, new Item.Settings());
 
     public static Item register(String path, Function<Item.Settings, Item> factory, Item.Settings settings) {
         final RegistryKey<Item> registryKey = RegistryKey.of(RegistryKeys.ITEM, Identifier.of("tzz_mod", path));

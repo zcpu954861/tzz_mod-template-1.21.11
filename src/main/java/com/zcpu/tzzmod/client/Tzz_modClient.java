@@ -155,6 +155,7 @@ public class Tzz_modClient implements ClientModInitializer {
         MapClient.register();
         MapHighlightRenderer.register();
         com.zcpu.tzzmod.client.phone.chat.PhoneChatClient.register();
+        com.zcpu.tzzmod.client.note.NoteClient.register();
         TaskClient.register();
         PasswordClient.register();
         BlockingCardClient.register();

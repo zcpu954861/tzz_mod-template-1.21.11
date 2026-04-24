@@ -1,6 +1,7 @@
 {
   "icons": {
     "map": "tzz_mod:textures/gui/phone/icons/dark/map.png",
-    "chat": "tzz_mod:textures/gui/phone/icons/dark/chat.png"
+    "chat": "tzz_mod:textures/gui/phone/icons/dark/chat.png",
+    "notes": "tzz_mod:textures/gui/phone/icons/dark/notes.png"
   }
 }

@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.client.ar.ui.app.*;
 import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
+import com.zcpu.tzzmod.client.note.NoteClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import net.minecraft.client.gui.DrawContext;
@@ -92,6 +93,7 @@ public class ARHomeScreen extends AbstractARScreen {
 
         int chatUnread = PhoneChatClient.getTotalUnreadCount();
         int taskUnread = TaskClient.getTotalUnreadCount();
+        int noteUnread = NoteClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
             // --- 2D theme-aware icon rendering ---
@@ -150,6 +152,9 @@ public class ARHomeScreen extends AbstractARScreen {
             }
             if ("task".equals(slot.entry.id()) && taskUnread > 0) {
                 renderBadge(context, slot, taskUnread);
+            }
+            if ("notes".equals(slot.entry.id()) && noteUnread > 0) {
+                renderBadge(context, slot, noteUnread);
             }
 
             // App label — allow wider text to accommodate longer names (e.g. Chinese characters)

@@ -63,6 +63,7 @@ public final class PhoneAppsConfig {
         cfg.apps.put("task", "true");
         cfg.apps.put("call_admin", "true");
         cfg.apps.put("compass", "true");
+        cfg.apps.put("notes", "true");
         cfg.apps.put("admin", "op");
         return cfg;
     }

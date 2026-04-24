@@ -15,9 +15,13 @@ import com.zcpu.tzzmod.network.DeathSyncServer;
 import com.zcpu.tzzmod.network.MapPayloads;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.network.GalleryPayloads;
+import com.zcpu.tzzmod.network.NotePayloads;
+import com.zcpu.tzzmod.note.NoteDataStore;
+import com.zcpu.tzzmod.note.NoteServer;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import com.zcpu.tzzmod.gallery.GalleryServer;
 import com.zcpu.tzzmod.command.MapCommand;
+import com.zcpu.tzzmod.command.NoteCommand;
 import com.zcpu.tzzmod.command.TaskCommand;
 import com.zcpu.tzzmod.network.TaskPayloads;
 import com.zcpu.tzzmod.task.TaskServer;
@@ -74,6 +78,8 @@ public class Tzz_mod implements ModInitializer {
 
 		GalleryPayloads.register();
 		GalleryServer.register();
+		NotePayloads.register();
+		NoteServer.register();
 
 		AdminPayloads.register();
 		AdminSyncServer.register();
@@ -92,17 +98,20 @@ public class Tzz_mod implements ModInitializer {
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			MapDataStore.flushDirty(server);
 			TaskDataStore.flushDirty(server);
+			NoteDataStore.flushDirty(server);
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
 			MapDataStore.flushDirty(server);
 			TaskDataStore.flushDirty(server);
+			NoteDataStore.flushDirty(server);
 			MapServer.clearServerState();
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
 			MapDataStore.clearCache(server);
 			TaskDataStore.clearCache(server);
+			NoteDataStore.clearCache(server);
 			MapServer.clearServerState();
 			PhotoSpeedConfig.clearCache(server);
 		});
@@ -112,6 +121,7 @@ public class Tzz_mod implements ModInitializer {
 			SendMsgCommand.register(dispatcher);
 			MapCommand.register(dispatcher);
 			TaskCommand.register(dispatcher);
+			NoteCommand.register(dispatcher);
 			//DeathSpectatorCommand.register(dispatcher);
 		});
 

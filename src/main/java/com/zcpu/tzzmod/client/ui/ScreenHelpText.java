@@ -32,7 +32,7 @@ public final class ScreenHelpText {
         if (raw.contains("发送") || lower.contains("send")) {
             return Text.translatable("phone.tzz_mod.help.send");
         }
-        if (raw.contains("创建") || lower.contains("create")) {
+        if (raw.contains("创建") || raw.contains("新建") || lower.contains("create")) {
             return Text.translatable("phone.tzz_mod.help.create");
         }
         if (raw.contains("添加") || lower.contains("add")) {
@@ -73,6 +73,7 @@ public final class ScreenHelpText {
             case "camera" -> Text.translatable("phone.tzz_mod.help.app.camera");
             case "gallery" -> Text.translatable("phone.tzz_mod.help.app.gallery");
             case "admin" -> Text.translatable("phone.tzz_mod.help.app.admin");
+            case "notes" -> Text.translatable("phone.tzz_mod.help.app.notes");
             default -> Text.translatable("phone.tzz_mod.help.open_app");
         };
     }

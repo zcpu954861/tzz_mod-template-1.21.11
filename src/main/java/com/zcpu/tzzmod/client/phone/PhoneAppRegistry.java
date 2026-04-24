@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.client.phone.ui.app.CompassAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.PhoneAdminAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.CameraAppScreen;
 import com.zcpu.tzzmod.client.phone.ui.app.GalleryAppScreen;
+import com.zcpu.tzzmod.client.phone.ui.app.PhoneNotesAppScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -29,6 +30,7 @@ public final class PhoneAppRegistry {
     private static final Identifier ADMIN_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/admin.png");
     private static final Identifier CAMERA_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/camera.png");
     private static final Identifier GALLERY_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/gallery.png");
+    private static final Identifier NOTES_ICON = Identifier.of(Tzz_mod.MOD_ID, "textures/gui/phone/icons/dark/notes.png");
 
     private PhoneAppRegistry() {
     }
@@ -50,6 +52,7 @@ public final class PhoneAppRegistry {
         canonical.add(new PhoneAppEntry("compass", Text.translatable("phone.tzz_mod.app.compass"), iconOverrides.getOrDefault("compass", COMPASS_ICON), CompassAppScreen::new));
         canonical.add(new PhoneAppEntry("camera", Text.translatable("phone.tzz_mod.app.camera"), iconOverrides.getOrDefault("camera", CAMERA_ICON), CameraAppScreen::new));
         canonical.add(new PhoneAppEntry("gallery", Text.translatable("phone.tzz_mod.app.gallery"), iconOverrides.getOrDefault("gallery", GALLERY_ICON), GalleryAppScreen::new));
+        canonical.add(new PhoneAppEntry("notes", Text.translatable("phone.tzz_mod.app.notes"), iconOverrides.getOrDefault("notes", NOTES_ICON), PhoneNotesAppScreen::new));
         canonical.add(new PhoneAppEntry("admin", Text.translatable("phone.tzz_mod.app.admin"), iconOverrides.getOrDefault("admin", ADMIN_ICON), PhoneAdminAppScreen::new));
 
         List<PhoneAppEntry> entries = new ArrayList<>();

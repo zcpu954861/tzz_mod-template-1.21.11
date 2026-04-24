@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.client.phone.ui;
 import com.zcpu.tzzmod.client.phone.PhoneAppEntry;
 import com.zcpu.tzzmod.client.phone.PhoneAppRegistry;
 import com.zcpu.tzzmod.client.phone.chat.PhoneChatClient;
+import com.zcpu.tzzmod.client.note.NoteClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.ui.ScreenHelpText;
 import net.minecraft.client.gui.DrawContext;
@@ -204,6 +205,7 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
         int chatUnread = PhoneChatClient.getTotalUnreadCount();
         int taskUnread = TaskClient.getTotalUnreadCount();
+        int noteUnread = NoteClient.getTotalUnreadCount();
 
         for (AppSlot slot : appSlots) {
             // Tech UI: angular chamfered border around each icon using theme accent colors
@@ -219,12 +221,12 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
             // Angular tech border (chamfered corners, bright accent top, accent accents)
             drawTechBorder(context, frameX, frameY, frameW, frameH);
 
-            // 根据当前主题选择合适版本的图标；如未找到则回退到 entry 中注册的默认图标
-            String themeFolder = isLightMode() ? "light" : "dark";
-            net.minecraft.util.Identifier themeIcon = net.minecraft.util.Identifier.of(
+                // 根据当前主题选择合适版本的图标；如未找到则回退到 entry 中注册的默认图标
+                String themeFolder = isLightMode() ? "light" : "dark";
+                net.minecraft.util.Identifier themeIcon = net.minecraft.util.Identifier.of(
                     com.zcpu.tzzmod.Tzz_mod.MOD_ID,
                     "textures/gui/phone/icons/" + themeFolder + "/" + slot.entry.id() + ".png");
-            net.minecraft.util.Identifier iconToUse = hasResource(themeIcon) ? themeIcon : slot.entry.iconTexture();
+                net.minecraft.util.Identifier iconToUse = hasResource(themeIcon) ? themeIcon : slot.entry.iconTexture();
             if (hasResource(iconToUse)) {
                 int iconPadding = s(0);
                 int iconSize = Math.max(1, slot.size - iconPadding * 2);
@@ -258,6 +260,10 @@ public class PhoneHomeScreen extends AbstractPhoneScreen {
 
             if ("task".equals(slot.entry.id()) && taskUnread > 0) {
                 renderChatBadge(context, slot, taskUnread);
+            }
+
+            if ("notes".equals(slot.entry.id()) && noteUnread > 0) {
+                renderChatBadge(context, slot, noteUnread);
             }
 
             String appName = slot.entry.name().getString();
