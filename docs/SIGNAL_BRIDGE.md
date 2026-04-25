@@ -1,0 +1,194 @@
+# SignalBridge 使用说明
+
+SignalBridge 是 TZZ Mod 的服务端事件桥 / 事件频道系统。它把“某个系统发生了事件”抽象成一个 `signal channel`，再由监听器根据 channel 执行动作。
+
+典型用途：
+
+```text
+RegionController 触发 signal
+-> SignalBridge 查找 listener
+-> listener 执行 command action 或 signal action
+-> ActionEngine 统一执行动作
+```
+
+SignalBridge 不新增方块、GUI 或网络 payload。它只负责服务端事件联动，适合让 RegionController、封锁卡、密码机、感应板以及未来工具共享同一套事件通道。
+
+## channel
+
+channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：
+
+- 小写字母 `a-z`
+- 数字 `0-9`
+- `_`
+- `-`
+- `.`
+- `:`
+
+示例：
+
+```text
+area.a.enter
+password.main.success
+debug.test
+```
+
+不要在 channel 中使用中文、空格或其他特殊字符。
+
+## listener
+
+listener 是 signal 的监听器。每个 listener 绑定一个 channel，并保存一组动作。
+
+当有人执行：
+
+```text
+/tzz signal emit debug.test
+```
+
+所有启用状态、channel 为 `debug.test` 且不在冷却中的 listener 都会执行自己的动作。
+
+listener 可以通过完整 ID、唯一短 ID 或精确名称引用。中文名称可直接使用；名称包含空格时需要加引号。
+
+```text
+/tzz signal listen info 测试监听器
+/tzz signal listen info "测试 监听器"
+```
+
+## 创建 listener
+
+```text
+/tzz signal listen create debug.test 测试监听器
+/tzz signal listen list
+/tzz signal listen info 测试监听器
+```
+
+`list` 会优先显示名称和短 ID，`info` 会显示完整 ID、channel、状态、冷却时间和动作数量。
+
+## command action
+
+listener 可以绑定命令动作：
+
+```text
+/tzz signal listen create debug.test 测试监听器
+/tzz signal listen addAction "测试监听器" command say 收到 debug.test
+/tzz signal emit debug.test
+```
+
+命令文本会交给 ActionEngine 执行。
+
+## signal action
+
+listener 也可以继续发出另一个 signal，用于链式事件：
+
+```text
+/tzz signal listen create debug.test 测试监听器
+/tzz signal listen create debug.chain 链式监听器
+/tzz signal listen addAction "测试监听器" signal debug.chain
+/tzz signal listen addAction "链式监听器" command say 收到链式信号
+/tzz signal emit debug.test
+```
+
+这种方式可以把多个系统拆成独立 listener，再用 channel 串联。
+
+## RegionController 联动
+
+RegionController 的 `addAction` 已支持 `signal` 类型：
+
+```text
+/tzz signal listen create area.a.enter A区进入监听器
+/tzz signal listen addAction "A区进入监听器" command say 收到A区进入信号
+/tzz regionctl addAction A区控制器 enter signal area.a.enter
+```
+
+当玩家进入 `A区控制器` 绑定的区域时，RegionController 会发出 `area.a.enter`，SignalBridge 再触发对应 listener。
+
+`exit` 和 `stay` 也可以使用 signal：
+
+```text
+/tzz regionctl addAction A区控制器 exit signal area.a.exit
+/tzz regionctl addAction A区控制器 stay signal area.a.stay
+```
+
+## cooldown
+
+listener 可以设置全局冷却时间，避免高频 signal 重复执行动作。
+
+```text
+/tzz signal listen cooldown 测试监听器 100
+```
+
+`100` 表示 100 tick。冷却时间不能小于 `0 tick`。
+
+## 递归保护
+
+SignalBridge 有最大递归深度限制，用于防止 signal action 无限触发自身或形成循环。
+
+示例风险：
+
+```text
+listener A -> signal debug.loop
+debug.loop 又触发 listener A
+```
+
+达到最大递归深度后，SignalBridge 会停止继续递归执行，并返回中文失败结果，不会卡死服务器。
+
+## 常见问题
+
+### channel 被拒绝
+
+检查 channel 是否只包含小写字母、数字、`_`、`-`、`.`、`:`。
+
+错误示例：
+
+```text
+Debug.Test
+区域.进入
+debug test
+```
+
+正确示例：
+
+```text
+debug.test
+area.a.enter
+password.main.success
+```
+
+### 找不到 listener
+
+可以先执行：
+
+```text
+/tzz signal listen list
+```
+
+然后使用完整名称、唯一短 ID 或完整 ID。名称包含空格时必须加引号。
+
+### emit 没有执行动作
+
+检查以下内容：
+
+- listener 是否启用。
+- listener 的 channel 是否和 emit 的 channel 完全一致。
+- listener 是否还在 cooldown 中。
+- listener 是否已经添加 action。
+
+### RegionController 没有触发 signal
+
+先用下面的命令确认 listener 本身可用：
+
+```text
+/tzz signal listen test A区进入监听器
+/tzz signal emit area.a.enter
+```
+
+如果 listener 可用，再检查 RegionController 是否启用、绑定区域是否正确、目标过滤是否允许当前玩家触发。
+
+## 配置文件
+
+SignalBridge listener 配置保存到：
+
+```text
+world/tzz_mod/signal_listeners.json
+```
+
+该文件由模组自动维护，不建议手动编辑，除非熟悉当前 JSON 结构。
