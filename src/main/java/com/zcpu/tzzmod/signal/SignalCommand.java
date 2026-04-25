@@ -13,6 +13,7 @@ import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import java.util.List;
+import java.util.function.Supplier;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -168,11 +169,11 @@ public final class SignalCommand {
         );
         ActionExecutionResult result = SignalBridgeServer.emit(event);
         if (result.success()) {
-            source.sendFeedback(() -> title("已发出信号：").append(channelText(channel)), false);
+            sendCommandFeedback(source, () -> title("已发出信号：").append(channelText(channel)), false);
             source.sendFeedback(() -> field("结果", result.message()), false);
             return 1;
         }
-        source.sendFeedback(() -> error(result.message().getString()), false);
+        sendCommandFeedback(source, () -> error(result.message().getString()), false);
         return 0;
     }
 
@@ -218,7 +219,7 @@ public final class SignalCommand {
 
         String channel = SignalChannel.normalize(rawChannel);
         if (!SignalChannel.isValid(channel)) {
-            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            sendCommandFeedback(source, () -> error(SignalChannel.validationError(rawChannel).getString()), false);
             return 0;
         }
 
@@ -226,7 +227,7 @@ public final class SignalCommand {
         List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), channel);
         List<SignalEventRecord> recentEvents = SignalChannelInspector.getRecentEvents(channel, 5);
         if (listeners.isEmpty() && recentEvents.isEmpty()) {
-            source.sendFeedback(() -> warning("频道 " + channel + " 没有监听器，也没有历史记录。"), false);
+            sendCommandFeedback(source, () -> warning("频道 " + channel + " 没有监听器，也没有历史记录。"), false);
             return 0;
         }
 
@@ -268,7 +269,7 @@ public final class SignalCommand {
     private static int executeHistory(ServerCommandSource source, String rawChannel) {
         String channel = rawChannel == null ? null : SignalChannel.normalize(rawChannel);
         if (channel != null && !SignalChannel.isValid(channel)) {
-            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            sendCommandFeedback(source, () -> error(SignalChannel.validationError(rawChannel).getString()), false);
             return 0;
         }
 
@@ -277,9 +278,9 @@ public final class SignalCommand {
                 : SignalEventHistory.snapshot(channel);
         if (records.isEmpty()) {
             if (channel == null) {
-                source.sendFeedback(() -> warning("没有 Signal 历史记录。"), false);
+                sendCommandFeedback(source, () -> warning("没有 Signal 历史记录。"), false);
             } else {
-                source.sendFeedback(() -> warning("频道 " + channel + " 没有历史记录。"), false);
+                sendCommandFeedback(source, () -> warning("频道 " + channel + " 没有历史记录。"), false);
             }
             return 0;
         }
@@ -309,7 +310,7 @@ public final class SignalCommand {
 
     private static int executeClearHistory(ServerCommandSource source) {
         SignalEventHistory.clear();
-        source.sendFeedback(() -> title("已清空 Signal 历史记录。"), true);
+        sendCommandFeedback(source, () -> title("已清空 Signal 历史记录。"), true);
         return 1;
     }
 
@@ -320,13 +321,13 @@ public final class SignalCommand {
 
         String channel = SignalChannel.normalize(rawChannel);
         if (!SignalChannel.isValid(channel)) {
-            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            sendCommandFeedback(source, () -> error(SignalChannel.validationError(rawChannel).getString()), false);
             return 0;
         }
 
         String listenerName = cleanUserText(name);
         SignalListenerData listener = SignalListenerStore.createListener(source.getServer(), channel, listenerName);
-        source.sendFeedback(() -> title("已创建信号监听器"), true);
+        sendCommandFeedback(source, () -> title("已创建信号监听器"), true);
         source.sendFeedback(() -> field("名称", listenerName(listener)), false);
         source.sendFeedback(() -> field("监听器", listenerName(listener)
                 .append(Text.literal("（ID：").formatted(Formatting.GRAY))
@@ -415,10 +416,10 @@ public final class SignalCommand {
 
         boolean changed = SignalListenerStore.setEnabled(source.getServer(), listener.id(), enabled);
         if (!changed) {
-            source.sendFeedback(() -> error("监听器状态更新失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("监听器状态更新失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title(enabled ? "已启用信号监听器" : "已禁用信号监听器")
+        sendCommandFeedback(source, () -> title(enabled ? "已启用信号监听器" : "已禁用信号监听器")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         return 1;
@@ -432,10 +433,10 @@ public final class SignalCommand {
 
         boolean deleted = SignalListenerStore.deleteListener(source.getServer(), listener.id());
         if (!deleted) {
-            source.sendFeedback(() -> error("监听器删除失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("监听器删除失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title("已删除信号监听器")
+        sendCommandFeedback(source, () -> title("已删除信号监听器")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         return 1;
@@ -455,16 +456,16 @@ public final class SignalCommand {
         ActionConfig action = ActionConfig.command(command, false);
         Text validationError = ActionValidator.validateForSave(player, action);
         if (validationError != null) {
-            source.sendFeedback(() -> error("动作配置无效，无法保存。"), false);
+            sendCommandFeedback(source, () -> error("动作配置无效，无法保存。"), false);
             return 0;
         }
 
         boolean changed = SignalListenerStore.addAction(source.getServer(), listener.id(), action);
         if (!changed) {
-            source.sendFeedback(() -> error("动作添加失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("动作添加失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title("已添加监听器动作")
+        sendCommandFeedback(source, () -> title("已添加监听器动作")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         source.sendFeedback(() -> field("命令", commandText(command)), false);
@@ -484,23 +485,23 @@ public final class SignalCommand {
 
         String channel = SignalChannel.normalize(rawChannel);
         if (!SignalChannel.isValid(channel)) {
-            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            sendCommandFeedback(source, () -> error(SignalChannel.validationError(rawChannel).getString()), false);
             return 0;
         }
 
         ActionConfig action = ActionConfig.signal(channel, false);
         Text validationError = ActionValidator.validateForSave(player, action);
         if (validationError != null) {
-            source.sendFeedback(() -> error(validationError.getString()), false);
+            sendCommandFeedback(source, () -> error(validationError.getString()), false);
             return 0;
         }
 
         boolean changed = SignalListenerStore.addAction(source.getServer(), listener.id(), action);
         if (!changed) {
-            source.sendFeedback(() -> error("动作添加失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("动作添加失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title("已添加监听器信号动作")
+        sendCommandFeedback(source, () -> title("已添加监听器信号动作")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         source.sendFeedback(() -> field("频道", channelText(channel)), false);
@@ -515,10 +516,10 @@ public final class SignalCommand {
 
         boolean changed = SignalListenerStore.clearActions(source.getServer(), listener.id());
         if (!changed) {
-            source.sendFeedback(() -> error("动作清空失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("动作清空失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title("已清空监听器动作")
+        sendCommandFeedback(source, () -> title("已清空监听器动作")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         return 1;
@@ -526,7 +527,7 @@ public final class SignalCommand {
 
     private static int executeCooldown(ServerCommandSource source, String listenerRef, int ticks) {
         if (ticks < SignalListenerData.MIN_COOLDOWN_TICKS) {
-            source.sendFeedback(() -> error("冷却时间不能小于 0 tick"), false);
+            sendCommandFeedback(source, () -> error("冷却时间不能小于 0 tick"), false);
             return 0;
         }
 
@@ -537,10 +538,10 @@ public final class SignalCommand {
 
         boolean changed = SignalListenerStore.setCooldown(source.getServer(), listener.id(), ticks);
         if (!changed) {
-            source.sendFeedback(() -> error("冷却时间更新失败：" + listenerRef), false);
+            sendCommandFeedback(source, () -> error("冷却时间更新失败：" + listenerRef), false);
             return 0;
         }
-        source.sendFeedback(() -> title("已更新监听器冷却")
+        sendCommandFeedback(source, () -> title("已更新监听器冷却")
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         source.sendFeedback(() -> field("冷却", number(ticks).append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
@@ -554,7 +555,7 @@ public final class SignalCommand {
         }
 
         if (listener.actions().isEmpty()) {
-            source.sendFeedback(() -> warning("该监听器没有配置动作。"), false);
+            sendCommandFeedback(source, () -> warning("该监听器没有配置动作。"), false);
             return 0;
         }
 
@@ -573,13 +574,13 @@ public final class SignalCommand {
         );
         ActionExecutionResult result = ActionEngine.executeAll(context, listener.actions());
         if (result.success()) {
-            source.sendFeedback(() -> title("监听器测试动作已执行")
+            sendCommandFeedback(source, () -> title("监听器测试动作已执行")
                     .append(Text.literal("：").formatted(Formatting.GRAY))
                     .append(listenerName(listener)), false);
             return 1;
         }
 
-        source.sendFeedback(() -> error("监听器测试动作执行失败。"), false);
+        sendCommandFeedback(source, () -> error("监听器测试动作执行失败。"), false);
         return 0;
     }
 
@@ -685,7 +686,7 @@ public final class SignalCommand {
         }
 
         if (resolved.ambiguous()) {
-            source.sendFeedback(() -> error("匹配到多个监听器，请使用完整 ID："), false);
+            sendCommandFeedback(source, () -> error("匹配到多个监听器，请使用完整 ID："), false);
             for (SignalListenerData match : resolved.matches()) {
                 source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
                         .append(listenerName(match))
@@ -696,7 +697,7 @@ public final class SignalCommand {
             return null;
         }
 
-        source.sendFeedback(() -> error("找不到信号监听器：" + listenerRef), false);
+        sendCommandFeedback(source, () -> error("找不到信号监听器：" + listenerRef), false);
         return null;
     }
 
@@ -704,7 +705,7 @@ public final class SignalCommand {
         if (source.getEntity() instanceof ServerPlayerEntity player) {
             return player;
         }
-        source.sendFeedback(() -> error("该命令必须由玩家执行。"), false);
+        sendCommandFeedback(source, () -> error("该命令必须由玩家执行。"), false);
         return null;
     }
 
@@ -722,6 +723,11 @@ public final class SignalCommand {
 
     private static void sendDivider(ServerCommandSource source) {
         source.sendFeedback(() -> Text.literal("===========").formatted(Formatting.AQUA), false);
+    }
+
+    private static void sendCommandFeedback(ServerCommandSource source, Supplier<Text> feedback, boolean broadcastToOps) {
+        sendDivider(source);
+        source.sendFeedback(feedback, broadcastToOps);
     }
 
     private static void sendHeader(ServerCommandSource source, Text header) {
