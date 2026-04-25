@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.4.1-signal-device-management`
+- 最新发布版本：`v1.5.0-signal-receiver`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -115,13 +115,64 @@ SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身�
 
 然后用拉杆或按钮给 `signal_emitter` 通电。SignalEventHistory 会记录来源为 `signal_device` 的事件。
 
+### SignalReceiver 信号接收器
+
+`signal_receiver` 是一个可放置的信号接收器方块。它负责把 SignalBridge channel 转换为红石输出：
+
+```text
+signal -> signal_receiver -> 红石输出
+```
+
+职责边界：
+
+- `SignalListener` 是虚拟逻辑接收端，用于执行 command / message / sound / signal 等 ActionEngine 动作。
+- `signal_receiver` 是世界实体红石接收端，只负责输出红石脉冲。
+- `signal_receiver` 不负责执行命令，也不需要 channel 上存在 SignalListener 才能工作。
+- 接收器只处理已登记且已加载区块中的方块实体，不扫描世界，也不强制加载区块。
+
+新增命令：
+
+```text
+/tzz signal receiver pulse <x> <y> <z> <ticks>
+/tzz signal receiver trigger <x> <y> <z>
+```
+
+`pulse` 用于设置红石输出脉冲时长，单位是 GT。默认 `5 GT`，常用范围建议 `2 GT` 到 `20 GT`。命令参数只输入整数，不输入 `GT` 后缀。
+
+`/tzz signal device bind <x> <y> <z> <channel>` 现在同时支持 `signal_emitter` 和 `signal_receiver`。`device list/info/debug/test` 也会显示和操作接收器：
+
+```text
+/tzz signal device bind <x> <y> <z> door.a.open
+/tzz signal receiver pulse <x> <y> <z> 5
+/tzz signal receiver trigger <x> <y> <z>
+/tzz signal device info <x> <y> <z>
+/tzz signal device debug <device>
+```
+
+最小使用示例：
+
+```text
+/tzz signal device bind <receiver-x> <receiver-y> <receiver-z> door.a.open
+/tzz signal receiver pulse <receiver-x> <receiver-y> <receiver-z> 5
+/tzz signal emit door.a.open
+```
+
+也可以由 `signal_emitter` 发出同一 channel：
+
+```text
+/tzz signal device bind <emitter-x> <emitter-y> <emitter-z> door.a.open
+/tzz signal device bind <receiver-x> <receiver-y> <receiver-z> door.a.open
+```
+
+之后给 `signal_emitter` 通电，`signal_receiver` 会收到 `door.a.open` 并输出红石脉冲。
+
 Signal 设备管理索引保存到：
 
 ```text
 world/tzz_mod/signal_devices.json
 ```
 
-该文件用于管理显示名、位置、最近触发和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`。设备历史来自内存中的 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块。
+该文件用于管理显示名、位置、最近触发/接收和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`；`SignalReceiverBlockEntity` 保存实际 `channel`、`enabled`、`pulseTicks` 和当前脉冲状态。设备历史来自内存中的 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块。
 
 ### SignalBridge 可观测性命令
 

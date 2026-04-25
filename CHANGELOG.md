@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.0-signal-receiver
+
+- 新增 `signal_receiver` 信号接收器方块。
+- 支持 `signal -> signal_receiver -> 红石输出`。
+- 新增 `SignalReceiverBlockEntity`，保存 `channel`、`enabled`、`pulseTicks`、`remainingPulseTicks`、最近接收时间和最近结果。
+- `pulseTicks` 默认 `5 GT`，命令参数使用整数 tick，不解析 `GT` 后缀。
+- 新增 `/tzz signal receiver pulse <x> <y> <z> <ticks>`。
+- 新增 `/tzz signal receiver trigger <x> <y> <z>`。
+- `/tzz signal device bind <pos> <channel>` 现在支持 `signal_receiver`。
+- `/tzz signal device list/info/debug/test/enable/disable` 现在支持 `signal_receiver`。
+- `signal_receiver` 不需要 SignalListener 也能工作，只处理已登记且已加载的接收器，不扫描世界或强制加载区块。
+- SignalBridge emit 现在会同时分发到 SignalListener 和已加载的 `signal_receiver`。
+- `signal_receiver` 使用与 `signal_emitter` 一致的多元素科技风模型，红色区分接收端，并支持 powered on/off 视觉状态。
+- 保持 SignalListener 作为虚拟逻辑接收端，`signal_receiver` 只负责红石输出，不执行命令动作。
+
 ## v1.4.1-signal-device-management
 
 - 新增 `signal_devices.json` 信号设备管理索引。

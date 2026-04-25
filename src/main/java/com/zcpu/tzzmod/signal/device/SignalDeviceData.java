@@ -12,6 +12,8 @@ public record SignalDeviceData(
         int z,
         String channel,
         boolean enabled,
+        int pulseTicks,
+        int remainingPulseTicks,
         long createdWallTimeMillis,
         long updatedWallTimeMillis,
         long lastTriggerGameTime,
@@ -19,6 +21,8 @@ public record SignalDeviceData(
         String lastResult
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
+    public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
+    public static final int DEFAULT_RECEIVER_PULSE_TICKS = 5;
 
     public SignalDeviceData normalized() {
         String cleanId = id == null ? "" : id.trim();
@@ -26,6 +30,9 @@ public record SignalDeviceData(
         String cleanName = name == null ? "" : name.trim();
         String cleanDimension = dimension == null ? "" : dimension.trim();
         String cleanLastResult = lastResult == null ? "" : lastResult.trim();
+        int cleanPulseTicks = cleanType.equals(TYPE_SIGNAL_RECEIVER)
+                ? Math.max(1, pulseTicks <= 0 ? DEFAULT_RECEIVER_PULSE_TICKS : pulseTicks)
+                : Math.max(0, pulseTicks);
         return new SignalDeviceData(
                 cleanId,
                 cleanType,
@@ -36,6 +43,8 @@ public record SignalDeviceData(
                 z,
                 SignalChannel.normalize(channel),
                 enabled,
+                cleanPulseTicks,
+                Math.max(0, remainingPulseTicks),
                 Math.max(0L, createdWallTimeMillis),
                 Math.max(0L, updatedWallTimeMillis),
                 Math.max(0L, lastTriggerGameTime),

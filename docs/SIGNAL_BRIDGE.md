@@ -158,6 +158,61 @@ world/tzz_mod/signal_devices.json
 
 这个文件只用于管理显示名、位置、最近触发和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`。设备 history 来自内存 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块，因此 registry 中的离线设备只会按已有记录展示；如果方块未加载或已不存在，`debug` 会显示相应提示。
 
+## SignalReceiver 接收器方块
+
+`signal_receiver` 是世界实体红石输出接收端。它把 SignalBridge channel 转换为红石脉冲：
+
+```text
+signal -> signal_receiver -> 红石输出
+```
+
+职责边界：
+
+- `SignalListener` 是虚拟接收端，负责执行 command / message / sound / signal 等 ActionEngine 动作。
+- `signal_receiver` 只负责红石输出，不执行命令动作。
+- `signal_receiver` 不要求 channel 上存在 SignalListener。
+- `signal_receiver` 只处理已登记且已加载区块中的方块实体，不扫描世界，不强制加载区块。
+
+基础命令：
+
+```text
+/tzz signal device bind <x> <y> <z> door.a.open
+/tzz signal device info <x> <y> <z>
+/tzz signal device test <x> <y> <z>
+/tzz signal device debug <device>
+```
+
+`device bind` 会根据坐标上的方块类型自动绑定发射频道或接收频道。`device test` 对发射器表示测试 emit signal；对接收器表示手动输出一次红石脉冲，不会 emit 新 signal。
+
+接收器专用命令：
+
+```text
+/tzz signal receiver pulse <x> <y> <z> <ticks>
+/tzz signal receiver trigger <x> <y> <z>
+/tzz signal receiver info <x> <y> <z>
+```
+
+`pulse` 设置输出脉冲时长，单位是 GT。默认值为 `5 GT`，常用范围建议 `2 GT` 到 `20 GT`。命令参数只输入整数，不输入 `GT` 后缀。
+
+最小联动流程：
+
+```text
+/tzz signal device bind <receiver-x> <receiver-y> <receiver-z> door.a.open
+/tzz signal receiver pulse <receiver-x> <receiver-y> <receiver-z> 5
+/tzz signal emit door.a.open
+```
+
+由发射器驱动接收器：
+
+```text
+/tzz signal device bind <emitter-x> <emitter-y> <emitter-z> door.a.open
+/tzz signal device bind <receiver-x> <receiver-y> <receiver-z> door.a.open
+```
+
+然后给 `signal_emitter` 通电，`signal_receiver` 会收到 `door.a.open` 并输出红石脉冲。
+
+`signal_devices.json` 继续作为设备管理索引。`SignalReceiverBlockEntity` 保存实际 `channel`、`enabled`、`pulseTicks` 和当前脉冲状态；索引用于显示名称、位置、最近接收和 debug 信息。receiver 的历史展示来自内存 SignalEventHistory，不写入新的 JSON。
+
 ## cooldown
 
 listener 可以设置全局冷却时间，避免高频 signal 重复执行动作。

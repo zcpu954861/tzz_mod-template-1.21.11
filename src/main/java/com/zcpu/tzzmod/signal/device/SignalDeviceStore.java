@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
+import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import java.nio.file.Path;
@@ -11,7 +12,6 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.util.math.BlockPos;
 
@@ -48,10 +48,40 @@ public final class SignalDeviceStore {
         return upsertEmitter(world, pos, blockEntity);
     }
 
+    public static synchronized SignalDeviceData upsertReceiver(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData updated = fromReceiver(world, pos, blockEntity, existing, false);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateChannel(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
+        return upsertReceiver(world, pos, blockEntity);
+    }
+
+    public static synchronized SignalDeviceData updateEnabled(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
+        return upsertReceiver(world, pos, blockEntity);
+    }
+
+    public static synchronized SignalDeviceData updatePulse(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
+        return upsertReceiver(world, pos, blockEntity);
+    }
+
     public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, String name) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
         SignalDeviceData updated = withName(fromEmitter(world, pos, blockEntity, existing, false), cleanUserText(name));
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity, String name) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData updated = withName(fromReceiver(world, pos, blockEntity, existing, false), cleanUserText(name));
         replaceOrAdd(state, updated);
         state.markDirty();
         return updated;
@@ -86,6 +116,8 @@ public final class SignalDeviceStore {
                 base.z(),
                 base.channel(),
                 base.enabled(),
+                base.pulseTicks(),
+                base.remainingPulseTicks(),
                 base.createdWallTimeMillis(),
                 now,
                 world.getTime(),
@@ -94,6 +126,47 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+    }
+
+    public static synchronized void recordReceive(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity, ActionExecutionResult result) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData base = fromReceiver(world, pos, blockEntity, existing, false);
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        SignalDeviceData updated = new SignalDeviceData(
+                base.id(),
+                base.type(),
+                base.name(),
+                base.dimension(),
+                base.x(),
+                base.y(),
+                base.z(),
+                base.channel(),
+                base.enabled(),
+                base.pulseTicks(),
+                base.remainingPulseTicks(),
+                base.createdWallTimeMillis(),
+                now,
+                world.getTime(),
+                now,
+                resultMessage
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized List<SignalDeviceData> getEnabledReceiversForChannel(MinecraftServer server, String channel) {
+        String normalizedChannel = com.zcpu.tzzmod.signal.SignalChannel.normalize(channel);
+        List<SignalDeviceData> result = new ArrayList<>();
+        for (SignalDeviceData device : getSnapshot(server)) {
+            if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_RECEIVER)
+                    && device.enabled()
+                    && device.channel().equals(normalizedChannel)) {
+                result.add(device);
+            }
+        }
+        return List.copyOf(result);
     }
 
     public static synchronized ResolveResult resolveDevice(MinecraftServer server, String deviceRef) {
@@ -159,6 +232,28 @@ public final class SignalDeviceStore {
         return world.getBlockEntity(pos) instanceof SignalEmitterBlockEntity blockEntity ? blockEntity : null;
     }
 
+    public static SignalReceiverBlockEntity getLoadedReceiver(MinecraftServer server, SignalDeviceData device) {
+        if (server == null || device == null) {
+            return null;
+        }
+
+        ServerWorld world = findWorld(server, device.dimension());
+        if (world == null) {
+            return null;
+        }
+
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        if (!world.isChunkLoaded(pos)) {
+            return null;
+        }
+
+        return world.getBlockEntity(pos) instanceof SignalReceiverBlockEntity blockEntity ? blockEntity : null;
+    }
+
+    public static ServerWorld getDeviceWorld(MinecraftServer server, SignalDeviceData device) {
+        return device == null ? null : findWorld(server, device.dimension());
+    }
+
     public static synchronized void flushDirty(MinecraftServer server) {
         State state = CACHE.get(server);
         if (state != null) {
@@ -218,17 +313,27 @@ public final class SignalDeviceStore {
     }
 
     private static SignalDeviceData refreshLoadedDevice(MinecraftServer server, State state, SignalDeviceData device) {
-        SignalEmitterBlockEntity blockEntity = getLoadedEmitter(server, device);
-        if (blockEntity == null) {
-            return device;
-        }
-
         ServerWorld world = findWorld(server, device.dimension());
         if (world == null) {
             return device;
         }
 
-        SignalDeviceData refreshed = fromEmitter(world, new BlockPos(device.x(), device.y(), device.z()), blockEntity, device, true);
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        SignalDeviceData refreshed = null;
+        if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_RECEIVER)) {
+            SignalReceiverBlockEntity receiver = getLoadedReceiver(server, device);
+            if (receiver != null) {
+                refreshed = fromReceiver(world, pos, receiver, device, true);
+            }
+        } else {
+            SignalEmitterBlockEntity emitter = getLoadedEmitter(server, device);
+            if (emitter != null) {
+                refreshed = fromEmitter(world, pos, emitter, device, true);
+            }
+        }
+        if (refreshed == null) {
+            return device;
+        }
         if (!refreshed.equals(device)) {
             replaceOrAdd(state, refreshed);
             state.markDirty();
@@ -256,6 +361,38 @@ public final class SignalDeviceStore {
                 pos.getZ(),
                 blockEntity.channel(),
                 blockEntity.enabled(),
+                0,
+                0,
+                created,
+                updated,
+                existing == null ? 0L : existing.lastTriggerGameTime(),
+                existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
+                existing == null ? "" : existing.lastResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData fromReceiver(
+            ServerWorld world,
+            BlockPos pos,
+            SignalReceiverBlockEntity blockEntity,
+            SignalDeviceData existing,
+            boolean preserveUpdatedTime
+    ) {
+        long now = System.currentTimeMillis();
+        long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
+        long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
+        return new SignalDeviceData(
+                SignalReceiverBlockEntity.sourceId(world, pos),
+                SignalDeviceData.TYPE_SIGNAL_RECEIVER,
+                existing == null ? "" : existing.name(),
+                world.getRegistryKey().getValue().toString(),
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                blockEntity.channel(),
+                blockEntity.enabled(),
+                blockEntity.pulseTicks(),
+                blockEntity.remainingPulseTicks(),
                 created,
                 updated,
                 existing == null ? 0L : existing.lastTriggerGameTime(),
@@ -275,6 +412,8 @@ public final class SignalDeviceStore {
                 device.z(),
                 device.channel(),
                 device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
                 device.createdWallTimeMillis(),
                 System.currentTimeMillis(),
                 device.lastTriggerGameTime(),
