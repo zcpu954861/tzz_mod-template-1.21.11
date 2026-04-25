@@ -134,6 +134,20 @@ public final class SignalBridgeServer {
         return CURRENT_DEPTH.get();
     }
 
+    public static long getRemainingCooldownTicks(SignalListenerData listener, long currentGameTime) {
+        if (listener == null || listener.cooldownTicks() <= 0) {
+            return 0L;
+        }
+
+        Long lastTick = LAST_TRIGGER_TICKS.get(listener.id());
+        if (lastTick == null) {
+            return 0L;
+        }
+
+        long remaining = listener.cooldownTicks() - (currentGameTime - lastTick);
+        return Math.max(0L, remaining);
+    }
+
     private static boolean isCoolingDown(SignalListenerData listener, long gameTime) {
         int cooldownTicks = listener.cooldownTicks();
         if (cooldownTicks <= 0) {

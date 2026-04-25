@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import java.util.List;
@@ -67,6 +68,12 @@ public final class SignalCommand {
                         .then(CommandManager.literal("info")
                                 .then(listenerTailArgument()
                                         .executes(context -> executeInfo(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "listener")
+                                        ))))
+                        .then(CommandManager.literal("debug")
+                                .then(listenerTailArgument()
+                                        .executes(context -> executeDebug(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "listener")
                                         ))))
@@ -368,6 +375,37 @@ public final class SignalCommand {
         return 1;
     }
 
+    private static int executeDebug(ServerCommandSource source, String listenerRef) {
+        SignalListenerData listener = resolveListener(source, listenerRef);
+        if (listener == null) {
+            return 0;
+        }
+
+        long remainingCooldownTicks = SignalBridgeServer.getRemainingCooldownTicks(listener, source.getWorld().getTime());
+        SignalChannelSummary summary = SignalChannelInspector.getSummary(source.getServer(), listener.channel());
+        List<SignalEventRecord> recentEvents = SignalChannelInspector.getRecentEvents(listener.channel(), 3);
+
+        source.sendFeedback(() -> title("信号监听器调试信息"), false);
+        source.sendFeedback(() -> field("名称", listenerName(listener)), false);
+        source.sendFeedback(() -> field("状态", statusText(listener.enabled())), false);
+        source.sendFeedback(() -> field("监听器ID", fullIdText(listener.id())), false);
+        source.sendFeedback(() -> field("短ID", shortIdText(listener.id())), false);
+        source.sendFeedback(() -> field("监听频道", channelText(listener.channel())), false);
+        source.sendFeedback(() -> field("冷却设置", number(listener.cooldownTicks()).append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("当前冷却剩余", cooldownRemainingText(remainingCooldownTicks)), false);
+        source.sendFeedback(() -> field("动作数量", number(listener.actions().size())), false);
+
+        source.sendFeedback(() -> title("同频道概览"), false);
+        source.sendFeedback(() -> field("监听器总数", number(summary.listenerCount())), false);
+        source.sendFeedback(() -> field("启用监听器", enabledNumber(summary.enabledListenerCount())), false);
+        source.sendFeedback(() -> field("禁用监听器", disabledNumber(summary.disabledListenerCount())), false);
+
+        sendDebugActions(source, listener);
+        sendDebugRecentEvents(source, recentEvents);
+        sendDirectRecursionWarning(source, listener);
+        return 1;
+    }
+
     private static int executeSetEnabled(ServerCommandSource source, String listenerRef, boolean enabled) {
         SignalListenerData listener = resolveListener(source, listenerRef);
         if (listener == null) {
@@ -585,6 +623,55 @@ public final class SignalCommand {
         source.sendFeedback(() -> field("  结果", resultText(record)), false);
     }
 
+    private static void sendDebugActions(ServerCommandSource source, SignalListenerData listener) {
+        source.sendFeedback(() -> title("动作列表"), false);
+        List<ActionConfig> actions = listener.actions();
+        if (actions.isEmpty()) {
+            source.sendFeedback(() -> warning("该监听器没有配置动作。"), false);
+            return;
+        }
+
+        for (int i = 0; i < actions.size(); i++) {
+            ActionConfig action = actions.get(i);
+            int index = i + 1;
+            source.sendFeedback(() -> Text.literal(index + ". ").formatted(Formatting.GRAY)
+                    .append(actionSummaryText(action)), false);
+            source.sendFeedback(() -> field("  状态", statusText(action.enabled())), false);
+            source.sendFeedback(() -> field("  通知管理员", booleanText(action.notifyOps())), false);
+            source.sendFeedback(() -> field("  需要 OP", booleanText(action.requiresOp())), false);
+        }
+    }
+
+    private static void sendDebugRecentEvents(ServerCommandSource source, List<SignalEventRecord> recentEvents) {
+        source.sendFeedback(() -> title("最近频道事件"), false);
+        if (recentEvents.isEmpty()) {
+            source.sendFeedback(() -> warning("该频道暂无历史记录。"), false);
+            return;
+        }
+
+        for (SignalEventRecord record : recentEvents) {
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                    .append(Text.literal("玩家：").formatted(Formatting.GRAY))
+                    .append(Text.literal(safeRecordText(record.playerName())).formatted(Formatting.WHITE)), false);
+            source.sendFeedback(() -> field("  来源", sourceTypeText(record.sourceType())), false);
+            source.sendFeedback(() -> field("  执行", number(record.executedCount())
+                    .append(Text.literal("，冷却跳过：").formatted(Formatting.GRAY))
+                    .append(number(record.skippedCooldownCount()))
+                    .append(Text.literal("，空动作：").formatted(Formatting.GRAY))
+                    .append(number(record.skippedEmptyCount()))
+                    .append(Text.literal("，失败：").formatted(Formatting.GRAY))
+                    .append(number(record.failedCount()))), false);
+            source.sendFeedback(() -> field("  距今", relativeTimeText(record.wallTimeMillis())), false);
+            source.sendFeedback(() -> field("  结果", resultText(record)), false);
+        }
+    }
+
+    private static void sendDirectRecursionWarning(ServerCommandSource source, SignalListenerData listener) {
+        if (hasDirectSignalRecursion(listener)) {
+            source.sendFeedback(() -> warning("警告：该监听器会向自身监听频道发出 signal，可能触发递归保护。"), false);
+        }
+    }
+
     private static SignalListenerData resolveListener(ServerCommandSource source, String listenerRef) {
         if (source.getServer() == null) {
             return null;
@@ -687,6 +774,59 @@ public final class SignalCommand {
 
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText cooldownRemainingText(long ticks) {
+        MutableText text = number(ticks).append(Text.literal(" tick").formatted(Formatting.GRAY));
+        if (ticks > 0) {
+            text.append(Text.literal("（约 ").formatted(Formatting.GRAY))
+                    .append(Text.literal(String.format(java.util.Locale.ROOT, "%.1f", ticks / 20.0D)).formatted(Formatting.LIGHT_PURPLE))
+                    .append(Text.literal(" 秒）").formatted(Formatting.GRAY));
+        }
+        return text;
+    }
+
+    private static MutableText actionSummaryText(ActionConfig action) {
+        if (action == null || action.type() == null) {
+            return Text.literal("未知动作").formatted(Formatting.YELLOW);
+        }
+
+        String value = action.value() == null ? "" : action.value();
+        if (action.type() == ActionType.SIGNAL) {
+            return Text.literal("信号 ").formatted(Formatting.AQUA)
+                    .append(channelText(value));
+        }
+        if (action.type() == ActionType.COMMAND) {
+            return Text.literal("命令 ").formatted(Formatting.GREEN)
+                    .append(commandText(value));
+        }
+        return Text.literal(actionTypeLabel(action.type()) + " ").formatted(Formatting.GOLD)
+                .append(Text.literal(value).formatted(Formatting.WHITE));
+    }
+
+    private static String actionTypeLabel(ActionType type) {
+        return switch (type) {
+            case MESSAGE -> "消息";
+            case SOUND -> "音效";
+            case SIGNAL -> "信号";
+            case COMMAND -> "命令";
+        };
+    }
+
+    private static MutableText booleanText(boolean value) {
+        return Text.literal(value ? "是" : "否").formatted(value ? Formatting.GREEN : Formatting.RED);
+    }
+
+    private static boolean hasDirectSignalRecursion(SignalListenerData listener) {
+        String channel = SignalChannel.normalize(listener.channel());
+        for (ActionConfig action : listener.actions()) {
+            if (action != null
+                    && action.type() == ActionType.SIGNAL
+                    && SignalChannel.normalize(action.value()).equals(channel)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static MutableText noListenerMarker(SignalChannelSummary summary) {
