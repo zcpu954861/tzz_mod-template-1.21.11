@@ -324,7 +324,8 @@ public final class SignalCommand {
             return 0;
         }
 
-        SignalListenerData listener = SignalListenerStore.createListener(source.getServer(), channel, name);
+        String listenerName = cleanUserText(name);
+        SignalListenerData listener = SignalListenerStore.createListener(source.getServer(), channel, listenerName);
         source.sendFeedback(() -> title("已创建信号监听器"), true);
         source.sendFeedback(() -> field("名称", listenerName(listener)), false);
         source.sendFeedback(() -> field("监听器", listenerName(listener)
@@ -677,7 +678,7 @@ public final class SignalCommand {
             return null;
         }
 
-        String normalizedRef = normalizeListenerRef(listenerRef);
+        String normalizedRef = cleanUserText(listenerRef);
         SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(source.getServer(), normalizedRef);
         if (resolved.foundUnique()) {
             return resolved.listener();
@@ -707,13 +708,13 @@ public final class SignalCommand {
         return null;
     }
 
-    private static String normalizeListenerRef(String listenerRef) {
-        String value = listenerRef == null ? "" : listenerRef.trim();
+    private static String cleanUserText(String raw) {
+        String value = raw == null ? "" : raw.trim();
         if (value.length() >= 2) {
-            char first = value.charAt(0);
-            char last = value.charAt(value.length() - 1);
-            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
-                return value.substring(1, value.length() - 1).trim();
+            boolean doubleQuoted = value.startsWith("\"") && value.endsWith("\"");
+            boolean singleQuoted = value.startsWith("'") && value.endsWith("'");
+            if (doubleQuoted || singleQuoted) {
+                value = value.substring(1, value.length() - 1).trim();
             }
         }
         return value;

@@ -42,7 +42,7 @@ public final class SignalListenerStore {
         State state = getState(server);
         SignalListenerData listener = new SignalListenerData(
                 UUID.randomUUID().toString(),
-                name == null ? "" : name.trim(),
+                cleanUserText(name),
                 SignalChannel.normalize(channel),
                 true,
                 SignalListenerData.DEFAULT_COOLDOWN_TICKS,
@@ -129,7 +129,7 @@ public final class SignalListenerStore {
             return ResolveResult.none();
         }
 
-        String query = listenerRef.trim();
+        String query = cleanUserText(listenerRef);
         for (SignalListenerData listener : getState(server).listeners) {
             if (listener.id().equals(query)) {
                 return ResolveResult.unique(listener);
@@ -139,7 +139,7 @@ public final class SignalListenerStore {
         String shortQuery = query.endsWith("...") ? query.substring(0, query.length() - 3) : query;
         List<SignalListenerData> matches = new ArrayList<>();
         for (SignalListenerData listener : getState(server).listeners) {
-            if (listener.name().equals(query)
+            if (cleanUserText(listener.name()).equals(query)
                     || shortId(listener.id()).equals(query)
                     || (shortQuery.length() >= 8 && listener.id().startsWith(shortQuery))) {
                 matches.add(listener);
@@ -208,6 +208,18 @@ public final class SignalListenerStore {
             return "未知";
         }
         return id.length() <= 8 ? id : id.substring(0, 8) + "...";
+    }
+
+    private static String cleanUserText(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.length() >= 2) {
+            boolean doubleQuoted = value.startsWith("\"") && value.endsWith("\"");
+            boolean singleQuoted = value.startsWith("'") && value.endsWith("'");
+            if (doubleQuoted || singleQuoted) {
+                value = value.substring(1, value.length() - 1).trim();
+            }
+        }
+        return value;
     }
 
     public static final class DataFile {
