@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
+import java.util.LinkedHashSet;
 import java.util.List;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
@@ -34,6 +35,15 @@ public final class SignalCommand {
                                         context.getSource(),
                                         StringArgumentType.getString(context, "channel")
                                 ))))
+                .then(CommandManager.literal("channels")
+                        .executes(context -> executeChannels(context.getSource())))
+                .then(CommandManager.literal("channel")
+                        .then(CommandManager.literal("info")
+                                .then(channelTailArgument()
+                                        .executes(context -> executeChannelInfo(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "channel")
+                                        )))))
                 .then(CommandManager.literal("history")
                         .executes(context -> executeHistory(context.getSource(), null))
                         .then(CommandManager.argument("channel", StringArgumentType.greedyString())
@@ -158,6 +168,92 @@ public final class SignalCommand {
         }
         source.sendFeedback(() -> error(result.message().getString()), false);
         return 0;
+    }
+
+    private static int executeChannels(ServerCommandSource source) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        LinkedHashSet<String> channels = new LinkedHashSet<>();
+        for (SignalListenerData listener : SignalListenerStore.getSnapshot(source.getServer())) {
+            if (listener.channel() != null && !listener.channel().isBlank()) {
+                channels.add(listener.channel());
+            }
+        }
+        for (SignalEventRecord record : SignalEventHistory.snapshot()) {
+            if (record.channel() != null && !record.channel().isBlank()) {
+                channels.add(record.channel());
+            }
+        }
+
+        source.sendFeedback(() -> title("Signal 频道列表：").append(number(channels.size())), false);
+        if (channels.isEmpty()) {
+            source.sendFeedback(() -> warning("暂无 Signal 频道。"), false);
+            return 0;
+        }
+
+        for (String channel : channels) {
+            List<SignalListenerData> listeners = listenersForChannel(source, channel);
+            SignalEventRecord latestRecord = latestRecord(channel);
+            int enabledCount = 0;
+            for (SignalListenerData listener : listeners) {
+                if (listener.enabled()) {
+                    enabledCount++;
+                }
+            }
+            int listenerCount = listeners.size();
+            int finalEnabledCount = enabledCount;
+            SignalEventRecord finalLatestRecord = latestRecord;
+
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY).append(channelText(channel)), false);
+            source.sendFeedback(() -> field("  监听器", number(listenerCount)
+                    .append(Text.literal("，启用：").formatted(Formatting.GRAY))
+                    .append(number(finalEnabledCount))), false);
+            source.sendFeedback(() -> field("  最近触发", finalLatestRecord == null
+                    ? Text.literal("尚未触发").formatted(Formatting.YELLOW)
+                    : relativeTimeText(finalLatestRecord.wallTimeMillis())), false);
+        }
+        return channels.size();
+    }
+
+    private static int executeChannelInfo(ServerCommandSource source, String rawChannel) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            return 0;
+        }
+
+        List<SignalListenerData> listeners = listenersForChannel(source, channel);
+        SignalEventRecord latestRecord = latestRecord(channel);
+        int enabledCount = 0;
+        for (SignalListenerData listener : listeners) {
+            if (listener.enabled()) {
+                enabledCount++;
+            }
+        }
+        int listenerCount = listeners.size();
+        int finalEnabledCount = enabledCount;
+
+        source.sendFeedback(() -> title("Signal 频道详情：").append(channelText(channel)), false);
+        source.sendFeedback(() -> field("监听器", number(listenerCount)
+                .append(Text.literal("，启用：").formatted(Formatting.GRAY))
+                .append(number(finalEnabledCount))), false);
+        source.sendFeedback(() -> field("最近触发", latestRecord == null
+                ? Text.literal("尚未触发").formatted(Formatting.YELLOW)
+                : relativeTimeText(latestRecord.wallTimeMillis())), false);
+
+        if (latestRecord != null) {
+            source.sendFeedback(() -> field("记录时间", number(latestRecord.gameTime())
+                    .append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+            source.sendFeedback(() -> field("距今", relativeTimeText(latestRecord.wallTimeMillis())), false);
+            source.sendFeedback(() -> field("最近结果", resultText(latestRecord)), false);
+        }
+        return 1;
     }
 
     private static int executeHistory(ServerCommandSource source, String rawChannel) {
@@ -467,6 +563,22 @@ public final class SignalCommand {
         source.sendFeedback(() -> field("  结果", resultText(record)), false);
     }
 
+    private static List<SignalListenerData> listenersForChannel(ServerCommandSource source, String channel) {
+        if (source.getServer() == null) {
+            return List.of();
+        }
+
+        String normalizedChannel = SignalChannel.normalize(channel);
+        return SignalListenerStore.getSnapshot(source.getServer()).stream()
+                .filter(listener -> SignalChannel.normalize(listener.channel()).equals(normalizedChannel))
+                .toList();
+    }
+
+    private static SignalEventRecord latestRecord(String channel) {
+        List<SignalEventRecord> records = SignalEventHistory.snapshot(channel);
+        return records.isEmpty() ? null : records.get(records.size() - 1);
+    }
+
     private static SignalListenerData resolveListener(ServerCommandSource source, String listenerRef) {
         if (source.getServer() == null) {
             return null;
@@ -561,6 +673,37 @@ public final class SignalCommand {
 
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText relativeTimeText(long wallTimeMillis) {
+        return Text.literal(formatElapsed(System.currentTimeMillis() - wallTimeMillis)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static String formatElapsed(long elapsedMillis) {
+        if (elapsedMillis < 2_000L) {
+            return "刚刚";
+        }
+
+        long totalSeconds = Math.max(0L, elapsedMillis / 1_000L);
+        long days = totalSeconds / 86_400L;
+        if (days > 0) {
+            long hours = (totalSeconds % 86_400L) / 3_600L;
+            return hours > 0 ? days + " 天 " + hours + " 小时前" : days + " 天前";
+        }
+
+        long hours = totalSeconds / 3_600L;
+        if (hours > 0) {
+            long minutes = (totalSeconds % 3_600L) / 60L;
+            return minutes > 0 ? hours + " 小时 " + minutes + " 分前" : hours + " 小时前";
+        }
+
+        long minutes = totalSeconds / 60L;
+        if (minutes > 0) {
+            long seconds = totalSeconds % 60L;
+            return seconds > 0 ? minutes + " 分 " + seconds + " 秒前" : minutes + " 分前";
+        }
+
+        return totalSeconds + " 秒前";
     }
 
     private static MutableText sourceTypeText(String sourceType) {

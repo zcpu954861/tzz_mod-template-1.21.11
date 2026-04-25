@@ -161,6 +161,7 @@ public final class SignalBridgeServer {
     ) {
         SignalEventHistory.record(new SignalEventRecord(
                 event == null ? 0L : event.gameTime(),
+                System.currentTimeMillis(),
                 channel == null || channel.isBlank() ? "unknown" : channel,
                 event == null || event.player() == null ? "unknown" : event.player().getName().getString(),
                 event == null || event.sourceType() == null ? "unknown" : event.sourceType().id(),

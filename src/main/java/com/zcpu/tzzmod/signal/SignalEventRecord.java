@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.signal;
 
 public record SignalEventRecord(
         long gameTime,
+        long wallTimeMillis,
         String channel,
         String playerName,
         String sourceType,
