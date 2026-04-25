@@ -6,6 +6,7 @@ public enum ActionSourceType {
     SILENT_SENSOR_PLATE("silent_sensor_plate"),
     REGION_CONTROLLER("region_controller"),
     SIGNAL_BRIDGE("signal_bridge"),
+    SIGNAL_DEVICE("signal_device"),
     COMMAND("command"),
     UNKNOWN("unknown");
 

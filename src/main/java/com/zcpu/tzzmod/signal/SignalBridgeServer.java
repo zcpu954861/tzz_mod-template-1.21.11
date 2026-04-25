@@ -32,9 +32,9 @@ public final class SignalBridgeServer {
             return ActionExecutionResult.failure(SignalChannel.validationError(event.channel()));
         }
 
-        if (event.player() == null || event.world() == null || event.position() == null) {
-            recordHistory(event, channel, 0, 0, 0, 0, 1, event.depth(), "信号缺少玩家、世界或位置上下文");
-            return ActionExecutionResult.failure(Text.literal("信号缺少玩家、世界或位置上下文"));
+        if (event.world() == null || event.position() == null) {
+            recordHistory(event, channel, 0, 0, 0, 0, 1, event.depth(), "信号缺少世界或位置上下文");
+            return ActionExecutionResult.failure(Text.literal("信号缺少世界或位置上下文"));
         }
 
         int depth = Math.max(event.depth(), CURRENT_DEPTH.get());

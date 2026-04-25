@@ -12,7 +12,7 @@ public final class ActionValidator {
     }
 
     public static Text validateForSave(ServerPlayerEntity player, ActionConfig config) {
-        Text commonError = validateCommon(player, config);
+        Text commonError = validateCommon(player, config, true);
         if (commonError != null) {
             return commonError;
         }
@@ -33,11 +33,15 @@ public final class ActionValidator {
             return Text.literal("动作上下文为空");
         }
 
-        return validateCommon(context.player(), config);
+        if (context.world() == null || context.position() == null) {
+            return Text.literal("动作上下文缺少世界或位置");
+        }
+
+        return validateCommon(context.player(), config, false);
     }
 
-    private static Text validateCommon(ServerPlayerEntity player, ActionConfig config) {
-        if (player == null) {
+    private static Text validateCommon(ServerPlayerEntity player, ActionConfig config, boolean requirePlayer) {
+        if (requirePlayer && player == null) {
             return Text.literal("玩家为空");
         }
 
@@ -45,7 +49,7 @@ public final class ActionValidator {
             return Text.literal("动作配置为空或未启用");
         }
 
-        if (config.requiresOp() && !player.isCreativeLevelTwoOp()) {
+        if (config.requiresOp() && player != null && !player.isCreativeLevelTwoOp()) {
             return Text.literal("该动作需要 OP 权限");
         }
 

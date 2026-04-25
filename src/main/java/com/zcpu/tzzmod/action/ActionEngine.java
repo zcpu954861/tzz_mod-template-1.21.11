@@ -6,6 +6,7 @@ import com.zcpu.tzzmod.signal.SignalEvent;
 import java.util.List;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
@@ -82,12 +83,7 @@ public final class ActionEngine {
     private static ActionExecutionResult executeCommand(ActionContext context, ActionConfig config) throws Exception {
         String command = ActionConfig.normalizeCommand(config.value());
 
-        ServerCommandSource source = context.player()
-                .getCommandSource()
-                .withPermissions(PermissionPredicate.ALL)
-                .withSilent()
-                .withWorld(context.world())
-                .withPosition(context.position());
+        ServerCommandSource source = commandSource(context);
 
         source.getServer()
                 .getCommandManager()
@@ -98,6 +94,10 @@ public final class ActionEngine {
     }
 
     private static ActionExecutionResult executeMessage(ActionContext context, ActionConfig config) {
+        if (context.player() == null) {
+            return ActionExecutionResult.failure(Text.literal("没有可接收消息的玩家"));
+        }
+
         context.player().sendMessage(Text.literal(config.value()), false);
         return ActionExecutionResult.success(Text.literal("消息已发送"));
     }
@@ -128,5 +128,24 @@ public final class ActionEngine {
                 context.world().getTime()
         );
         return SignalBridgeServer.emit(event);
+    }
+
+    private static ServerCommandSource commandSource(ActionContext context) {
+        ServerPlayerEntity player = context.player();
+        if (player != null) {
+            return player.getCommandSource()
+                    .withPermissions(PermissionPredicate.ALL)
+                    .withSilent()
+                    .withWorld(context.world())
+                    .withPosition(context.position());
+        }
+
+        return context.world()
+                .getServer()
+                .getCommandSource()
+                .withPermissions(PermissionPredicate.ALL)
+                .withSilent()
+                .withWorld(context.world())
+                .withPosition(context.position());
     }
 }
