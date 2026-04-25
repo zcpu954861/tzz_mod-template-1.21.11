@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.4.0-signal-emitter
+
+- 新增 `signal_emitter` 信号发射器方块。
+- 新增 `SignalEmitterBlockEntity`，支持保存 `channel`、`enabled`、`lastPowered`。
+- 支持红石上升沿 emit signal。
+- 持续通电不会重复 emit。
+- 支持 `/tzz signal device bind/info/test/enable/disable`。
+- 支持右键信号发射器查看状态。
+- 支持无玩家上下文的 SignalBridge 触发。
+- SignalEventHistory 可记录 `signal_device` 来源。
+- 新增 `signal_emitter` 科技风模型与贴图。
+- `signal_emitter` 支持 powered on/off 视觉状态。
+
 ## v1.3.1-signal-observability
 
 - 新增 Signal 事件历史记录。

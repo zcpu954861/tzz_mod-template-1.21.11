@@ -108,6 +108,30 @@ RegionController 的 `addAction` 已支持 `signal` 类型：
 /tzz regionctl addAction A区控制器 stay signal area.a.stay
 ```
 
+## SignalEmitter 发射器方块
+
+`signal_emitter` 是第一个可放置的 SignalBridge 设备方块。它绑定一个 channel，并在红石从未通电变为通电时发出 signal。
+
+```text
+/tzz signal device bind <x> <y> <z> redstone.test
+/tzz signal device info <x> <y> <z>
+/tzz signal device test <x> <y> <z>
+/tzz signal device enable <x> <y> <z>
+/tzz signal device disable <x> <y> <z>
+```
+
+最小联动流程：
+
+```text
+/tzz signal listen create redstone.test 红石测试监听器
+/tzz signal listen addAction "红石测试监听器" command say 收到红石信号
+/tzz signal device bind <x> <y> <z> redstone.test
+```
+
+绑定后，用拉杆或按钮给 `signal_emitter` 通电即可触发 `redstone.test`。持续通电不会重复触发，断电后再次通电会再次触发。
+
+右键信号发射器可以查看当前频道、启用状态、红石状态和位置。`test` 命令会使用执行命令的玩家作为上下文；红石自动触发时没有玩家上下文，SignalBridge 会以设备位置作为动作执行位置。SignalEventHistory 中会记录 `sourceType = signal_device`。
+
 ## cooldown
 
 listener 可以设置全局冷却时间，避免高频 signal 重复执行动作。

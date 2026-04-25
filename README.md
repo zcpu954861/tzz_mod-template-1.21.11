@@ -68,6 +68,36 @@ debug.test
 
 SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身。listener 也可以设置 `cooldownTicks`，用于限制高频触发。
 
+### SignalEmitter 信号发射器
+
+`signal_emitter` 是一个可放置的信号发射器方块。它可以绑定一个 SignalBridge channel，并在红石从未通电变为通电时发出 signal。
+
+- 红石上升沿触发 signal。
+- 持续通电不会重复触发。
+- 断电后再次通电可再次触发。
+- 右键方块可查看频道、启用状态、红石状态和位置。
+- 可通过 `/tzz signal device` 命令配置。
+
+设备命令：
+
+```text
+/tzz signal device bind <x> <y> <z> redstone.test
+/tzz signal device info <x> <y> <z>
+/tzz signal device test <x> <y> <z>
+/tzz signal device enable <x> <y> <z>
+/tzz signal device disable <x> <y> <z>
+```
+
+最小使用示例：
+
+```text
+/tzz signal listen create redstone.test 红石测试监听器
+/tzz signal listen addAction "红石测试监听器" command say 收到红石信号
+/tzz signal device bind <x> <y> <z> redstone.test
+```
+
+然后用拉杆或按钮给 `signal_emitter` 通电。SignalEventHistory 会记录来源为 `signal_device` 的事件。
+
 ### SignalBridge 可观测性命令
 
 4.5 阶段补充了 SignalBridge 的只读观测与诊断命令，用于排查 signal 是否发出、channel 是否存在 listener、listener 是否处于冷却或存在递归风险。
@@ -184,6 +214,7 @@ world/tzz_mod/region_controllers.json
 - `map_marker`：添加地图标点。
 - `region_planner`：创建和编辑规划区域。
 - `task_configurator`：创建和编辑任务配置。
+- `signal_emitter`：可绑定 SignalBridge channel，并在红石上升沿发出 signal。
 
 ## 开发与构建
 
