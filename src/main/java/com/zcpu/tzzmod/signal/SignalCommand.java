@@ -1,14 +1,9 @@
 package com.zcpu.tzzmod.signal;
 
-import com.mojang.brigadier.LiteralMessage;
-import com.mojang.brigadier.StringReader;
-import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
@@ -16,7 +11,6 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
-import java.util.Collection;
 import java.util.List;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
@@ -115,7 +109,7 @@ public final class SignalCommand {
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, String> listenerArgument() {
-        return CommandManager.argument("listener", ListenerRefArgumentType.listenerRef())
+        return CommandManager.argument("listener", StringArgumentType.string())
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalListenerRefs(context.getSource(), builder));
     }
 
@@ -484,47 +478,5 @@ public final class SignalCommand {
 
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
-    }
-
-    private static final class ListenerRefArgumentType implements ArgumentType<String> {
-        private static final SimpleCommandExceptionType EMPTY_LISTENER =
-                new SimpleCommandExceptionType(new LiteralMessage("监听器引用不能为空"));
-        private static final Collection<String> EXAMPLES = List.of("测试监听器", "\"测试 监听器\"", "abcd1234...");
-
-        private ListenerRefArgumentType() {
-        }
-
-        private static ListenerRefArgumentType listenerRef() {
-            return new ListenerRefArgumentType();
-        }
-
-        @Override
-        public String parse(StringReader reader) throws CommandSyntaxException {
-            if (!reader.canRead()) {
-                throw EMPTY_LISTENER.createWithContext(reader);
-            }
-
-            String value;
-            if (reader.peek() == '"' || reader.peek() == '\'') {
-                value = reader.readString();
-            } else {
-                int start = reader.getCursor();
-                while (reader.canRead() && !Character.isWhitespace(reader.peek())) {
-                    reader.skip();
-                }
-                value = reader.getString().substring(start, reader.getCursor());
-            }
-
-            value = value.trim();
-            if (value.isEmpty()) {
-                throw EMPTY_LISTENER.createWithContext(reader);
-            }
-            return value;
-        }
-
-        @Override
-        public Collection<String> getExamples() {
-            return EXAMPLES;
-        }
     }
 }
