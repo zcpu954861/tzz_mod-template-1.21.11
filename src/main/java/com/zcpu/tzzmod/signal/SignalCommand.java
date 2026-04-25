@@ -38,6 +38,8 @@ public final class SignalCommand {
                                 ))))
                 .then(CommandManager.literal("channels")
                         .executes(context -> executeChannels(context.getSource())))
+                .then(CommandManager.literal("doctor")
+                        .executes(context -> executeDoctor(context.getSource())))
                 .then(CommandManager.literal("channel")
                         .then(CommandManager.literal("info")
                                 .then(channelTailArgument()
@@ -210,6 +212,26 @@ public final class SignalCommand {
             }
         }
         return summaries.size();
+    }
+
+    private static int executeDoctor(ServerCommandSource source) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        SignalDoctorReport report = SignalDoctor.inspect(source.getServer());
+        sendHeader(source, Text.literal("SignalBridge 诊断报告").formatted(Formatting.GOLD));
+        if (report.issues().isEmpty()) {
+            source.sendFeedback(() -> Text.literal("未发现明显问题。").formatted(Formatting.GREEN), false);
+            sendDoctorOverview(source, report);
+            return 1;
+        }
+
+        sendDoctorOverview(source, report);
+        sendDoctorIssues(source, report, SignalDoctorIssue.Severity.ERROR);
+        sendDoctorIssues(source, report, SignalDoctorIssue.Severity.WARNING);
+        sendDoctorIssues(source, report, SignalDoctorIssue.Severity.INFO);
+        return report.issues().size();
     }
 
     private static int executeChannelInfo(ServerCommandSource source, String rawChannel) {
@@ -668,6 +690,41 @@ public final class SignalCommand {
         }
     }
 
+    private static void sendDoctorOverview(ServerCommandSource source, SignalDoctorReport report) {
+        source.sendFeedback(() -> title("总览："), false);
+        source.sendFeedback(() -> field("监听器", number(report.listenerCount())
+                .append(Text.literal(" 个（启用 ").formatted(Formatting.GRAY))
+                .append(enabledNumber(report.enabledListenerCount()))
+                .append(Text.literal("，禁用 ").formatted(Formatting.GRAY))
+                .append(disabledNumber(report.disabledListenerCount()))
+                .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("频道", number(report.channelCount()).append(Text.literal(" 个").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("历史记录", number(report.historyCount()).append(Text.literal(" 条").formatted(Formatting.GRAY))), false);
+    }
+
+    private static void sendDoctorIssues(
+            ServerCommandSource source,
+            SignalDoctorReport report,
+            SignalDoctorIssue.Severity severity
+    ) {
+        List<SignalDoctorIssue> issues = report.issues().stream()
+                .filter(issue -> issue.severity() == severity)
+                .toList();
+        if (issues.isEmpty()) {
+            return;
+        }
+
+        source.sendFeedback(() -> doctorSectionTitle(severity), false);
+        Formatting itemFormatting = doctorItemFormatting(severity);
+        for (SignalDoctorIssue issue : issues) {
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                    .append(Text.literal(issue.title()).formatted(itemFormatting)), false);
+            if (issue.detail() != null && !issue.detail().isBlank()) {
+                source.sendFeedback(() -> Text.literal("  " + issue.detail()).formatted(Formatting.GRAY), false);
+            }
+        }
+    }
+
     private static void sendDirectRecursionWarning(ServerCommandSource source, SignalListenerData listener) {
         if (hasDirectSignalRecursion(listener)) {
             source.sendFeedback(() -> warning("警告：该监听器会向自身监听频道发出 signal，可能触发递归保护。"), false);
@@ -745,6 +802,22 @@ public final class SignalCommand {
 
     private static MutableText warning(String text) {
         return Text.literal(text).formatted(Formatting.YELLOW);
+    }
+
+    private static MutableText doctorSectionTitle(SignalDoctorIssue.Severity severity) {
+        return switch (severity) {
+            case ERROR -> Text.literal("错误：").formatted(Formatting.RED);
+            case WARNING -> Text.literal("警告：").formatted(Formatting.YELLOW);
+            case INFO -> Text.literal("提示：").formatted(Formatting.GRAY);
+        };
+    }
+
+    private static Formatting doctorItemFormatting(SignalDoctorIssue.Severity severity) {
+        return switch (severity) {
+            case ERROR -> Formatting.RED;
+            case WARNING -> Formatting.YELLOW;
+            case INFO -> Formatting.GRAY;
+        };
     }
 
     private static MutableText field(String label, Text value) {
