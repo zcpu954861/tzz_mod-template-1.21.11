@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.ModBlock.custom;
 
 import com.mojang.serialization.MapCodec;
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
+import com.zcpu.tzzmod.action.ActionExecutionResult;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -78,8 +79,9 @@ public class SignalEmitterBlock extends BlockWithEntity {
         }
 
         boolean powered = world.isReceivingRedstonePower(pos);
-        if (world.getBlockEntity(pos) instanceof SignalEmitterBlockEntity blockEntity) {
+        if (world instanceof ServerWorld serverWorld && world.getBlockEntity(pos) instanceof SignalEmitterBlockEntity blockEntity) {
             blockEntity.setLastPowered(powered);
+            com.zcpu.tzzmod.signal.device.SignalDeviceStore.upsertEmitter(serverWorld, pos, blockEntity);
         }
         if (state.get(POWERED) != powered) {
             world.setBlockState(pos, state.with(POWERED, powered), Block.NOTIFY_ALL);
@@ -138,7 +140,12 @@ public class SignalEmitterBlock extends BlockWithEntity {
             world.setBlockState(pos, state.with(POWERED, newPowered), Block.NOTIFY_ALL);
         }
         if (!oldPowered && newPowered) {
-            blockEntity.emitSignal(world, null);
+            ActionExecutionResult result = blockEntity.emitSignal(world, null);
+            if (blockEntity.enabled()
+                    && !blockEntity.channel().isBlank()
+                    && com.zcpu.tzzmod.signal.SignalChannel.isValid(blockEntity.channel())) {
+                com.zcpu.tzzmod.signal.device.SignalDeviceStore.recordTrigger(world, pos, blockEntity, result);
+            }
         }
     }
 

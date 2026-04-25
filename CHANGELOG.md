@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.4.1-signal-device-management
+
+- 新增 `signal_devices.json` 信号设备管理索引。
+- 新增 `/tzz signal device list`。
+- 新增 `/tzz signal device name <x> <y> <z> <name>`。
+- 新增 `/tzz signal device clearName <device>`。
+- 新增 `/tzz signal device info <device>`，同时保留坐标版 `info`。
+- 新增 `/tzz signal device history <device>`。
+- 新增 `/tzz signal device debug <device>`。
+- 支持使用设备名称、完整 sourceId 或短 ID 引用信号设备。
+- 设备列表与详情优先显示名称，并显示短 ID、位置、频道、启用状态和最近触发时间。
+- 设备调试会提示未绑定频道、设备禁用、频道无 listener、方块未加载或注册表与 BlockEntity 状态不一致。
+- Signal 设备历史仍来自内存 SignalEventHistory，不新增历史 JSON，不扫描未加载区块。
+
 ## v1.4.0-signal-emitter
 
 - 新增 `signal_emitter` 信号发射器方块。
