@@ -1,0 +1,6 @@
+{
+  "parent": "tzz_mod:block/signal_emitter_off",
+  "textures": {
+    "panel": "tzz_mod:block/signal_emitter_panel_on"
+  }
+}

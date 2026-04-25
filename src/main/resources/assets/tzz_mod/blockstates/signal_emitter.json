@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "tzz_mod:block/signal_emitter_off"
+    },
+    "powered=true": {
+      "model": "tzz_mod:block/signal_emitter_on"
+    }
+  }
+}
