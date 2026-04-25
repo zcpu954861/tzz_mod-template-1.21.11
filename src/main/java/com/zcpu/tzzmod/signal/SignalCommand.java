@@ -11,7 +11,6 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
-import java.util.LinkedHashSet;
 import java.util.List;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
@@ -175,46 +174,34 @@ public final class SignalCommand {
             return 0;
         }
 
-        LinkedHashSet<String> channels = new LinkedHashSet<>();
-        for (SignalListenerData listener : SignalListenerStore.getSnapshot(source.getServer())) {
-            if (listener.channel() != null && !listener.channel().isBlank()) {
-                channels.add(listener.channel());
-            }
-        }
-        for (SignalEventRecord record : SignalEventHistory.snapshot()) {
-            if (record.channel() != null && !record.channel().isBlank()) {
-                channels.add(record.channel());
-            }
-        }
-
-        source.sendFeedback(() -> title("Signal 频道列表：").append(number(channels.size())), false);
-        if (channels.isEmpty()) {
-            source.sendFeedback(() -> warning("暂无 Signal 频道。"), false);
+        List<SignalChannelSummary> summaries = SignalChannelInspector.getSummaries(source.getServer());
+        source.sendFeedback(() -> title("Signal 频道列表：").append(number(summaries.size())), false);
+        if (summaries.isEmpty()) {
+            source.sendFeedback(() -> warning("没有已知 Signal 频道。"), false);
             return 0;
         }
 
-        for (String channel : channels) {
-            List<SignalListenerData> listeners = listenersForChannel(source, channel);
-            SignalEventRecord latestRecord = latestRecord(channel);
-            int enabledCount = 0;
-            for (SignalListenerData listener : listeners) {
-                if (listener.enabled()) {
-                    enabledCount++;
-                }
-            }
-            int listenerCount = listeners.size();
-            int finalEnabledCount = enabledCount;
-            SignalEventRecord finalLatestRecord = latestRecord;
+        for (SignalChannelSummary summary : summaries) {
+            SignalChannelSummary current = summary;
 
-            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY).append(channelText(channel)), false);
-            source.sendFeedback(() -> field("  监听器", number(listenerCount)
-                    .append(Text.literal("，启用：").formatted(Formatting.GRAY))
-                    .append(number(finalEnabledCount))), false);
-            source.sendFeedback(() -> field("  最近触发", finalLatestRecord == null
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                    .append(channelText(current.channel()))
+                    .append(noListenerMarker(current)), false);
+            source.sendFeedback(() -> field("  监听器", number(current.listenerCount())
+                    .append(Text.literal(" 个（启用 ").formatted(Formatting.GRAY))
+                    .append(enabledNumber(current.enabledListenerCount()))
+                    .append(Text.literal("，禁用 ").formatted(Formatting.GRAY))
+                    .append(disabledNumber(current.disabledListenerCount()))
+                    .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+            source.sendFeedback(() -> field("  动作", number(current.actionCount())), false);
+            source.sendFeedback(() -> field("  最近触发", current.latestEvent() == null
                     ? Text.literal("尚未触发").formatted(Formatting.YELLOW)
-                    : relativeTimeText(finalLatestRecord.wallTimeMillis())), false);
+                    : relativeTimeText(current.latestEvent().wallTimeMillis())), false);
+            if (current.latestEvent() != null) {
+                source.sendFeedback(() -> field("  结果", resultText(current.latestEvent())), false);
+            }
         }
-        return channels.size();
+        return summaries.size();
     }
 
     private static int executeChannelInfo(ServerCommandSource source, String rawChannel) {
@@ -228,30 +215,45 @@ public final class SignalCommand {
             return 0;
         }
 
-        List<SignalListenerData> listeners = listenersForChannel(source, channel);
-        SignalEventRecord latestRecord = latestRecord(channel);
-        int enabledCount = 0;
-        for (SignalListenerData listener : listeners) {
-            if (listener.enabled()) {
-                enabledCount++;
-            }
+        SignalChannelSummary summary = SignalChannelInspector.getSummary(source.getServer(), channel);
+        List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), channel);
+        List<SignalEventRecord> recentEvents = SignalChannelInspector.getRecentEvents(channel, 5);
+        if (listeners.isEmpty() && recentEvents.isEmpty()) {
+            source.sendFeedback(() -> warning("频道 " + channel + " 没有监听器，也没有历史记录。"), false);
+            return 0;
         }
-        int listenerCount = listeners.size();
-        int finalEnabledCount = enabledCount;
 
         source.sendFeedback(() -> title("Signal 频道详情：").append(channelText(channel)), false);
-        source.sendFeedback(() -> field("监听器", number(listenerCount)
-                .append(Text.literal("，启用：").formatted(Formatting.GRAY))
-                .append(number(finalEnabledCount))), false);
-        source.sendFeedback(() -> field("最近触发", latestRecord == null
+        source.sendFeedback(() -> field("监听器", number(summary.listenerCount())
+                .append(Text.literal(" 个（启用 ").formatted(Formatting.GRAY))
+                .append(enabledNumber(summary.enabledListenerCount()))
+                .append(Text.literal("，禁用 ").formatted(Formatting.GRAY))
+                .append(disabledNumber(summary.disabledListenerCount()))
+                .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("动作", number(summary.actionCount())), false);
+        source.sendFeedback(() -> field("最近触发", summary.latestEvent() == null
                 ? Text.literal("尚未触发").formatted(Formatting.YELLOW)
-                : relativeTimeText(latestRecord.wallTimeMillis())), false);
+                : relativeTimeText(summary.latestEvent().wallTimeMillis())), false);
 
-        if (latestRecord != null) {
-            source.sendFeedback(() -> field("记录时间", number(latestRecord.gameTime())
-                    .append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
-            source.sendFeedback(() -> field("距今", relativeTimeText(latestRecord.wallTimeMillis())), false);
-            source.sendFeedback(() -> field("最近结果", resultText(latestRecord)), false);
+        if (listeners.isEmpty()) {
+            source.sendFeedback(() -> field("监听器列表", number(0).append(Text.literal(" 个").formatted(Formatting.GRAY))), false);
+        } else {
+            source.sendFeedback(() -> title("监听器："), false);
+            for (SignalListenerData listener : listeners) {
+                source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY).append(listenerName(listener)), false);
+                source.sendFeedback(() -> field("  状态", statusText(listener.enabled())), false);
+                source.sendFeedback(() -> field("  冷却", number(listener.cooldownTicks()).append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+                source.sendFeedback(() -> field("  动作", number(listener.actions().size())), false);
+            }
+        }
+
+        if (recentEvents.isEmpty()) {
+            source.sendFeedback(() -> warning("最近事件：暂无历史记录。"), false);
+        } else {
+            source.sendFeedback(() -> title("最近事件："), false);
+            for (SignalEventRecord record : recentEvents) {
+                sendChannelInfoRecord(source, record);
+            }
         }
         return 1;
     }
@@ -563,20 +565,24 @@ public final class SignalCommand {
         source.sendFeedback(() -> field("  结果", resultText(record)), false);
     }
 
-    private static List<SignalListenerData> listenersForChannel(ServerCommandSource source, String channel) {
-        if (source.getServer() == null) {
-            return List.of();
-        }
-
-        String normalizedChannel = SignalChannel.normalize(channel);
-        return SignalListenerStore.getSnapshot(source.getServer()).stream()
-                .filter(listener -> SignalChannel.normalize(listener.channel()).equals(normalizedChannel))
-                .toList();
-    }
-
-    private static SignalEventRecord latestRecord(String channel) {
-        List<SignalEventRecord> records = SignalEventHistory.snapshot(channel);
-        return records.isEmpty() ? null : records.get(records.size() - 1);
+    private static void sendChannelInfoRecord(ServerCommandSource source, SignalEventRecord record) {
+        source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                .append(Text.literal("玩家：").formatted(Formatting.GRAY))
+                .append(Text.literal(safeRecordText(record.playerName())).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("  来源", sourceTypeText(record.sourceType())), false);
+        source.sendFeedback(() -> field("  监听器", number(record.listenerCount())
+                .append(Text.literal("，执行：").formatted(Formatting.GRAY))
+                .append(number(record.executedCount()))
+                .append(Text.literal("，冷却跳过：").formatted(Formatting.GRAY))
+                .append(number(record.skippedCooldownCount()))
+                .append(Text.literal("，空动作：").formatted(Formatting.GRAY))
+                .append(number(record.skippedEmptyCount()))
+                .append(Text.literal("，失败：").formatted(Formatting.GRAY))
+                .append(number(record.failedCount()))), false);
+        source.sendFeedback(() -> field("  距今", relativeTimeText(record.wallTimeMillis())), false);
+        source.sendFeedback(() -> field("  记录时间", number(record.gameTime())
+                .append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("  结果", resultText(record)), false);
     }
 
     private static SignalListenerData resolveListener(ServerCommandSource source, String listenerRef) {
@@ -671,16 +677,34 @@ public final class SignalCommand {
         return Text.literal(Long.toString(value)).formatted(Formatting.LIGHT_PURPLE);
     }
 
+    private static MutableText enabledNumber(int value) {
+        return Text.literal(Integer.toString(value)).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText disabledNumber(int value) {
+        return Text.literal(Integer.toString(value)).formatted(Formatting.RED);
+    }
+
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
     }
 
+    private static MutableText noListenerMarker(SignalChannelSummary summary) {
+        if (summary.listenerCount() == 0 && summary.latestEvent() != null) {
+            return Text.literal("（无监听器）").formatted(Formatting.YELLOW);
+        }
+        return Text.literal("");
+    }
+
     private static MutableText relativeTimeText(long wallTimeMillis) {
+        if (wallTimeMillis <= 0L) {
+            return Text.literal("未知").formatted(Formatting.YELLOW);
+        }
         return Text.literal(formatElapsed(System.currentTimeMillis() - wallTimeMillis)).formatted(Formatting.LIGHT_PURPLE);
     }
 
     private static String formatElapsed(long elapsedMillis) {
-        if (elapsedMillis < 2_000L) {
+        if (elapsedMillis < 3_000L) {
             return "刚刚";
         }
 
