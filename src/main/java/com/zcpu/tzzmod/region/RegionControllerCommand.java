@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.region;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
@@ -121,12 +122,12 @@ public final class RegionControllerCommand {
                         }));
     }
 
-    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<ServerCommandSource, String> controllerIdArgument() {
+    private static RequiredArgumentBuilder<ServerCommandSource, String> controllerIdArgument() {
         return CommandManager.argument("controllerId", StringArgumentType.string())
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestRegionControllerIds(context.getSource(), builder));
     }
 
-    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<ServerCommandSource, String> triggerTypeArgument() {
+    private static RequiredArgumentBuilder<ServerCommandSource, String> triggerTypeArgument() {
         return CommandManager.argument("triggerType", StringArgumentType.string())
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestRegionTriggerTypes(builder));
     }
@@ -331,7 +332,7 @@ public final class RegionControllerCommand {
             source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
             return 0;
         }
-        List<com.zcpu.tzzmod.action.ActionConfig> actions = controller.actionsFor(triggerType);
+        List<ActionConfig> actions = controller.actionsFor(triggerType);
         if (actions.isEmpty()) {
             source.sendFeedback(() -> Text.literal("No actions configured for " + triggerType.name().toLowerCase()), false);
             return 0;
