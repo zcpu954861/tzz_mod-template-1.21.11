@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.zcpu.tzzmod.region.RegionControllerCommand;
+import com.zcpu.tzzmod.signal.SignalCommand;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 
@@ -15,6 +16,7 @@ public final class TzzRootCommand {
                 .then(TaskCommand.build())
                 .then(NoteCommand.build())
                 .then(SendMsgCommand.build())
-                .then(RegionControllerCommand.build()));
+                .then(RegionControllerCommand.build())
+                .then(SignalCommand.build()));
     }
 }

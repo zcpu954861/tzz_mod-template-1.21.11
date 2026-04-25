@@ -7,6 +7,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.phone.chat.PhoneChatService;
 import com.zcpu.tzzmod.region.RegionControllerStore;
+import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -128,6 +129,31 @@ public final class CommandSuggestionUtil {
 
     public static CompletableFuture<Suggestions> suggestRegionTargetFilterTypes(SuggestionsBuilder builder) {
         return suggestStrings(List.of("all", "op", "tag"), builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestSignalListenerRefs(ServerCommandSource source, SuggestionsBuilder builder) {
+        if (source.getServer() == null) {
+            return builder.buildFuture();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (var listener : SignalListenerStore.getSnapshot(source.getServer())) {
+            values.add(listener.name());
+            values.add(listener.id());
+            values.add(SignalListenerStore.shortId(listener.id()));
+        }
+        return suggestStrings(values, builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestSignalChannels(ServerCommandSource source, SuggestionsBuilder builder) {
+        if (source.getServer() == null) {
+            return builder.buildFuture();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (var listener : SignalListenerStore.getSnapshot(source.getServer())) {
+            values.add(listener.channel());
+        }
+        values.add("debug.test");
+        return suggestStrings(values, builder);
     }
 
     public static CompletableFuture<Suggestions> suggestOnlinePlayerTags(ServerCommandSource source, SuggestionsBuilder builder) {
