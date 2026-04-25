@@ -151,7 +151,7 @@ public final class RegionControllerCommand {
         }
         MapDataStore.PlannerRegionData region = MapDataStore.getPlannerRegion(source.getServer(), regionId);
         if (region == null) {
-            source.sendFeedback(() -> Text.literal("鎵句笉鍒拌鍒掑尯鍩燂細" + regionId), false);
+            source.sendFeedback(() -> Text.literal("找不到规划区域：" + regionId), false);
             return 0;
         }
         RegionControllerData controller = RegionControllerStore.createController(source.getServer(), region.id(), name);
@@ -338,7 +338,7 @@ public final class RegionControllerCommand {
         }
         ActionContext context = new ActionContext(
                 player,
-                player.getEntityWorld(),
+                player.getCommandSource().getWorld(),
                 new Vec3d(player.getX(), player.getY(), player.getZ()),
                 ActionSourceType.REGION_CONTROLLER,
                 controller.id(),
