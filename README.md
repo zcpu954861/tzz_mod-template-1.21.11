@@ -88,6 +88,23 @@ SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身�
 /tzz signal device disable <x> <y> <z>
 ```
 
+5.2 阶段补充了设备管理命令：
+
+```text
+/tzz signal device list
+/tzz signal device name <x> <y> <z> <name>
+/tzz signal device clearName <device>
+/tzz signal device info <device>
+/tzz signal device history <device>
+/tzz signal device debug <device>
+```
+
+`<device>` 可以是设备名称、完整 sourceId 或短 ID。设备名称包含空格时需要加引号，例如：
+
+```text
+/tzz signal device info "大厅拉杆发射器"
+```
+
 最小使用示例：
 
 ```text
@@ -97,6 +114,14 @@ SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身�
 ```
 
 然后用拉杆或按钮给 `signal_emitter` 通电。SignalEventHistory 会记录来源为 `signal_device` 的事件。
+
+Signal 设备管理索引保存到：
+
+```text
+world/tzz_mod/signal_devices.json
+```
+
+该文件用于管理显示名、位置、最近触发和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`。设备历史来自内存中的 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块。
 
 ### SignalBridge 可观测性命令
 

@@ -120,17 +120,43 @@ RegionController 的 `addAction` 已支持 `signal` 类型：
 /tzz signal device disable <x> <y> <z>
 ```
 
+设备管理命令：
+
+```text
+/tzz signal device list
+/tzz signal device name <x> <y> <z> <name>
+/tzz signal device clearName <device>
+/tzz signal device info <device>
+/tzz signal device history <device>
+/tzz signal device debug <device>
+```
+
+`<device>` 可以是设备名称、完整 sourceId 或短 ID。名称包含空格时需要加引号：
+
+```text
+/tzz signal device info "大厅拉杆发射器"
+```
+
 最小联动流程：
 
 ```text
 /tzz signal listen create redstone.test 红石测试监听器
 /tzz signal listen addAction "红石测试监听器" command say 收到红石信号
 /tzz signal device bind <x> <y> <z> redstone.test
+/tzz signal device name <x> <y> <z> 大厅拉杆发射器
 ```
 
 绑定后，用拉杆或按钮给 `signal_emitter` 通电即可触发 `redstone.test`。持续通电不会重复触发，断电后再次通电会再次触发。
 
 右键信号发射器可以查看当前频道、启用状态、红石状态和位置。`test` 命令会使用执行命令的玩家作为上下文；红石自动触发时没有玩家上下文，SignalBridge 会以设备位置作为动作执行位置。SignalEventHistory 中会记录 `sourceType = signal_device`。
+
+设备管理索引保存到：
+
+```text
+world/tzz_mod/signal_devices.json
+```
+
+这个文件只用于管理显示名、位置、最近触发和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`。设备 history 来自内存 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块，因此 registry 中的离线设备只会按已有记录展示；如果方块未加载或已不存在，`debug` 会显示相应提示。
 
 ## cooldown
 
