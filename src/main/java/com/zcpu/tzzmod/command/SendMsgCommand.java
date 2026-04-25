@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.command;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.phone.chat.PhoneChatConfig;
 import com.zcpu.tzzmod.phone.chat.PhoneChatService;
 import net.minecraft.server.command.CommandManager;
@@ -14,40 +14,42 @@ import java.util.List;
 public final class SendMsgCommand {
     private SendMsgCommand() {}
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(
-                CommandManager.literal("sendmsg")
-            .then(CommandManager.literal("player")
-                .then(CommandManager.argument("player", StringArgumentType.string())
-                    .suggests((context, builder) -> CommandSuggestionUtil.suggestOnlinePlayerNames(context.getSource(), builder))
-                    .then(CommandManager.argument("text", StringArgumentType.greedyString())
-                        .executes(context -> executeDirect(
-                            context.getSource(),
-                            StringArgumentType.getString(context, "player"),
-                            StringArgumentType.getString(context, "text")
-                        ))
-                    )
-                )
-            )
-            .then(CommandManager.literal("group")
-                .then(CommandManager.argument("group", StringArgumentType.string())
-                    .suggests((context, builder) -> CommandSuggestionUtil.suggestGroupTargets(builder))
-                    .then(CommandManager.argument("text", StringArgumentType.greedyString())
-                        .executes(context -> executeGroup(
-                            context.getSource(),
-                            StringArgumentType.getString(context, "group"),
-                            StringArgumentType.getString(context, "text")
-                        ))
-                    )
-                )
-            )
-                        .then(CommandManager.argument("target", StringArgumentType.string())
-                .suggests((context, builder) -> CommandSuggestionUtil.suggestSendMsgTargets(context.getSource(), builder))
+    public static LiteralArgumentBuilder<ServerCommandSource> build() {
+        return CommandManager.literal("sendmsg")
+                .then(CommandManager.literal("player")
+                        .then(CommandManager.argument("player", StringArgumentType.string())
+                                .suggests((context, builder) -> CommandSuggestionUtil.suggestOnlinePlayerNames(context.getSource(), builder))
                                 .then(CommandManager.argument("text", StringArgumentType.greedyString())
-                                        .executes(context -> execute(context.getSource(), StringArgumentType.getString(context, "target"), StringArgumentType.getString(context, "text")))
+                                        .executes(context -> executeDirect(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "player"),
+                                                StringArgumentType.getString(context, "text")
+                                        ))
                                 )
                         )
-        );
+                )
+                .then(CommandManager.literal("group")
+                        .then(CommandManager.argument("group", StringArgumentType.string())
+                                .suggests((context, builder) -> CommandSuggestionUtil.suggestGroupTargets(builder))
+                                .then(CommandManager.argument("text", StringArgumentType.greedyString())
+                                        .executes(context -> executeGroup(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "group"),
+                                                StringArgumentType.getString(context, "text")
+                                        ))
+                                )
+                        )
+                )
+                .then(CommandManager.argument("target", StringArgumentType.string())
+                        .suggests((context, builder) -> CommandSuggestionUtil.suggestSendMsgTargets(context.getSource(), builder))
+                        .then(CommandManager.argument("text", StringArgumentType.greedyString())
+                                .executes(context -> execute(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "target"),
+                                        StringArgumentType.getString(context, "text")
+                                ))
+                        )
+                );
     }
 
     private static int execute(ServerCommandSource source, String target, String text) {

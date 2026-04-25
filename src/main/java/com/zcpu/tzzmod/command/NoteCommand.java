@@ -1,6 +1,6 @@
 package com.zcpu.tzzmod.command;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.note.NoteDataStore;
 import com.zcpu.tzzmod.note.NoteServer;
 import net.minecraft.server.command.CommandManager;
@@ -12,11 +12,11 @@ public final class NoteCommand {
     private NoteCommand() {
     }
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("note")
+    public static LiteralArgumentBuilder<ServerCommandSource> build() {
+        return CommandManager.literal("note")
                 .then(CommandManager.literal("removeall")
-                .requires(source -> !(source.getEntity() instanceof ServerPlayerEntity player) || player.isCreativeLevelTwoOp())
-                        .executes(context -> removeAll(context.getSource()))));
+                        .requires(source -> !(source.getEntity() instanceof ServerPlayerEntity player) || player.isCreativeLevelTwoOp())
+                        .executes(context -> removeAll(context.getSource())));
     }
 
     private static int removeAll(ServerCommandSource source) {

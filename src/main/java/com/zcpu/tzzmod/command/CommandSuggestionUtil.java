@@ -4,7 +4,9 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.phone.chat.PhoneChatService;
+import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -96,6 +98,47 @@ public final class CommandSuggestionUtil {
             }
         }
         return suggestStrings(suggestions, builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestPlannerRegionIds(ServerCommandSource source, SuggestionsBuilder builder) {
+        if (source.getServer() == null) {
+            return builder.buildFuture();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (MapDataStore.PlannerRegionData region : MapDataStore.getPlannerRegionsSnapshot(source.getServer())) {
+            values.add(region.id());
+        }
+        return suggestStrings(values, builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestRegionControllerIds(ServerCommandSource source, SuggestionsBuilder builder) {
+        if (source.getServer() == null) {
+            return builder.buildFuture();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (var controller : RegionControllerStore.getSnapshot(source.getServer())) {
+            values.add(controller.id());
+        }
+        return suggestStrings(values, builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestRegionTriggerTypes(SuggestionsBuilder builder) {
+        return suggestStrings(List.of("enter", "exit", "stay"), builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestRegionTargetFilterTypes(SuggestionsBuilder builder) {
+        return suggestStrings(List.of("all", "op", "tag"), builder);
+    }
+
+    public static CompletableFuture<Suggestions> suggestOnlinePlayerTags(ServerCommandSource source, SuggestionsBuilder builder) {
+        if (source.getServer() == null) {
+            return builder.buildFuture();
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (ServerPlayerEntity player : source.getServer().getPlayerManager().getPlayerList()) {
+            values.addAll(player.getCommandTags());
+        }
+        return suggestStrings(values, builder);
     }
 
     public static CompletableFuture<Suggestions> suggestStrings(Iterable<String> values, SuggestionsBuilder builder) {

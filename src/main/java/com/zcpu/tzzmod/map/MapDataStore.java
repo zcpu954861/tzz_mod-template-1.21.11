@@ -181,6 +181,10 @@ public final class MapDataStore {
         return null;
     }
 
+    public static synchronized List<PlannerRegionData> getPlannerRegionsSnapshot(MinecraftServer server) {
+        return List.copyOf(getState(server).plannerRegions);
+    }
+
     public static synchronized PlannerRegionData findPlannerRegionContaining(MinecraftServer server, String dimensionId, double x, double z) {
         MapState state = getState(server);
         String cleanDimensionId = safeDimensionId(dimensionId);

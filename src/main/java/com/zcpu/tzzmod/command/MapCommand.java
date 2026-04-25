@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.command;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.map.MapServer;
 import net.minecraft.server.command.CommandManager;
@@ -13,33 +13,31 @@ public final class MapCommand {
     private MapCommand() {
     }
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(
-                CommandManager.literal("map")
-                        .then(CommandManager.literal("set")
-                                .then(CommandManager.literal("xyz")
-                                        .then(CommandManager.argument("x1", IntegerArgumentType.integer())
-                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.X, ""))
-                                                .then(CommandManager.argument("y1", IntegerArgumentType.integer())
-                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Y, ""))
-                                                        .then(CommandManager.argument("z1", IntegerArgumentType.integer())
-                                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Z, ""))
-                                                                .then(CommandManager.argument("x2", IntegerArgumentType.integer())
-                                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.X, "x1"))
-                                                                        .then(CommandManager.argument("y2", IntegerArgumentType.integer())
-                                                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Y, "y1"))
-                                                                                .then(CommandManager.argument("z2", IntegerArgumentType.integer())
-                                                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Z, "z1"))
-                                                                                        .executes(context -> executeSet(
-                                                                                                context.getSource(),
-                                                                                                IntegerArgumentType.getInteger(context, "x1"),
-                                                                                                IntegerArgumentType.getInteger(context, "y1"),
-                                                                                                IntegerArgumentType.getInteger(context, "z1"),
-                                                                                                IntegerArgumentType.getInteger(context, "x2"),
-                                                                                                IntegerArgumentType.getInteger(context, "y2"),
-                                                                                                IntegerArgumentType.getInteger(context, "z2")
-                                                                                        ))
-                                                                                )
+    public static LiteralArgumentBuilder<ServerCommandSource> build() {
+        return CommandManager.literal("map")
+                .then(CommandManager.literal("set")
+                        .then(CommandManager.literal("xyz")
+                                .then(CommandManager.argument("x1", IntegerArgumentType.integer())
+                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.X, ""))
+                                        .then(CommandManager.argument("y1", IntegerArgumentType.integer())
+                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Y, ""))
+                                                .then(CommandManager.argument("z1", IntegerArgumentType.integer())
+                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Z, ""))
+                                                        .then(CommandManager.argument("x2", IntegerArgumentType.integer())
+                                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.X, "x1"))
+                                                                .then(CommandManager.argument("y2", IntegerArgumentType.integer())
+                                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Y, "y1"))
+                                                                        .then(CommandManager.argument("z2", IntegerArgumentType.integer())
+                                                                                .suggests((context, builder) -> CommandSuggestionUtil.suggestCoordinate(context, builder, CommandSuggestionUtil.Axis.Z, "z1"))
+                                                                                .executes(context -> executeSet(
+                                                                                        context.getSource(),
+                                                                                        IntegerArgumentType.getInteger(context, "x1"),
+                                                                                        IntegerArgumentType.getInteger(context, "y1"),
+                                                                                        IntegerArgumentType.getInteger(context, "z1"),
+                                                                                        IntegerArgumentType.getInteger(context, "x2"),
+                                                                                        IntegerArgumentType.getInteger(context, "y2"),
+                                                                                        IntegerArgumentType.getInteger(context, "z2")
+                                                                                ))
                                                                         )
                                                                 )
                                                         )
@@ -47,7 +45,7 @@ public final class MapCommand {
                                         )
                                 )
                         )
-        );
+                );
     }
 
     private static int executeSet(ServerCommandSource source, int x1, int y1, int z1, int x2, int y2, int z2) {
