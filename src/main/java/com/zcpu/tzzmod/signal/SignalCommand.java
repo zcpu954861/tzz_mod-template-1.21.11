@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
+import com.zcpu.tzzmod.signal.device.SignalDeviceCommand;
 import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.item.ItemStack;
@@ -40,6 +41,7 @@ public final class SignalCommand {
                         .executes(context -> executeChannels(context.getSource())))
                 .then(CommandManager.literal("doctor")
                         .executes(context -> executeDoctor(context.getSource())))
+                .then(SignalDeviceCommand.build())
                 .then(CommandManager.literal("channel")
                         .then(CommandManager.literal("info")
                                 .then(channelTailArgument()
