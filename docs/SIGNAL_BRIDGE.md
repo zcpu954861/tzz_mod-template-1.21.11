@@ -192,3 +192,27 @@ world/tzz_mod/signal_listeners.json
 ```
 
 该文件由模组自动维护，不建议手动编辑，除非熟悉当前 JSON 结构。
+
+## 可观测性与诊断命令
+
+4.5 阶段新增了一组只读观测命令，用于排查 SignalBridge 的运行状态：
+
+```text
+/tzz signal history
+/tzz signal history <channel>
+/tzz signal clearHistory
+/tzz signal channels
+/tzz signal channel info <channel>
+/tzz signal listen debug <listener>
+/tzz signal doctor
+```
+
+- `history`：查看最近 signal 事件。
+- `history <channel>`：查看指定 channel 的最近 signal 事件。
+- `clearHistory`：清空当前内存中的 signal 历史记录。
+- `channels`：查看所有已知 signal channel，以及 listener 数量、动作数量、最近触发时间。
+- `channel info <channel>`：查看指定 channel 的 listener 和最近事件详情。
+- `listen debug <listener>`：查看单个 listener 的动作列表、冷却剩余、最近事件和直接 signal 自递归风险。
+- `doctor`：全局诊断 SignalBridge 配置问题，包括空动作 listener、最近触发但没有 listener 的 channel、全部禁用的 channel、直接 signal 自递归、过长 cooldown、非法 channel 脏数据和异常 action 配置。
+
+这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。

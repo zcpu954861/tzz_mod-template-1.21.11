@@ -68,6 +68,30 @@ debug.test
 
 SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身。listener 也可以设置 `cooldownTicks`，用于限制高频触发。
 
+### SignalBridge 可观测性命令
+
+4.5 阶段补充了 SignalBridge 的只读观测与诊断命令，用于排查 signal 是否发出、channel 是否存在 listener、listener 是否处于冷却或存在递归风险。
+
+```text
+/tzz signal history
+/tzz signal history <channel>
+/tzz signal clearHistory
+/tzz signal channels
+/tzz signal channel info <channel>
+/tzz signal listen debug <listener>
+/tzz signal doctor
+```
+
+- `history`：查看最近 signal 事件，默认显示最近 10 条。
+- `history <channel>`：只查看指定 channel 的最近 signal 事件。
+- `clearHistory`：清空内存中的 signal 历史记录。
+- `channels`：查看所有已知 signal channel，包括 listener 数量、动作数量和最近触发时间。
+- `channel info <channel>`：查看某个 channel 的 listener 列表和最近事件。
+- `listen debug <listener>`：查看单个 listener 的动作、冷却剩余、最近频道事件和直接递归风险。
+- `doctor`：全局诊断 SignalBridge 配置问题，例如空动作 listener、无 listener channel、全部禁用 channel、直接 signal 自递归、异常 cooldown 和脏数据。
+
+这些命令只用于查看、清理内存历史或诊断配置，不改变 SignalBridge 的 `emit`、listener 或 ActionEngine 执行语义。
+
 ## RegionController
 
 RegionController 是“区域事件控制器”，用于让已有规划区域拥有逻辑触发能力：

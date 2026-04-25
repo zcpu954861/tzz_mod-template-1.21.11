@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.3.1-signal-observability
+
+- 新增 Signal 事件历史记录。
+- 新增 `/tzz signal history` 和 `/tzz signal clearHistory`。
+- 新增 Signal channel 总览和详情命令。
+- 新增 `/tzz signal channels`。
+- 新增 `/tzz signal channel info <channel>`。
+- 新增 `/tzz signal listen debug <listener>`。
+- 新增 `/tzz signal doctor`。
+- 增强 `/tzz signal` 命令反馈可读性，统一添加青色分割线。
+- 修复带空格监听器名称解析。
+- SignalBridge 可观测性增强，不改变原有 emit / listener / ActionEngine 执行语义。
+
 ## 下一开发版本
 
 - 统一命令入口到 `/tzz`。
