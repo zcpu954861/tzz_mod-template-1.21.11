@@ -30,7 +30,7 @@ public final class RegionControllerTracker {
             onlinePlayers.add(playerId);
 
             PlayerRegionState state = PLAYER_STATES.computeIfAbsent(playerId, ignored -> new PlayerRegionState());
-            String dimensionId = player.getEntityWorld().getRegistryKey().getValue().toString();
+            String dimensionId = player.getCommandSource().getWorld().getRegistryKey().getValue().toString();
 
             for (RegionControllerData controller : controllers) {
                 if (!controller.targetFilter().normalized().matches(player)) {
@@ -121,7 +121,7 @@ public final class RegionControllerTracker {
 
         ActionContext context = new ActionContext(
                 player,
-                player.getEntityWorld(),
+                player.getCommandSource().getWorld(),
                 new Vec3d(player.getX(), player.getY(), player.getZ()),
                 ActionSourceType.REGION_CONTROLLER,
                 controller.id(),
