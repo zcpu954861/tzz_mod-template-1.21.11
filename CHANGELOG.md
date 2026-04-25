@@ -8,6 +8,7 @@
 - `pulseTicks` 默认 `5 GT`，命令参数使用整数 tick，不解析 `GT` 后缀。
 - 新增 `/tzz signal receiver pulse <x> <y> <z> <ticks>`。
 - 新增 `/tzz signal receiver trigger <x> <y> <z>`。
+- 新增 `/tzz signal receiver info <x> <y> <z>`。
 - `/tzz signal device bind <pos> <channel>` 现在支持 `signal_receiver`。
 - `/tzz signal device list/info/debug/test/enable/disable` 现在支持 `signal_receiver`。
 - `signal_receiver` 不需要 SignalListener 也能工作，只处理已登记且已加载的接收器，不扫描世界或强制加载区块。

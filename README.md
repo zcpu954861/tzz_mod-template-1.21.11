@@ -135,6 +135,7 @@ signal -> signal_receiver -> 红石输出
 ```text
 /tzz signal receiver pulse <x> <y> <z> <ticks>
 /tzz signal receiver trigger <x> <y> <z>
+/tzz signal receiver info <x> <y> <z>
 ```
 
 `pulse` 用于设置红石输出脉冲时长，单位是 GT。默认 `5 GT`，常用范围建议 `2 GT` 到 `20 GT`。命令参数只输入整数，不输入 `GT` 后缀。
