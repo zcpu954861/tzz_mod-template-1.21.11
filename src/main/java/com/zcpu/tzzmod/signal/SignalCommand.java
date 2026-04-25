@@ -179,9 +179,10 @@ public final class SignalCommand {
             return 0;
         }
 
+        int displayCount = Math.min(records.size(), 10);
         if (channel == null) {
-            source.sendFeedback(() -> title("最近 Signal 事件：")
-                    .append(number(Math.min(records.size(), 10)))
+            source.sendFeedback(() -> title("最近 Signal 事件（最新在下）：")
+                    .append(number(displayCount))
                     .append(Text.literal(" / ").formatted(Formatting.GRAY))
                     .append(number(SignalEventHistory.size()))
                     .append(Text.literal("，最多保留 ").formatted(Formatting.GRAY))
@@ -190,16 +191,15 @@ public final class SignalCommand {
         } else {
             source.sendFeedback(() -> title("频道 ")
                     .append(channelText(channel))
-                    .append(Text.literal(" 的最近 Signal 事件：").formatted(Formatting.GREEN))
-                    .append(number(Math.min(records.size(), 10))), false);
+                    .append(Text.literal(" 的最近 Signal 事件（最新在下）：").formatted(Formatting.GREEN))
+                    .append(number(displayCount)), false);
         }
 
-        int displayed = 0;
-        for (int i = records.size() - 1; i >= 0 && displayed < 10; i--) {
+        int startIndex = Math.max(0, records.size() - displayCount);
+        for (int i = startIndex; i < records.size(); i++) {
             sendHistoryRecord(source, records.get(i));
-            displayed++;
         }
-        return displayed;
+        return displayCount;
     }
 
     private static int executeClearHistory(ServerCommandSource source) {
