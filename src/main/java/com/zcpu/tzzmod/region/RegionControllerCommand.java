@@ -12,12 +12,15 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import com.zcpu.tzzmod.map.MapDataStore;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Vec3d;
 
 public final class RegionControllerCommand {
@@ -136,12 +139,24 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         List<MapDataStore.PlannerRegionData> regions = MapDataStore.getPlannerRegionsSnapshot(source.getServer());
-        source.sendFeedback(() -> Text.literal("Planner regions: " + regions.size()), false);
+        source.sendFeedback(() -> title("规划区域列表：").append(number(regions.size())), false);
+        if (regions.isEmpty()) {
+            source.sendFeedback(() -> warning("暂无规划区域。"), false);
+            return 0;
+        }
+
         for (MapDataStore.PlannerRegionData region : regions) {
-            source.sendFeedback(() -> Text.literal(
-                    region.id() + " | " + region.name() + " | " + region.dimensionId() + " | points=" + region.points().size()
-            ), false);
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                    .append(regionName(region))
+                    .append(Text.literal("（ID：").formatted(Formatting.GRAY))
+                    .append(shortIdText(region.id()))
+                    .append(Text.literal("）").formatted(Formatting.GRAY)), false);
+            source.sendFeedback(() -> Text.literal("  维度：").formatted(Formatting.GRAY)
+                    .append(Text.literal(region.dimensionId()).formatted(Formatting.YELLOW))
+                    .append(Text.literal("，点数：").formatted(Formatting.GRAY))
+                    .append(number(region.points().size())), false);
         }
         return regions.size();
     }
@@ -150,15 +165,25 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         MapDataStore.PlannerRegionData region = MapDataStore.getPlannerRegion(source.getServer(), regionId);
         if (region == null) {
-            source.sendFeedback(() -> Text.literal("找不到规划区域：" + regionId), false);
+            source.sendFeedback(() -> error("找不到规划区域：" + regionId), false);
             return 0;
         }
+
         RegionControllerData controller = RegionControllerStore.createController(source.getServer(), region.id(), name);
-        source.sendFeedback(() -> Text.literal(
-                "Created region controller: " + controller.id() + " -> " + controller.regionId()
-        ), true);
+        source.sendFeedback(() -> title("已创建区域控制器"), true);
+        source.sendFeedback(() -> field("名称", controllerName(controller)), false);
+        source.sendFeedback(() -> field("控制器", controllerName(controller)
+                .append(Text.literal("（ID：").formatted(Formatting.GRAY))
+                .append(shortIdText(controller.id()))
+                .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("绑定区域", regionName(region)
+                .append(Text.literal("（ID：").formatted(Formatting.GRAY))
+                .append(shortIdText(region.id()))
+                .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("查看详情", commandText("/tzz regionctl info " + shortId(controller.id()))), false);
         return 1;
     }
 
@@ -166,18 +191,24 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         List<RegionControllerData> controllers = RegionControllerStore.getSnapshot(source.getServer());
-        source.sendFeedback(() -> Text.literal("Region controllers: " + controllers.size()), false);
+        source.sendFeedback(() -> title("区域控制器列表：").append(number(controllers.size())), false);
+        if (controllers.isEmpty()) {
+            source.sendFeedback(() -> warning("暂无区域控制器。"), false);
+            return 0;
+        }
+
         for (RegionControllerData controller : controllers) {
-            source.sendFeedback(() -> Text.literal(
-                    controller.id()
-                            + " | " + controller.name()
-                            + " | region=" + controller.regionId()
-                            + " | enabled=" + controller.enabled()
-                            + " | enter=" + controller.enterActions().size()
-                            + " | exit=" + controller.exitActions().size()
-                            + " | stay=" + controller.stayActions().size()
-            ), false);
+            MapDataStore.PlannerRegionData region = MapDataStore.getPlannerRegion(source.getServer(), controller.regionId());
+            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY).append(controllerName(controller)), false);
+            source.sendFeedback(() -> field("  ID", shortIdText(controller.id())), false);
+            source.sendFeedback(() -> field("  绑定区域", regionName(region)
+                    .append(Text.literal("（").formatted(Formatting.GRAY))
+                    .append(shortIdText(controller.regionId()))
+                    .append(Text.literal("）").formatted(Formatting.GRAY))), false);
+            source.sendFeedback(() -> field("  状态", statusText(controller.enabled())), false);
+            source.sendFeedback(() -> field("  动作", actionCounts(controller)), false);
         }
         return controllers.size();
     }
@@ -186,22 +217,24 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
-        RegionControllerData controller = RegionControllerStore.getController(source.getServer(), controllerId);
+
+        RegionControllerData controller = resolveController(source, controllerId);
         if (controller == null) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
             return 0;
         }
+
         MapDataStore.PlannerRegionData region = MapDataStore.getPlannerRegion(source.getServer(), controller.regionId());
-        String regionName = region == null ? "<missing>" : region.name();
         RegionTargetFilter filter = controller.targetFilter().normalized();
-        source.sendFeedback(() -> Text.literal("id=" + controller.id()), false);
-        source.sendFeedback(() -> Text.literal("name=" + controller.name()), false);
-        source.sendFeedback(() -> Text.literal("enabled=" + controller.enabled()), false);
-        source.sendFeedback(() -> Text.literal("regionId=" + controller.regionId()), false);
-        source.sendFeedback(() -> Text.literal("regionName=" + regionName), false);
-        source.sendFeedback(() -> Text.literal("target=" + filter.type() + (filter.value().isBlank() ? "" : ":" + filter.value())), false);
-        source.sendFeedback(() -> Text.literal("stayIntervalTicks=" + controller.stayIntervalTicks()), false);
-        source.sendFeedback(() -> Text.literal("enter=" + controller.enterActions().size() + ", exit=" + controller.exitActions().size() + ", stay=" + controller.stayActions().size()), false);
+        source.sendFeedback(() -> title("区域控制器详情"), false);
+        source.sendFeedback(() -> field("名称", controllerName(controller)), false);
+        source.sendFeedback(() -> field("状态", statusText(controller.enabled())), false);
+        source.sendFeedback(() -> field("控制器ID", fullIdText(controller.id())), false);
+        source.sendFeedback(() -> field("绑定区域", regionName(region)), false);
+        source.sendFeedback(() -> field("绑定区域ID", fullIdText(controller.regionId())), false);
+        source.sendFeedback(() -> field("触发对象", targetFilterText(filter)), false);
+        source.sendFeedback(() -> field("停留间隔", number(controller.stayIntervalTicks())
+                .append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("动作数量", actionCounts(controller)), false);
         return 1;
     }
 
@@ -209,12 +242,24 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
-        boolean changed = RegionControllerStore.setEnabled(source.getServer(), controllerId, enabled);
-        if (!changed) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
             return 0;
         }
-        source.sendFeedback(() -> Text.literal((enabled ? "Enabled" : "Disabled") + " region controller: " + controllerId), true);
+
+        boolean changed = RegionControllerStore.setEnabled(source.getServer(), controller.id(), enabled);
+        if (!changed) {
+            source.sendFeedback(() -> error("区域控制器状态更新失败：" + controllerId), false);
+            return 0;
+        }
+
+        source.sendFeedback(() -> title(enabled ? "已启用区域控制器" : "已禁用区域控制器")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(controllerName(controller))
+                .append(Text.literal("（ID：").formatted(Formatting.GRAY))
+                .append(shortIdText(controller.id()))
+                .append(Text.literal("）").formatted(Formatting.GRAY)), true);
         return 1;
     }
 
@@ -222,12 +267,24 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
-        boolean deleted = RegionControllerStore.deleteController(source.getServer(), controllerId);
-        if (!deleted) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
             return 0;
         }
-        source.sendFeedback(() -> Text.literal("Deleted region controller: " + controllerId), true);
+
+        boolean deleted = RegionControllerStore.deleteController(source.getServer(), controller.id());
+        if (!deleted) {
+            source.sendFeedback(() -> error("区域控制器删除失败：" + controllerId), false);
+            return 0;
+        }
+
+        source.sendFeedback(() -> title("已删除区域控制器")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(controllerName(controller))
+                .append(Text.literal("（ID：").formatted(Formatting.GRAY))
+                .append(shortIdText(controller.id()))
+                .append(Text.literal("）").formatted(Formatting.GRAY)), true);
         return 1;
     }
 
@@ -235,31 +292,42 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         ServerPlayerEntity player = requirePlayer(source);
         if (player == null) {
             return 0;
         }
+
         RegionTriggerType triggerType = parseTriggerType(triggerTypeId);
         if (triggerType == null) {
-            source.sendFeedback(() -> Text.literal("Unknown trigger type: " + triggerTypeId), false);
+            source.sendFeedback(() -> error("未知触发类型：" + triggerTypeId), false);
             return 0;
         }
-        if (RegionControllerStore.getController(source.getServer(), controllerId) == null) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
             return 0;
         }
+
         ActionConfig action = ActionConfig.command(command, false);
         Text validationError = ActionValidator.validateForSave(player, action);
         if (validationError != null) {
-            source.sendFeedback(() -> validationError, false);
+            source.sendFeedback(() -> error("动作配置无效，无法保存。"), false);
             return 0;
         }
-        boolean changed = RegionControllerStore.addAction(source.getServer(), controllerId, triggerType, action);
+
+        boolean changed = RegionControllerStore.addAction(source.getServer(), controller.id(), triggerType, action);
         if (!changed) {
-            source.sendFeedback(() -> Text.literal("Failed to add action for controller: " + controllerId), false);
+            source.sendFeedback(() -> error("动作添加失败：" + controllerId), false);
             return 0;
         }
-        source.sendFeedback(() -> Text.literal("Added " + triggerType.name().toLowerCase() + " action to " + controllerId), true);
+
+        source.sendFeedback(() -> title("已添加区域动作")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(triggerText(triggerType))
+                .append(Text.literal(" -> ").formatted(Formatting.GRAY))
+                .append(controllerName(controller)), true);
+        source.sendFeedback(() -> field("命令", commandText(command)), false);
         return 1;
     }
 
@@ -267,17 +335,29 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         RegionTriggerType triggerType = parseTriggerType(triggerTypeId);
         if (triggerType == null) {
-            source.sendFeedback(() -> Text.literal("Unknown trigger type: " + triggerTypeId), false);
+            source.sendFeedback(() -> error("未知触发类型：" + triggerTypeId), false);
             return 0;
         }
-        boolean changed = RegionControllerStore.clearActions(source.getServer(), controllerId, triggerType);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
+            return 0;
+        }
+
+        boolean changed = RegionControllerStore.clearActions(source.getServer(), controller.id(), triggerType);
         if (!changed) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+            source.sendFeedback(() -> error("动作清空失败：" + controllerId), false);
             return 0;
         }
-        source.sendFeedback(() -> Text.literal("Cleared " + triggerType.name().toLowerCase() + " actions for " + controllerId), true);
+
+        source.sendFeedback(() -> title("已清空区域动作")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(triggerText(triggerType))
+                .append(Text.literal(" -> ").formatted(Formatting.GRAY))
+                .append(controllerName(controller)), true);
         return 1;
     }
 
@@ -285,15 +365,23 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
-        boolean changed = RegionControllerStore.setTargetFilter(source.getServer(), controllerId, filter);
-        if (!changed) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
             return 0;
         }
+
+        boolean changed = RegionControllerStore.setTargetFilter(source.getServer(), controller.id(), filter);
+        if (!changed) {
+            source.sendFeedback(() -> error("触发对象更新失败：" + controllerId), false);
+            return 0;
+        }
+
         RegionTargetFilter normalized = filter.normalized();
-        source.sendFeedback(() -> Text.literal(
-                "Updated target filter for " + controllerId + ": " + normalized.type() + (normalized.value().isBlank() ? "" : ":" + normalized.value())
-        ), true);
+        source.sendFeedback(() -> title("已更新触发对象")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(controllerName(controller)), true);
+        source.sendFeedback(() -> field("触发对象", targetFilterText(normalized)), false);
         return 1;
     }
 
@@ -301,16 +389,27 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         if (ticks < RegionControllerData.MIN_STAY_INTERVAL_TICKS) {
-            source.sendFeedback(() -> Text.literal("stayInterval must be at least " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " ticks"), false);
+            source.sendFeedback(() -> error("停留触发间隔不能低于 " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " tick"), false);
             return 0;
         }
-        boolean changed = RegionControllerStore.setStayInterval(source.getServer(), controllerId, ticks);
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
+            return 0;
+        }
+
+        boolean changed = RegionControllerStore.setStayInterval(source.getServer(), controller.id(), ticks);
         if (!changed) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
+            source.sendFeedback(() -> error("停留间隔更新失败：" + controllerId), false);
             return 0;
         }
-        source.sendFeedback(() -> Text.literal("Updated stayInterval for " + controllerId + " to " + ticks + " ticks"), true);
+
+        source.sendFeedback(() -> title("已更新停留触发间隔")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(controllerName(controller)), true);
+        source.sendFeedback(() -> field("停留间隔", number(ticks).append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
         return 1;
     }
 
@@ -318,25 +417,29 @@ public final class RegionControllerCommand {
         if (source.getServer() == null) {
             return 0;
         }
+
         ServerPlayerEntity player = requirePlayer(source);
         if (player == null) {
             return 0;
         }
+
         RegionTriggerType triggerType = parseTriggerType(triggerTypeId);
         if (triggerType == null) {
-            source.sendFeedback(() -> Text.literal("Unknown trigger type: " + triggerTypeId), false);
+            source.sendFeedback(() -> error("未知触发类型：" + triggerTypeId), false);
             return 0;
         }
-        RegionControllerData controller = RegionControllerStore.getController(source.getServer(), controllerId);
+
+        RegionControllerData controller = resolveController(source, controllerId);
         if (controller == null) {
-            source.sendFeedback(() -> Text.literal("Region controller not found: " + controllerId), false);
             return 0;
         }
+
         List<ActionConfig> actions = controller.actionsFor(triggerType);
         if (actions.isEmpty()) {
-            source.sendFeedback(() -> Text.literal("No actions configured for " + triggerType.name().toLowerCase()), false);
+            source.sendFeedback(() -> warning("该触发类型没有配置动作：").append(triggerText(triggerType)), false);
             return 0;
         }
+
         ActionContext context = new ActionContext(
                 player,
                 player.getCommandSource().getWorld(),
@@ -346,7 +449,15 @@ public final class RegionControllerCommand {
                 ItemStack.EMPTY
         );
         ActionExecutionResult result = ActionEngine.executeAll(context, actions);
-        source.sendFeedback(() -> result.message(), false);
+        if (result.success()) {
+            source.sendFeedback(() -> title("测试动作已执行")
+                    .append(Text.literal("：").formatted(Formatting.GRAY))
+                    .append(triggerText(triggerType))
+                    .append(Text.literal(" -> ").formatted(Formatting.GRAY))
+                    .append(controllerName(controller)), false);
+        } else {
+            source.sendFeedback(() -> error("测试动作执行失败。"), false);
+        }
         return result.success() ? 1 : 0;
     }
 
@@ -354,7 +465,7 @@ public final class RegionControllerCommand {
         if (source.getEntity() instanceof ServerPlayerEntity player) {
             return player;
         }
-        source.sendFeedback(() -> Text.literal("This command must be executed by a player."), false);
+        source.sendFeedback(() -> error("该命令必须由玩家执行。"), false);
         return null;
     }
 
@@ -368,5 +479,137 @@ public final class RegionControllerCommand {
             case "stay" -> RegionTriggerType.STAY;
             default -> null;
         };
+    }
+
+    private static RegionControllerData resolveController(ServerCommandSource source, String rawControllerId) {
+        if (source.getServer() == null) {
+            return null;
+        }
+
+        String query = rawControllerId == null ? "" : rawControllerId.trim();
+        if (query.isBlank()) {
+            source.sendFeedback(() -> error("控制器标识不能为空。"), false);
+            return null;
+        }
+
+        List<RegionControllerData> controllers = RegionControllerStore.getSnapshot(source.getServer());
+        for (RegionControllerData controller : controllers) {
+            if (controller.id().equals(query)) {
+                return controller;
+            }
+        }
+
+        String shortQuery = query.endsWith("...") ? query.substring(0, query.length() - 3) : query;
+        List<RegionControllerData> matches = new ArrayList<>();
+        for (RegionControllerData controller : controllers) {
+            if (safeName(controller).equals(query)
+                    || shortId(controller.id()).equals(query)
+                    || (shortQuery.length() >= 8 && controller.id().startsWith(shortQuery))) {
+                matches.add(controller);
+            }
+        }
+
+        if (matches.isEmpty()) {
+            source.sendFeedback(() -> error("找不到区域控制器：" + query), false);
+            return null;
+        }
+
+        if (matches.size() > 1) {
+            source.sendFeedback(() -> error("控制器标识不唯一：" + query + "，请使用完整 ID。"), false);
+            return null;
+        }
+
+        return matches.get(0);
+    }
+
+    private static MutableText title(String text) {
+        return Text.literal(text).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText error(String text) {
+        return Text.literal(text).formatted(Formatting.RED);
+    }
+
+    private static MutableText warning(String text) {
+        return Text.literal(text).formatted(Formatting.YELLOW);
+    }
+
+    private static MutableText field(String label, Text value) {
+        return Text.literal(label + "：").formatted(Formatting.GRAY).append(value);
+    }
+
+    private static MutableText controllerName(RegionControllerData controller) {
+        return Text.literal(safeName(controller)).formatted(Formatting.GOLD);
+    }
+
+    private static String safeName(RegionControllerData controller) {
+        return controller.name() == null || controller.name().isBlank() ? "未命名控制器" : controller.name();
+    }
+
+    private static MutableText regionName(MapDataStore.PlannerRegionData region) {
+        if (region == null) {
+            return Text.literal("缺失区域").formatted(Formatting.YELLOW);
+        }
+        String name = region.name() == null || region.name().isBlank() ? "未命名区域" : region.name();
+        return Text.literal(name).formatted(Formatting.YELLOW);
+    }
+
+    private static MutableText statusText(boolean enabled) {
+        return Text.literal(enabled ? "启用" : "禁用").formatted(enabled ? Formatting.GREEN : Formatting.RED);
+    }
+
+    private static MutableText targetFilterText(RegionTargetFilter filter) {
+        RegionTargetFilter normalized = filter == null ? RegionTargetFilter.all() : filter.normalized();
+        return switch (normalized.type()) {
+            case ALL -> Text.literal("所有玩家").formatted(Formatting.WHITE);
+            case OP -> Text.literal("OP 玩家").formatted(Formatting.YELLOW);
+            case TAG -> Text.literal("标签 ").formatted(Formatting.GRAY)
+                    .append(Text.literal(normalized.value()).formatted(Formatting.AQUA));
+        };
+    }
+
+    private static MutableText actionCounts(RegionControllerData controller) {
+        return triggerText(RegionTriggerType.ENTER)
+                .append(Text.literal(" ").formatted(Formatting.GRAY))
+                .append(number(controller.enterActions().size()))
+                .append(Text.literal("，").formatted(Formatting.GRAY))
+                .append(triggerText(RegionTriggerType.EXIT))
+                .append(Text.literal(" ").formatted(Formatting.GRAY))
+                .append(number(controller.exitActions().size()))
+                .append(Text.literal("，").formatted(Formatting.GRAY))
+                .append(triggerText(RegionTriggerType.STAY))
+                .append(Text.literal(" ").formatted(Formatting.GRAY))
+                .append(number(controller.stayActions().size()));
+    }
+
+    private static MutableText triggerText(RegionTriggerType triggerType) {
+        return switch (triggerType) {
+            case ENTER -> Text.literal("进入").formatted(Formatting.GREEN);
+            case EXIT -> Text.literal("离开").formatted(Formatting.GOLD);
+            case STAY -> Text.literal("停留").formatted(Formatting.LIGHT_PURPLE);
+        };
+    }
+
+    private static MutableText number(int value) {
+        return Text.literal(Integer.toString(value)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText commandText(String command) {
+        return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText fullIdText(String id) {
+        return Text.literal(id == null || id.isBlank() ? "未知" : id).formatted(Formatting.AQUA);
+    }
+
+    private static MutableText shortIdText(String id) {
+        return Text.literal(shortId(id)).formatted(Formatting.AQUA);
+    }
+
+    private static String shortId(String id) {
+        if (id == null || id.isBlank()) {
+            return "未知";
+        }
+        return id.length() <= 8 ? id : id.substring(0, 8) + "...";
     }
 }
