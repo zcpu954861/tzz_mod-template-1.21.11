@@ -182,7 +182,7 @@ public final class SignalCommand {
         }
 
         List<SignalChannelSummary> summaries = SignalChannelInspector.getSummaries(source.getServer());
-        source.sendFeedback(() -> title("Signal 频道列表：").append(number(summaries.size())), false);
+        sendHeader(source, title("Signal 频道列表：").append(number(summaries.size())));
         if (summaries.isEmpty()) {
             source.sendFeedback(() -> warning("没有已知 Signal 频道。"), false);
             return 0;
@@ -230,7 +230,7 @@ public final class SignalCommand {
             return 0;
         }
 
-        source.sendFeedback(() -> title("Signal 频道详情：").append(channelText(channel)), false);
+        sendHeader(source, title("Signal 频道详情：").append(channelText(channel)));
         source.sendFeedback(() -> field("监听器", number(summary.listenerCount())
                 .append(Text.literal(" 个（启用 ").formatted(Formatting.GRAY))
                 .append(enabledNumber(summary.enabledListenerCount()))
@@ -286,18 +286,18 @@ public final class SignalCommand {
 
         int displayCount = Math.min(records.size(), 10);
         if (channel == null) {
-            source.sendFeedback(() -> title("最近 Signal 事件（最新在下）：")
+            sendHeader(source, title("最近 Signal 事件（最新在下）：")
                     .append(number(displayCount))
                     .append(Text.literal(" / ").formatted(Formatting.GRAY))
                     .append(number(SignalEventHistory.size()))
                     .append(Text.literal("，最多保留 ").formatted(Formatting.GRAY))
                     .append(number(SignalEventHistory.maxSize()))
-                    .append(Text.literal(" 条").formatted(Formatting.GRAY)), false);
+                    .append(Text.literal(" 条").formatted(Formatting.GRAY)));
         } else {
-            source.sendFeedback(() -> title("频道 ")
+            sendHeader(source, title("频道 ")
                     .append(channelText(channel))
                     .append(Text.literal(" 的最近 Signal 事件（最新在下）：").formatted(Formatting.GREEN))
-                    .append(number(displayCount)), false);
+                    .append(number(displayCount)));
         }
 
         int startIndex = Math.max(0, records.size() - displayCount);
@@ -342,7 +342,7 @@ public final class SignalCommand {
         }
 
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(source.getServer());
-        source.sendFeedback(() -> title("信号监听器列表：").append(number(listeners.size())), false);
+        sendHeader(source, title("信号监听器列表：").append(number(listeners.size())));
         if (listeners.isEmpty()) {
             source.sendFeedback(() -> warning("暂无信号监听器。"), false);
             return 0;
@@ -365,7 +365,7 @@ public final class SignalCommand {
             return 0;
         }
 
-        source.sendFeedback(() -> title("信号监听器详情"), false);
+        sendHeader(source, title("信号监听器详情"));
         source.sendFeedback(() -> field("名称", listenerName(listener)), false);
         source.sendFeedback(() -> field("状态", statusText(listener.enabled())), false);
         source.sendFeedback(() -> field("监听器ID", fullIdText(listener.id())), false);
@@ -385,7 +385,7 @@ public final class SignalCommand {
         SignalChannelSummary summary = SignalChannelInspector.getSummary(source.getServer(), listener.channel());
         List<SignalEventRecord> recentEvents = SignalChannelInspector.getRecentEvents(listener.channel(), 3);
 
-        source.sendFeedback(() -> title("信号监听器调试信息"), false);
+        sendHeader(source, title("信号监听器调试信息"));
         source.sendFeedback(() -> field("名称", listenerName(listener)), false);
         source.sendFeedback(() -> field("状态", statusText(listener.enabled())), false);
         source.sendFeedback(() -> field("监听器ID", fullIdText(listener.id())), false);
@@ -717,6 +717,15 @@ public final class SignalCommand {
             }
         }
         return value;
+    }
+
+    private static void sendDivider(ServerCommandSource source) {
+        source.sendFeedback(() -> Text.literal("===========").formatted(Formatting.AQUA), false);
+    }
+
+    private static void sendHeader(ServerCommandSource source, Text header) {
+        sendDivider(source);
+        source.sendFeedback(() -> header, false);
     }
 
     private static MutableText title(String text) {
