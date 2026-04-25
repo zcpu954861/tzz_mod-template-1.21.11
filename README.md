@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`1.1.5`
+- 最新发布版本：`v1.4.1-signal-device-management`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
