@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.action;
 
 import com.mojang.brigadier.ParseResults;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -18,6 +19,10 @@ public final class ActionValidator {
 
         if (config.type() == ActionType.COMMAND && !isCommandValid(player, config.value())) {
             return Text.literal("命令无效");
+        }
+
+        if (config.type() == ActionType.SIGNAL && !SignalChannel.isValid(config.value())) {
+            return SignalChannel.validationError(config.value());
         }
 
         return null;

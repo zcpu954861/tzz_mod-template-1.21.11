@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import com.zcpu.tzzmod.map.MapDataStore;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.item.ItemStack;
@@ -62,6 +63,15 @@ public final class RegionControllerCommand {
                                                                 StringArgumentType.getString(context, "controllerId"),
                                                                 StringArgumentType.getString(context, "triggerType"),
                                                                 StringArgumentType.getString(context, "command")
+                                                        ))))
+                                        .then(CommandManager.literal("signal")
+                                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                                        .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalChannels(context.getSource(), builder))
+                                                        .executes(context -> executeAddSignalAction(
+                                                                context.getSource(),
+                                                                StringArgumentType.getString(context, "controllerId"),
+                                                                StringArgumentType.getString(context, "triggerType"),
+                                                                StringArgumentType.getString(context, "channel")
                                                         )))))))
                 .then(CommandManager.literal("clearActions")
                         .then(controllerIdArgument()
@@ -328,6 +338,55 @@ public final class RegionControllerCommand {
                 .append(Text.literal(" -> ").formatted(Formatting.GRAY))
                 .append(controllerName(controller)), true);
         source.sendFeedback(() -> field("命令", commandText(command)), false);
+        return 1;
+    }
+
+    private static int executeAddSignalAction(ServerCommandSource source, String controllerId, String triggerTypeId, String rawChannel) {
+        if (source.getServer() == null) {
+            return 0;
+        }
+
+        ServerPlayerEntity player = requirePlayer(source);
+        if (player == null) {
+            return 0;
+        }
+
+        RegionTriggerType triggerType = parseTriggerType(triggerTypeId);
+        if (triggerType == null) {
+            source.sendFeedback(() -> error("未知触发类型：" + triggerTypeId), false);
+            return 0;
+        }
+
+        RegionControllerData controller = resolveController(source, controllerId);
+        if (controller == null) {
+            return 0;
+        }
+
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            return 0;
+        }
+
+        ActionConfig action = ActionConfig.signal(channel, false);
+        Text validationError = ActionValidator.validateForSave(player, action);
+        if (validationError != null) {
+            source.sendFeedback(() -> error(validationError.getString()), false);
+            return 0;
+        }
+
+        boolean changed = RegionControllerStore.addAction(source.getServer(), controller.id(), triggerType, action);
+        if (!changed) {
+            source.sendFeedback(() -> error("动作添加失败：" + controllerId), false);
+            return 0;
+        }
+
+        source.sendFeedback(() -> title("已添加区域信号动作")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(triggerText(triggerType))
+                .append(Text.literal(" -> ").formatted(Formatting.GRAY))
+                .append(controllerName(controller)), true);
+        source.sendFeedback(() -> field("频道", commandText(channel)), false);
         return 1;
     }
 

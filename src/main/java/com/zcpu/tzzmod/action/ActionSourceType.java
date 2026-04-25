@@ -5,6 +5,7 @@ public enum ActionSourceType {
     PASSWORD_MACHINE("password_machine"),
     SILENT_SENSOR_PLATE("silent_sensor_plate"),
     REGION_CONTROLLER("region_controller"),
+    SIGNAL_BRIDGE("signal_bridge"),
     COMMAND("command"),
     UNKNOWN("unknown");
 

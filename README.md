@@ -29,9 +29,44 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 /tzz note ...
 /tzz sendmsg ...
 /tzz regionctl ...
+/tzz signal ...
 ```
 
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
+
+## SignalBridge
+
+SignalBridge 是服务端事件桥 / 事件频道系统，用于把不同系统产生的事件通过 `signal channel` 串联起来。RegionController、封锁卡、密码机、感应板以及未来工具都可以通过 signal channel 联动，并最终由 listener 触发 ActionEngine 动作。
+
+完整使用说明见 [docs/SIGNAL_BRIDGE.md](docs/SIGNAL_BRIDGE.md)。
+
+### 基本示例
+
+```text
+/tzz signal listen create debug.test 测试监听器
+/tzz signal listen addAction "测试监听器" command say 收到 debug.test
+/tzz signal emit debug.test
+```
+
+### signal action 示例
+
+```text
+/tzz signal listen create area.a.enter A区进入监听器
+/tzz signal listen addAction "A区进入监听器" command say 收到A区进入信号
+/tzz regionctl addAction A区控制器 enter signal area.a.enter
+```
+
+### channel 规则
+
+channel 是技术标识，会被规范化为小写，只允许小写字母、数字、`_`、`-`、`.`、`:`，长度为 1 到 128 个字符。
+
+```text
+area.a.enter
+password.main.success
+debug.test
+```
+
+SignalBridge 内置最大递归深度限制，防止 signal 无限触发自身。listener 也可以设置 `cooldownTicks`，用于限制高频触发。
 
 ## RegionController
 

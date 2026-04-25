@@ -3,7 +3,8 @@ package com.zcpu.tzzmod.action;
 public enum ActionType {
     COMMAND("command"),
     MESSAGE("message"),
-    SOUND("sound");
+    SOUND("sound"),
+    SIGNAL("signal");
 
     private final String id;
 

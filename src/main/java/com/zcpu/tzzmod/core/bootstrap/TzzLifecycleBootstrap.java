@@ -8,6 +8,8 @@ import com.zcpu.tzzmod.note.NoteDataStore;
 import com.zcpu.tzzmod.phone.PhoneAppsConfig;
 import com.zcpu.tzzmod.region.RegionControllerServer;
 import com.zcpu.tzzmod.region.RegionControllerStore;
+import com.zcpu.tzzmod.signal.SignalBridgeServer;
+import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -31,6 +33,7 @@ public final class TzzLifecycleBootstrap {
             TaskDataStore.flushDirty(server);
             NoteDataStore.flushDirty(server);
             RegionControllerStore.flushDirty(server);
+            SignalListenerStore.flushDirty(server);
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
@@ -38,6 +41,7 @@ public final class TzzLifecycleBootstrap {
             TaskDataStore.flushDirty(server);
             NoteDataStore.flushDirty(server);
             RegionControllerStore.flushDirty(server);
+            SignalListenerStore.flushDirty(server);
             MapServer.clearServerState();
         });
 
@@ -46,8 +50,10 @@ public final class TzzLifecycleBootstrap {
             TaskDataStore.clearCache(server);
             NoteDataStore.clearCache(server);
             RegionControllerStore.clearCache(server);
+            SignalListenerStore.clearCache(server);
             MapServer.clearServerState();
             RegionControllerServer.clearServerState();
+            SignalBridgeServer.clearServerState();
             PhotoSpeedConfig.clearCache(server);
         });
     }

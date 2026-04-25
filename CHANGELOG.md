@@ -16,6 +16,18 @@
 - 保留封锁卡原有使用方式，封锁卡命令执行已接入 `ActionEngine`。
 - 补充 RegionController 使用说明和最小验收流程文档。
 
+- 新增 SignalBridge 事件桥系统。
+- 新增 `/tzz signal` 命令。
+- 支持 signal listener 创建、删除、启用、禁用、查看、测试。
+- 支持 listener 绑定 command action。
+- 支持 listener 绑定 signal action，实现链式事件。
+- 支持 listener cooldown。
+- 支持 signal 递归保护。
+- RegionController `addAction` 已支持 signal 类型。
+- 支持 RegionController -> SignalBridge -> Listener -> ActionEngine 联动。
+- `/tzz signal` 命令反馈已中文化、颜色化、名称优先。
+- 补充 SignalBridge 使用说明和常见问题文档。
+
 ## 1.1.5
 
 - 同步当前 GitHub Release 版本。
