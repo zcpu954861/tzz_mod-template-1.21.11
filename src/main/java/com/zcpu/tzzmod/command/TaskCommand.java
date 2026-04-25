@@ -1,8 +1,9 @@
 package com.zcpu.tzzmod.command;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import com.zcpu.tzzmod.task.TaskServer;
 import com.zcpu.tzzmod.network.TaskS2CPayload;
@@ -12,37 +13,33 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
-import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 
 public final class TaskCommand {
     private TaskCommand() {
     }
 
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(
-                CommandManager.literal("task")
-                        .then(CommandManager.literal("run")
-                    .then(buildLineNameArgument()
-                        .then(buildTaskIndexArgument("lineName")
-                                                .executes(context -> executeRun(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "lineName"),
-                                                        IntegerArgumentType.getInteger(context, "taskIndex")
-                                                ))
-                                        )
+    public static LiteralArgumentBuilder<ServerCommandSource> build() {
+        return CommandManager.literal("task")
+                .then(CommandManager.literal("run")
+                        .then(buildLineNameArgument()
+                                .then(buildTaskIndexArgument("lineName")
+                                        .executes(context -> executeRun(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "lineName"),
+                                                IntegerArgumentType.getInteger(context, "taskIndex")
+                                        ))
                                 )
                         )
-                        .then(buildDelSubcommands())
-                        .then(CommandManager.literal("cancel")
-                            .then(buildLineNameArgument()
+                )
+                .then(buildDelSubcommands())
+                .then(CommandManager.literal("cancel")
+                        .then(buildLineNameArgument()
                                 .then(buildTaskIndexArgument("lineName")
-                                                .executes(context -> executeCancel(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "lineName"),
-                                                        IntegerArgumentType.getInteger(context, "taskIndex")
-                                                ))))
-        ));
+                                        .executes(context -> executeCancel(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "lineName"),
+                                                IntegerArgumentType.getInteger(context, "taskIndex")
+                                        )))));
     }
 
     private static LiteralArgumentBuilder<ServerCommandSource> buildDelSubcommands() {
