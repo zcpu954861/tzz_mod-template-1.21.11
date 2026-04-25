@@ -1,9 +1,14 @@
 package com.zcpu.tzzmod.signal;
 
+import com.mojang.brigadier.LiteralMessage;
+import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
@@ -11,6 +16,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
+import java.util.Collection;
 import java.util.List;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
@@ -46,7 +52,7 @@ public final class SignalCommand {
                         .then(CommandManager.literal("list")
                                 .executes(context -> executeList(context.getSource())))
                         .then(CommandManager.literal("info")
-                                .then(listenerArgument()
+                                .then(listenerTailArgument()
                                         .executes(context -> executeInfo(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "listener")
@@ -71,7 +77,7 @@ public final class SignalCommand {
                                                                 StringArgumentType.getString(context, "channel")
                                                         ))))))
                         .then(CommandManager.literal("clearActions")
-                                .then(listenerArgument()
+                                .then(listenerTailArgument()
                                         .executes(context -> executeClearActions(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "listener")
@@ -85,7 +91,7 @@ public final class SignalCommand {
                                                         IntegerArgumentType.getInteger(context, "ticks")
                                                 )))))
                         .then(CommandManager.literal("test")
-                                .then(listenerArgument()
+                                .then(listenerTailArgument()
                                         .executes(context -> executeTest(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "listener")
@@ -94,7 +100,7 @@ public final class SignalCommand {
 
     private static LiteralArgumentBuilder<ServerCommandSource> enableDisableDeleteCommand(String action) {
         return CommandManager.literal(action)
-                .then(listenerArgument()
+                .then(listenerTailArgument()
                         .executes(context -> switch (action) {
                             case "enable" -> executeSetEnabled(context.getSource(), StringArgumentType.getString(context, "listener"), true);
                             case "disable" -> executeSetEnabled(context.getSource(), StringArgumentType.getString(context, "listener"), false);
@@ -109,7 +115,12 @@ public final class SignalCommand {
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, String> listenerArgument() {
-        return CommandManager.argument("listener", StringArgumentType.string())
+        return CommandManager.argument("listener", ListenerRefArgumentType.listenerRef())
+                .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalListenerRefs(context.getSource(), builder));
+    }
+
+    private static RequiredArgumentBuilder<ServerCommandSource, String> listenerTailArgument() {
+        return CommandManager.argument("listener", StringArgumentType.greedyString())
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalListenerRefs(context.getSource(), builder));
     }
 
@@ -388,7 +399,8 @@ public final class SignalCommand {
             return null;
         }
 
-        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(source.getServer(), listenerRef);
+        String normalizedRef = normalizeListenerRef(listenerRef);
+        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(source.getServer(), normalizedRef);
         if (resolved.foundUnique()) {
             return resolved.listener();
         }
@@ -415,6 +427,18 @@ public final class SignalCommand {
         }
         source.sendFeedback(() -> error("该命令必须由玩家执行。"), false);
         return null;
+    }
+
+    private static String normalizeListenerRef(String listenerRef) {
+        String value = listenerRef == null ? "" : listenerRef.trim();
+        if (value.length() >= 2) {
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                return value.substring(1, value.length() - 1).trim();
+            }
+        }
+        return value;
     }
 
     private static MutableText title(String text) {
@@ -460,5 +484,47 @@ public final class SignalCommand {
 
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
+    }
+
+    private static final class ListenerRefArgumentType implements ArgumentType<String> {
+        private static final SimpleCommandExceptionType EMPTY_LISTENER =
+                new SimpleCommandExceptionType(new LiteralMessage("监听器引用不能为空"));
+        private static final Collection<String> EXAMPLES = List.of("测试监听器", "\"测试 监听器\"", "abcd1234...");
+
+        private ListenerRefArgumentType() {
+        }
+
+        private static ListenerRefArgumentType listenerRef() {
+            return new ListenerRefArgumentType();
+        }
+
+        @Override
+        public String parse(StringReader reader) throws CommandSyntaxException {
+            if (!reader.canRead()) {
+                throw EMPTY_LISTENER.createWithContext(reader);
+            }
+
+            String value;
+            if (reader.peek() == '"' || reader.peek() == '\'') {
+                value = reader.readString();
+            } else {
+                int start = reader.getCursor();
+                while (reader.canRead() && !Character.isWhitespace(reader.peek())) {
+                    reader.skip();
+                }
+                value = reader.getString().substring(start, reader.getCursor());
+            }
+
+            value = value.trim();
+            if (value.isEmpty()) {
+                throw EMPTY_LISTENER.createWithContext(reader);
+            }
+            return value;
+        }
+
+        @Override
+        public Collection<String> getExamples() {
+            return EXAMPLES;
+        }
     }
 }
