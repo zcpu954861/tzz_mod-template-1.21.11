@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.signal.device.SignalReceiverDispatcher;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,21 +44,26 @@ public final class SignalBridgeServer {
             return ActionExecutionResult.failure(Text.literal("信号递归深度超过限制：" + channel));
         }
 
+        int receiverCount = SignalReceiverDispatcher.dispatch(event, channel);
         List<SignalListenerData> listeners = SignalListenerStore.getEnabledListenersForChannel(event.world().getServer(), channel);
         Tzz_mod.LOGGER.info(
-                "[SignalBridge] channel={} source={} listenerCount={}",
+                "[SignalBridge] channel={} source={} listenerCount={} receiverCount={}",
                 channel,
                 event.sourceType() == null ? "unknown" : event.sourceType().id(),
-                listeners.size()
+                listeners.size(),
+                receiverCount
         );
 
         if (listeners.isEmpty()) {
-            recordHistory(event, channel, 0, 0, 0, 0, 0, depth, "没有监听器处理该信号");
-            return ActionExecutionResult.success(Text.literal("信号已发出，但没有监听器处理：" + channel));
+            String message = receiverCount > 0
+                    ? "没有监听器处理该信号，已触发接收器：" + receiverCount
+                    : "没有监听器处理该信号";
+            recordHistory(event, channel, 0, 0, 0, 0, 0, depth, message);
+            return ActionExecutionResult.success(Text.literal("信号已发出：" + channel + "；" + message));
         }
 
         ActionExecutionResult lastResult = ActionExecutionResult.success(
-                Text.literal("信号已发出：" + channel + "，匹配监听器：" + listeners.size())
+                Text.literal("信号已发出：" + channel + "，匹配监听器：" + listeners.size() + "，触发接收器：" + receiverCount)
         );
         int executedCount = 0;
         int skippedCooldownCount = 0;
@@ -119,7 +125,7 @@ public final class SignalBridgeServer {
                 skippedEmptyCount,
                 failedCount,
                 depth,
-                resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount)
+                resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, receiverCount)
         );
         return lastResult;
     }
@@ -195,16 +201,17 @@ public final class SignalBridgeServer {
             int executedCount,
             int skippedCooldownCount,
             int skippedEmptyCount,
-            int failedCount
+            int failedCount,
+            int receiverCount
     ) {
         if (failedCount > 0) {
             return "部分监听器执行失败";
         }
         if (listenerCount == 0) {
-            return "没有监听器处理该信号";
+            return receiverCount > 0 ? "没有监听器处理该信号，已触发接收器：" + receiverCount : "没有监听器处理该信号";
         }
         if (executedCount > 0 && skippedCooldownCount == 0 && skippedEmptyCount == 0) {
-            return "已处理信号";
+            return receiverCount > 0 ? "已处理信号，已触发接收器：" + receiverCount : "已处理信号";
         }
         if (skippedCooldownCount == listenerCount) {
             return "所有监听器均因冷却跳过";
@@ -221,6 +228,6 @@ public final class SignalBridgeServer {
         if (skippedEmptyCount > 0) {
             return "部分监听器没有配置动作";
         }
-        return "已处理信号";
+        return receiverCount > 0 ? "已处理信号，已触发接收器：" + receiverCount : "已处理信号";
     }
 }

@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.ModBlock.custom.CatcherChestBlock;
 import com.zcpu.tzzmod.ModBlock.custom.PasswordMachineBlock;
 import com.zcpu.tzzmod.ModBlock.custom.SilentSensorPlateBlock;
 import com.zcpu.tzzmod.ModBlock.custom.SignalEmitterBlock;
+import com.zcpu.tzzmod.ModBlock.custom.SignalReceiverBlock;
 import com.zcpu.tzzmod.ModItem.ModItems;
 import com.zcpu.tzzmod.Tzz_mod;
 import net.minecraft.block.AbstractBlock;
@@ -41,6 +42,12 @@ public class ModBlocks {
     public static final Block SIGNAL_EMITTER = registerBlock(
             "signal_emitter",
             SignalEmitterBlock::new,
+            AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
+    );
+
+    public static final Block SIGNAL_RECEIVER = registerBlock(
+            "signal_receiver",
+            SignalReceiverBlock::new,
             AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
     );
 

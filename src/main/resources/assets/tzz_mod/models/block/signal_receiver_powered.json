@@ -1,0 +1,6 @@
+{
+  "parent": "tzz_mod:block/signal_receiver",
+  "textures": {
+    "panel": "tzz_mod:block/signal_receiver_panel_on"
+  }
+}

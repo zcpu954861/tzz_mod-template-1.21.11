@@ -1,0 +1,74 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "tzz_mod:block/signal_receiver_core_side",
+    "base_top": "tzz_mod:block/signal_receiver_base_top",
+    "base_side": "tzz_mod:block/signal_receiver_base_side",
+    "core_top": "tzz_mod:block/signal_receiver_core_top",
+    "core_side": "tzz_mod:block/signal_receiver_core_side",
+    "panel": "tzz_mod:block/signal_receiver_panel_off",
+    "antenna": "tzz_mod:block/signal_receiver_antenna"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 4, 16],
+      "faces": {
+        "down": { "texture": "#base_side", "cullface": "down" },
+        "up": { "texture": "#base_top" },
+        "north": { "texture": "#base_side" },
+        "south": { "texture": "#base_side" },
+        "west": { "texture": "#base_side" },
+        "east": { "texture": "#base_side" }
+      }
+    },
+    {
+      "from": [2, 4, 2],
+      "to": [14, 12, 14],
+      "faces": {
+        "up": { "texture": "#core_top" },
+        "down": { "texture": "#core_side" },
+        "north": { "texture": "#panel" },
+        "south": { "texture": "#core_side" },
+        "west": { "texture": "#core_side" },
+        "east": { "texture": "#core_side" }
+      }
+    },
+    {
+      "from": [5, 12, 5],
+      "to": [11, 16, 11],
+      "faces": {
+        "up": { "texture": "#antenna" },
+        "down": { "texture": "#antenna" },
+        "north": { "texture": "#antenna" },
+        "south": { "texture": "#antenna" },
+        "west": { "texture": "#antenna" },
+        "east": { "texture": "#antenna" }
+      }
+    },
+    {
+      "from": [0, 4, 6],
+      "to": [2, 10, 10],
+      "faces": {
+        "up": { "texture": "#core_side" },
+        "down": { "texture": "#core_side" },
+        "north": { "texture": "#core_side" },
+        "south": { "texture": "#core_side" },
+        "west": { "texture": "#panel" },
+        "east": { "texture": "#core_side" }
+      }
+    },
+    {
+      "from": [14, 4, 6],
+      "to": [16, 10, 10],
+      "faces": {
+        "up": { "texture": "#core_side" },
+        "down": { "texture": "#core_side" },
+        "north": { "texture": "#core_side" },
+        "south": { "texture": "#core_side" },
+        "west": { "texture": "#core_side" },
+        "east": { "texture": "#panel" }
+      }
+    }
+  ]
+}

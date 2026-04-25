@@ -19,6 +19,7 @@ public final class ModFunctionItemGroup {
                 entries.add(ModBlocks.PASSWORD_MACHINE);
                 entries.add(ModBlocks.SILENT_SENSOR_PLATE);
                 entries.add(ModBlocks.SIGNAL_EMITTER);
+                entries.add(ModBlocks.SIGNAL_RECEIVER);
                 entries.add(ModItems.BLOCKING_CARD_CONFIGURATOR);
                 entries.add(ModItems.PASSWORD_CONFIG_CARD);
             }))

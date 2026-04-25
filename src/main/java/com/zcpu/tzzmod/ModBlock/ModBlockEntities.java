@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.ModBlock;
 import com.zcpu.tzzmod.ModBlock.entity.PasswordMachineBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SilentSensorPlateBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
+import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
@@ -29,6 +30,12 @@ public final class ModBlockEntities {
                         blockEntityTypeRegistry(),
             Identifier.of(Tzz_mod.MOD_ID, "signal_emitter"),
             FabricBlockEntityTypeBuilder.create(SignalEmitterBlockEntity::new, ModBlocks.SIGNAL_EMITTER).build()
+    );
+
+    public static final BlockEntityType<SignalReceiverBlockEntity> SIGNAL_RECEIVER = Registry.register(
+                        blockEntityTypeRegistry(),
+            Identifier.of(Tzz_mod.MOD_ID, "signal_receiver"),
+            FabricBlockEntityTypeBuilder.create(SignalReceiverBlockEntity::new, ModBlocks.SIGNAL_RECEIVER).build()
     );
 
     private ModBlockEntities() {
