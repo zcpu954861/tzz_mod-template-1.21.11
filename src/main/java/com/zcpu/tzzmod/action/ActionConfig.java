@@ -1,5 +1,7 @@
 package com.zcpu.tzzmod.action;
 
+import com.zcpu.tzzmod.signal.SignalChannel;
+
 public record ActionConfig(
         ActionType type,
         String value,
@@ -12,6 +14,17 @@ public record ActionConfig(
         return new ActionConfig(
                 ActionType.COMMAND,
                 normalizeCommand(command),
+                true,
+                false,
+                0,
+                notifyOps
+        );
+    }
+
+    public static ActionConfig signal(String channel, boolean notifyOps) {
+        return new ActionConfig(
+                ActionType.SIGNAL,
+                SignalChannel.normalize(channel),
                 true,
                 false,
                 0,

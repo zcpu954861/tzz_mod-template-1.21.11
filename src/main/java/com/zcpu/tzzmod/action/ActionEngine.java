@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.action;
 
+import com.zcpu.tzzmod.signal.SignalBridgeServer;
+import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.SignalEvent;
 import java.util.List;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.server.command.ServerCommandSource;
@@ -29,6 +32,7 @@ public final class ActionEngine {
                 case COMMAND -> executeCommand(context, config);
                 case MESSAGE -> executeMessage(context, config);
                 case SOUND -> executeSound(context, config);
+                case SIGNAL -> executeSignal(context, config);
             };
 
             ActionAuditLogger.log(context, config, result);
@@ -109,5 +113,20 @@ public final class ActionEngine {
         );
 
         return ActionExecutionResult.success(Text.literal("音效已播放"));
+    }
+
+    private static ActionExecutionResult executeSignal(ActionContext context, ActionConfig config) {
+        String channel = SignalChannel.normalize(config.value());
+        SignalEvent event = new SignalEvent(
+                channel,
+                context.player(),
+                context.world(),
+                context.position(),
+                context.sourceType(),
+                context.sourceId(),
+                SignalBridgeServer.currentDepth() + 1,
+                context.world().getTime()
+        );
+        return SignalBridgeServer.emit(event);
     }
 }

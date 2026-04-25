@@ -62,6 +62,13 @@ public final class SignalCommand {
                                                                 context.getSource(),
                                                                 StringArgumentType.getString(context, "listener"),
                                                                 StringArgumentType.getString(context, "command")
+                                                        ))))
+                                        .then(CommandManager.literal("signal")
+                                                .then(channelArgument()
+                                                        .executes(context -> executeAddSignalAction(
+                                                                context.getSource(),
+                                                                StringArgumentType.getString(context, "listener"),
+                                                                StringArgumentType.getString(context, "channel")
                                                         ))))))
                         .then(CommandManager.literal("clearActions")
                                 .then(listenerArgument()
@@ -261,6 +268,42 @@ public final class SignalCommand {
                 .append(Text.literal("：").formatted(Formatting.GRAY))
                 .append(listenerName(listener)), true);
         source.sendFeedback(() -> field("命令", commandText(command)), false);
+        return 1;
+    }
+
+    private static int executeAddSignalAction(ServerCommandSource source, String listenerRef, String rawChannel) {
+        SignalListenerData listener = resolveListener(source, listenerRef);
+        if (listener == null) {
+            return 0;
+        }
+
+        ServerPlayerEntity player = requirePlayer(source);
+        if (player == null) {
+            return 0;
+        }
+
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            return 0;
+        }
+
+        ActionConfig action = ActionConfig.signal(channel, false);
+        Text validationError = ActionValidator.validateForSave(player, action);
+        if (validationError != null) {
+            source.sendFeedback(() -> error(validationError.getString()), false);
+            return 0;
+        }
+
+        boolean changed = SignalListenerStore.addAction(source.getServer(), listener.id(), action);
+        if (!changed) {
+            source.sendFeedback(() -> error("动作添加失败：" + listenerRef), false);
+            return 0;
+        }
+        source.sendFeedback(() -> title("已添加监听器信号动作")
+                .append(Text.literal("：").formatted(Formatting.GRAY))
+                .append(listenerName(listener)), true);
+        source.sendFeedback(() -> field("频道", channelText(channel)), false);
         return 1;
     }
 
