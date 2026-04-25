@@ -29,11 +29,21 @@ public final class SignalCommand {
         return CommandManager.literal("signal")
                 .requires(source -> !(source.getEntity() instanceof ServerPlayerEntity player) || player.isCreativeLevelTwoOp())
                 .then(CommandManager.literal("emit")
-                        .then(channelArgument()
+                        .then(channelTailArgument()
                                 .executes(context -> executeEmit(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "channel")
                                 ))))
+                .then(CommandManager.literal("history")
+                        .executes(context -> executeHistory(context.getSource(), null))
+                        .then(CommandManager.argument("channel", StringArgumentType.greedyString())
+                                .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalChannels(context.getSource(), builder))
+                                .executes(context -> executeHistory(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "channel")
+                                ))))
+                .then(CommandManager.literal("clearHistory")
+                        .executes(context -> executeClearHistory(context.getSource())))
                 .then(CommandManager.literal("listen")
                         .then(CommandManager.literal("create")
                                 .then(channelArgument()
@@ -108,6 +118,11 @@ public final class SignalCommand {
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalChannels(context.getSource(), builder));
     }
 
+    private static RequiredArgumentBuilder<ServerCommandSource, String> channelTailArgument() {
+        return CommandManager.argument("channel", StringArgumentType.greedyString())
+                .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalChannels(context.getSource(), builder));
+    }
+
     private static RequiredArgumentBuilder<ServerCommandSource, String> listenerArgument() {
         return CommandManager.argument("listener", StringArgumentType.string())
                 .suggests((context, builder) -> CommandSuggestionUtil.suggestSignalListenerRefs(context.getSource(), builder));
@@ -125,11 +140,6 @@ public final class SignalCommand {
         }
 
         String channel = SignalChannel.normalize(rawChannel);
-        if (!SignalChannel.isValid(channel)) {
-            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
-            return 0;
-        }
-
         SignalEvent event = new SignalEvent(
                 channel,
                 player,
@@ -148,6 +158,54 @@ public final class SignalCommand {
         }
         source.sendFeedback(() -> error(result.message().getString()), false);
         return 0;
+    }
+
+    private static int executeHistory(ServerCommandSource source, String rawChannel) {
+        String channel = rawChannel == null ? null : SignalChannel.normalize(rawChannel);
+        if (channel != null && !SignalChannel.isValid(channel)) {
+            source.sendFeedback(() -> error(SignalChannel.validationError(rawChannel).getString()), false);
+            return 0;
+        }
+
+        List<SignalEventRecord> records = channel == null
+                ? SignalEventHistory.snapshot()
+                : SignalEventHistory.snapshot(channel);
+        if (records.isEmpty()) {
+            if (channel == null) {
+                source.sendFeedback(() -> warning("没有 Signal 历史记录。"), false);
+            } else {
+                source.sendFeedback(() -> warning("频道 " + channel + " 没有历史记录。"), false);
+            }
+            return 0;
+        }
+
+        if (channel == null) {
+            source.sendFeedback(() -> title("最近 Signal 事件：")
+                    .append(number(Math.min(records.size(), 10)))
+                    .append(Text.literal(" / ").formatted(Formatting.GRAY))
+                    .append(number(SignalEventHistory.size()))
+                    .append(Text.literal("，最多保留 ").formatted(Formatting.GRAY))
+                    .append(number(SignalEventHistory.maxSize()))
+                    .append(Text.literal(" 条").formatted(Formatting.GRAY)), false);
+        } else {
+            source.sendFeedback(() -> title("频道 ")
+                    .append(channelText(channel))
+                    .append(Text.literal(" 的最近 Signal 事件：").formatted(Formatting.GREEN))
+                    .append(number(Math.min(records.size(), 10))), false);
+        }
+
+        int displayed = 0;
+        for (int i = records.size() - 1; i >= 0 && displayed < 10; i--) {
+            sendHistoryRecord(source, records.get(i));
+            displayed++;
+        }
+        return displayed;
+    }
+
+    private static int executeClearHistory(ServerCommandSource source) {
+        SignalEventHistory.clear();
+        source.sendFeedback(() -> title("已清空 Signal 历史记录。"), true);
+        return 1;
     }
 
     private static int executeCreate(ServerCommandSource source, String rawChannel, String name) {
@@ -388,6 +446,27 @@ public final class SignalCommand {
         return 0;
     }
 
+    private static void sendHistoryRecord(ServerCommandSource source, SignalEventRecord record) {
+        source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                .append(channelText(record.channel())), false);
+        source.sendFeedback(() -> field("  来源", sourceTypeText(record.sourceType())), false);
+        source.sendFeedback(() -> field("  玩家", Text.literal(safeRecordText(record.playerName())).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("  监听器", number(record.listenerCount())
+                .append(Text.literal("，执行：").formatted(Formatting.GRAY))
+                .append(number(record.executedCount()))
+                .append(Text.literal("，冷却跳过：").formatted(Formatting.GRAY))
+                .append(number(record.skippedCooldownCount()))
+                .append(Text.literal("，空动作：").formatted(Formatting.GRAY))
+                .append(number(record.skippedEmptyCount()))
+                .append(Text.literal("，失败：").formatted(Formatting.GRAY))
+                .append(number(record.failedCount()))), false);
+        source.sendFeedback(() -> field("  深度", number(record.depth())
+                .append(Text.literal("，时间：").formatted(Formatting.GRAY))
+                .append(number(record.gameTime()))
+                .append(Text.literal(" tick").formatted(Formatting.GRAY))), false);
+        source.sendFeedback(() -> field("  结果", resultText(record)), false);
+    }
+
     private static SignalListenerData resolveListener(ServerCommandSource source, String listenerRef) {
         if (source.getServer() == null) {
             return null;
@@ -476,7 +555,24 @@ public final class SignalCommand {
         return Text.literal(Integer.toString(value)).formatted(Formatting.LIGHT_PURPLE);
     }
 
+    private static MutableText number(long value) {
+        return Text.literal(Long.toString(value)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
     private static MutableText commandText(String command) {
         return Text.literal(command == null ? "" : command).formatted(Formatting.GREEN);
+    }
+
+    private static MutableText sourceTypeText(String sourceType) {
+        return Text.literal(safeRecordText(sourceType)).formatted(Formatting.GOLD);
+    }
+
+    private static MutableText resultText(SignalEventRecord record) {
+        Formatting formatting = record.failedCount() > 0 ? Formatting.RED : Formatting.GREEN;
+        return Text.literal(safeRecordText(record.resultMessage())).formatted(formatting);
+    }
+
+    private static String safeRecordText(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
     }
 }
