@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.9.0-block-interaction
+
+- 为 `virtual_block_device` 新增右键交互触发能力。
+- 新增 `/tzz signal blockDevice interactChannel <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice clearInteractChannel <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice interaction <x> <y> <z> enable|disable`。
+- 新增 `/tzz signal blockDevice interactionCooldown <x> <y> <z> <ticks>`。
+- 新增 `/tzz signal blockDevice interactionInfo <x> <y> <z>`。
+- 交互触发只对已登记的 `virtual_block_device` 坐标生效，不监听未绑定方块。
+- 右键事件只检查被右键的一个坐标，不扫描世界、区块或周围方块。
+- 默认只处理 `MAIN_HAND`，避免主副手双触发。
+- 默认不阻止原版交互，箱子、门、按钮等原有右键行为继续执行。
+- 成功触发 interaction signal 时，触发玩家会播放一次主手挥手动画。
+- interaction 会带玩家上下文进入 SignalBridge / ActionEngine。
+- `interactionCooldownTicks` 单位是 GT，命令参数只输入整数。
+- 当前方块 ID 与绑定时 `blockId` 不一致时不触发，并在 info/debug 中提示 refresh 或重新 bind。
+- `/tzz signal blockDevice info`、`/tzz signal device info`、`/tzz signal device debug` 会显示 interaction 摘要和诊断信息。
+- `/tzz signal device history` 可查看 `virtual_block_device` 的交互触发记录。
+- 保持 5.5 红石虚拟方块发射器和 5.6 BlockState condition 功能兼容。
+
 ## v1.8.0-blockstate-condition
 
 - 为 `virtual_block_device` 新增方块状态条件触发能力。

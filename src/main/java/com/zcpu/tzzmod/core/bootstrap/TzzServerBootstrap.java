@@ -10,6 +10,7 @@ import com.zcpu.tzzmod.note.NoteServer;
 import com.zcpu.tzzmod.password.PasswordServer;
 import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import com.zcpu.tzzmod.region.RegionControllerServer;
+import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceInteractionHandler;
 import com.zcpu.tzzmod.task.TaskServer;
 
 public final class TzzServerBootstrap {
@@ -28,5 +29,6 @@ public final class TzzServerBootstrap {
         NoteServer.register();
         AdminSyncServer.register();
         RegionControllerServer.register();
+        VirtualBlockDeviceInteractionHandler.register();
     }
 }

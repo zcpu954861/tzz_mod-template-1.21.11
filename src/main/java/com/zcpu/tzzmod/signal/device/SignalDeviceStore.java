@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
 import net.minecraft.util.math.BlockPos;
@@ -262,6 +263,107 @@ public final class SignalDeviceStore {
                 existing.lastConditionMatched(),
                 existing.lastConditionCheckGameTime(),
                 existing.lastConditionResult()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualInteractChannel(ServerWorld world, BlockPos pos, String channel) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        String normalizedChannel = SignalChannel.normalize(channel);
+        SignalDeviceData updated = withInteraction(
+                existing,
+                !normalizedChannel.isBlank(),
+                normalizedChannel,
+                existing.interactionCooldownTicks(),
+                existing.lastInteractionGameTime(),
+                existing.lastInteractionWallTimeMillis(),
+                existing.lastInteractionPlayerName(),
+                existing.lastInteractionPlayerUuid(),
+                existing.lastInteractionResult(),
+                existing.lastInteractionHand(),
+                existing.lastInteractionSide()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData clearVirtualInteractChannel(ServerWorld world, BlockPos pos) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withInteraction(
+                existing,
+                false,
+                "",
+                existing.interactionCooldownTicks(),
+                existing.lastInteractionGameTime(),
+                existing.lastInteractionWallTimeMillis(),
+                existing.lastInteractionPlayerName(),
+                existing.lastInteractionPlayerUuid(),
+                "已清空交互触发频道",
+                existing.lastInteractionHand(),
+                existing.lastInteractionSide()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualInteractionEnabled(ServerWorld world, BlockPos pos, boolean enabled) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withInteraction(
+                existing,
+                enabled,
+                existing.interactChannel(),
+                existing.interactionCooldownTicks(),
+                existing.lastInteractionGameTime(),
+                existing.lastInteractionWallTimeMillis(),
+                existing.lastInteractionPlayerName(),
+                existing.lastInteractionPlayerUuid(),
+                existing.lastInteractionResult(),
+                existing.lastInteractionHand(),
+                existing.lastInteractionSide()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualInteractionCooldown(ServerWorld world, BlockPos pos, int cooldownTicks) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withInteraction(
+                existing,
+                existing.interactionEnabled(),
+                existing.interactChannel(),
+                cooldownTicks,
+                existing.lastInteractionGameTime(),
+                existing.lastInteractionWallTimeMillis(),
+                existing.lastInteractionPlayerName(),
+                existing.lastInteractionPlayerUuid(),
+                existing.lastInteractionResult(),
+                existing.lastInteractionHand(),
+                existing.lastInteractionSide()
         );
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -592,7 +694,17 @@ public final class SignalDeviceStore {
                 existing.conditionMode(),
                 existing.lastConditionMatched(),
                 existing.lastConditionCheckGameTime(),
-                existing.lastConditionResult()
+                existing.lastConditionResult(),
+                existing.interactionEnabled(),
+                existing.interactChannel(),
+                existing.interactionCooldownTicks(),
+                existing.lastInteractionGameTime(),
+                existing.lastInteractionWallTimeMillis(),
+                existing.lastInteractionPlayerName(),
+                existing.lastInteractionPlayerUuid(),
+                existing.lastInteractionResult(),
+                existing.lastInteractionHand(),
+                existing.lastInteractionSide()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -689,10 +801,108 @@ public final class SignalDeviceStore {
                 conditioned.conditionMode(),
                 conditioned.lastConditionMatched(),
                 conditioned.lastConditionCheckGameTime(),
-                conditioned.lastConditionResult()
+                conditioned.lastConditionResult(),
+                conditioned.interactionEnabled(),
+                conditioned.interactChannel(),
+                conditioned.interactionCooldownTicks(),
+                conditioned.lastInteractionGameTime(),
+                conditioned.lastInteractionWallTimeMillis(),
+                conditioned.lastInteractionPlayerName(),
+                conditioned.lastInteractionPlayerUuid(),
+                conditioned.lastInteractionResult(),
+                conditioned.lastInteractionHand(),
+                conditioned.lastInteractionSide()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+    }
+
+    public static synchronized void recordVirtualInteractionTrigger(
+            ServerWorld world,
+            SignalDeviceData device,
+            ServerPlayerEntity player,
+            String handName,
+            String sideName,
+            ActionExecutionResult result
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        SignalDeviceData interacted = withInteraction(
+                existing,
+                existing.interactionEnabled(),
+                existing.interactChannel(),
+                existing.interactionCooldownTicks(),
+                world.getTime(),
+                now,
+                player == null ? "" : player.getName().getString(),
+                player == null ? "" : player.getUuidAsString(),
+                resultMessage,
+                handName,
+                sideName
+        );
+        SignalDeviceData updated = new SignalDeviceData(
+                interacted.id(),
+                interacted.type(),
+                interacted.name(),
+                interacted.dimension(),
+                interacted.x(),
+                interacted.y(),
+                interacted.z(),
+                interacted.channel(),
+                interacted.enabled(),
+                interacted.pulseTicks(),
+                interacted.remainingPulseTicks(),
+                interacted.cooldownTicks(),
+                interacted.actionCount(),
+                interacted.createdWallTimeMillis(),
+                now,
+                world.getTime(),
+                now,
+                resultMessage,
+                interacted.blockId(),
+                interacted.offChannel(),
+                interacted.mode(),
+                interacted.lastPowered(),
+                interacted.lastPowerLevel(),
+                interacted.conditionEnabled(),
+                interacted.conditionBlockId(),
+                interacted.conditionProperties(),
+                interacted.conditionRaw(),
+                interacted.conditionMode(),
+                interacted.lastConditionMatched(),
+                interacted.lastConditionCheckGameTime(),
+                interacted.lastConditionResult(),
+                interacted.interactionEnabled(),
+                interacted.interactChannel(),
+                interacted.interactionCooldownTicks(),
+                interacted.lastInteractionGameTime(),
+                interacted.lastInteractionWallTimeMillis(),
+                interacted.lastInteractionPlayerName(),
+                interacted.lastInteractionPlayerUuid(),
+                interacted.lastInteractionResult(),
+                interacted.lastInteractionHand(),
+                interacted.lastInteractionSide()
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static long getRemainingInteractionCooldownTicks(SignalDeviceData device, long currentGameTime) {
+        if (device == null || device.interactionCooldownTicks() <= 0 || device.lastInteractionGameTime() <= 0L) {
+            return 0L;
+        }
+        long elapsed = Math.max(0L, currentGameTime - device.lastInteractionGameTime());
+        return Math.max(0L, device.interactionCooldownTicks() - elapsed);
     }
 
     public static synchronized List<SignalDeviceData> getEnabledReceiversForChannel(MinecraftServer server, String channel) {
@@ -1098,7 +1308,17 @@ public final class SignalDeviceStore {
                 existing == null ? BlockStateConditionMode.CONDITION_ENTER.id() : existing.conditionMode(),
                 existing != null && existing.lastConditionMatched(),
                 existing == null ? 0L : existing.lastConditionCheckGameTime(),
-                existing == null ? "" : existing.lastConditionResult()
+                existing == null ? "" : existing.lastConditionResult(),
+                existing != null && existing.interactionEnabled(),
+                existing == null ? "" : existing.interactChannel(),
+                existing == null ? 0 : existing.interactionCooldownTicks(),
+                existing == null ? 0L : existing.lastInteractionGameTime(),
+                existing == null ? 0L : existing.lastInteractionWallTimeMillis(),
+                existing == null ? "" : existing.lastInteractionPlayerName(),
+                existing == null ? "" : existing.lastInteractionPlayerUuid(),
+                existing == null ? "" : existing.lastInteractionResult(),
+                existing == null ? "" : existing.lastInteractionHand(),
+                existing == null ? "" : existing.lastInteractionSide()
         ).normalized();
     }
 
@@ -1140,7 +1360,17 @@ public final class SignalDeviceStore {
                 device.conditionMode(),
                 device.lastConditionMatched(),
                 device.lastConditionCheckGameTime(),
-                device.lastConditionResult()
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide()
         ).normalized();
     }
 
@@ -1183,7 +1413,17 @@ public final class SignalDeviceStore {
                 device.conditionMode(),
                 device.lastConditionMatched(),
                 device.lastConditionCheckGameTime(),
-                device.lastConditionResult()
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide()
         ).normalized();
     }
 
@@ -1229,7 +1469,75 @@ public final class SignalDeviceStore {
                 conditionMode,
                 lastConditionMatched,
                 lastConditionCheckGameTime,
-                lastConditionResult
+                lastConditionResult,
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withInteraction(
+            SignalDeviceData device,
+            boolean interactionEnabled,
+            String interactChannel,
+            int interactionCooldownTicks,
+            long lastInteractionGameTime,
+            long lastInteractionWallTimeMillis,
+            String lastInteractionPlayerName,
+            String lastInteractionPlayerUuid,
+            String lastInteractionResult,
+            String lastInteractionHand,
+            String lastInteractionSide
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                interactionEnabled,
+                interactChannel,
+                interactionCooldownTicks,
+                lastInteractionGameTime,
+                lastInteractionWallTimeMillis,
+                lastInteractionPlayerName,
+                lastInteractionPlayerUuid,
+                lastInteractionResult,
+                lastInteractionHand,
+                lastInteractionSide
         ).normalized();
     }
 
@@ -1265,7 +1573,17 @@ public final class SignalDeviceStore {
                 device.conditionMode(),
                 device.lastConditionMatched(),
                 device.lastConditionCheckGameTime(),
-                device.lastConditionResult()
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide()
         ).normalized();
     }
 

@@ -154,6 +154,11 @@ public final class SignalDeviceCommand {
                 if (device.conditionEnabled()) {
                     source.sendFeedback(() -> indentField("条件", conditionSummary(device)), false);
                 }
+                if (device.interactionEnabled() || !device.interactChannel().isBlank()) {
+                    source.sendFeedback(() -> indentField("交互频道", channelOrEmpty(device.interactChannel())), false);
+                    source.sendFeedback(() -> indentField("交互触发", boolText(device.interactionEnabled())), false);
+                    source.sendFeedback(() -> indentField("交互冷却", gtText(device.interactionCooldownTicks())), false);
+                }
                 source.sendFeedback(() -> indentField("通电状态", boolText(device.lastPowered())
                         .append(Text.literal("，强度 ").formatted(Formatting.GRAY))
                         .append(number(device.lastPowerLevel()))), false);
@@ -622,6 +627,12 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("条件模式", conditionModeText(device.conditionMode())), false);
             source.sendFeedback(() -> field("上次条件满足", boolText(device.lastConditionMatched())), false);
             source.sendFeedback(() -> field("当前条件满足", conditionMatchedText(source, device)), false);
+            source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+            source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+            source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
+            source.sendFeedback(() -> field("交互冷却剩余", remainingInteractionCooldownText(device, source.getWorld().getTime())), false);
+            source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
+            source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
@@ -642,6 +653,12 @@ public final class SignalDeviceCommand {
         List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), device.channel());
         int receiverCount = receiverCountForChannel(source, device.channel());
         int relayCount = actionRelayCountForChannel(source, device.channel());
+        List<SignalListenerData> interactionListeners = device.interactChannel().isBlank()
+                ? List.of()
+                : SignalChannelInspector.getListenersForChannel(source.getServer(), device.interactChannel());
+        int interactionReceiverCount = receiverCountForChannel(source, device.interactChannel());
+        int interactionRelayCount = actionRelayCountForChannel(source, device.interactChannel());
+        long remainingInteractionCooldown = SignalDeviceStore.getRemainingInteractionCooldownTicks(device, source.getWorld().getTime());
 
         sendHeader(source, Text.literal("虚拟方块发射器调试信息").formatted(Formatting.GOLD));
         source.sendFeedback(() -> field("名称", nameText(SignalDeviceStore.displayName(device))), false);
@@ -680,6 +697,16 @@ public final class SignalDeviceCommand {
                 source.sendFeedback(() -> Text.literal("- " + issue).formatted(Formatting.YELLOW), false);
             }
         }
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
+        source.sendFeedback(() -> field("交互冷却剩余", cooldownText(remainingInteractionCooldown)), false);
+        source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
+        source.sendFeedback(() -> field("最近交互结果", resultText(device.lastInteractionResult())), false);
+        source.sendFeedback(() -> field("交互频道监听器", number(interactionListeners.size())), false);
+        source.sendFeedback(() -> field("交互频道接收器", number(interactionReceiverCount)), false);
+        source.sendFeedback(() -> field("交互频道动作继电器", number(interactionRelayCount)), false);
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("频道监听器", number(listeners.size())), false);
         source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
@@ -687,7 +714,19 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
 
-        List<Text> hints = virtualDebugHints(device, powerState, currentState, chunkLoaded, listeners, receiverCount, relayCount);
+        List<Text> hints = virtualDebugHints(
+                device,
+                powerState,
+                currentState,
+                chunkLoaded,
+                listeners,
+                receiverCount,
+                relayCount,
+                interactionListeners.size(),
+                interactionReceiverCount,
+                interactionRelayCount,
+                remainingInteractionCooldown
+        );
         if (!hints.isEmpty()) {
             source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
             for (Text hint : hints) {
@@ -720,7 +759,11 @@ public final class SignalDeviceCommand {
             boolean chunkLoaded,
             List<SignalListenerData> listeners,
             int receiverCount,
-            int relayCount
+            int relayCount,
+            int interactionListenerCount,
+            int interactionReceiverCount,
+            int interactionRelayCount,
+            long remainingInteractionCooldown
     ) {
         List<Text> hints = new ArrayList<>();
         if (device.channel().isBlank()) {
@@ -755,6 +798,25 @@ public final class SignalDeviceCommand {
                     hints.add(Text.literal(issue).formatted(Formatting.YELLOW));
                 }
             }
+        }
+        if (device.interactionEnabled() && device.interactChannel().isBlank()) {
+            hints.add(Text.literal("未设置 interactChannel。").formatted(Formatting.YELLOW));
+        }
+        if (!device.interactionEnabled() && !device.interactChannel().isBlank()) {
+            hints.add(Text.literal("interaction 已禁用。").formatted(Formatting.YELLOW));
+        }
+        if (!device.interactChannel().isBlank() && !SignalChannel.isValid(device.interactChannel())) {
+            hints.add(Text.literal("interactChannel 名称无效。").formatted(Formatting.RED));
+        }
+        if (remainingInteractionCooldown > 0L) {
+            hints.add(Text.literal("正处于 interaction cooldown。").formatted(Formatting.YELLOW));
+        }
+        if (!device.interactChannel().isBlank()
+                && interactionListenerCount <= 0
+                && interactionReceiverCount <= 0
+                && interactionRelayCount <= 0) {
+            hints.add(Text.literal("interactChannel 没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。")
+                    .formatted(Formatting.YELLOW));
         }
         if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
             hints.add(Text.literal("频道没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。").formatted(Formatting.YELLOW));
@@ -1066,6 +1128,25 @@ public final class SignalDeviceCommand {
 
     private static MutableText gtText(int ticks) {
         return Text.literal(ticks + " GT").formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text remainingInteractionCooldownText(SignalDeviceData device, long currentGameTime) {
+        return cooldownText(SignalDeviceStore.getRemainingInteractionCooldownTicks(device, currentGameTime));
+    }
+
+    private static Text cooldownText(long ticks) {
+        if (ticks <= 0L) {
+            return Text.literal("0 GT").formatted(Formatting.LIGHT_PURPLE);
+        }
+        double seconds = ticks / 20.0D;
+        return Text.literal(ticks + " GT（约 " + String.format(java.util.Locale.ROOT, "%.1f", seconds) + " 秒）")
+                .formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text playerOrNever(String playerName) {
+        return playerName == null || playerName.isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(playerName).formatted(Formatting.WHITE);
     }
 
     private static Text emitterRedstoneText(ServerCommandSource source, SignalDeviceData device) {
