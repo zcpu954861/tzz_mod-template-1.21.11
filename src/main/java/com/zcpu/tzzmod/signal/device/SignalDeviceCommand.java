@@ -20,6 +20,8 @@ import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -648,6 +650,12 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("交互冷却剩余", remainingInteractionCooldownText(device, source.getWorld().getTime())), false);
             source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
             source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
+            source.sendFeedback(() -> field("主手物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+            source.sendFeedback(() -> field("匹配成功频道", channelOrEmpty(device.interactionItemMatcher().successChannel())), false);
+            source.sendFeedback(() -> field("匹配失败频道", channelOrEmpty(device.interactionItemMatcher().failChannel())), false);
+            source.sendFeedback(() -> field("成功消耗", boolText(device.interactionItemMatcher().consumeEnabled())), false);
+            source.sendFeedback(() -> field("消耗数量", number(device.interactionItemMatcher().consumeCount())), false);
+            source.sendFeedback(() -> field("最近物品匹配结果", resultText(device.lastInteractionItemResult())), false);
             source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
             source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
             source.sendFeedback(() -> field("容器关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
@@ -737,6 +745,19 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
         source.sendFeedback(() -> field("最近交互结果", resultText(device.lastInteractionResult())), false);
+        ItemStackMatcherData interactionMatcher = device.interactionItemMatcher().normalized();
+        source.sendFeedback(() -> field("主手物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+        source.sendFeedback(() -> field("物品匹配模板", Text.literal(ItemStackMatcherSupport.summary(interactionMatcher)).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("匹配成功频道", channelOrEmpty(interactionMatcher.successChannel())), false);
+        source.sendFeedback(() -> field("匹配失败频道", channelOrEmpty(interactionMatcher.failChannel())), false);
+        source.sendFeedback(() -> field("成功消息", configuredText(interactionMatcher.successMessage())), false);
+        source.sendFeedback(() -> field("失败消息", configuredText(interactionMatcher.failMessage())), false);
+        source.sendFeedback(() -> field("成功音效", soundText(interactionMatcher.successSoundId(), interactionMatcher.successSoundVolume(), interactionMatcher.successSoundPitch())), false);
+        source.sendFeedback(() -> field("失败音效", soundText(interactionMatcher.failSoundId(), interactionMatcher.failSoundVolume(), interactionMatcher.failSoundPitch())), false);
+        source.sendFeedback(() -> field("成功消耗", boolText(interactionMatcher.consumeEnabled())), false);
+        source.sendFeedback(() -> field("消耗数量", number(interactionMatcher.consumeCount())), false);
+        source.sendFeedback(() -> field("最近主手匹配", boolText(device.lastInteractionItemMatched())), false);
+        source.sendFeedback(() -> field("最近主手匹配结果", resultText(device.lastInteractionItemResult())), false);
         source.sendFeedback(() -> field("交互频道监听器", number(interactionListeners.size())), false);
         source.sendFeedback(() -> field("交互频道接收器", number(interactionReceiverCount)), false);
         source.sendFeedback(() -> field("交互频道动作继电器", number(interactionRelayCount)), false);
@@ -878,6 +899,27 @@ public final class SignalDeviceCommand {
         }
         if (!device.interactChannel().isBlank() && !SignalChannel.isValid(device.interactChannel())) {
             hints.add(Text.literal("interactChannel 名称无效。").formatted(Formatting.RED));
+        }
+        ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
+        if (device.interactionItemMatcherEnabled()) {
+            if (!matcher.enabled()) {
+                hints.add(Text.literal("interactionItem 已启用，但缺少主手物品模板。").formatted(Formatting.RED));
+            }
+            if (device.interactChannel().isBlank() && matcher.successChannel().isBlank()) {
+                hints.add(Text.literal("未设置 interactChannel 或 successChannel，匹配成功时不会 emit signal。").formatted(Formatting.YELLOW));
+            }
+            if (!matcher.successChannel().isBlank() && !SignalChannel.isValid(matcher.successChannel())) {
+                hints.add(Text.literal("successChannel 名称无效。").formatted(Formatting.RED));
+            }
+            if (!matcher.failChannel().isBlank() && !SignalChannel.isValid(matcher.failChannel())) {
+                hints.add(Text.literal("failChannel 名称无效。").formatted(Formatting.RED));
+            }
+            if (matcher.failChannel().isBlank()) {
+                hints.add(Text.literal("failChannel 未设置，匹配失败时不会 emit signal。").formatted(Formatting.YELLOW));
+            }
+            if (matcher.consumeEnabled() && matcher.consumeCount() <= 0) {
+                hints.add(Text.literal("consumeCount 无效。").formatted(Formatting.RED));
+            }
         }
         if (remainingInteractionCooldown > 0L) {
             hints.add(Text.literal("正处于 interaction cooldown。").formatted(Formatting.YELLOW));
@@ -1146,6 +1188,18 @@ public final class SignalDeviceCommand {
         return channel == null || channel.isBlank()
                 ? Text.literal("未绑定").formatted(Formatting.YELLOW)
                 : channelText(channel);
+    }
+
+    private static Text configuredText(String value) {
+        return value == null || value.isBlank()
+                ? Text.literal("未设置").formatted(Formatting.YELLOW)
+                : Text.literal(value).formatted(Formatting.WHITE);
+    }
+
+    private static Text soundText(String soundId, float volume, float pitch) {
+        return soundId == null || soundId.isBlank()
+                ? Text.literal("未设置").formatted(Formatting.YELLOW)
+                : Text.literal(soundId + " / volume " + volume + " / pitch " + pitch).formatted(Formatting.AQUA);
     }
 
     private static MutableText typeText(SignalDeviceData device) {

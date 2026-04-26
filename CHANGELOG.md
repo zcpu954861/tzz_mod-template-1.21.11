@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.13.0-interaction-item-feedback
+
+- 增强 `virtual_block_device` 的 `interactionItem` 主手物品匹配反馈。
+- 新增匹配成功频道 `successChannel` 和匹配失败频道 `failChannel`，均通过现有 SignalBridge emit。
+- 新增匹配成功 / 失败消息配置，消息完全由管理员设置，默认不显示。
+- 新增匹配成功 / 失败音效配置，支持 namespaced sound id、volume 和 pitch，默认不播放。
+- 新增匹配成功后消耗主手物品的可选配置，默认不消耗，`consumeCount` 默认 1。
+- 物品数量不足以消耗时进入失败流程，不 emit 成功频道、不发送成功反馈、不消耗物品。
+- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不阻止原版交互。
+- 继续只处理 `MAIN_HAND`，不读取背包、副手、装备栏或盔甲栏。
+- 保持 5.10 默认行为兼容：未配置 5.11 字段时，匹配成功仍回退使用 `interactChannel`，匹配失败仍默认静默。
+- 本阶段不实现 GUI、玩家背包检测、副手匹配、装备栏 / 盔甲栏匹配或通用 NBT 查询。
+
 ## v1.12.0-itemstack-matcher
 
 - 新增通用 `ItemStackMatcher`，供容器物品条件和右键交互主手物品匹配共用。

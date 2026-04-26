@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.12.0-itemstack-matcher`
-- 当前开发版本：`v1.12.0-itemstack-matcher`（5.10 物品数据匹配系统；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.13.0-interaction-item-feedback`
+- 当前开发版本：`v1.13.0-interaction-item-feedback`（5.11 右键物品匹配增强；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -464,14 +464,35 @@ minecraft:wheat[age=7]
 
 当前 `ItemStackMatcher` 支持 item registry id、count、damage、自定义名称、lore、`custom_data` 和 data components 的整体快照匹配。默认只启用 item id 与数量规则；更严格的 damage / 名称 / lore / custom_data / components 需要管理员显式开启。本阶段不是任意 NBT path 查询系统，也不检测告示牌文字、命令方块命令、刷怪笼 NBT、BlockEntity NBT、玩家 NBT 或实体 NBT。
 
-后续计划仍只记录，不在 5.10 实现：
+5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。冷却中不会 emit、不会反馈、不会消耗，也不会阻止原版右键行为。
+
+```text
+/tzz signal blockDevice interactionItem successChannel <x> <y> <z> <channel>
+/tzz signal blockDevice interactionItem clearSuccessChannel <x> <y> <z>
+/tzz signal blockDevice interactionItem failChannel <x> <y> <z> <channel>
+/tzz signal blockDevice interactionItem clearFailChannel <x> <y> <z>
+/tzz signal blockDevice interactionItem successMessage <x> <y> <z> <message>
+/tzz signal blockDevice interactionItem clearSuccessMessage <x> <y> <z>
+/tzz signal blockDevice interactionItem failMessage <x> <y> <z> <message>
+/tzz signal blockDevice interactionItem clearFailMessage <x> <y> <z>
+/tzz signal blockDevice interactionItem successSound <x> <y> <z> <soundId> <volume> <pitch>
+/tzz signal blockDevice interactionItem clearSuccessSound <x> <y> <z>
+/tzz signal blockDevice interactionItem failSound <x> <y> <z> <soundId> <volume> <pitch>
+/tzz signal blockDevice interactionItem clearFailSound <x> <y> <z>
+/tzz signal blockDevice interactionItem consume <x> <y> <z> enable
+/tzz signal blockDevice interactionItem consume <x> <y> <z> disable
+/tzz signal blockDevice interactionItem consumeCount <x> <y> <z> <count>
+```
+
+5.11 的消耗只处理右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏；物品数量不足以消耗时会进入失败流程。成功 / 失败 signal 都继续通过 SignalBridge emit，保留玩家上下文，并记录到 history。
+
+后续计划仍只记录，不在 5.11 实现：
 
 - 玩家背包内是否包含匹配物品。
 - 玩家副手物品匹配。
-- 右键成功后消耗匹配物品。
-- 右键失败提示消息。
+- 更复杂的消耗规则和失败提示策略。
 - 匹配装备栏和盔甲栏。
-- 6.0 / 7.0 GUI / Admin UI：容器槽位和物品条件未来不应长期依赖超长命令，GUI 应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
+- 6.0 / 7.0 GUI / Admin UI：容器槽位、物品条件、success/fail channel、message、sound、consume 和 consumeCount 未来不应长期依赖超长命令，GUI 应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 
 ### SignalBridge 可观测性命令
 

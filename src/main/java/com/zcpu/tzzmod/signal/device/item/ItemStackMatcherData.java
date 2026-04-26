@@ -22,9 +22,77 @@ public record ItemStackMatcherData(
         String templateCustomData,
         String templateComponents,
         String templateSummary,
+        String successChannel,
+        String failChannel,
+        String successMessage,
+        String failMessage,
+        String successSoundId,
+        float successSoundVolume,
+        float successSoundPitch,
+        String failSoundId,
+        float failSoundVolume,
+        float failSoundPitch,
+        boolean consumeEnabled,
+        int consumeCount,
         long createdWallTimeMillis,
         long updatedWallTimeMillis
 ) {
+    public ItemStackMatcherData(
+            boolean enabled,
+            String templateItemId,
+            int templateCount,
+            String countMode,
+            int requiredCount,
+            boolean matchItemId,
+            boolean matchDamage,
+            boolean matchCustomName,
+            boolean matchLore,
+            boolean matchCustomData,
+            boolean matchComponents,
+            int templateDamage,
+            String templateCustomName,
+            List<String> templateLore,
+            String templateCustomData,
+            String templateComponents,
+            String templateSummary,
+            long createdWallTimeMillis,
+            long updatedWallTimeMillis
+    ) {
+        this(
+                enabled,
+                templateItemId,
+                templateCount,
+                countMode,
+                requiredCount,
+                matchItemId,
+                matchDamage,
+                matchCustomName,
+                matchLore,
+                matchCustomData,
+                matchComponents,
+                templateDamage,
+                templateCustomName,
+                templateLore,
+                templateCustomData,
+                templateComponents,
+                templateSummary,
+                "",
+                "",
+                "",
+                "",
+                "",
+                1.0F,
+                1.0F,
+                "",
+                1.0F,
+                1.0F,
+                false,
+                1,
+                createdWallTimeMillis,
+                updatedWallTimeMillis
+        );
+    }
+
     public static ItemStackMatcherData empty() {
         return new ItemStackMatcherData(
                 false,
@@ -44,6 +112,18 @@ public record ItemStackMatcherData(
                 "",
                 "",
                 "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                1.0F,
+                1.0F,
+                "",
+                1.0F,
+                1.0F,
+                false,
+                1,
                 0L,
                 0L
         );
@@ -59,6 +139,12 @@ public record ItemStackMatcherData(
         String cleanCustomData = templateCustomData == null ? "" : templateCustomData.trim();
         String cleanComponents = templateComponents == null ? "" : templateComponents.trim();
         String cleanSummary = templateSummary == null ? "" : templateSummary.trim();
+        String cleanSuccessChannel = successChannel == null ? "" : successChannel.trim().toLowerCase();
+        String cleanFailChannel = failChannel == null ? "" : failChannel.trim().toLowerCase();
+        String cleanSuccessMessage = successMessage == null ? "" : successMessage.trim();
+        String cleanFailMessage = failMessage == null ? "" : failMessage.trim();
+        String cleanSuccessSoundId = successSoundId == null ? "" : successSoundId.trim().toLowerCase();
+        String cleanFailSoundId = failSoundId == null ? "" : failSoundId.trim().toLowerCase();
         List<String> cleanLore = new ArrayList<>();
         if (templateLore != null) {
             for (String line : templateLore) {
@@ -86,6 +172,18 @@ public record ItemStackMatcherData(
                 cleanCustomData,
                 cleanComponents,
                 cleanSummary,
+                cleanSuccessChannel,
+                cleanFailChannel,
+                cleanSuccessMessage,
+                cleanFailMessage,
+                cleanSuccessSoundId,
+                clamp(successSoundVolume, 0.0F, 10.0F, 1.0F),
+                clamp(successSoundPitch, 0.0F, 2.0F, 1.0F),
+                cleanFailSoundId,
+                clamp(failSoundVolume, 0.0F, 10.0F, 1.0F),
+                clamp(failSoundPitch, 0.0F, 2.0F, 1.0F),
+                consumeEnabled,
+                Math.max(1, consumeCount),
                 Math.max(0L, createdWallTimeMillis),
                 Math.max(0L, updatedWallTimeMillis)
         );
@@ -93,5 +191,12 @@ public record ItemStackMatcherData(
 
     public boolean configured() {
         return normalized().enabled();
+    }
+
+    private static float clamp(float value, float min, float max, float fallback) {
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            return fallback;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 }

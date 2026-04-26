@@ -1,18 +1,24 @@
 package com.zcpu.tzzmod.signal.device;
 
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherCommandSupport;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
 public final class VirtualBlockInteractionItemCommand {
@@ -68,6 +74,120 @@ public final class VirtualBlockInteractionItemCommand {
                                                 ContainerItemCountMode.IGNORE,
                                                 0
                                         )))))
+                .then(CommandManager.literal("successChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel"),
+                                                true
+                                        )))))
+                .then(CommandManager.literal("clearSuccessChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        true
+                                ))))
+                .then(CommandManager.literal("failChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel"),
+                                                false
+                                        )))))
+                .then(CommandManager.literal("clearFailChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        false
+                                ))))
+                .then(CommandManager.literal("successMessage")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                                        .executes(context -> executeMessage(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "message"),
+                                                true
+                                        )))))
+                .then(CommandManager.literal("clearSuccessMessage")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeMessage(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        true
+                                ))))
+                .then(CommandManager.literal("failMessage")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("message", StringArgumentType.greedyString())
+                                        .executes(context -> executeMessage(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "message"),
+                                                false
+                                        )))))
+                .then(CommandManager.literal("clearFailMessage")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeMessage(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        false
+                                ))))
+                .then(CommandManager.literal("successSound")
+                        .then(soundBranch(true)))
+                .then(CommandManager.literal("clearSuccessSound")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeSound(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        1.0F,
+                                        1.0F,
+                                        true
+                                ))))
+                .then(CommandManager.literal("failSound")
+                        .then(soundBranch(false)))
+                .then(CommandManager.literal("clearFailSound")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeSound(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                        "",
+                                        1.0F,
+                                        1.0F,
+                                        false
+                                ))))
+                .then(CommandManager.literal("consume")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.literal("enable")
+                                        .executes(context -> executeConsume(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                true
+                                        )))
+                                .then(CommandManager.literal("disable")
+                                        .executes(context -> executeConsume(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                false
+                                        )))))
+                .then(CommandManager.literal("consumeCount")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("count", IntegerArgumentType.integer(1, MAX_COUNT))
+                                        .executes(context -> executeConsumeCount(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                IntegerArgumentType.getInteger(context, "count")
+                                        )))))
                 .then(CommandManager.literal("info")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeInfo(
@@ -103,6 +223,21 @@ public final class VirtualBlockInteractionItemCommand {
                                 mode,
                                 IntegerArgumentType.getInteger(context, "count")
                         )));
+    }
+
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<ServerCommandSource, ?> soundBranch(boolean success) {
+        return CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                .then(CommandManager.argument("soundId", IdentifierArgumentType.identifier())
+                        .then(CommandManager.argument("volume", FloatArgumentType.floatArg(0.0F, 10.0F))
+                                .then(CommandManager.argument("pitch", FloatArgumentType.floatArg(0.0F, 2.0F))
+                                        .executes(context -> executeSound(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                IdentifierArgumentType.getIdentifier(context, "soundId").toString(),
+                                                FloatArgumentType.getFloat(context, "volume"),
+                                                FloatArgumentType.getFloat(context, "pitch"),
+                                                success
+                                        )))));
     }
 
     private static int executeSetFromHand(ServerCommandSource source, BlockPos pos) {
@@ -226,6 +361,105 @@ public final class VirtualBlockInteractionItemCommand {
         return 1;
     }
 
+    private static int executeChannel(ServerCommandSource source, BlockPos pos, String rawChannel, boolean success) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null || !hasMatcher(source, device)) {
+            return 0;
+        }
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!channel.isBlank() && !SignalChannel.isValid(channel)) {
+            sendError(source, SignalChannel.validationError(rawChannel));
+            return 0;
+        }
+
+        ItemStackMatcherData matcher = success
+                ? ItemStackMatcherSupport.withSuccessChannel(device.interactionItemMatcher(), channel)
+                : ItemStackMatcherSupport.withFailChannel(device.interactionItemMatcher(), channel);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, success ? "已更新成功频道" : "已更新失败频道");
+        sendHeader(source, Text.literal(success ? "已更新匹配成功频道" : "已更新匹配失败频道").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field(success ? "成功频道" : "失败频道", channelOrEmpty(success
+                ? updated.interactionItemMatcher().successChannel()
+                : updated.interactionItemMatcher().failChannel())), false);
+        return 1;
+    }
+
+    private static int executeMessage(ServerCommandSource source, BlockPos pos, String message, boolean success) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null || !hasMatcher(source, device)) {
+            return 0;
+        }
+
+        ItemStackMatcherData matcher = success
+                ? ItemStackMatcherSupport.withSuccessMessage(device.interactionItemMatcher(), message)
+                : ItemStackMatcherSupport.withFailMessage(device.interactionItemMatcher(), message);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, success ? "已更新成功消息" : "已更新失败消息");
+        sendHeader(source, Text.literal(success ? "已更新匹配成功消息" : "已更新匹配失败消息").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field(success ? "成功消息" : "失败消息", configuredText(success
+                ? updated.interactionItemMatcher().successMessage()
+                : updated.interactionItemMatcher().failMessage())), false);
+        return 1;
+    }
+
+    private static int executeSound(ServerCommandSource source, BlockPos pos, String soundId, float volume, float pitch, boolean success) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null || !hasMatcher(source, device)) {
+            return 0;
+        }
+        String cleanSoundId = soundId == null ? "" : soundId.trim().toLowerCase();
+        if (!cleanSoundId.isBlank()) {
+            Identifier id = Identifier.tryParse(cleanSoundId);
+            if (id == null || !Registries.SOUND_EVENT.containsId(id)) {
+                sendError(source, Text.literal("音效 ID 无效或不存在：" + soundId));
+                return 0;
+            }
+        }
+
+        ItemStackMatcherData matcher = success
+                ? ItemStackMatcherSupport.withSuccessSound(device.interactionItemMatcher(), cleanSoundId, volume, pitch)
+                : ItemStackMatcherSupport.withFailSound(device.interactionItemMatcher(), cleanSoundId, volume, pitch);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, success ? "已更新成功音效" : "已更新失败音效");
+        ItemStackMatcherData updatedMatcher = updated.interactionItemMatcher();
+        sendHeader(source, Text.literal(success ? "已更新匹配成功音效" : "已更新匹配失败音效").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field(success ? "成功音效" : "失败音效", soundText(success
+                ? updatedMatcher.successSoundId()
+                : updatedMatcher.failSoundId(), success
+                ? updatedMatcher.successSoundVolume()
+                : updatedMatcher.failSoundVolume(), success
+                ? updatedMatcher.successSoundPitch()
+                : updatedMatcher.failSoundPitch())), false);
+        return 1;
+    }
+
+    private static int executeConsume(ServerCommandSource source, BlockPos pos, boolean enabled) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null || !hasMatcher(source, device)) {
+            return 0;
+        }
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withConsume(device.interactionItemMatcher(), enabled);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, enabled ? "已启用成功消耗" : "已禁用成功消耗");
+        sendHeader(source, Text.literal(enabled ? "已启用匹配成功消耗" : "已禁用匹配成功消耗").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("消耗", boolText(updated.interactionItemMatcher().consumeEnabled())), false);
+        source.sendFeedback(() -> field("消耗数量", Text.literal(Integer.toString(updated.interactionItemMatcher().consumeCount())).formatted(Formatting.LIGHT_PURPLE)), false);
+        return 1;
+    }
+
+    private static int executeConsumeCount(ServerCommandSource source, BlockPos pos, int count) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null || !hasMatcher(source, device)) {
+            return 0;
+        }
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withConsumeCount(device.interactionItemMatcher(), count);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, "已更新成功消耗数量");
+        sendHeader(source, Text.literal("已更新匹配成功消耗数量").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("消耗数量", Text.literal(Integer.toString(updated.interactionItemMatcher().consumeCount())).formatted(Formatting.LIGHT_PURPLE)), false);
+        return 1;
+    }
+
     private static int executeInfo(ServerCommandSource source, BlockPos pos) {
         SignalDeviceData device = getVirtualDevice(source, pos);
         if (device == null) {
@@ -235,12 +469,48 @@ public final class VirtualBlockInteractionItemCommand {
         source.sendFeedback(() -> field("位置", posText(pos)), false);
         source.sendFeedback(() -> field("启用", boolText(device.interactionItemMatcherEnabled())), false);
         source.sendFeedback(() -> field("模板", Text.literal(ItemStackMatcherSupport.summary(device.interactionItemMatcher())).formatted(Formatting.WHITE)), false);
+        ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
+        source.sendFeedback(() -> field("成功频道", channelOrEmpty(matcher.successChannel())), false);
+        source.sendFeedback(() -> field("失败频道", channelOrEmpty(matcher.failChannel())), false);
+        source.sendFeedback(() -> field("成功消息", configuredText(matcher.successMessage())), false);
+        source.sendFeedback(() -> field("失败消息", configuredText(matcher.failMessage())), false);
+        source.sendFeedback(() -> field("成功音效", soundText(matcher.successSoundId(), matcher.successSoundVolume(), matcher.successSoundPitch())), false);
+        source.sendFeedback(() -> field("失败音效", soundText(matcher.failSoundId(), matcher.failSoundVolume(), matcher.failSoundPitch())), false);
+        source.sendFeedback(() -> field("成功消耗", boolText(matcher.consumeEnabled())), false);
+        source.sendFeedback(() -> field("消耗数量", Text.literal(Integer.toString(matcher.consumeCount())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近匹配", boolText(device.lastInteractionItemMatched())), false);
         source.sendFeedback(() -> field("最近结果", Text.literal(device.lastInteractionItemResult().isBlank() ? "暂无结果" : device.lastInteractionItemResult()).formatted(Formatting.WHITE)), false);
-        if (device.interactChannel().isBlank()) {
-            source.sendFeedback(() -> warning("尚未设置 interactChannel。"), false);
+        if (device.interactChannel().isBlank() && matcher.successChannel().isBlank()) {
+            source.sendFeedback(() -> warning("尚未设置 interactChannel 或成功频道。"), false);
+        }
+        if (matcher.failChannel().isBlank()) {
+            source.sendFeedback(() -> warning("失败频道未设置，失败时不会 emit signal。"), false);
         }
         return 1;
+    }
+
+    private static boolean hasMatcher(ServerCommandSource source, SignalDeviceData device) {
+        if (device.interactionItemMatcher() == null || !device.interactionItemMatcher().normalized().enabled()) {
+            sendError(source, Text.literal("还没有交互物品模板，请先使用 setFromHand。"));
+            return false;
+        }
+        return true;
+    }
+
+    private static SignalDeviceData updateMatcher(
+            ServerCommandSource source,
+            BlockPos pos,
+            SignalDeviceData device,
+            ItemStackMatcherData matcher,
+            String result
+    ) {
+        return SignalDeviceStore.updateVirtualInteractionItemMatcher(
+                source.getWorld(),
+                pos,
+                matcher,
+                device.interactionItemMatcherEnabled(),
+                result
+        );
     }
 
     private static SignalDeviceData getVirtualDevice(ServerCommandSource source, BlockPos pos) {
@@ -263,6 +533,27 @@ public final class VirtualBlockInteractionItemCommand {
 
     private static MutableText field(String label, Text value) {
         return Text.literal(label + "：").formatted(Formatting.GRAY).append(value);
+    }
+
+    private static MutableText channelOrEmpty(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return Text.literal("未设置").formatted(Formatting.YELLOW);
+        }
+        return Text.literal(channel).formatted(Formatting.AQUA);
+    }
+
+    private static MutableText configuredText(String value) {
+        if (value == null || value.isBlank()) {
+            return Text.literal("未设置").formatted(Formatting.YELLOW);
+        }
+        return Text.literal(value).formatted(Formatting.WHITE);
+    }
+
+    private static MutableText soundText(String soundId, float volume, float pitch) {
+        if (soundId == null || soundId.isBlank()) {
+            return Text.literal("未设置").formatted(Formatting.YELLOW);
+        }
+        return Text.literal(soundId + " / volume " + volume + " / pitch " + pitch).formatted(Formatting.AQUA);
     }
 
     private static MutableText warning(String message) {
