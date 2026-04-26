@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.10.0-container-events`
-- 当前开发版本：`v1.11.0-container-item-conditions`（5.9 容器槽位 / 物品条件触发，开发中；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.11.0-container-item-conditions`
+- 当前开发版本：`v1.11.0-container-item-conditions`（5.9 容器槽位 / 物品条件触发；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -394,6 +394,8 @@ minecraft:wheat[age=7]
 /tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> exactly <count> <channel>
 /tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_most <count> <channel>
 /tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_most <count> <channel>
 /tzz signal blockDevice itemCondition list <x> <y> <z>
 /tzz signal blockDevice itemCondition info <x> <y> <z> <name>
 /tzz signal blockDevice itemCondition remove <x> <y> <z> <name>

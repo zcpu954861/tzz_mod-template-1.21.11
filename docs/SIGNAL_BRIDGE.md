@@ -475,6 +475,8 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 /tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> exactly <count> <channel>
 /tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_most <count> <channel>
 /tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_most <count> <channel>
 /tzz signal blockDevice itemCondition list <x> <y> <z>
 /tzz signal blockDevice itemCondition info <x> <y> <z> <name>
 /tzz signal blockDevice itemCondition remove <x> <y> <z> <name>
