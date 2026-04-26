@@ -534,8 +534,10 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 ```text
 /tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> ignore <channel>
 /tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> exactly <count> <channel>
 /tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> ignore <channel>
 /tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> at_least <count> <channel>
 /tzz signal blockDevice itemCondition matcherInfo <x> <y> <z> <name>
 /tzz signal blockDevice itemCondition matcherFromHand <x> <y> <z> <name>
@@ -567,6 +569,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 - 默认匹配 item registry id 和数量规则。
 - `countMode` 支持 `at_least`、`exactly`、`at_most` 和 `ignore`。
+- `ignore` 不接收数量参数，表示 matcher 不检查数量；info/debug 中显示“数量要求：不检查”。如果需要至少 2 个物品，应使用 `at_least 2`。
 - 可选匹配 damage、自定义名称、lore、`custom_data` 和 data components 整体快照。
 - 所有启用的匹配项都必须满足；未启用的匹配项不参与判断。
 - 模板可以从玩家主手捕获，也可以从容器槽位捕获。
@@ -610,7 +613,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - success / fail sound 只播放给触发玩家，未配置时不播放。
 - `consume` 只消耗右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏。
 - `consumeCount` 必须大于 0；主手数量不足时进入失败流程，不发成功频道、不发送成功反馈、不消耗。
-- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不阻止原版交互。
+- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不额外播放触发动效。
 - 成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不额外播放触发动画。
 - 成功 / 失败 signal 都保留玩家上下文并走现有 SignalBridge 递归保护。
 
@@ -620,6 +623,38 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - 不做玩家背包检测、副手匹配、装备栏 / 盔甲栏匹配、复杂多物品条件或 GUI。
 - 不做通用 NBT 查询，不检测告示牌文字、命令方块命令、刷怪笼 NBT、任意 BlockEntity NBT、玩家 NBT 或实体 NBT。
 - 未来 GUI / Admin UI 应覆盖 success/fail channel、message、sound、consume 和 consumeCount；也可以拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器和 debug/doctor 工具。
+
+### 玩家物品来源匹配
+
+5.12 阶段把 `interactionItem` 的物品来源从固定主手扩展为可配置来源。旧配置缺少新字段时默认 `main_hand`，保持 5.10 / 5.11 行为；`off_hand` 和 `inventory_contains` 必须由管理员显式配置。
+
+```text
+/tzz signal blockDevice interactionItem source <x> <y> <z> main_hand
+/tzz signal blockDevice interactionItem source <x> <y> <z> off_hand
+/tzz signal blockDevice interactionItem source <x> <y> <z> inventory_contains
+/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> allow
+/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> require_item_match
+```
+
+来源规则：
+
+- `main_hand`：读取触发玩家 `MAIN_HAND`，继续支持 5.11 的主手消耗。
+- `off_hand`：只检查触发玩家副手物品；右键事件仍只处理 `MAIN_HAND`，不会处理副手右键事件。
+- `inventory_contains`：只在玩家右键已绑定方块时检查该玩家自己的主背包 / 热键栏；不包含副手、装备栏或盔甲栏，也不在 tick 中扫描。
+- `inventory_contains` 使用 `ItemStackMatcher` 的非数量条件筛选背包 stack，然后统计总数；`ignore` 表示至少存在一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于总数，其中 `at_most` 要求总数大于 0。
+- `consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关；启用 consume 时仍必须满足消耗数量。
+- `consume` 只支持 `main_hand`。source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝；旧数据中出现不兼容配置时运行时不会消耗，并会进入失败流程或在 debug 中提示。
+- `vanillaInteraction` 默认 `allow`，不阻止原版右键行为。显式设置 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会阻止箱子打开、门开关、按钮/拉杆切换等原版 use。`interactionCooldownTicks` 不会让锁失效；冷却中匹配失败仍会阻止原版交互，只是不 emit、不反馈、不消耗、不额外播放触发动效，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+
+性能边界：
+
+- 仍然只检查被右键的一个坐标。
+- 不扫描世界、区块或周围方块，不强制加载区块。
+- 不每 tick 检查玩家背包。
+- 不读取其他玩家背包。
+- 不读取装备栏或盔甲栏。
+- 不做背包消耗、副手消耗、多物品提交、复杂条件组或通用 NBT 查询。
+- `interactionItem info` 会显示 source、最近匹配来源、最近匹配槽位和最近匹配数量；`device debug` 会显示 source 与 consume 的兼容性诊断。
 
 ### 统一设备命令
 
@@ -671,13 +706,11 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.10 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.12 MVP 实现：
 
-- 玩家背包内是否包含匹配物品。
-- 玩家副手物品匹配。
-- 更复杂的消耗规则和失败提示策略。
-- 匹配装备栏和盔甲栏。
-- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine；容器槽位和物品条件不应长期依赖超长命令，未来应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
+- 5.13 装备栏 / 盔甲栏匹配。
+- 5.14 消耗策略 / 多物品提交，包括背包消耗、副手消耗和更复杂的提交规则。
+- GUI / Admin UI：所有 source、matcher、consume 和反馈配置未来都应进入 GUI；可拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器、debug/doctor 工具。
 
 ## cooldown
 

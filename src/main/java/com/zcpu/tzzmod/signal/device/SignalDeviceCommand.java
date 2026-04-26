@@ -20,6 +20,8 @@ import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
+import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
+import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.ArrayList;
@@ -650,11 +652,20 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("交互冷却剩余", remainingInteractionCooldownText(device, source.getWorld().getTime())), false);
             source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
             source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
-            source.sendFeedback(() -> field("主手物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
-            source.sendFeedback(() -> field("匹配成功频道", channelOrEmpty(device.interactionItemMatcher().successChannel())), false);
-            source.sendFeedback(() -> field("匹配失败频道", channelOrEmpty(device.interactionItemMatcher().failChannel())), false);
-            source.sendFeedback(() -> field("成功消耗", boolText(device.interactionItemMatcher().consumeEnabled())), false);
-            source.sendFeedback(() -> field("消耗数量", number(device.interactionItemMatcher().consumeCount())), false);
+            ItemStackMatcherData interactionMatcher = device.interactionItemMatcher().normalized();
+            source.sendFeedback(() -> field("交互物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+            source.sendFeedback(() -> field("物品来源", Text.literal(InteractionItemSource.displayName(interactionMatcher.interactionItemSource())).formatted(Formatting.AQUA)), false);
+            source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
+            source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
+            source.sendFeedback(() -> field("原版交互策略", Text.literal(InteractionItemVanillaPolicy.displayName(interactionMatcher.interactionItemVanillaPolicy())).formatted(Formatting.AQUA)), false);
+            source.sendFeedback(() -> field("来源支持消耗", boolText(InteractionItemSource.supportsConsume(interactionMatcher.interactionItemSource()))), false);
+            source.sendFeedback(() -> field("匹配成功频道", channelOrEmpty(interactionMatcher.successChannel())), false);
+            source.sendFeedback(() -> field("匹配失败频道", channelOrEmpty(interactionMatcher.failChannel())), false);
+            source.sendFeedback(() -> field("成功消耗", boolText(interactionMatcher.consumeEnabled())), false);
+            source.sendFeedback(() -> field("消耗数量", number(interactionMatcher.consumeCount())), false);
+            source.sendFeedback(() -> field("最近匹配来源", sourceText(interactionMatcher.lastInteractionItemSource())), false);
+            source.sendFeedback(() -> field("最近匹配槽位", number(interactionMatcher.lastInteractionItemMatchedSlot())), false);
+            source.sendFeedback(() -> field("最近匹配数量", number(interactionMatcher.lastInteractionItemMatchedCount())), false);
             source.sendFeedback(() -> field("最近物品匹配结果", resultText(device.lastInteractionItemResult())), false);
             source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
             source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
@@ -746,8 +757,13 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
         source.sendFeedback(() -> field("最近交互结果", resultText(device.lastInteractionResult())), false);
         ItemStackMatcherData interactionMatcher = device.interactionItemMatcher().normalized();
-        source.sendFeedback(() -> field("主手物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+        source.sendFeedback(() -> field("交互物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
         source.sendFeedback(() -> field("物品匹配模板", Text.literal(ItemStackMatcherSupport.summary(interactionMatcher)).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("物品来源", Text.literal(InteractionItemSource.displayName(interactionMatcher.interactionItemSource())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("原版交互策略", Text.literal(InteractionItemVanillaPolicy.displayName(interactionMatcher.interactionItemVanillaPolicy())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("来源支持消耗", boolText(InteractionItemSource.supportsConsume(interactionMatcher.interactionItemSource()))), false);
         source.sendFeedback(() -> field("匹配成功频道", channelOrEmpty(interactionMatcher.successChannel())), false);
         source.sendFeedback(() -> field("匹配失败频道", channelOrEmpty(interactionMatcher.failChannel())), false);
         source.sendFeedback(() -> field("成功消息", configuredText(interactionMatcher.successMessage())), false);
@@ -756,8 +772,12 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("失败音效", soundText(interactionMatcher.failSoundId(), interactionMatcher.failSoundVolume(), interactionMatcher.failSoundPitch())), false);
         source.sendFeedback(() -> field("成功消耗", boolText(interactionMatcher.consumeEnabled())), false);
         source.sendFeedback(() -> field("消耗数量", number(interactionMatcher.consumeCount())), false);
-        source.sendFeedback(() -> field("最近主手匹配", boolText(device.lastInteractionItemMatched())), false);
-        source.sendFeedback(() -> field("最近主手匹配结果", resultText(device.lastInteractionItemResult())), false);
+        source.sendFeedback(() -> field("最近物品匹配", boolText(device.lastInteractionItemMatched())), false);
+        source.sendFeedback(() -> field("最近匹配来源", sourceText(interactionMatcher.lastInteractionItemSource())), false);
+        source.sendFeedback(() -> field("最近匹配槽位", number(interactionMatcher.lastInteractionItemMatchedSlot())), false);
+        source.sendFeedback(() -> field("最近匹配数量", number(interactionMatcher.lastInteractionItemMatchedCount())), false);
+        source.sendFeedback(() -> field("最近来源结果", resultText(interactionMatcher.lastInteractionItemSourceResult())), false);
+        source.sendFeedback(() -> field("最近物品匹配结果", resultText(device.lastInteractionItemResult())), false);
         source.sendFeedback(() -> field("交互频道监听器", number(interactionListeners.size())), false);
         source.sendFeedback(() -> field("交互频道接收器", number(interactionReceiverCount)), false);
         source.sendFeedback(() -> field("交互频道动作继电器", number(interactionRelayCount)), false);
@@ -919,6 +939,9 @@ public final class SignalDeviceCommand {
             }
             if (matcher.consumeEnabled() && matcher.consumeCount() <= 0) {
                 hints.add(Text.literal("consumeCount 无效。").formatted(Formatting.RED));
+            }
+            if (matcher.consumeEnabled() && !InteractionItemSource.supportsConsume(matcher.interactionItemSource())) {
+                hints.add(Text.literal("当前 interactionItem source 不支持 consume，请关闭 consume 或切回 main_hand。").formatted(Formatting.RED));
             }
         }
         if (remainingInteractionCooldown > 0L) {
@@ -1194,6 +1217,12 @@ public final class SignalDeviceCommand {
         return value == null || value.isBlank()
                 ? Text.literal("未设置").formatted(Formatting.YELLOW)
                 : Text.literal(value).formatted(Formatting.WHITE);
+    }
+
+    private static Text sourceText(String source) {
+        return source == null || source.isBlank()
+                ? Text.literal("暂无").formatted(Formatting.YELLOW)
+                : Text.literal(source).formatted(Formatting.AQUA);
     }
 
     private static Text soundText(String soundId, float volume, float pitch) {

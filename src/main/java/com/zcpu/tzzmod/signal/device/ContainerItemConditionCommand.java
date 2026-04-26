@@ -68,6 +68,8 @@ public final class ContainerItemConditionCommand {
                                                 .then(slotMatcherModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, slot, mode, count, channel) ->
                                                         executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))
                                                 .then(slotMatcherModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, slot, mode, count, channel) ->
+                                                        executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))
+                                                .then(slotMatcherModeBranch(ContainerItemCountMode.IGNORE, (source, pos, name, slot, mode, count, channel) ->
                                                         executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))))))
                 .then(CommandManager.literal("addSlotMatchFromSlot")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
@@ -79,6 +81,8 @@ public final class ContainerItemConditionCommand {
                                                         .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
                                                                 executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false)))
                                                         .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
+                                                                executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false)))
+                                                        .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.IGNORE, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
                                                                 executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false))))))))
                 .then(CommandManager.literal("addTotalMatchFromHand")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
@@ -88,6 +92,8 @@ public final class ContainerItemConditionCommand {
                                         .then(totalMatcherModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, mode, count, channel) ->
                                                 executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true)))
                                         .then(totalMatcherModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, mode, count, channel) ->
+                                                executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true)))
+                                        .then(totalMatcherModeBranch(ContainerItemCountMode.IGNORE, (source, pos, name, mode, count, channel) ->
                                                 executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true))))))
                 .then(CommandManager.literal("addTotalMatchFromSlot")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
@@ -98,6 +104,8 @@ public final class ContainerItemConditionCommand {
                                                 .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, templateSlot, mode, count, channel) ->
                                                         executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))
                                                 .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, templateSlot, mode, count, channel) ->
+                                                        executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))
+                                                .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.IGNORE, (source, pos, name, templateSlot, mode, count, channel) ->
                                                         executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))))))
                 .then(CommandManager.literal("list")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
@@ -253,14 +261,7 @@ public final class ContainerItemConditionCommand {
                                         .then(matcherCountBranch(ContainerItemCountMode.AT_LEAST))
                                         .then(matcherCountBranch(ContainerItemCountMode.EXACTLY))
                                         .then(matcherCountBranch(ContainerItemCountMode.AT_MOST))
-                                        .then(CommandManager.literal(ContainerItemCountMode.IGNORE.id())
-                                                .executes(context -> executeMatcherCount(
-                                                        context.getSource(),
-                                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
-                                                        StringArgumentType.getString(context, "name"),
-                                                        ContainerItemCountMode.IGNORE,
-                                                        0
-                                                ))))));
+                                        .then(matcherCountBranch(ContainerItemCountMode.IGNORE)))));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Identifier> slotItemArgument(
@@ -322,8 +323,20 @@ public final class ContainerItemConditionCommand {
             ContainerItemCountMode mode,
             SlotMatcherExecutor executor
     ) {
-        return CommandManager.literal(mode.id())
-                .then(slotMatcherCountBranch(mode, executor));
+        LiteralArgumentBuilder<ServerCommandSource> branch = CommandManager.literal(mode.id());
+        if (mode == ContainerItemCountMode.IGNORE) {
+            return branch.then(CommandManager.argument("channel", StringArgumentType.string())
+                    .executes(context -> executor.execute(
+                            context.getSource(),
+                            BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                            StringArgumentType.getString(context, "name"),
+                            IntegerArgumentType.getInteger(context, "slot"),
+                            mode,
+                            0,
+                            StringArgumentType.getString(context, "channel")
+                    )));
+        }
+        return branch.then(slotMatcherCountBranch(mode, executor));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Integer> slotMatcherCountBranch(
@@ -347,8 +360,21 @@ public final class ContainerItemConditionCommand {
             ContainerItemCountMode mode,
             SlotMatcherFromSlotExecutor executor
     ) {
-        return CommandManager.literal(mode.id())
-                .then(slotMatcherFromSlotCountBranch(mode, executor));
+        LiteralArgumentBuilder<ServerCommandSource> branch = CommandManager.literal(mode.id());
+        if (mode == ContainerItemCountMode.IGNORE) {
+            return branch.then(CommandManager.argument("channel", StringArgumentType.string())
+                    .executes(context -> executor.execute(
+                            context.getSource(),
+                            BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                            StringArgumentType.getString(context, "name"),
+                            IntegerArgumentType.getInteger(context, "targetSlot"),
+                            IntegerArgumentType.getInteger(context, "templateSlot"),
+                            mode,
+                            0,
+                            StringArgumentType.getString(context, "channel")
+                    )));
+        }
+        return branch.then(slotMatcherFromSlotCountBranch(mode, executor));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Integer> slotMatcherFromSlotCountBranch(
@@ -373,8 +399,19 @@ public final class ContainerItemConditionCommand {
             ContainerItemCountMode mode,
             TotalMatcherExecutor executor
     ) {
-        return CommandManager.literal(mode.id())
-                .then(totalMatcherCountBranch(mode, executor));
+        LiteralArgumentBuilder<ServerCommandSource> branch = CommandManager.literal(mode.id());
+        if (mode == ContainerItemCountMode.IGNORE) {
+            return branch.then(CommandManager.argument("channel", StringArgumentType.string())
+                    .executes(context -> executor.execute(
+                            context.getSource(),
+                            BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                            StringArgumentType.getString(context, "name"),
+                            mode,
+                            0,
+                            StringArgumentType.getString(context, "channel")
+                    )));
+        }
+        return branch.then(totalMatcherCountBranch(mode, executor));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Integer> totalMatcherCountBranch(
@@ -397,8 +434,20 @@ public final class ContainerItemConditionCommand {
             ContainerItemCountMode mode,
             TotalMatcherFromSlotExecutor executor
     ) {
-        return CommandManager.literal(mode.id())
-                .then(totalMatcherFromSlotCountBranch(mode, executor));
+        LiteralArgumentBuilder<ServerCommandSource> branch = CommandManager.literal(mode.id());
+        if (mode == ContainerItemCountMode.IGNORE) {
+            return branch.then(CommandManager.argument("channel", StringArgumentType.string())
+                    .executes(context -> executor.execute(
+                            context.getSource(),
+                            BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                            StringArgumentType.getString(context, "name"),
+                            IntegerArgumentType.getInteger(context, "templateSlot"),
+                            mode,
+                            0,
+                            StringArgumentType.getString(context, "channel")
+                    )));
+        }
+        return branch.then(totalMatcherFromSlotCountBranch(mode, executor));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Integer> totalMatcherFromSlotCountBranch(
@@ -430,15 +479,24 @@ public final class ContainerItemConditionCommand {
     }
 
     private static LiteralArgumentBuilder<ServerCommandSource> matcherCountBranch(ContainerItemCountMode mode) {
-        return CommandManager.literal(mode.id())
-                .then(CommandManager.argument("count", IntegerArgumentType.integer(1))
-                        .executes(context -> executeMatcherCount(
-                                context.getSource(),
-                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
-                                StringArgumentType.getString(context, "name"),
-                                mode,
-                                IntegerArgumentType.getInteger(context, "count")
-                        )));
+        LiteralArgumentBuilder<ServerCommandSource> branch = CommandManager.literal(mode.id());
+        if (mode == ContainerItemCountMode.IGNORE) {
+            return branch.executes(context -> executeMatcherCount(
+                    context.getSource(),
+                    BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                    StringArgumentType.getString(context, "name"),
+                    mode,
+                    0
+            ));
+        }
+        return branch.then(CommandManager.argument("count", IntegerArgumentType.integer(1))
+                .executes(context -> executeMatcherCount(
+                        context.getSource(),
+                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                        StringArgumentType.getString(context, "name"),
+                        mode,
+                        IntegerArgumentType.getInteger(context, "count")
+                )));
     }
 
     private static int executeAddSlotEmpty(ServerCommandSource source, BlockPos pos, String rawName, int slot, String rawChannel) {
@@ -1252,7 +1310,7 @@ public final class ContainerItemConditionCommand {
         source.sendFeedback(() -> field("模板", Text.literal(ItemStackMatcherSupport.summary(matcher)).formatted(Formatting.WHITE)), false);
         source.sendFeedback(() -> field("物品 ID", Text.literal(matcher.templateItemId().isBlank() ? "未设置" : matcher.templateItemId()).formatted(Formatting.AQUA)), false);
         source.sendFeedback(() -> field("数量模式", Text.literal(matcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
-        source.sendFeedback(() -> field("要求数量", Text.literal(Integer.toString(matcher.requiredCount())).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(matcher)).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("匹配物品 ID", boolText(matcher.matchItemId())), false);
         source.sendFeedback(() -> field("匹配耐久", boolText(matcher.matchDamage())), false);
         source.sendFeedback(() -> field("匹配自定义名称", boolText(matcher.matchCustomName())), false);
