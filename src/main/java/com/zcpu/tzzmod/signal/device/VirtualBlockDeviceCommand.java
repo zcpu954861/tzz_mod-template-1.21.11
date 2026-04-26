@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
@@ -22,6 +23,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 public final class VirtualBlockDeviceCommand {
+    private static final int MAX_INTERACTION_COOLDOWN_TICKS = 72_000;
+
     private VirtualBlockDeviceCommand() {
     }
 
@@ -106,6 +109,48 @@ public final class VirtualBlockDeviceCommand {
                 .then(CommandManager.literal("conditionInfo")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeConditionInfo(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("interactChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeInteractChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel")
+                                        )))))
+                .then(CommandManager.literal("clearInteractChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeClearInteractChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("interaction")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.literal("enable")
+                                        .executes(context -> executeInteractionEnabled(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                true
+                                        )))
+                                .then(CommandManager.literal("disable")
+                                        .executes(context -> executeInteractionEnabled(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                false
+                                        )))))
+                .then(CommandManager.literal("interactionCooldown")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("ticks", IntegerArgumentType.integer(0, MAX_INTERACTION_COOLDOWN_TICKS))
+                                        .executes(context -> executeInteractionCooldown(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                IntegerArgumentType.getInteger(context, "ticks")
+                                        )))))
+                .then(CommandManager.literal("interactionInfo")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeInteractionInfo(
                                         context.getSource(),
                                         BlockPosArgumentType.getLoadedBlockPos(context, "pos")
                                 ))))
@@ -276,6 +321,93 @@ public final class VirtualBlockDeviceCommand {
         return 1;
     }
 
+    private static int executeInteractChannel(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            sendError(source, SignalChannel.validationError(rawChannel));
+            return 0;
+        }
+
+        BlockState state = source.getWorld().getBlockState(pos);
+        if (state.isAir()) {
+            sendError(source, Text.literal("当前位置是空气，不能设置交互触发频道。"));
+            return 0;
+        }
+        if (!VirtualBlockDeviceSupport.blockId(state).equals(existing.blockId())) {
+            sendError(source, Text.literal("当前方块 ID 与绑定时不一致，请 refresh 或重新 bind 后再设置交互触发。"));
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualInteractChannel(source.getWorld(), pos, channel);
+        sendHeader(source, Text.literal("已设置虚拟方块交互触发频道").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("当前方块 ID", idText(VirtualBlockDeviceSupport.blockId(state))), false);
+        source.sendFeedback(() -> field("交互频道", channelText(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        return 1;
+    }
+
+    private static int executeClearInteractChannel(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.clearVirtualInteractChannel(source.getWorld(), pos);
+        sendHeader(source, Text.literal("已清空虚拟方块交互触发频道").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        return 1;
+    }
+
+    private static int executeInteractionEnabled(ServerCommandSource source, BlockPos pos, boolean enabled) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+        if (enabled && existing.interactChannel().isBlank()) {
+            sendError(source, Text.literal("请先设置 interactChannel。"));
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualInteractionEnabled(source.getWorld(), pos, enabled);
+        sendHeader(source, Text.literal(enabled ? "已启用虚拟方块交互触发" : "已禁用虚拟方块交互触发")
+                .formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        return 1;
+    }
+
+    private static int executeInteractionCooldown(ServerCommandSource source, BlockPos pos, int ticks) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualInteractionCooldown(source.getWorld(), pos, ticks);
+        sendHeader(source, Text.literal("已设置虚拟方块交互触发冷却").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
+        return 1;
+    }
+
+    private static int executeInteractionInfo(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null) {
+            return 0;
+        }
+
+        sendInteractionInfo(source, device, pos);
+        return 1;
+    }
+
     private static int executeInfo(ServerCommandSource source, BlockPos pos) {
         SignalDeviceData device = getVirtualDevice(source, pos);
         if (device == null) {
@@ -391,6 +523,11 @@ public final class VirtualBlockDeviceCommand {
         source.sendFeedback(() -> field("方块状态条件", conditionSummary(device)), false);
         source.sendFeedback(() -> field("条件模式", conditionModeText(device.conditionMode())), false);
         source.sendFeedback(() -> field("上次条件满足", boolText(device.lastConditionMatched())), false);
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
+        source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
@@ -423,6 +560,33 @@ public final class VirtualBlockDeviceCommand {
                 source.sendFeedback(() -> Text.literal("- " + issue).formatted(Formatting.YELLOW), false);
             }
         }
+    }
+
+    private static void sendInteractionInfo(ServerCommandSource source, SignalDeviceData device, BlockPos pos) {
+        BlockState state = source.getWorld().getBlockState(pos);
+        String currentBlockId = VirtualBlockDeviceSupport.blockId(state);
+        long remainingCooldown = SignalDeviceStore.getRemainingInteractionCooldownTicks(device, source.getWorld().getTime());
+
+        sendHeader(source, Text.literal("虚拟方块交互触发详情").formatted(Formatting.GOLD));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("交互触发", boolText(device.interactionEnabled())), false);
+        source.sendFeedback(() -> field("交互频道", channelOrEmpty(device.interactChannel())), false);
+        source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
+        source.sendFeedback(() -> field("当前冷却剩余", cooldownText(remainingCooldown)), false);
+        source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
+        source.sendFeedback(() -> field("最近交互结果", resultText(device.lastInteractionResult())), false);
+        source.sendFeedback(() -> field("最近交互手", device.lastInteractionHand().isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(device.lastInteractionHand()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("最近点击面", device.lastInteractionSide().isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(device.lastInteractionSide()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("当前方块 ID", idText(currentBlockId)), false);
+        source.sendFeedback(() -> field("绑定时方块 ID", idText(device.blockId())), false);
+        source.sendFeedback(() -> field("方块一致性", Text.literal(currentBlockId.equals(device.blockId()) ? "一致" : "不一致")
+                .formatted(currentBlockId.equals(device.blockId()) ? Formatting.GREEN : Formatting.YELLOW)), false);
+        source.sendFeedback(() -> field("设备状态", enabledText(device.enabled())), false);
     }
 
     private static void sendHeader(ServerCommandSource source, Text title) {
@@ -483,6 +647,25 @@ public final class VirtualBlockDeviceCommand {
 
     private static MutableText number(int value) {
         return Text.literal(Integer.toString(value)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText gtText(int ticks) {
+        return Text.literal(ticks + " GT").formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text cooldownText(long ticks) {
+        if (ticks <= 0L) {
+            return Text.literal("0 GT").formatted(Formatting.LIGHT_PURPLE);
+        }
+        double seconds = ticks / 20.0D;
+        return Text.literal(ticks + " GT（约 " + String.format(java.util.Locale.ROOT, "%.1f", seconds) + " 秒）")
+                .formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text playerOrNever(String playerName) {
+        return playerName == null || playerName.isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(playerName).formatted(Formatting.WHITE);
     }
 
     private static MutableText resultText(String value) {

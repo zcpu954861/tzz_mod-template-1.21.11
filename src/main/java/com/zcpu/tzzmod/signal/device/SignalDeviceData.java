@@ -35,7 +35,17 @@ public record SignalDeviceData(
         String conditionMode,
         boolean lastConditionMatched,
         long lastConditionCheckGameTime,
-        String lastConditionResult
+        String lastConditionResult,
+        boolean interactionEnabled,
+        String interactChannel,
+        int interactionCooldownTicks,
+        long lastInteractionGameTime,
+        long lastInteractionWallTimeMillis,
+        String lastInteractionPlayerName,
+        String lastInteractionPlayerUuid,
+        String lastInteractionResult,
+        String lastInteractionHand,
+        String lastInteractionSide
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
     public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
@@ -99,6 +109,16 @@ public record SignalDeviceData(
                 BlockStateConditionMode.CONDITION_ENTER.id(),
                 false,
                 0L,
+                "",
+                false,
+                "",
+                0,
+                0L,
+                0L,
+                "",
+                "",
+                "",
+                "",
                 ""
         );
     }
@@ -116,6 +136,12 @@ public record SignalDeviceData(
         String cleanConditionRaw = conditionRaw == null ? "" : conditionRaw.trim();
         String cleanConditionMode = BlockStateConditionMode.normalize(conditionMode);
         String cleanConditionResult = lastConditionResult == null ? "" : lastConditionResult.trim();
+        String cleanInteractChannel = SignalChannel.normalize(interactChannel);
+        String cleanInteractionPlayerName = lastInteractionPlayerName == null ? "" : lastInteractionPlayerName.trim();
+        String cleanInteractionPlayerUuid = lastInteractionPlayerUuid == null ? "" : lastInteractionPlayerUuid.trim();
+        String cleanInteractionResult = lastInteractionResult == null ? "" : lastInteractionResult.trim();
+        String cleanInteractionHand = lastInteractionHand == null ? "" : lastInteractionHand.trim();
+        String cleanInteractionSide = lastInteractionSide == null ? "" : lastInteractionSide.trim();
         Map<String, String> cleanConditionProperties = new LinkedHashMap<>();
         if (conditionProperties != null) {
             for (Map.Entry<String, String> entry : conditionProperties.entrySet()) {
@@ -162,7 +188,17 @@ public record SignalDeviceData(
                 cleanConditionMode,
                 lastConditionMatched,
                 Math.max(0L, lastConditionCheckGameTime),
-                cleanConditionResult
+                cleanConditionResult,
+                interactionEnabled && !cleanInteractChannel.isBlank(),
+                cleanInteractChannel,
+                Math.max(0, interactionCooldownTicks),
+                Math.max(0L, lastInteractionGameTime),
+                Math.max(0L, lastInteractionWallTimeMillis),
+                cleanInteractionPlayerName,
+                cleanInteractionPlayerUuid,
+                cleanInteractionResult,
+                cleanInteractionHand,
+                cleanInteractionSide
         );
     }
 }

@@ -319,6 +319,12 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 /tzz signal blockDevice conditionMode <x> <y> <z> condition_exit
 /tzz signal blockDevice conditionMode <x> <y> <z> condition_both
 /tzz signal blockDevice conditionInfo <x> <y> <z>
+/tzz signal blockDevice interactChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearInteractChannel <x> <y> <z>
+/tzz signal blockDevice interaction <x> <y> <z> enable
+/tzz signal blockDevice interaction <x> <y> <z> disable
+/tzz signal blockDevice interactionCooldown <x> <y> <z> <ticks>
+/tzz signal blockDevice interactionInfo <x> <y> <z>
 ```
 
 `bind` 会记录当前位置的方块 ID、当前是否通电和当前红石强度，避免绑定瞬间误触发。`refresh` 用于管理员更换该坐标方块后重新读取当前方块 ID 和红石状态。
@@ -352,7 +358,6 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - 命令方块里的命令。
 - 方块实体 NBT。
 - 容器是否被玩家打开。
-- 玩家是否右键了方块。
 - 周围方块状态或红石网络结构。
 
 完整格式示例：
@@ -394,6 +399,30 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 `clearCondition` 只清空 BlockState 条件，不影响 5.5 的红石状态检测配置。`conditionInfo` 会显示当前方块 ID、条件方块 ID、条件属性、当前方块支持的 property 列表、上次满足状态和当前满足状态。
 
+### 右键交互触发
+
+5.7 阶段新增虚拟方块交互触发。它只对 `signal_devices.json` 中已经登记为 `virtual_block_device` 的坐标生效，不监听未绑定方块。
+
+```text
+/tzz signal blockDevice interactChannel <x> <y> <z> lobby.terminal.click
+/tzz signal blockDevice interactionCooldown <x> <y> <z> 20
+/tzz signal blockDevice interactionInfo <x> <y> <z>
+```
+
+交互触发规则：
+
+- `interactChannel` 设置后会自动启用 interaction。
+- `clearInteractChannel` 会清空 `interactChannel` 并禁用 interaction。
+- `interaction enable` 要求已经设置 `interactChannel`。
+- `interactionCooldownTicks` 单位是 GT，默认 `0 GT`，表示无冷却；命令参数只输入整数，不输入 `GT` 后缀。
+- 默认只处理 `MAIN_HAND`，避免主副手双触发。
+- 默认不阻止原版交互：右键箱子仍打开箱子，右键门仍开关门，右键按钮仍按下按钮，同时可以 emit signal。
+- 成功触发 interaction signal 时，触发玩家会播放一次主手挥手动画。
+- 交互触发会带玩家上下文进入 SignalBridge / ActionEngine。
+- 当前方块 ID 与绑定时 `blockId` 不一致时不触发，`interactionInfo` 和 `device debug` 会提示 refresh 或重新 bind。
+
+一个虚拟方块发射器可以同时配置红石、BlockState condition 和 interaction 三种触发。如果这些触发都指向同一 channel，一次玩家右键可能因为原版状态变化和 interaction 同时产生多个 signal。这是可配置行为，管理员应按玩法需求使用不同 channel 或关闭不需要的触发。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -409,6 +438,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 ```
 
 `device info` 和 `device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道、condition 摘要和常见问题提示。
+5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition 和 interaction 触发记录。
 
 `cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。condition 不合法时也不会自动删除记录，只在 debug 中提示重新设置 condition 或 `clearCondition`。
 
@@ -425,6 +455,10 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 - 未加载区块直接跳过。
 - 每个设备每次只检测自己的一个坐标。
 - 有 condition 时 tick 不重新解析 condition 字符串，只比较保存后的 property/value。
+- 交互触发是事件驱动的，不通过 tick 轮询。
+- 右键事件只检查被右键的一个坐标，不扫描世界、区块或周围方块。
+- 不自动寻找可交互方块。
+- 不在每次右键时遍历世界内容。
 - 状态不变不 emit。
 - 状态不变不写 JSON。
 - `signal_devices.json` 写入已节流，服务端停止时强制保存。
@@ -432,16 +466,15 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 ### 职责边界
 
 - `signal_emitter`：专用方块，红石 / 交互 -> signal。
-- `virtual_block_device`：已有方块，红石状态变化 -> signal。
+- `virtual_block_device`：已有方块，红石状态变化 / BlockState condition / 玩家右键交互 -> signal。
 - `signal_receiver`：signal -> 红石输出。
 - `action_relay`：signal -> ActionEngine actions。
 - `SignalListener`：后台虚拟逻辑接收端。
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.6 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.7 MVP 实现：
 
-- 5.7 交互触发：右键已绑定方块发 signal，适合告示牌、任务终端、装饰按钮等。
 - 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
 - 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
 

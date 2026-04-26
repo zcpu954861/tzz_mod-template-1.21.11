@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.8.0-blockstate-condition`
+- 最新发布版本：`v1.9.0-block-interaction`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -264,7 +264,7 @@ signal -> action_relay -> ActionEngine actions
 
 因此执行 `clearOffChannel` 后，如果模式仍是 `redstone_both`，通电和断电都会发出主 `channel`，这是预期行为。
 
-5.6 阶段为虚拟方块发射器增加了方块状态条件触发。它检测的是当前方块公开的 BlockState 属性，不检测方块实体 NBT、容器内容、告示牌文字、命令方块命令或玩家右键交互。
+5.6 阶段为虚拟方块发射器增加了方块状态条件触发。它检测的是当前方块公开的 BlockState 属性，不检测方块实体 NBT、容器内容、告示牌文字或命令方块命令。
 
 ```text
 /tzz signal blockDevice condition <x> <y> <z> <condition>
@@ -297,6 +297,21 @@ minecraft:wheat[age=7]
 
 因此执行 `clearOffChannel` 后，如果模式是 `condition_both`，进入和退出条件都会发出主 `channel`，这是预期行为。
 
+5.7 阶段为虚拟方块发射器增加了右键交互触发。它只对已经登记为 `virtual_block_device` 的坐标生效，玩家右键该坐标方块时可以 emit 独立的 `interactChannel`。
+
+```text
+/tzz signal blockDevice interactChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearInteractChannel <x> <y> <z>
+/tzz signal blockDevice interaction <x> <y> <z> enable
+/tzz signal blockDevice interaction <x> <y> <z> disable
+/tzz signal blockDevice interactionCooldown <x> <y> <z> <ticks>
+/tzz signal blockDevice interactionInfo <x> <y> <z>
+```
+
+交互触发是事件驱动的，不通过 tick 轮询；默认只处理 `MAIN_HAND`，避免主副手双触发。它不会阻止原版右键行为：右键箱子仍会打开箱子，右键门仍会开关门，右键按钮或拉杆仍会正常响应，同时可发出 signal。成功触发 interaction signal 时，触发玩家会播放一次主手挥手动画。`interactionCooldownTicks` 单位是 GT，命令参数只输入整数，不输入 `GT` 后缀。
+
+右键交互会带玩家上下文进入 SignalBridge / ActionEngine。当前方块 ID 与绑定时 `blockId` 不一致时不会触发，`interactionInfo` / `device debug` 会提示 refresh 或重新 bind。一个虚拟方块发射器可以同时配置红石、condition 和 interaction；如果这些触发都指向同一 channel，一次右键可能因原版状态变化和 interaction 同时产生多个 signal，这是可配置行为。
+
 性能边界：
 
 - 不扫描世界。
@@ -306,6 +321,9 @@ minecraft:wheat[age=7]
 - 不强制加载区块。
 - 只检测 `signal_devices.json` 中登记过的 `virtual_block_device`。
 - 每个设备每次只检测自己的一个坐标。
+- 交互触发只检查被右键的一个坐标，不扫描世界、区块或周围方块。
+- 不自动寻找可交互方块。
+- 不在每次右键时遍历世界内容。
 - 有 condition 时 tick 不重新解析 condition 字符串，只比较保存后的 property/value。
 - 状态不变不 emit，也不写 JSON。
 - `signal_devices.json` 写入已节流，服务端停止时会强制保存。
@@ -323,6 +341,7 @@ minecraft:wheat[age=7]
 ```
 
 `device info` 和 `device debug` 会显示 condition 摘要与诊断信息。`cleanup` 对虚拟方块发射器采用保守策略：如果已加载位置变成空气，会删除记录；如果当前方块 ID 与绑定时不一致但不是空气，只在 debug 中提示，不自动删除。condition 无效时也不会自动删除记录，只会提示重新设置 condition 或 `clearCondition`。
+`device info` 和 `device debug` 也会显示 interaction 摘要、交互冷却、最近交互玩家和最近交互结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition 和 interaction 触发记录。
 
 职责边界：
 
@@ -332,9 +351,8 @@ minecraft:wheat[age=7]
 - `action_relay`：signal -> ActionEngine actions。
 - `SignalListener`：后台虚拟逻辑接收端。
 
-后续计划仍只记录，不在 5.6 实现：
+后续计划仍只记录，不在 5.7 实现：
 
-- 5.7 交互触发：右键已绑定方块发 signal。
 - 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
 - 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
 
