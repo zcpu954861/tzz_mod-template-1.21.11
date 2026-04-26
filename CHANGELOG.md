@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.11.0-container-item-conditions
+
+- 为 `virtual_block_device` 新增容器槽位 / 物品条件触发能力。
+- 新增 `itemConditions` 设备数据，支持 `slot_empty`、`slot_item` 和 `total_item` 三类条件。
+- 支持 `at_least`、`exactly`、`at_most` 三种数量比较模式。
+- 新增 `/tzz signal blockDevice itemCondition addSlotEmpty <x> <y> <z> <name> <slot> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_least|exactly|at_most <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_least|exactly|at_most <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition list|info|remove|clear|enable|disable|mode|offChannel|clearOffChannel|refresh|test` 管理命令。
+- `itemId` 保存前会校验是否存在于运行时物品注册表。
+- slot 条件保存前会校验槽位范围，越界会被拒绝。
+- 新增条件时会初始化 `lastMatched`，避免设置瞬间误触发。
+- 条件进入 / 退出边沿通过现有 SignalBridge emit，继续记录到 SignalEventHistory 和 device history。
+- 复用 5.8 容器内容 fingerprint / check interval，在内容变化后检查 item conditions。
+- 只检查已登记、已配置 itemCondition 的绑定容器，不扫描世界、区块或周围方块，不强制加载区块。
+- 本阶段只比较 item registry id 和 count，不比较 NBT、数据组件、lore、自定义名称或附魔。
+- `/tzz signal blockDevice info`、`containerInfo`、`/tzz signal device info/debug` 显示 itemCondition 摘要和诊断信息。
+- 保持 5.5 红石触发、5.6 BlockState condition、5.7 interaction、5.8 container open/close/change 行为兼容。
+
 ## v1.10.0-container-events
 
 - 为 `virtual_block_device` 新增容器事件触发能力。

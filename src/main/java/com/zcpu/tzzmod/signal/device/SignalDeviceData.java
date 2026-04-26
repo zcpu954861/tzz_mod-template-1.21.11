@@ -1,7 +1,9 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.signal.SignalChannel;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public record SignalDeviceData(
@@ -63,7 +65,8 @@ public record SignalDeviceData(
         String lastContainerPlayerName,
         String lastContainerPlayerUuid,
         String lastContainerResult,
-        String lastContainerEventType
+        String lastContainerEventType,
+        List<ContainerItemConditionData> itemConditions
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
     public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
@@ -155,7 +158,8 @@ public record SignalDeviceData(
                 "",
                 "",
                 "",
-                ""
+                "",
+                List.of()
         );
     }
 
@@ -261,7 +265,8 @@ public record SignalDeviceData(
                 "",
                 "",
                 "",
-                ""
+                "",
+                List.of()
         );
     }
 
@@ -292,6 +297,18 @@ public record SignalDeviceData(
         String cleanContainerPlayerUuid = lastContainerPlayerUuid == null ? "" : lastContainerPlayerUuid.trim();
         String cleanContainerResult = lastContainerResult == null ? "" : lastContainerResult.trim();
         String cleanContainerEventType = lastContainerEventType == null ? "" : lastContainerEventType.trim();
+        List<ContainerItemConditionData> cleanItemConditions = new ArrayList<>();
+        if (itemConditions != null) {
+            for (ContainerItemConditionData condition : itemConditions) {
+                if (condition == null) {
+                    continue;
+                }
+                ContainerItemConditionData normalized = condition.normalized();
+                if (!normalized.name().isBlank()) {
+                    cleanItemConditions.add(normalized);
+                }
+            }
+        }
         Map<String, String> cleanConditionProperties = new LinkedHashMap<>();
         if (conditionProperties != null) {
             for (Map.Entry<String, String> entry : conditionProperties.entrySet()) {
@@ -370,7 +387,8 @@ public record SignalDeviceData(
                 cleanContainerPlayerName,
                 cleanContainerPlayerUuid,
                 cleanContainerResult,
-                cleanContainerEventType
+                cleanContainerEventType,
+                List.copyOf(cleanItemConditions)
         );
     }
 }

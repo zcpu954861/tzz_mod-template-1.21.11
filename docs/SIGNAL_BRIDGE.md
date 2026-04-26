@@ -465,6 +465,65 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 一个虚拟方块发射器可以同时配置红石、BlockState condition、interaction 和 container 事件。如果多个触发指向同一 channel，可能出现多个 signal，这是配置结果，不是 bug。
 
+### 容器槽位 / 物品条件触发
+
+5.9 阶段新增容器槽位 / 物品条件触发。它只对已经登记为 `virtual_block_device`、当前方块是容器、并且配置了 itemCondition 的坐标生效。它不是通用 NBT 检测，也不匹配物品名称、lore、附魔或新版数据组件。
+
+```text
+/tzz signal blockDevice itemCondition addSlotEmpty <x> <y> <z> <name> <slot> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition list <x> <y> <z>
+/tzz signal blockDevice itemCondition info <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition remove <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition clear <x> <y> <z>
+/tzz signal blockDevice itemCondition enable <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition disable <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_enter
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_exit
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_both
+/tzz signal blockDevice itemCondition offChannel <x> <y> <z> <name> <channel>
+/tzz signal blockDevice itemCondition clearOffChannel <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition refresh <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition test <x> <y> <z> <name>
+```
+
+条件类型：
+
+- `slot_empty`：指定槽位为空。
+- `slot_item`：指定槽位的 item registry id 等于配置值，并且 count 满足 `at_least`、`exactly` 或 `at_most`。
+- `total_item`：统计整个容器内指定 item registry id 的总数量，并按 `at_least`、`exactly` 或 `at_most` 判断。
+
+触发规则：
+
+- `condition_enter`：条件 false -> true 时 emit `channel`。
+- `condition_exit`：条件 true -> false 时优先 emit `offChannel`；未设置时回退 emit `channel`。
+- `condition_both`：进入条件 emit `channel`，退出条件优先 emit `offChannel`；未设置时回退 emit `channel`。
+- 新增或重新启用条件时会把 `lastMatched` 初始化为当前匹配结果，避免配置瞬间误触发。
+- `refresh` 只重新同步当前匹配状态，不会 emit signal。
+- `test` 只手动 emit 该条件的 `channel`，不会改变 `lastMatched`。
+
+校验规则：
+
+- `itemId` 必须存在于当前运行时物品注册表。
+- `slot_empty` 和 `slot_item` 的 slot 必须在当前容器槽位范围内。
+- `count` 必须大于等于 1。
+- name 在同一设备内必须唯一。
+- 条件配置异常不会被 cleanup 自动删除，`device debug` 会提示管理员修复或 remove condition。
+
+性能边界：
+
+- 只检查已登记、已启用、配置了 itemCondition 的绑定容器。
+- slot 条件只读取指定 slot。
+- total 条件只遍历该容器自身 slot；同一容器内多个 total 条件会在一次统计中复用结果。
+- 不扫描世界、区块或周围方块，不自动寻找容器，不强制加载区块。
+- 不读取未绑定容器，不序列化完整 ItemStack NBT。
+- 内容不变不 emit；条件匹配状态不变不 emit；状态不变不写 `signal_devices.json`。
+
+5.8 的 `containerChangeChannel` 和 5.9 的 itemCondition 可以同时存在：前者表示“任意内容变化”，后者表示“具体条件进入 / 退出”。如果两个配置指向同一 channel，可能出现多个 signal，这是配置结果，不是 bug。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -480,7 +539,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 ```
 
 `device info` 和 `device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道、condition 摘要和常见问题提示。
-5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。5.8 后会显示 container 摘要、open / close / change channel、容器冷却、内容检查间隔、最近容器事件和最近结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition、interaction 和 container 触发记录。
+5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。5.8 后会显示 container 摘要、open / close / change channel、容器冷却、内容检查间隔、最近容器事件和最近结果。5.9 后会显示 itemCondition 数量、启用数量、最近物品条件触发和条件诊断。`device history` 可查看来源为 `virtual_block_device` 的红石、condition、interaction、container 和 itemCondition 触发记录。
 
 `cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。condition 不合法时也不会自动删除记录，只在 debug 中提示重新设置 condition 或 `clearCondition`。
 
@@ -515,11 +574,10 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.8 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.9 MVP 实现：
 
-- 5.9 容器槽位 / 物品条件：第 N 格为空、第 N 格是某物品、第 N 格数量满足条件、容器内总计包含某物品数量。
 - 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
-- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine，容器槽位和物品条件不应长期依赖超长命令。
+- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine；容器槽位和物品条件不应长期依赖超长命令，未来应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 
 ## cooldown
 

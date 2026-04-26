@@ -3,7 +3,7 @@
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
 - 最新发布版本：`v1.10.0-container-events`
-- 当前开发版本：下一阶段待定（以 `gradle.properties` 的 `mod_version` 为准）
+- 当前开发版本：`v1.11.0-container-item-conditions`（5.9 容器槽位 / 物品条件触发，开发中；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -383,9 +383,59 @@ minecraft:wheat[age=7]
 
 后续计划仍只记录，不在 5.8 实现：
 
-- 5.9 容器槽位 / 物品条件：第 N 格为空、第 N 格是某物品、数量满足条件、容器内总计包含某物品数量等。
 - 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
-- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine。
+- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController、ActionEngine、容器/物品条件和游戏主线调度系统。
+
+5.9 阶段为已绑定容器的 `virtual_block_device` 增加了容器槽位 / 物品条件触发。它不是物品 NBT 检测、数据组件匹配或 GUI 配置系统，只比较基础 item registry id 和数量：
+
+```text
+/tzz signal blockDevice itemCondition addSlotEmpty <x> <y> <z> <name> <slot> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addSlotItem <x> <y> <z> <name> <slot> <itemId> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalItem <x> <y> <z> <name> <itemId> at_least <count> <channel>
+/tzz signal blockDevice itemCondition list <x> <y> <z>
+/tzz signal blockDevice itemCondition info <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition remove <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition clear <x> <y> <z>
+/tzz signal blockDevice itemCondition enable <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition disable <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_enter
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_exit
+/tzz signal blockDevice itemCondition mode <x> <y> <z> <name> condition_both
+/tzz signal blockDevice itemCondition offChannel <x> <y> <z> <name> <channel>
+/tzz signal blockDevice itemCondition clearOffChannel <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition refresh <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition test <x> <y> <z> <name>
+```
+
+条件类型：
+
+- `slot_empty`：指定槽位为空时匹配。
+- `slot_item`：指定槽位是指定 `itemId`，并且数量满足 `at_least`、`exactly` 或 `at_most`。
+- `total_item`：统计整个容器内指定 `itemId` 的总数量，并按 `at_least`、`exactly` 或 `at_most` 判断。
+
+触发规则：
+
+- `condition_enter`：条件从 false -> true 时 emit `channel`。
+- `condition_exit`：条件从 true -> false 时优先 emit `offChannel`；未设置时回退 emit `channel`。
+- `condition_both`：进入条件 emit `channel`，退出条件优先 emit `offChannel`；未设置时回退 emit `channel`。
+- 新增条件时会初始化 `lastMatched` 为当前匹配结果，避免设置瞬间误触发；`refresh` 可手动重新同步当前匹配状态。
+
+性能和边界：
+
+- 只对已绑定、已配置 `itemCondition` 的 `virtual_block_device` 生效。
+- 当前方块必须是容器。
+- 不扫描世界、区块或周围方块，不强制加载区块，不读取未绑定容器。
+- slot 条件只读取指定 slot；total 条件只遍历该容器自身 slot。
+- 内容不变不 emit；条件匹配状态不变不 emit；状态不变不写 `signal_devices.json`。
+- 本阶段不比较 NBT、数据组件、lore、自定义名称或附魔，也不是通用 NBT 检测系统。
+- 如果 `containerChangeChannel` 和 itemCondition channel 指向同一 channel，内容变化和条件边沿可能各自发出 signal，这是配置结果，不是 bug。
+
+后续计划仍只记录，不在 5.9 实现：
+
+- 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
+- 6.0 / 7.0 GUI / Admin UI：容器槽位和物品条件未来不应长期依赖超长命令，GUI 应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 
 ### SignalBridge 可观测性命令
 
