@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.16.0-consume-submit
+
+- Added 5.14 Consume Strategies / Multi-Item Submission MVP for `virtual_block_device`.
+- `interactionItem` consume now supports explicit consume strategies for `main_hand`, `off_hand`, and `inventory_contains`.
+- Added `/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> matched_source|inventory|main_hand|off_hand`.
+- Added `/tzz signal blockDevice interactionItem inventoryConsumeOrder <x> <y> <z> hotbar_first|main_inventory_first`.
+- `armor_head`, `armor_chest`, `armor_legs`, `armor_feet`, and `armor_any` still do not support consume.
+- Inventory consume only uses the triggering player's main inventory / hotbar and can consume across multiple matching stacks.
+- Consume is atomic: all required items are checked before any stack is decremented.
+- Added optional `itemSubmit` multi-item submission, disabled by default.
+- `interactionItem` matcher and `itemSubmit` are now mutually exclusive matching modes.
+- Enabling `itemSubmit` automatically disables the single-item `interactionItem` matcher while preserving success/fail feedback configuration.
+- Added `/tzz signal blockDevice itemSubmit enable|disable <x> <y> <z>`.
+- Added `/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> at_least|exactly|at_most <count>` and `/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> ignore`.
+- Added `/tzz signal blockDevice itemSubmit list|info|infoAll|remove|clear`.
+- Added `/tzz signal blockDevice itemSubmit enableRequirement|disableRequirement|matcherFromHand|matcherOption|count|consume|consumeOrder|consumeCount`.
+- `itemSubmit` checks only the triggering player's main inventory / hotbar, requires all enabled requirements to match, and can optionally consume atomically.
+- When `itemSubmit` is enabled, submit requirements decide success and the single-item `interactionItem` matcher / consume path is not evaluated.
+- `ignore` count mode still takes no count parameter and means "do not check matcher count"; inventory matching requires at least one matching stack.
+- `require_item_match` remains a lock: in `itemSubmit` mode it locks based on submit success/failure, and cooldown suppresses signal/message/sound/history/extra animation side effects but does not unlock failed matches or skip enabled consume.
+- No world scan, chunk scan, neighbor scan, tick backpack scan, forced chunk load, GUI, armor consume, ConditionEngine, or generic NBT path query is implemented.
+- Follow-up plan only: 5.15 stabilization / GUI preparation, later ConditionEngine / ConditionGroup, and 6.0 / 7.0 GUI / Admin UI.
+
 ## v1.15.0-equipment-armor-source
 
 - 扩展 `virtual_block_device` 的 `interactionItem` 玩家物品来源匹配。
@@ -33,7 +56,7 @@
 - `vanillaInteraction` 默认 `allow`，保持不阻止原版右键行为；显式设置 `require_item_match` 后，interactionItem 匹配失败会阻止原版 use，但仍可执行失败反馈。
 - `require_item_match` 可作为锁定策略；`interactionCooldownTicks` 不会让锁失效，冷却中匹配失败仍会阻止原版交互。
 - 对门使用 `require_item_match` 时支持上下半格归一化，绑定任一半格后右键另一半也会走同一设备锁定判断。
-- 冷却只抑制 success/fail signal、message、sound、consume、额外动画和结果/历史写入等副作用。
+- 冷却只抑制 success/fail signal、message、sound、额外动画和结果/历史写入等副作用；5.14 起已启用的成功消耗不会被 cooldown 跳过。
 - 成功 / 失败 signal 继续通过 SignalBridge emit，保留玩家上下文并记录到 SignalEventHistory / device history。
 - 本阶段不实现背包消耗、副手消耗、装备栏 / 盔甲栏匹配、多物品提交、GUI 或通用 NBT 查询。
 
@@ -45,7 +68,7 @@
 - 新增匹配成功 / 失败音效配置，支持 namespaced sound id、volume 和 pitch，默认不播放。
 - 新增匹配成功后消耗主手物品的可选配置，默认不消耗，`consumeCount` 默认 1。
 - 物品数量不足以消耗时进入失败流程，不 emit 成功频道、不发送成功反馈、不消耗物品。
-- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不阻止原版交互。
+- `interactionCooldownTicks` 同时限制成功和失败反馈；5.14 起冷却中不 emit、不反馈，但匹配成功并启用消耗时仍会扣除物品。
 - 成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不额外播放触发动画。
 - 继续只处理 `MAIN_HAND`，不读取背包、副手、装备栏或盔甲栏。
 - 保持 5.10 默认行为兼容：未配置 5.11 字段时，匹配成功仍回退使用 `interactChannel`，匹配失败仍默认静默。

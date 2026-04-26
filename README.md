@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.15.0-equipment-armor-source`
-- 当前开发版本：`v1.15.0-equipment-armor-source`（5.13 玩家装备 / 盔甲来源匹配；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.16.0-consume-submit`
+- 当前开发版本：`v1.16.0-consume-submit`（5.14 Consume Strategies / Multi-Item Submission MVP；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -36,6 +36,67 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## SignalBridge
+
+### 5.14 Consume Strategies / Multi-Item Submission MVP
+
+Version marker: `v1.16.0-consume-submit`.
+
+5.14 extends `virtual_block_device` right-click item matching with optional consume strategies and optional multi-item submission.
+
+- `interactionItem` consume can use `matched_source`, `main_hand`, `off_hand`, or `inventory`.
+- `main_hand`, `off_hand`, and `inventory_contains` can consume matched items when explicitly enabled.
+- `armor_head`, `armor_chest`, `armor_legs`, `armor_feet`, and `armor_any` still reject consume; equipment / armor consume is not implemented.
+- Inventory consume only reads and consumes the triggering player's main inventory / hotbar.
+- `inventoryConsumeOrder` supports `hotbar_first` and `main_inventory_first`.
+- Consume is atomic: the mod checks every required item before decrementing any stack.
+- `itemSubmit` is disabled by default and must be enabled by an admin.
+- `interactionItem` matcher and `itemSubmit` are mutually exclusive matching modes.
+- Enabling `itemSubmit` automatically disables the single-item `interactionItem` matcher while preserving success/fail feedback configuration.
+- `itemSubmit` requirements are captured from the admin's main hand and checked against the triggering player's main inventory / hotbar.
+- All enabled `itemSubmit` requirements must match for submit success.
+- When `itemSubmit` is enabled, submit requirements decide success and the single-item `interactionItem` matcher / consume path is not evaluated.
+- `itemSubmit consume` is optional and atomically consumes all requirement items when enabled.
+- `ignore` count mode does not take a count parameter and means the matcher does not check count; inventory matching still requires at least one matching stack.
+- `require_item_match` remains a lock. In `itemSubmit` mode it locks based on submit success/failure; cooldown only suppresses signal/message/sound/history/extra animation side effects and does not unlock failed matches or skip enabled consume.
+- No GUI, armor consume, backpack tick scan, world scan, ConditionEngine, or generic NBT path query is implemented in this phase.
+
+New commands:
+
+```text
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> matched_source
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> inventory
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> main_hand
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> off_hand
+/tzz signal blockDevice interactionItem inventoryConsumeOrder <x> <y> <z> hotbar_first
+/tzz signal blockDevice interactionItem inventoryConsumeOrder <x> <y> <z> main_inventory_first
+
+/tzz signal blockDevice itemSubmit enable <x> <y> <z>
+/tzz signal blockDevice itemSubmit disable <x> <y> <z>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> at_least <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> exactly <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> at_most <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> ignore
+/tzz signal blockDevice itemSubmit list <x> <y> <z>
+/tzz signal blockDevice itemSubmit info <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit infoAll <x> <y> <z>
+/tzz signal blockDevice itemSubmit remove <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit clear <x> <y> <z>
+/tzz signal blockDevice itemSubmit enableRequirement <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit disableRequirement <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit matcherFromHand <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit matcherOption <x> <y> <z> <name> <option> enable|disable
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> at_least <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> exactly <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> at_most <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> ignore
+/tzz signal blockDevice itemSubmit consume <x> <y> <z> enable
+/tzz signal blockDevice itemSubmit consume <x> <y> <z> disable
+/tzz signal blockDevice itemSubmit consumeOrder <x> <y> <z> hotbar_first
+/tzz signal blockDevice itemSubmit consumeOrder <x> <y> <z> main_inventory_first
+/tzz signal blockDevice itemSubmit consumeCount <x> <y> <z> <name> <count>
+```
+
+Future plan only: 5.15 stabilization / GUI preparation, later ConditionEngine / ConditionGroup, and 6.0 / 7.0 GUI / Admin UI. These are not implemented in 5.14.
 
 SignalBridge 是服务端事件桥 / 事件频道系统，用于把不同系统产生的事件通过 `signal channel` 串联起来。RegionController、封锁卡、密码机、感应板以及未来工具都可以通过 signal channel 联动，并最终由 listener 触发 ActionEngine 动作。
 
@@ -468,7 +529,7 @@ minecraft:wheat[age=7]
 
 `ignore` 数量模式不接收数量参数，表示 matcher 不检查数量；info/debug 中显示“数量要求：不检查”。如果需要至少 2 个物品，应使用 `at_least 2`。`consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关，启用 consume 时仍会检查主手数量是否足够。
 
-5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不会 emit、不会反馈、不会消耗，也不会额外播放触发动画，也不会阻止原版右键行为。
+5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不会 emit、不会反馈，也不会额外播放触发动画。当前 5.14 语义下，已启用的成功消耗属于开锁成本：匹配成功并放行原版交互时仍会扣除物品，即使处于 cooldown。
 
 ```text
 /tzz signal blockDevice interactionItem successChannel <x> <y> <z> <channel>
@@ -511,7 +572,7 @@ minecraft:wheat[age=7]
 
 `consume` 仍只支持 `main_hand`；source 为 `off_hand`、`inventory_contains` 或任意 `armor_*` 时启用 consume 会被拒绝。旧数据中出现 `armor_*` source 同时 `consumeEnabled=true` 时，运行时不会消耗，并会按失败流程处理或在 debug 中提示。
 
-`vanillaInteraction` 默认是 `allow`，保持旧行为：即使 interactionItem 匹配失败，也不阻止箱子、门、按钮、拉杆等原版右键行为。管理员显式设置为 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会返回阻止原版 use 的结果，不触发成功频道、不消耗物品。`interactionCooldownTicks` 不会让这个锁失效；冷却中匹配失败仍会阻止箱子打开、门开关、按钮/拉杆切换等原版交互，只是不再 emit、不显示消息、不播放音效、不消耗、不额外挥手，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+`vanillaInteraction` 默认是 `allow`，保持旧行为：即使 interactionItem 匹配失败，也不阻止箱子、门、按钮、拉杆等原版右键行为。管理员显式设置为 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会返回阻止原版 use 的结果，不触发成功频道、不消耗物品。`interactionCooldownTicks` 不会让这个锁失效；冷却中匹配失败仍会阻止箱子打开、门开关、按钮/拉杆切换等原版交互。cooldown 只抑制 signal、message、sound、history / lastResult 和额外挥手动画；不会跳过已启用的成功消耗。匹配成功并放行原版交互时仍会扣除物品，即使处于 cooldown。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
 
 门会按上下半格做最小归一化：如果管理员绑定门下半格，玩家右键上半格时会尝试匹配下半格设备；如果绑定上半格，右键下半格也会尝试匹配上半格设备。该逻辑只检查当前点击坐标和门的另一半坐标，不扫描世界，用于避免 `require_item_match` 被右键另一半门绕过。
 

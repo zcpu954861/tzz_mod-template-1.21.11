@@ -613,7 +613,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - success / fail sound 只播放给触发玩家，未配置时不播放。
 - `consume` 只消耗右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏。
 - `consumeCount` 必须大于 0；主手数量不足时进入失败流程，不发成功频道、不发送成功反馈、不消耗。
-- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不额外播放触发动效。
+- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不额外播放触发动效。5.14 起，已启用的成功消耗属于开锁成本，匹配成功并放行原版交互时仍会扣除物品，即使处于 cooldown。
 - 成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不额外播放触发动画。
 - 成功 / 失败 signal 都保留玩家上下文并走现有 SignalBridge 递归保护。
 
@@ -656,7 +656,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - `inventory_contains` 使用 `ItemStackMatcher` 的非数量条件筛选背包 stack，然后统计总数；`ignore` 表示至少存在一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于总数，其中 `at_most` 要求总数大于 0。
 - `consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关；启用 consume 时仍必须满足消耗数量。
 - `consume` 只支持 `main_hand`。source 为 `off_hand`、`inventory_contains` 或任意 `armor_*` 时启用 consume 会被拒绝；旧数据中出现不兼容配置时运行时不会消耗，并会进入失败流程或在 debug 中提示。
-- `vanillaInteraction` 默认 `allow`，不阻止原版右键行为。显式设置 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会阻止箱子打开、门开关、按钮/拉杆切换等原版 use。`interactionCooldownTicks` 不会让锁失效；冷却中匹配失败仍会阻止原版交互，只是不 emit、不反馈、不消耗、不额外播放触发动效，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+- `vanillaInteraction` 默认 `allow`，不阻止原版右键行为。显式设置 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会阻止箱子打开、门开关、按钮/拉杆切换等原版 use。`interactionCooldownTicks` 不会让锁失效；冷却中匹配失败仍会阻止原版交互。cooldown 只抑制 signal、message、sound、history / lastResult 和额外挥手动画，不会跳过已启用的成功消耗。匹配成功并放行原版交互时仍会扣除物品，即使处于 cooldown。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
 - 对门使用 `require_item_match` 时，绑定上半格或下半格都可以；玩家右键另一半门时会尝试归一化到已绑定设备，避免通过门的另一半绕过锁。该逻辑只检查当前点击坐标和门的另一半坐标，不扫描世界。
 
 性能边界：
@@ -668,6 +668,88 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - `armor_head` / `armor_chest` / `armor_legs` / `armor_feet` 只读取对应盔甲槽；`armor_any` 只读取四个盔甲槽。
 - 不做背包消耗、副手消耗、装备 / 盔甲消耗、多物品提交、复杂条件组或通用 NBT 查询。
 - `interactionItem info` 会显示 source、最近匹配来源、最近匹配槽位和最近匹配数量；`device debug` 会显示 source 与 consume 的兼容性诊断。
+
+### 消耗策略 / 多物品提交
+
+5.14 阶段增强 `interactionItem` 的消耗策略，并新增可选的 `itemSubmit` 多物品提交。所有新增能力默认关闭，必须由管理员显式配置。
+
+`interactionItem matcher` 和 `itemSubmit` 是互斥的匹配模式：前者用于钥匙、通行证、单个任务物品等单物品匹配；后者用于多个 requirement 全部满足后提交。启用 `itemSubmit` 时会自动关闭单物品 `interactionItem matcher`，但 success/fail channel、message、sound、`vanillaInteractionPolicy`、cooldown 等反馈配置仍会保留并复用。如果要恢复单物品匹配，需要先 disable `itemSubmit`，再手动 enable `interactionItem` matcher。
+
+```text
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> matched_source
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> inventory
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> main_hand
+/tzz signal blockDevice interactionItem consumeSource <x> <y> <z> off_hand
+/tzz signal blockDevice interactionItem inventoryConsumeOrder <x> <y> <z> hotbar_first
+/tzz signal blockDevice interactionItem inventoryConsumeOrder <x> <y> <z> main_inventory_first
+```
+
+消耗规则：
+
+- `consume` 仍默认关闭。
+- `interactionItemConsumeSource=matched_source` 是默认策略：`main_hand` 来源消耗主手，`off_hand` 来源消耗副手，`inventory_contains` 来源消耗主背包 / 热键栏。
+- `interactionItemConsumeSource=inventory` 会从触发玩家主背包 / 热键栏中消耗匹配物品。
+- `interactionItemConsumeSource=main_hand` / `off_hand` 会强制从对应手消耗，但对应手上的物品也必须匹配。
+- `inventoryConsumeOrder` 支持 `hotbar_first` 和 `main_inventory_first`。
+- `main_hand`、`off_hand`、`inventory_contains` 可以在显式启用 consume 后消耗匹配物品。
+- `armor_head`、`armor_chest`、`armor_legs`、`armor_feet` 和 `armor_any` 仍不支持 consume。
+- 物品数量不足时进入失败流程，不发成功频道、不发送成功反馈、不播放成功音效、不消耗。
+- 消耗是原子操作：会先检查所有需要消耗的物品，确认全部满足后才实际扣减 stack。
+- creative 玩家按同一套配置扣减匹配 stack，用于避免小游戏逻辑绕过。
+
+`itemSubmit` 是可选的多物品提交系统。它只在玩家右键已绑定 `virtual_block_device` 时检查触发玩家自己的主背包 / 热键栏，不在 tick 中扫描玩家背包。
+
+```text
+/tzz signal blockDevice itemSubmit enable <x> <y> <z>
+/tzz signal blockDevice itemSubmit disable <x> <y> <z>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> at_least <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> exactly <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> at_most <count>
+/tzz signal blockDevice itemSubmit addFromHand <x> <y> <z> <name> ignore
+/tzz signal blockDevice itemSubmit list <x> <y> <z>
+/tzz signal blockDevice itemSubmit info <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit infoAll <x> <y> <z>
+/tzz signal blockDevice itemSubmit remove <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit clear <x> <y> <z>
+/tzz signal blockDevice itemSubmit enableRequirement <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit disableRequirement <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit matcherFromHand <x> <y> <z> <name>
+/tzz signal blockDevice itemSubmit matcherOption <x> <y> <z> <name> <option> enable|disable
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> at_least <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> exactly <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> at_most <count>
+/tzz signal blockDevice itemSubmit count <x> <y> <z> <name> ignore
+/tzz signal blockDevice itemSubmit consume <x> <y> <z> enable
+/tzz signal blockDevice itemSubmit consume <x> <y> <z> disable
+/tzz signal blockDevice itemSubmit consumeOrder <x> <y> <z> hotbar_first
+/tzz signal blockDevice itemSubmit consumeOrder <x> <y> <z> main_inventory_first
+/tzz signal blockDevice itemSubmit consumeCount <x> <y> <z> <name> <count>
+```
+
+提交规则：
+
+- `itemSubmit` 默认关闭；启用后会作为当前主要匹配条件，所有启用的 requirement 必须同时满足才算提交成功。
+- `itemSubmit` 启用后不再额外要求单物品 `interactionItem matcher` 通过，也不会执行单物品 `interactionItem consume`，避免隐藏单物品条件和双重消耗。
+- `addFromHand` 从管理员主手捕获 `ItemStackMatcher` 模板；提交时仍检查触发玩家的主背包 / 热键栏。
+- `ignore` 不带 count，表示不检查 matcher 数量；背包匹配仍要求至少存在一个匹配 stack。
+- `itemSubmit consume` 默认关闭；启用后会按 `consumeOrder` 原子消耗所有 requirement 对应的物品。
+- 每个 requirement 可以设置自己的 `consumeCount`。
+- 任一 requirement 不满足或消耗计划不足时，整次提交失败，不扣减任何物品。
+- 成功 / 失败反馈复用 5.11 的 success/fail channel、message、sound、`vanillaInteractionPolicy` 和 cooldown 逻辑。
+- `require_item_match` 仍然是锁定策略；`itemSubmit` 启用时按提交结果决定是否放行原版交互：提交满足则放行，提交失败则阻止。cooldown 不会让锁失效，也不会跳过已启用的原子消耗；它只限制 signal、message、sound、history / lastResult 和额外动画等副作用。
+
+性能边界：
+
+- 不扫描世界、区块或周围方块，不强制加载区块。
+- 不每 tick 扫描玩家背包。
+- 只有玩家右键已绑定方块时才检查触发玩家。
+- 单个 `interactionItem` inventory consume 只扫描触发玩家主背包 / 热键栏。
+- `itemSubmit` 只扫描触发玩家主背包 / 热键栏。
+- 不读取其他玩家。
+- 不读取副手，除非 source 明确为 `off_hand`。
+- 不读取装备 / 盔甲用于消耗。
+- 不做完整 NBT path 查询。
+- 状态不变不写 `signal_devices.json`。
 
 ### 统一设备命令
 
@@ -684,7 +766,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 ```
 
 `device info` 和 `device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道、condition 摘要和常见问题提示。
-5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。5.8 后会显示 container 摘要、open / close / change channel、容器冷却、内容检查间隔、最近容器事件和最近结果。5.9 后会显示 itemCondition 数量、启用数量、最近物品条件触发和条件诊断。`device history` 可查看来源为 `virtual_block_device` 的红石、condition、interaction、container 和 itemCondition 触发记录。
+5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。5.8 后会显示 container 摘要、open / close / change channel、容器冷却、内容检查间隔、最近容器事件和最近结果。5.9 后会显示 itemCondition 数量、启用数量、最近物品条件触发和条件诊断。5.14 后会显示当前匹配模式、`interactionItem` consumeSource、inventoryConsumeOrder、最近消耗摘要，以及 `itemSubmit` requirement 数量、提交结果和消耗摘要；`itemSubmit` 模式下会提示单物品 matcher 已被忽略/禁用。`device history` 可查看来源为 `virtual_block_device` 的红石、condition、interaction、container、itemCondition 和 itemSubmit 触发记录。
 
 `cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。condition 不合法时也不会自动删除记录，只在 debug 中提示重新设置 condition 或 `clearCondition`。
 
@@ -719,12 +801,11 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.13 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.14 MVP 实现：
 
-- 5.14 消耗策略 / 多物品提交，包括背包消耗、副手消耗和更复杂的提交规则。
 - 复杂 ConditionEngine / ConditionGroup 后续单独设计。
 - 5.15 稳定化 / GUI 前置整理版。
-- GUI / Admin UI：所有 source、matcher、consume 和反馈配置未来都应进入 GUI；可拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器、debug/doctor 工具。
+- 6.0 / 7.0 GUI / Admin UI：所有 source、matcher、consume、itemSubmit、反馈、容器、区域、action 和 signal 设备配置未来都应进入 GUI；可拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器、debug/doctor 工具。
 
 ## cooldown
 

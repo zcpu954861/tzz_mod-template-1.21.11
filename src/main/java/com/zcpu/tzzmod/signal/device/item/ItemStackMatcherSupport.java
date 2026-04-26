@@ -52,6 +52,59 @@ public final class ItemStackMatcherSupport {
         ).normalized();
     }
 
+    public static ItemStackMatcherData withInteractionSettingsFrom(
+            ItemStackMatcherData template,
+            ItemStackMatcherData previousSettings
+    ) {
+        ItemStackMatcherData data = template == null ? ItemStackMatcherData.empty() : template.normalized();
+        ItemStackMatcherData previous = previousSettings == null ? ItemStackMatcherData.empty() : previousSettings.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                previous.successChannel(),
+                previous.failChannel(),
+                previous.successMessage(),
+                previous.failMessage(),
+                previous.successSoundId(),
+                previous.successSoundVolume(),
+                previous.successSoundPitch(),
+                previous.failSoundId(),
+                previous.failSoundVolume(),
+                previous.failSoundPitch(),
+                previous.consumeEnabled(),
+                previous.consumeCount(),
+                previous.interactionItemConsumeSource(),
+                previous.interactionItemInventoryConsumeOrder(),
+                previous.interactionItemSource(),
+                previous.interactionItemVanillaPolicy(),
+                "",
+                -1,
+                0,
+                "",
+                "",
+                "",
+                "",
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
     public static ItemStackMatcherData withOption(ItemStackMatcherData matcher, String option, boolean enabled) {
         ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
         long now = System.currentTimeMillis();
@@ -85,12 +138,17 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 data.interactionItemSource(),
                 data.interactionItemVanillaPolicy(),
                 data.lastInteractionItemSource(),
                 data.lastInteractionItemMatchedSlot(),
                 data.lastInteractionItemMatchedCount(),
                 data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -131,12 +189,17 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 data.interactionItemSource(),
                 data.interactionItemVanillaPolicy(),
                 data.lastInteractionItemSource(),
                 data.lastInteractionItemMatchedSlot(),
                 data.lastInteractionItemMatchedCount(),
                 data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -204,6 +267,104 @@ public final class ItemStackMatcherSupport {
                 data.consumeEnabled(), Math.max(1, count));
     }
 
+    public static ItemStackMatcherData withConsumeSource(ItemStackMatcherData matcher, String consumeSource) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                InteractionItemConsumeSource.normalize(consumeSource),
+                data.interactionItemInventoryConsumeOrder(),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
+    public static ItemStackMatcherData withInventoryConsumeOrder(ItemStackMatcherData matcher, String order) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                InventoryConsumeOrder.normalize(order),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
     public static ItemStackMatcherData withSource(ItemStackMatcherData matcher, String source) {
         ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
         long now = System.currentTimeMillis();
@@ -237,12 +398,17 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 InteractionItemSource.normalize(source),
                 data.interactionItemVanillaPolicy(),
                 data.lastInteractionItemSource(),
                 data.lastInteractionItemMatchedSlot(),
                 data.lastInteractionItemMatchedCount(),
                 data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -281,12 +447,17 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 data.interactionItemSource(),
                 InteractionItemVanillaPolicy.normalize(policy),
                 data.lastInteractionItemSource(),
                 data.lastInteractionItemMatchedSlot(),
                 data.lastInteractionItemMatchedCount(),
                 data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -331,11 +502,70 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 data.interactionItemSource(),
                 data.interactionItemVanillaPolicy(),
                 InteractionItemSource.normalize(source),
                 matchedSlot,
                 matchedCount,
+                result == null ? "" : result,
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
+    public static ItemStackMatcherData withConsumeResult(
+            ItemStackMatcherData matcher,
+            String consumeSource,
+            String consumedSlots,
+            String result
+    ) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
+                InteractionItemConsumeSource.normalize(consumeSource),
+                consumedSlots == null ? "" : consumedSlots,
                 result == null ? "" : result,
                 data.createdWallTimeMillis(),
                 now
@@ -388,12 +618,17 @@ public final class ItemStackMatcherSupport {
                 failSoundPitch,
                 consumeEnabled,
                 consumeCount,
+                data.interactionItemConsumeSource(),
+                data.interactionItemInventoryConsumeOrder(),
                 data.interactionItemSource(),
                 data.interactionItemVanillaPolicy(),
                 data.lastInteractionItemSource(),
                 data.lastInteractionItemMatchedSlot(),
                 data.lastInteractionItemMatchedCount(),
                 data.lastInteractionItemSourceResult(),
+                data.lastInteractionItemConsumeSource(),
+                data.lastInteractionItemConsumedSlots(),
+                data.lastInteractionItemConsumeResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();

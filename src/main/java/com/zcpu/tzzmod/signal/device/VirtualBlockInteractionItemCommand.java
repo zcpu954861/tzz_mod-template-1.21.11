@@ -5,8 +5,10 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.device.item.InteractionItemConsumeSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
+import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherCommandSupport;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
@@ -190,6 +192,46 @@ public final class VirtualBlockInteractionItemCommand {
                                                 BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
                                                 IntegerArgumentType.getInteger(context, "count")
                                         )))))
+                .then(CommandManager.literal("consumeSource")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.literal(InteractionItemConsumeSource.MATCHED_SOURCE)
+                                        .executes(context -> executeConsumeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemConsumeSource.MATCHED_SOURCE
+                                        )))
+                                .then(CommandManager.literal(InteractionItemConsumeSource.INVENTORY)
+                                        .executes(context -> executeConsumeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemConsumeSource.INVENTORY
+                                        )))
+                                .then(CommandManager.literal(InteractionItemConsumeSource.MAIN_HAND)
+                                        .executes(context -> executeConsumeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemConsumeSource.MAIN_HAND
+                                        )))
+                                .then(CommandManager.literal(InteractionItemConsumeSource.OFF_HAND)
+                                        .executes(context -> executeConsumeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemConsumeSource.OFF_HAND
+                                        )))))
+                .then(CommandManager.literal("inventoryConsumeOrder")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.literal(InventoryConsumeOrder.HOTBAR_FIRST)
+                                        .executes(context -> executeInventoryConsumeOrder(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InventoryConsumeOrder.HOTBAR_FIRST
+                                        )))
+                                .then(CommandManager.literal(InventoryConsumeOrder.MAIN_INVENTORY_FIRST)
+                                        .executes(context -> executeInventoryConsumeOrder(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InventoryConsumeOrder.MAIN_INVENTORY_FIRST
+                                        )))))
                 .then(CommandManager.literal("source")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .then(CommandManager.literal(InteractionItemSource.MAIN_HAND)
@@ -322,17 +364,25 @@ public final class VirtualBlockInteractionItemCommand {
             return 0;
         }
 
-        ItemStackMatcherData matcher = ItemStackMatcherSupport.captureTemplate(stack, ContainerItemCountMode.AT_LEAST, 1);
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withInteractionSettingsFrom(
+                ItemStackMatcherSupport.captureTemplate(stack, ContainerItemCountMode.AT_LEAST, 1),
+                device.interactionItemMatcher()
+        );
         SignalDeviceData updated = SignalDeviceStore.updateVirtualInteractionItemMatcher(
                 source.getWorld(),
                 pos,
                 matcher,
-                true,
+                !device.itemSubmitEnabled(),
                 "已从主手捕获交互物品模板"
         );
-        sendHeader(source, Text.literal("已设置交互主手物品匹配").formatted(Formatting.GREEN));
+        sendHeader(source, Text.literal(device.itemSubmitEnabled()
+                ? "已保存交互物品模板"
+                : "已设置交互主手物品匹配").formatted(Formatting.GREEN));
         source.sendFeedback(() -> field("位置", posText(pos)), false);
         source.sendFeedback(() -> field("模板", Text.literal(ItemStackMatcherSupport.summary(updated.interactionItemMatcher())).formatted(Formatting.WHITE)), false);
+        if (device.itemSubmitEnabled()) {
+            source.sendFeedback(() -> warning("当前已启用多物品提交，单物品 interactionItem 匹配保持关闭。"), false);
+        }
         if (updated.interactChannel().isBlank()) {
             source.sendFeedback(() -> warning("尚未设置 interactChannel，设置后右键才会发出 signal。"), false);
         }
@@ -354,6 +404,10 @@ public final class VirtualBlockInteractionItemCommand {
     private static int executeEnabled(ServerCommandSource source, BlockPos pos, boolean enabled) {
         SignalDeviceData device = getVirtualDevice(source, pos);
         if (device == null) {
+            return 0;
+        }
+        if (enabled && device.itemSubmitEnabled()) {
+            sendError(source, Text.literal("当前已启用多物品提交；单物品 interactionItem 匹配与 itemSubmit 互斥。请先 disable itemSubmit。"));
             return 0;
         }
         if (enabled && (device.interactionItemMatcher() == null || !device.interactionItemMatcher().normalized().enabled())) {
@@ -429,7 +483,7 @@ public final class VirtualBlockInteractionItemCommand {
 
     private static int executeChannel(ServerCommandSource source, BlockPos pos, String rawChannel, boolean success) {
         SignalDeviceData device = getVirtualDevice(source, pos);
-        if (device == null || !hasMatcher(source, device)) {
+        if (device == null) {
             return 0;
         }
         String channel = SignalChannel.normalize(rawChannel);
@@ -452,7 +506,7 @@ public final class VirtualBlockInteractionItemCommand {
 
     private static int executeMessage(ServerCommandSource source, BlockPos pos, String message, boolean success) {
         SignalDeviceData device = getVirtualDevice(source, pos);
-        if (device == null || !hasMatcher(source, device)) {
+        if (device == null) {
             return 0;
         }
 
@@ -470,7 +524,7 @@ public final class VirtualBlockInteractionItemCommand {
 
     private static int executeSound(ServerCommandSource source, BlockPos pos, String soundId, float volume, float pitch, boolean success) {
         SignalDeviceData device = getVirtualDevice(source, pos);
-        if (device == null || !hasMatcher(source, device)) {
+        if (device == null) {
             return 0;
         }
         String cleanSoundId = soundId == null ? "" : soundId.trim().toLowerCase();
@@ -506,8 +560,8 @@ public final class VirtualBlockInteractionItemCommand {
         }
         if (enabled && !InteractionItemSource.supportsConsume(device.interactionItemMatcher().interactionItemSource())) {
             sendError(source, Text.literal("当前物品来源为 "
-                    + device.interactionItemMatcher().interactionItemSource()
-                    + "，5.12 MVP 不支持该来源消耗。请先切回 main_hand。"));
+                    + InteractionItemSource.displayName(device.interactionItemMatcher().interactionItemSource())
+                    + "，当前不支持该来源消耗。请先切回主手。"));
             return 0;
         }
         ItemStackMatcherData matcher = ItemStackMatcherSupport.withConsume(device.interactionItemMatcher(), enabled);
@@ -516,6 +570,40 @@ public final class VirtualBlockInteractionItemCommand {
         source.sendFeedback(() -> field("位置", posText(pos)), false);
         source.sendFeedback(() -> field("消耗", boolText(updated.interactionItemMatcher().consumeEnabled())), false);
         source.sendFeedback(() -> field("消耗数量", Text.literal(Integer.toString(updated.interactionItemMatcher().consumeCount())).formatted(Formatting.LIGHT_PURPLE)), false);
+        return 1;
+    }
+
+    private static int executeConsumeSource(ServerCommandSource source, BlockPos pos, String rawConsumeSource) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null) {
+            return 0;
+        }
+        ItemStackMatcherData current = device.interactionItemMatcher().normalized();
+        if (current.consumeEnabled() && !InteractionItemSource.supportsConsume(current.interactionItemSource())) {
+            sendError(source, Text.literal("当前交互物品来源不支持消耗。请先关闭成功消耗，或切换到支持消耗的来源。"));
+            return 0;
+        }
+
+        String consumeSource = InteractionItemConsumeSource.normalize(rawConsumeSource);
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withConsumeSource(current, consumeSource);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, "已更新交互物品消耗来源");
+        sendHeader(source, Text.literal("已更新交互物品消耗来源").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("消耗来源", Text.literal(InteractionItemConsumeSource.displayName(updated.interactionItemMatcher().interactionItemConsumeSource())).formatted(Formatting.AQUA)), false);
+        return 1;
+    }
+
+    private static int executeInventoryConsumeOrder(ServerCommandSource source, BlockPos pos, String rawOrder) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null) {
+            return 0;
+        }
+        String order = InventoryConsumeOrder.normalize(rawOrder);
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withInventoryConsumeOrder(device.interactionItemMatcher(), order);
+        SignalDeviceData updated = updateMatcher(source, pos, device, matcher, "已更新背包消耗顺序");
+        sendHeader(source, Text.literal("已更新背包消耗顺序").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("消耗顺序", Text.literal(InventoryConsumeOrder.displayName(updated.interactionItemMatcher().interactionItemInventoryConsumeOrder())).formatted(Formatting.AQUA)), false);
         return 1;
     }
 
@@ -563,7 +651,7 @@ public final class VirtualBlockInteractionItemCommand {
 
     private static int executeConsumeCount(ServerCommandSource source, BlockPos pos, int count) {
         SignalDeviceData device = getVirtualDevice(source, pos);
-        if (device == null || !hasMatcher(source, device)) {
+        if (device == null) {
             return 0;
         }
         ItemStackMatcherData matcher = ItemStackMatcherSupport.withConsumeCount(device.interactionItemMatcher(), count);
@@ -581,6 +669,12 @@ public final class VirtualBlockInteractionItemCommand {
         }
         sendHeader(source, Text.literal("交互物品匹配详情").formatted(Formatting.GOLD));
         source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("当前匹配模式", Text.literal(device.itemSubmitEnabled()
+                ? "多物品 itemSubmit"
+                : "单物品 interactionItem").formatted(Formatting.AQUA)), false);
+        if (device.itemSubmitEnabled()) {
+            source.sendFeedback(() -> warning("itemSubmit 已启用，单物品 interactionItem matcher 当前被忽略。"), false);
+        }
         source.sendFeedback(() -> field("启用", boolText(device.interactionItemMatcherEnabled())), false);
         source.sendFeedback(() -> field("模板", Text.literal(ItemStackMatcherSupport.summary(device.interactionItemMatcher())).formatted(Formatting.WHITE)), false);
         ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
@@ -603,6 +697,11 @@ public final class VirtualBlockInteractionItemCommand {
         source.sendFeedback(() -> field("最近匹配数量", Text.literal(Integer.toString(matcher.lastInteractionItemMatchedCount())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近来源结果", Text.literal(matcher.lastInteractionItemSourceResult().isBlank() ? "暂无结果" : matcher.lastInteractionItemSourceResult()).formatted(Formatting.WHITE)), false);
         source.sendFeedback(() -> field("最近结果", Text.literal(device.lastInteractionItemResult().isBlank() ? "暂无结果" : device.lastInteractionItemResult()).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("消耗来源", Text.literal(InteractionItemConsumeSource.displayName(matcher.interactionItemConsumeSource())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("背包消耗顺序", Text.literal(InventoryConsumeOrder.displayName(matcher.interactionItemInventoryConsumeOrder())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("最近消耗来源", Text.literal(matcher.lastInteractionItemConsumeSource().isBlank() ? "暂无" : InteractionItemConsumeSource.displayName(matcher.lastInteractionItemConsumeSource())).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("最近消耗槽位", Text.literal(matcher.lastInteractionItemConsumedSlots().isBlank() ? "暂无" : matcher.lastInteractionItemConsumedSlots()).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("最近消耗结果", Text.literal(matcher.lastInteractionItemConsumeResult().isBlank() ? "暂无结果" : matcher.lastInteractionItemConsumeResult()).formatted(Formatting.WHITE)), false);
         if (device.interactChannel().isBlank() && matcher.successChannel().isBlank()) {
             source.sendFeedback(() -> warning("尚未设置 interactChannel 或成功频道。"), false);
         }
@@ -610,7 +709,7 @@ public final class VirtualBlockInteractionItemCommand {
             source.sendFeedback(() -> warning("失败频道未设置，失败时不会 emit signal。"), false);
         }
         if (matcher.consumeEnabled() && !InteractionItemSource.supportsConsume(matcher.interactionItemSource())) {
-            source.sendFeedback(() -> warning("当前来源不支持 consume，请关闭 consume 或切回 main_hand。"), false);
+            source.sendFeedback(() -> warning("当前来源不支持成功消耗，请关闭成功消耗或切回主手。"), false);
         }
         return 1;
     }

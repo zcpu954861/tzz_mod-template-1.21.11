@@ -611,6 +611,70 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualItemSubmit(
+            ServerWorld world,
+            BlockPos pos,
+            boolean enabled,
+            boolean consumeEnabled,
+            String consumeOrder,
+            List<ItemSubmitRequirementData> requirements,
+            String result
+    ) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withItemSubmit(
+                existing,
+                enabled,
+                consumeEnabled,
+                consumeOrder,
+                requirements == null ? existing.itemSubmitRequirements() : requirements,
+                existing.lastItemSubmitMatched(),
+                existing.lastItemSubmitFailureReason(),
+                existing.lastItemSubmitConsumedSummary(),
+                result == null ? existing.lastItemSubmitResult() : result
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized void recordVirtualItemSubmitResult(
+            ServerWorld world,
+            SignalDeviceData device,
+            boolean matched,
+            String failureReason,
+            String consumedSummary,
+            String result
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        SignalDeviceData updated = withItemSubmit(
+                existing,
+                existing.itemSubmitEnabled(),
+                existing.itemSubmitConsumeEnabled(),
+                existing.itemSubmitConsumeOrder(),
+                existing.itemSubmitRequirements(),
+                matched,
+                failureReason,
+                consumedSummary,
+                result
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
     public static synchronized void recordVirtualItemConditionState(
             ServerWorld world,
             SignalDeviceData device,
@@ -747,7 +811,15 @@ public final class SignalDeviceStore {
                 conditioned.interactionItemMatcherEnabled(),
                 conditioned.interactionItemMatcher(),
                 conditioned.lastInteractionItemMatched(),
-                conditioned.lastInteractionItemResult()
+                conditioned.lastInteractionItemResult(),
+                conditioned.itemSubmitEnabled(),
+                conditioned.itemSubmitConsumeEnabled(),
+                conditioned.itemSubmitConsumeOrder(),
+                conditioned.itemSubmitRequirements(),
+                conditioned.lastItemSubmitMatched(),
+                conditioned.lastItemSubmitFailureReason(),
+                conditioned.lastItemSubmitConsumedSummary(),
+                conditioned.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
@@ -1154,7 +1226,15 @@ public final class SignalDeviceStore {
                 existing.interactionItemMatcherEnabled(),
                 existing.interactionItemMatcher(),
                 existing.lastInteractionItemMatched(),
-                existing.lastInteractionItemResult()
+                existing.lastInteractionItemResult(),
+                existing.itemSubmitEnabled(),
+                existing.itemSubmitConsumeEnabled(),
+                existing.itemSubmitConsumeOrder(),
+                existing.itemSubmitRequirements(),
+                existing.lastItemSubmitMatched(),
+                existing.lastItemSubmitFailureReason(),
+                existing.lastItemSubmitConsumedSummary(),
+                existing.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1284,7 +1364,15 @@ public final class SignalDeviceStore {
                 conditioned.interactionItemMatcherEnabled(),
                 conditioned.interactionItemMatcher(),
                 conditioned.lastInteractionItemMatched(),
-                conditioned.lastInteractionItemResult()
+                conditioned.lastInteractionItemResult(),
+                conditioned.itemSubmitEnabled(),
+                conditioned.itemSubmitConsumeEnabled(),
+                conditioned.itemSubmitConsumeOrder(),
+                conditioned.itemSubmitRequirements(),
+                conditioned.lastItemSubmitMatched(),
+                conditioned.lastItemSubmitFailureReason(),
+                conditioned.lastItemSubmitConsumedSummary(),
+                conditioned.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1387,7 +1475,15 @@ public final class SignalDeviceStore {
                 interacted.interactionItemMatcherEnabled(),
                 interacted.interactionItemMatcher(),
                 interacted.interactionItemMatcherEnabled(),
-                interacted.interactionItemMatcherEnabled() ? "主手物品匹配通过" : interacted.lastInteractionItemResult()
+                interacted.interactionItemMatcherEnabled() ? "主手物品匹配通过" : interacted.lastInteractionItemResult(),
+                interacted.itemSubmitEnabled(),
+                interacted.itemSubmitConsumeEnabled(),
+                interacted.itemSubmitConsumeOrder(),
+                interacted.itemSubmitRequirements(),
+                interacted.lastItemSubmitMatched(),
+                interacted.lastItemSubmitFailureReason(),
+                interacted.lastItemSubmitConsumedSummary(),
+                interacted.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1413,6 +1509,9 @@ public final class SignalDeviceStore {
             String itemSource,
             int matchedSlot,
             int matchedCount,
+            String consumeSource,
+            String consumedSlots,
+            String consumeResult,
             ActionExecutionResult signalResult
     ) {
         if (world == null || device == null) {
@@ -1428,19 +1527,22 @@ public final class SignalDeviceStore {
         String signalMessage = signalResult == null || signalResult.message() == null ? "" : signalResult.message().getString();
         String resultMessage = feedbackResult == null ? "" : feedbackResult.trim();
         if (!signalMessage.isBlank()) {
-            resultMessage = resultMessage.isBlank() ? signalMessage : resultMessage + "；" + signalMessage;
+            resultMessage = resultMessage.isBlank() ? signalMessage : resultMessage + "; " + signalMessage;
         }
         if (consumedCount > 0) {
             resultMessage = resultMessage.isBlank()
-                    ? "已消耗 " + consumedCount + " 个物品"
-                    : resultMessage + "；已消耗 " + consumedCount + " 个物品";
+                    ? "consumed " + consumedCount + " item(s)"
+                    : resultMessage + "; consumed " + consumedCount + " item(s)";
         }
         String sourceResult = resultMessage;
         String cleanItemSource = itemSource == null ? "" : itemSource.trim();
         if (!cleanItemSource.isBlank()) {
             String sourceDetail = "source=" + cleanItemSource + " slot=" + matchedSlot + " count=" + matchedCount;
-            sourceResult = sourceResult.isBlank() ? sourceDetail : sourceResult + "；" + sourceDetail;
+            sourceResult = sourceResult.isBlank() ? sourceDetail : sourceResult + "; " + sourceDetail;
         }
+        String cleanConsumeSource = consumeSource == null ? "" : consumeSource.trim();
+        String cleanConsumedSlots = consumedSlots == null ? "" : consumedSlots.trim();
+        String cleanConsumeResult = consumeResult == null ? "" : consumeResult.trim();
         long now = System.currentTimeMillis();
         SignalDeviceData interacted = withInteraction(
                 existing,
@@ -1517,15 +1619,28 @@ public final class SignalDeviceStore {
                 interacted.lastContainerEventType(),
                 interacted.itemConditions(),
                 interacted.interactionItemMatcherEnabled(),
-                ItemStackMatcherSupport.withSourceResult(
-                        interacted.interactionItemMatcher(),
-                        cleanItemSource,
-                        matchedSlot,
-                        matchedCount,
-                        sourceResult
+                ItemStackMatcherSupport.withConsumeResult(
+                        ItemStackMatcherSupport.withSourceResult(
+                                interacted.interactionItemMatcher(),
+                                cleanItemSource,
+                                matchedSlot,
+                                matchedCount,
+                                sourceResult
+                        ),
+                        cleanConsumeSource,
+                        cleanConsumedSlots,
+                        cleanConsumeResult
                 ),
                 matched,
-                resultMessage
+                resultMessage,
+                interacted.itemSubmitEnabled(),
+                interacted.itemSubmitConsumeEnabled(),
+                interacted.itemSubmitConsumeOrder(),
+                interacted.itemSubmitRequirements(),
+                interacted.lastItemSubmitMatched(),
+                interacted.lastItemSubmitFailureReason(),
+                interacted.lastItemSubmitConsumedSummary(),
+                interacted.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1640,7 +1755,15 @@ public final class SignalDeviceStore {
                 updated.interactionItemMatcherEnabled(),
                 updated.interactionItemMatcher(),
                 updated.lastInteractionItemMatched(),
-                updated.lastInteractionItemResult()
+                updated.lastInteractionItemResult(),
+                updated.itemSubmitEnabled(),
+                updated.itemSubmitConsumeEnabled(),
+                updated.itemSubmitConsumeOrder(),
+                updated.itemSubmitRequirements(),
+                updated.lastItemSubmitMatched(),
+                updated.lastItemSubmitFailureReason(),
+                updated.lastItemSubmitConsumedSummary(),
+                updated.lastItemSubmitResult()
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
@@ -2136,7 +2259,15 @@ public final class SignalDeviceStore {
                 existing != null && existing.interactionItemMatcherEnabled(),
                 existing == null ? ItemStackMatcherData.empty() : existing.interactionItemMatcher(),
                 existing != null && existing.lastInteractionItemMatched(),
-                existing == null ? "" : existing.lastInteractionItemResult()
+                existing == null ? "" : existing.lastInteractionItemResult(),
+                existing != null && existing.itemSubmitEnabled(),
+                existing != null && existing.itemSubmitConsumeEnabled(),
+                existing == null ? com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder.HOTBAR_FIRST : existing.itemSubmitConsumeOrder(),
+                existing == null ? List.of() : existing.itemSubmitRequirements(),
+                existing != null && existing.lastItemSubmitMatched(),
+                existing == null ? "" : existing.lastItemSubmitFailureReason(),
+                existing == null ? "" : existing.lastItemSubmitConsumedSummary(),
+                existing == null ? "" : existing.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2211,7 +2342,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2287,7 +2426,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2366,7 +2513,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2447,7 +2602,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2536,7 +2699,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2608,7 +2779,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 
@@ -2683,7 +2862,102 @@ public final class SignalDeviceStore {
                 interactionItemMatcherEnabled,
                 interactionItemMatcher == null ? ItemStackMatcherData.empty() : interactionItemMatcher,
                 lastInteractionItemMatched,
-                lastInteractionItemResult == null ? "" : lastInteractionItemResult
+                lastInteractionItemResult == null ? "" : lastInteractionItemResult,
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withItemSubmit(
+            SignalDeviceData device,
+            boolean itemSubmitEnabled,
+            boolean itemSubmitConsumeEnabled,
+            String itemSubmitConsumeOrder,
+            List<ItemSubmitRequirementData> itemSubmitRequirements,
+            boolean lastItemSubmitMatched,
+            String lastItemSubmitFailureReason,
+            String lastItemSubmitConsumedSummary,
+            String lastItemSubmitResult
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType(),
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult(),
+                itemSubmitEnabled,
+                itemSubmitConsumeEnabled,
+                itemSubmitConsumeOrder,
+                itemSubmitRequirements == null ? List.of() : itemSubmitRequirements,
+                lastItemSubmitMatched,
+                lastItemSubmitFailureReason == null ? "" : lastItemSubmitFailureReason,
+                lastItemSubmitConsumedSummary == null ? "" : lastItemSubmitConsumedSummary,
+                lastItemSubmitResult == null ? "" : lastItemSubmitResult
         ).normalized();
     }
 
@@ -2752,7 +3026,15 @@ public final class SignalDeviceStore {
                 device.interactionItemMatcherEnabled(),
                 device.interactionItemMatcher(),
                 device.lastInteractionItemMatched(),
-                device.lastInteractionItemResult()
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
         ).normalized();
     }
 

@@ -22,6 +22,7 @@ import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
+import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.ArrayList;
@@ -653,7 +654,11 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
             source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
             ItemStackMatcherData interactionMatcher = device.interactionItemMatcher().normalized();
+            source.sendFeedback(() -> field("当前匹配模式", matchingModeText(device)), false);
             source.sendFeedback(() -> field("交互物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+            if (device.itemSubmitEnabled()) {
+                source.sendFeedback(() -> field("单物品 matcher", Text.literal("已被 itemSubmit 模式忽略/禁用").formatted(Formatting.YELLOW)), false);
+            }
             source.sendFeedback(() -> field("物品来源", Text.literal(InteractionItemSource.displayName(interactionMatcher.interactionItemSource())).formatted(Formatting.AQUA)), false);
             source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
             source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
@@ -667,6 +672,11 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("最近匹配槽位", number(interactionMatcher.lastInteractionItemMatchedSlot())), false);
             source.sendFeedback(() -> field("最近匹配数量", number(interactionMatcher.lastInteractionItemMatchedCount())), false);
             source.sendFeedback(() -> field("最近物品匹配结果", resultText(device.lastInteractionItemResult())), false);
+            source.sendFeedback(() -> field("多物品提交", boolText(device.itemSubmitEnabled())), false);
+            source.sendFeedback(() -> field("提交条件", itemSubmitRequirementCountText(device)), false);
+            source.sendFeedback(() -> field("提交后消耗", boolText(device.itemSubmitConsumeEnabled())), false);
+            source.sendFeedback(() -> field("最近提交满足", boolText(device.lastItemSubmitMatched())), false);
+            source.sendFeedback(() -> field("最近提交结果", resultText(device.lastItemSubmitResult())), false);
             source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
             source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
             source.sendFeedback(() -> field("容器关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
@@ -757,7 +767,11 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
         source.sendFeedback(() -> field("最近交互结果", resultText(device.lastInteractionResult())), false);
         ItemStackMatcherData interactionMatcher = device.interactionItemMatcher().normalized();
+        source.sendFeedback(() -> field("当前匹配模式", matchingModeText(device)), false);
         source.sendFeedback(() -> field("交互物品匹配", boolText(device.interactionItemMatcherEnabled())), false);
+        if (device.itemSubmitEnabled()) {
+            source.sendFeedback(() -> field("单物品 matcher", Text.literal("已被 itemSubmit 模式忽略/禁用").formatted(Formatting.YELLOW)), false);
+        }
         source.sendFeedback(() -> field("物品匹配模板", Text.literal(ItemStackMatcherSupport.summary(interactionMatcher)).formatted(Formatting.WHITE)), false);
         source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
@@ -778,6 +792,28 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近匹配数量", number(interactionMatcher.lastInteractionItemMatchedCount())), false);
         source.sendFeedback(() -> field("最近来源结果", resultText(interactionMatcher.lastInteractionItemSourceResult())), false);
         source.sendFeedback(() -> field("最近物品匹配结果", resultText(device.lastInteractionItemResult())), false);
+        source.sendFeedback(() -> field("多物品提交条件", boolText(device.itemSubmitEnabled())), false);
+        source.sendFeedback(() -> field("提交条件", itemSubmitRequirementCountText(device)), false);
+        source.sendFeedback(() -> field("提交后消耗", boolText(device.itemSubmitConsumeEnabled())), false);
+        source.sendFeedback(() -> field("提交消耗顺序", Text.literal(InventoryConsumeOrder.displayName(device.itemSubmitConsumeOrder())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("最近提交满足", boolText(device.lastItemSubmitMatched())), false);
+        source.sendFeedback(() -> field("最近提交失败原因", resultText(device.lastItemSubmitFailureReason())), false);
+        source.sendFeedback(() -> field("最近提交消耗摘要", resultText(device.lastItemSubmitConsumedSummary())), false);
+        source.sendFeedback(() -> field("最近提交结果", resultText(device.lastItemSubmitResult())), false);
+        if (!device.itemSubmitRequirements().isEmpty()) {
+            source.sendFeedback(() -> Text.literal("物品提交条件：").formatted(Formatting.GRAY), false);
+            for (ItemSubmitRequirementData requirement : device.itemSubmitRequirements()) {
+                ItemSubmitRequirementData data = requirement.normalized();
+                source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                        .append(nameText(data.name()))
+                        .append(Text.literal("，启用 ").formatted(Formatting.GRAY))
+                        .append(boolText(data.enabled()))
+                        .append(Text.literal("，最近满足 ").formatted(Formatting.GRAY))
+                        .append(boolText(data.lastMatched()))
+                        .append(Text.literal("，最近数量 ").formatted(Formatting.GRAY))
+                        .append(number(data.lastMatchedCount())), false);
+            }
+        }
         source.sendFeedback(() -> field("交互频道监听器", number(interactionListeners.size())), false);
         source.sendFeedback(() -> field("交互频道接收器", number(interactionReceiverCount)), false);
         source.sendFeedback(() -> field("交互频道动作继电器", number(interactionRelayCount)), false);
@@ -921,6 +957,17 @@ public final class SignalDeviceCommand {
             hints.add(Text.literal("interactChannel 名称无效。").formatted(Formatting.RED));
         }
         ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
+        if (device.itemSubmitEnabled() && device.interactionItemMatcherEnabled()) {
+            hints.add(Text.literal("itemSubmit 已启用，单物品 interactionItem matcher 会被忽略；建议保持其禁用。").formatted(Formatting.YELLOW));
+        }
+        if (device.itemSubmitEnabled()) {
+            if (enabledItemSubmitRequirementCount(device) <= 0) {
+                hints.add(Text.literal("itemSubmit 已启用，但没有已启用的提交条件。").formatted(Formatting.RED));
+            }
+            if (device.itemSubmitConsumeEnabled() && device.itemSubmitRequirements().isEmpty()) {
+                hints.add(Text.literal("itemSubmit 消耗已启用，但没有提交条件可消耗。").formatted(Formatting.RED));
+            }
+        }
         if (device.interactionItemMatcherEnabled()) {
             if (!matcher.enabled()) {
                 hints.add(Text.literal("interactionItem 已启用，但缺少主手物品模板。").formatted(Formatting.RED));
@@ -1259,6 +1306,26 @@ public final class SignalDeviceCommand {
 
     private static MutableText modeText(String mode) {
         return Text.literal(VirtualBlockDeviceMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText matchingModeText(SignalDeviceData device) {
+        return Text.literal(device.itemSubmitEnabled() ? "多物品 itemSubmit" : "单物品 interactionItem")
+                .formatted(device.itemSubmitEnabled() ? Formatting.AQUA : Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText itemSubmitRequirementCountText(SignalDeviceData device) {
+        return Text.literal(device.itemSubmitRequirements().size() + " 个，启用 " + enabledItemSubmitRequirementCount(device) + " 个")
+                .formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static int enabledItemSubmitRequirementCount(SignalDeviceData device) {
+        int count = 0;
+        for (ItemSubmitRequirementData requirement : device.itemSubmitRequirements()) {
+            if (requirement.normalized().enabled()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static MutableText itemConditionCountText(SignalDeviceData device) {
