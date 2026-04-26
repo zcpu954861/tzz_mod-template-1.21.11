@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -1409,6 +1410,9 @@ public final class SignalDeviceStore {
             boolean matched,
             String feedbackResult,
             int consumedCount,
+            String itemSource,
+            int matchedSlot,
+            int matchedCount,
             ActionExecutionResult signalResult
     ) {
         if (world == null || device == null) {
@@ -1430,6 +1434,12 @@ public final class SignalDeviceStore {
             resultMessage = resultMessage.isBlank()
                     ? "已消耗 " + consumedCount + " 个物品"
                     : resultMessage + "；已消耗 " + consumedCount + " 个物品";
+        }
+        String sourceResult = resultMessage;
+        String cleanItemSource = itemSource == null ? "" : itemSource.trim();
+        if (!cleanItemSource.isBlank()) {
+            String sourceDetail = "source=" + cleanItemSource + " slot=" + matchedSlot + " count=" + matchedCount;
+            sourceResult = sourceResult.isBlank() ? sourceDetail : sourceResult + "；" + sourceDetail;
         }
         long now = System.currentTimeMillis();
         SignalDeviceData interacted = withInteraction(
@@ -1507,7 +1517,13 @@ public final class SignalDeviceStore {
                 interacted.lastContainerEventType(),
                 interacted.itemConditions(),
                 interacted.interactionItemMatcherEnabled(),
-                interacted.interactionItemMatcher(),
+                ItemStackMatcherSupport.withSourceResult(
+                        interacted.interactionItemMatcher(),
+                        cleanItemSource,
+                        matchedSlot,
+                        matchedCount,
+                        sourceResult
+                ),
                 matched,
                 resultMessage
         ).normalized();

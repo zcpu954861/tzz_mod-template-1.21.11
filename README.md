@@ -3,7 +3,7 @@
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
 - 最新发布版本：`v1.13.0-interaction-item-feedback`
-- 当前开发版本：`v1.13.0-interaction-item-feedback`（5.11 右键物品匹配增强；以 `gradle.properties` 的 `mod_version` 为准）
+- 当前开发版本：`v1.14.0-player-item-source`（5.12 玩家物品来源匹配；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -438,8 +438,10 @@ minecraft:wheat[age=7]
 
 ```text
 /tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> ignore <channel>
 /tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> exactly <count> <channel>
 /tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> ignore <channel>
 /tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> at_least <count> <channel>
 /tzz signal blockDevice itemCondition matcherInfo <x> <y> <z> <name>
 /tzz signal blockDevice itemCondition matcherFromHand <x> <y> <z> <name>
@@ -464,6 +466,8 @@ minecraft:wheat[age=7]
 
 当前 `ItemStackMatcher` 支持 item registry id、count、damage、自定义名称、lore、`custom_data` 和 data components 的整体快照匹配。默认只启用 item id 与数量规则；更严格的 damage / 名称 / lore / custom_data / components 需要管理员显式开启。本阶段不是任意 NBT path 查询系统，也不检测告示牌文字、命令方块命令、刷怪笼 NBT、BlockEntity NBT、玩家 NBT 或实体 NBT。
 
+`ignore` 数量模式不接收数量参数，表示 matcher 不检查数量；info/debug 中显示“数量要求：不检查”。如果需要至少 2 个物品，应使用 `at_least 2`。`consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关，启用 consume 时仍会检查主手数量是否足够。
+
 5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不会 emit、不会反馈、不会消耗，也不会额外播放触发动画，也不会阻止原版右键行为。
 
 ```text
@@ -486,13 +490,27 @@ minecraft:wheat[age=7]
 
 5.11 的消耗只处理右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏；物品数量不足以消耗时会进入失败流程。成功 / 失败 signal 都继续通过 SignalBridge emit，保留玩家上下文，并记录到 history。
 
-后续计划仍只记录，不在 5.11 实现：
+5.12 阶段把 `interactionItem` 的检测来源扩展为可配置的玩家物品来源。默认仍是 `main_hand`，旧配置没有新字段时保持 5.10 / 5.11 行为；`off_hand` 和 `inventory_contains` 只有管理员显式配置后才启用。右键事件本身仍只处理 `MAIN_HAND`，`off_hand` 只是检查玩家副手物品，`inventory_contains` 只在玩家右键该绑定方块时检查该玩家自己的主背包 / 热键栏，不包含副手、装备栏或盔甲栏，也不会在 tick 中扫描。
 
-- 玩家背包内是否包含匹配物品。
-- 玩家副手物品匹配。
-- 更复杂的消耗规则和失败提示策略。
-- 匹配装备栏和盔甲栏。
-- 6.0 / 7.0 GUI / Admin UI：容器槽位、物品条件、success/fail channel、message、sound、consume 和 consumeCount 未来不应长期依赖超长命令，GUI 应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
+```text
+/tzz signal blockDevice interactionItem source <x> <y> <z> main_hand
+/tzz signal blockDevice interactionItem source <x> <y> <z> off_hand
+/tzz signal blockDevice interactionItem source <x> <y> <z> inventory_contains
+/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> allow
+/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> require_item_match
+```
+
+`inventory_contains` 会用同一套 `ItemStackMatcher` 先匹配非数量条件，再统计主背包 / 热键栏内匹配 ItemStack 的总数：`ignore` 表示至少存在一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于总数量，其中 `at_most` 要求总数大于 0，避免没有物品也满足条件。消耗仍只支持 `main_hand`；source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝，旧数据中出现不兼容配置时运行时不会消耗，并会在 debug 中提示。
+
+`vanillaInteraction` 默认是 `allow`，保持旧行为：即使 interactionItem 匹配失败，也不阻止箱子、门、按钮、拉杆等原版右键行为。管理员显式设置为 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会返回阻止原版 use 的结果，不触发成功频道、不消耗物品。`interactionCooldownTicks` 不会让这个锁失效；冷却中匹配失败仍会阻止箱子打开、门开关、按钮/拉杆切换等原版交互，只是不再 emit、不显示消息、不播放音效、不消耗、不额外挥手，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+
+性能边界保持不变：只检查被右键的一个坐标，不扫描世界、区块或周围方块，不强制加载区块；`main_hand` 只读主手，`off_hand` 只读副手，`inventory_contains` 只读触发玩家的主背包 / 热键栏，不读取其他玩家、装备栏或盔甲栏。
+
+后续计划仍只记录，不在 5.12 实现：
+
+- 5.13 装备栏 / 盔甲栏匹配。
+- 5.14 消耗策略 / 多物品提交，包括背包消耗、副手消耗和更复杂的提交规则。
+- 更完整的 GUI / Admin UI：所有 source、matcher、consume 和反馈配置未来都应进入 GUI；可拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器、debug/doctor 工具。
 
 ### SignalBridge 可观测性命令
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.14.0-player-item-source
+
+- 增强 `virtual_block_device` 的 `interactionItem` 玩家物品来源匹配。
+- 新增 `/tzz signal blockDevice interactionItem source <x> <y> <z> main_hand|off_hand|inventory_contains`。
+- `main_hand` 为默认来源，保持 5.10 / 5.11 旧配置兼容。
+- `off_hand` 只检查玩家副手物品，不处理副手右键事件。
+- `inventory_contains` 只在玩家主手右键已绑定方块时检查触发玩家自己的主背包 / 热键栏。
+- `inventory_contains` 不包含副手、装备栏或盔甲栏，不在 tick 中扫描。
+- `inventory_contains` 的 `ignore` 表示存在至少一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于匹配物品总数，其中 `at_most` 要求总数大于 0。
+- `ignore` 数量模式不接收数量参数，info/debug 显示“数量要求：不检查”，最近匹配数量记录实际匹配到的数量。
+- `consume` 仍只支持 `main_hand`；source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝。
+- 运行时遇到旧数据中 source 与 consume 不兼容时不会消耗，并按失败流程处理或在 debug 中提示。
+- `interactionItem info`、`device info` 和 `device debug` 显示 source、最近匹配来源、匹配槽位和匹配数量。
+- 新增 `/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> allow|require_item_match`。
+- `vanillaInteraction` 默认 `allow`，保持不阻止原版右键行为；显式设置 `require_item_match` 后，interactionItem 匹配失败会阻止原版 use，但仍可执行失败反馈。
+- `require_item_match` 可作为锁定策略；`interactionCooldownTicks` 不会让锁失效，冷却中匹配失败仍会阻止原版交互。
+- 冷却只抑制 success/fail signal、message、sound、consume、额外动画和结果/历史写入等副作用。
+- 成功 / 失败 signal 继续通过 SignalBridge emit，保留玩家上下文并记录到 SignalEventHistory / device history。
+- 本阶段不实现背包消耗、副手消耗、装备栏 / 盔甲栏匹配、多物品提交、GUI 或通用 NBT 查询。
+
 ## v1.13.0-interaction-item-feedback
 
 - 增强 `virtual_block_device` 的 `interactionItem` 主手物品匹配反馈。
@@ -19,10 +39,10 @@
 - 新增通用 `ItemStackMatcher`，供容器物品条件和右键交互主手物品匹配共用。
 - 新增 `slot_matcher` 和 `total_matcher` 容器物品条件类型。
 - 支持从执行者主手或容器槽位捕获 ItemStack 模板。
-- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> <countMode> <count> <channel>`。
-- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> <countMode> <count> <channel>`。
-- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> <countMode> <count> <channel>`。
-- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> <countMode> <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> at_least|exactly|at_most <count> <channel>`，`ignore` 模式使用 `<slot> ignore <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> at_least|exactly|at_most <count> <channel>`，`ignore` 模式使用 `<targetSlot> <templateSlot> ignore <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> at_least|exactly|at_most <count> <channel>`，`ignore` 模式使用 `<name> ignore <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> at_least|exactly|at_most <count> <channel>`，`ignore` 模式使用 `<templateSlot> ignore <channel>`。
 - 新增 `matcherInfo`、`matcherFromHand`、`matcherFromSlot`、`matcherOption`、`matcherCount` 管理命令。
 - 新增 `/tzz signal blockDevice interactionItem ...` 命令，用于给右键交互配置主手物品模板匹配。
 - 右键交互物品匹配只检查 `MAIN_HAND`，匹配失败时不 emit、不阻止原版交互、不显示失败提示、不消耗物品。

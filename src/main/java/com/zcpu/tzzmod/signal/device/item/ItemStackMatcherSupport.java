@@ -85,6 +85,12 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -125,6 +131,12 @@ public final class ItemStackMatcherSupport {
                 data.failSoundPitch(),
                 data.consumeEnabled(),
                 data.consumeCount(),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -192,6 +204,144 @@ public final class ItemStackMatcherSupport {
                 data.consumeEnabled(), Math.max(1, count));
     }
 
+    public static ItemStackMatcherData withSource(ItemStackMatcherData matcher, String source) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                InteractionItemSource.normalize(source),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
+    public static ItemStackMatcherData withVanillaPolicy(ItemStackMatcherData matcher, String policy) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                data.interactionItemSource(),
+                InteractionItemVanillaPolicy.normalize(policy),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
+    public static ItemStackMatcherData withSourceResult(
+            ItemStackMatcherData matcher,
+            String source,
+            int matchedSlot,
+            int matchedCount,
+            String result
+    ) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                InteractionItemSource.normalize(source),
+                matchedSlot,
+                matchedCount,
+                result == null ? "" : result,
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
     private static ItemStackMatcherData copyFeedback(
             ItemStackMatcherData data,
             String successChannel,
@@ -238,6 +388,12 @@ public final class ItemStackMatcherSupport {
                 failSoundPitch,
                 consumeEnabled,
                 consumeCount,
+                data.interactionItemSource(),
+                data.interactionItemVanillaPolicy(),
+                data.lastInteractionItemSource(),
+                data.lastInteractionItemMatchedSlot(),
+                data.lastInteractionItemMatchedCount(),
+                data.lastInteractionItemSourceResult(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -280,7 +436,9 @@ public final class ItemStackMatcherSupport {
         ItemStackMatcherData matcher = rawMatcher.normalized();
         StringBuilder builder = new StringBuilder(matcher.templateItemId());
         builder.append(" count ").append(matcher.countMode());
-        if (!ContainerItemCountMode.IGNORE.id().equals(matcher.countMode())) {
+        if (ContainerItemCountMode.IGNORE.id().equals(matcher.countMode())) {
+            builder.append("（不检查数量）");
+        } else {
             builder.append(" ").append(matcher.requiredCount());
         }
         if (matcher.matchDamage()) {
@@ -299,6 +457,14 @@ public final class ItemStackMatcherSupport {
             builder.append(", components");
         }
         return builder.toString();
+    }
+
+    public static String countRequirementText(ItemStackMatcherData rawMatcher) {
+        ItemStackMatcherData matcher = rawMatcher == null ? ItemStackMatcherData.empty() : rawMatcher.normalized();
+        if (ContainerItemCountMode.IGNORE.id().equals(matcher.countMode())) {
+            return "不检查数量";
+        }
+        return Integer.toString(matcher.requiredCount());
     }
 
     private static String summary(

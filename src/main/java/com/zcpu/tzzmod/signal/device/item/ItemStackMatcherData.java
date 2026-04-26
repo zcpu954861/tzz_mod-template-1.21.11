@@ -34,6 +34,12 @@ public record ItemStackMatcherData(
         float failSoundPitch,
         boolean consumeEnabled,
         int consumeCount,
+        String interactionItemSource,
+        String interactionItemVanillaPolicy,
+        String lastInteractionItemSource,
+        int lastInteractionItemMatchedSlot,
+        int lastInteractionItemMatchedCount,
+        String lastInteractionItemSourceResult,
         long createdWallTimeMillis,
         long updatedWallTimeMillis
 ) {
@@ -88,6 +94,12 @@ public record ItemStackMatcherData(
                 1.0F,
                 false,
                 1,
+                InteractionItemSource.MAIN_HAND,
+                InteractionItemVanillaPolicy.ALLOW,
+                "",
+                -1,
+                0,
+                "",
                 createdWallTimeMillis,
                 updatedWallTimeMillis
         );
@@ -124,6 +136,12 @@ public record ItemStackMatcherData(
                 1.0F,
                 false,
                 1,
+                InteractionItemSource.MAIN_HAND,
+                InteractionItemVanillaPolicy.ALLOW,
+                "",
+                -1,
+                0,
+                "",
                 0L,
                 0L
         );
@@ -145,6 +163,10 @@ public record ItemStackMatcherData(
         String cleanFailMessage = failMessage == null ? "" : failMessage.trim();
         String cleanSuccessSoundId = successSoundId == null ? "" : successSoundId.trim().toLowerCase();
         String cleanFailSoundId = failSoundId == null ? "" : failSoundId.trim().toLowerCase();
+        String cleanInteractionItemSource = InteractionItemSource.normalize(interactionItemSource);
+        String cleanInteractionItemVanillaPolicy = InteractionItemVanillaPolicy.normalize(interactionItemVanillaPolicy);
+        String cleanLastInteractionItemSource = lastInteractionItemSource == null ? "" : lastInteractionItemSource.trim().toLowerCase();
+        String cleanLastInteractionItemSourceResult = lastInteractionItemSourceResult == null ? "" : lastInteractionItemSourceResult.trim();
         List<String> cleanLore = new ArrayList<>();
         if (templateLore != null) {
             for (String line : templateLore) {
@@ -184,6 +206,12 @@ public record ItemStackMatcherData(
                 clamp(failSoundPitch, 0.0F, 2.0F, 1.0F),
                 consumeEnabled,
                 Math.max(1, consumeCount),
+                cleanInteractionItemSource,
+                cleanInteractionItemVanillaPolicy,
+                cleanLastInteractionItemSource,
+                Math.max(-1, lastInteractionItemMatchedSlot),
+                Math.max(0, lastInteractionItemMatchedCount),
+                cleanLastInteractionItemSourceResult,
                 Math.max(0L, createdWallTimeMillis),
                 Math.max(0L, updatedWallTimeMillis)
         );
