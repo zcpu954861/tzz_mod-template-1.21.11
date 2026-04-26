@@ -194,6 +194,80 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualCondition(
+            ServerWorld world,
+            BlockPos pos,
+            BlockStateCondition condition,
+            boolean currentMatched
+    ) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null || condition == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withCondition(
+                existing,
+                true,
+                condition.blockId(),
+                condition.properties(),
+                condition.raw(),
+                existing.conditionMode(),
+                currentMatched,
+                world.getTime(),
+                currentMatched ? "当前满足条件" : "当前不满足条件"
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData clearVirtualCondition(ServerWorld world, BlockPos pos) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withCondition(
+                existing,
+                false,
+                "",
+                Map.of(),
+                "",
+                BlockStateConditionMode.CONDITION_ENTER.id(),
+                false,
+                world.getTime(),
+                "已清空方块状态条件"
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualConditionMode(ServerWorld world, BlockPos pos, String mode) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withCondition(
+                existing,
+                existing.conditionEnabled(),
+                existing.conditionBlockId(),
+                existing.conditionProperties(),
+                existing.conditionRaw(),
+                BlockStateConditionMode.normalize(mode),
+                existing.lastConditionMatched(),
+                existing.lastConditionCheckGameTime(),
+                existing.lastConditionResult()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
     public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, String name) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
@@ -510,7 +584,112 @@ public final class SignalDeviceStore {
                 existing.offChannel(),
                 existing.mode(),
                 existing.lastPowered(),
-                existing.lastPowerLevel()
+                existing.lastPowerLevel(),
+                existing.conditionEnabled(),
+                existing.conditionBlockId(),
+                existing.conditionProperties(),
+                existing.conditionRaw(),
+                existing.conditionMode(),
+                existing.lastConditionMatched(),
+                existing.lastConditionCheckGameTime(),
+                existing.lastConditionResult()
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualConditionState(
+            ServerWorld world,
+            SignalDeviceData device,
+            boolean currentMatched,
+            String resultMessage
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        SignalDeviceData updated = withCondition(
+                existing,
+                existing.conditionEnabled(),
+                existing.conditionBlockId(),
+                existing.conditionProperties(),
+                existing.conditionRaw(),
+                existing.conditionMode(),
+                currentMatched,
+                world.getTime(),
+                resultMessage
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualConditionTrigger(
+            ServerWorld world,
+            SignalDeviceData device,
+            boolean currentMatched,
+            ActionExecutionResult result
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        SignalDeviceData conditioned = withCondition(
+                existing,
+                existing.conditionEnabled(),
+                existing.conditionBlockId(),
+                existing.conditionProperties(),
+                existing.conditionRaw(),
+                existing.conditionMode(),
+                currentMatched,
+                world.getTime(),
+                resultMessage
+        );
+        long now = System.currentTimeMillis();
+        SignalDeviceData updated = new SignalDeviceData(
+                conditioned.id(),
+                conditioned.type(),
+                conditioned.name(),
+                conditioned.dimension(),
+                conditioned.x(),
+                conditioned.y(),
+                conditioned.z(),
+                conditioned.channel(),
+                conditioned.enabled(),
+                conditioned.pulseTicks(),
+                conditioned.remainingPulseTicks(),
+                conditioned.cooldownTicks(),
+                conditioned.actionCount(),
+                conditioned.createdWallTimeMillis(),
+                now,
+                world.getTime(),
+                now,
+                resultMessage,
+                conditioned.blockId(),
+                conditioned.offChannel(),
+                conditioned.mode(),
+                conditioned.lastPowered(),
+                conditioned.lastPowerLevel(),
+                conditioned.conditionEnabled(),
+                conditioned.conditionBlockId(),
+                conditioned.conditionProperties(),
+                conditioned.conditionRaw(),
+                conditioned.conditionMode(),
+                conditioned.lastConditionMatched(),
+                conditioned.lastConditionCheckGameTime(),
+                conditioned.lastConditionResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -911,7 +1090,15 @@ public final class SignalDeviceStore {
                 offChannel,
                 mode,
                 powerState.currentPowered(),
-                powerState.receivedPowerLevel()
+                powerState.receivedPowerLevel(),
+                existing != null && existing.conditionEnabled(),
+                existing == null ? "" : existing.conditionBlockId(),
+                existing == null ? Map.of() : existing.conditionProperties(),
+                existing == null ? "" : existing.conditionRaw(),
+                existing == null ? BlockStateConditionMode.CONDITION_ENTER.id() : existing.conditionMode(),
+                existing != null && existing.lastConditionMatched(),
+                existing == null ? 0L : existing.lastConditionCheckGameTime(),
+                existing == null ? "" : existing.lastConditionResult()
         ).normalized();
     }
 
@@ -945,7 +1132,15 @@ public final class SignalDeviceStore {
                 offChannel,
                 mode,
                 device.lastPowered(),
-                device.lastPowerLevel()
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult()
         ).normalized();
     }
 
@@ -980,7 +1175,61 @@ public final class SignalDeviceStore {
                 device.offChannel(),
                 device.mode(),
                 powerState.currentPowered(),
-                powerState.receivedPowerLevel()
+                powerState.receivedPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withCondition(
+            SignalDeviceData device,
+            boolean conditionEnabled,
+            String conditionBlockId,
+            Map<String, String> conditionProperties,
+            String conditionRaw,
+            String conditionMode,
+            boolean lastConditionMatched,
+            long lastConditionCheckGameTime,
+            String lastConditionResult
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                conditionEnabled,
+                conditionBlockId,
+                conditionProperties == null ? Map.of() : conditionProperties,
+                conditionRaw,
+                conditionMode,
+                lastConditionMatched,
+                lastConditionCheckGameTime,
+                lastConditionResult
         ).normalized();
     }
 
@@ -1008,7 +1257,15 @@ public final class SignalDeviceStore {
                 device.offChannel(),
                 device.mode(),
                 device.lastPowered(),
-                device.lastPowerLevel()
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult()
         ).normalized();
     }
 

@@ -1,6 +1,8 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.signal.SignalChannel;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public record SignalDeviceData(
         String id,
@@ -25,13 +27,81 @@ public record SignalDeviceData(
         String offChannel,
         String mode,
         boolean lastPowered,
-        int lastPowerLevel
+        int lastPowerLevel,
+        boolean conditionEnabled,
+        String conditionBlockId,
+        Map<String, String> conditionProperties,
+        String conditionRaw,
+        String conditionMode,
+        boolean lastConditionMatched,
+        long lastConditionCheckGameTime,
+        String lastConditionResult
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
     public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
     public static final String TYPE_ACTION_RELAY = "action_relay";
     public static final String TYPE_VIRTUAL_BLOCK_DEVICE = "virtual_block_device";
     public static final int DEFAULT_RECEIVER_PULSE_TICKS = 5;
+
+    public SignalDeviceData(
+            String id,
+            String type,
+            String name,
+            String dimension,
+            int x,
+            int y,
+            int z,
+            String channel,
+            boolean enabled,
+            int pulseTicks,
+            int remainingPulseTicks,
+            int cooldownTicks,
+            int actionCount,
+            long createdWallTimeMillis,
+            long updatedWallTimeMillis,
+            long lastTriggerGameTime,
+            long lastTriggerWallTimeMillis,
+            String lastResult,
+            String blockId,
+            String offChannel,
+            String mode,
+            boolean lastPowered,
+            int lastPowerLevel
+    ) {
+        this(
+                id,
+                type,
+                name,
+                dimension,
+                x,
+                y,
+                z,
+                channel,
+                enabled,
+                pulseTicks,
+                remainingPulseTicks,
+                cooldownTicks,
+                actionCount,
+                createdWallTimeMillis,
+                updatedWallTimeMillis,
+                lastTriggerGameTime,
+                lastTriggerWallTimeMillis,
+                lastResult,
+                blockId,
+                offChannel,
+                mode,
+                lastPowered,
+                lastPowerLevel,
+                false,
+                "",
+                Map.of(),
+                "",
+                BlockStateConditionMode.CONDITION_ENTER.id(),
+                false,
+                0L,
+                ""
+        );
+    }
 
     public SignalDeviceData normalized() {
         String cleanId = id == null ? "" : id.trim();
@@ -42,6 +112,22 @@ public record SignalDeviceData(
         String cleanBlockId = blockId == null ? "" : blockId.trim();
         String cleanOffChannel = SignalChannel.normalize(offChannel);
         String cleanMode = VirtualBlockDeviceMode.normalize(mode);
+        String cleanConditionBlockId = conditionBlockId == null ? "" : conditionBlockId.trim();
+        String cleanConditionRaw = conditionRaw == null ? "" : conditionRaw.trim();
+        String cleanConditionMode = BlockStateConditionMode.normalize(conditionMode);
+        String cleanConditionResult = lastConditionResult == null ? "" : lastConditionResult.trim();
+        Map<String, String> cleanConditionProperties = new LinkedHashMap<>();
+        if (conditionProperties != null) {
+            for (Map.Entry<String, String> entry : conditionProperties.entrySet()) {
+                if (entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) {
+                    continue;
+                }
+                cleanConditionProperties.put(entry.getKey().trim(), entry.getValue().trim());
+            }
+        }
+        boolean cleanConditionEnabled = conditionEnabled
+                && !cleanConditionBlockId.isBlank()
+                && !cleanConditionProperties.isEmpty();
         int cleanPulseTicks = cleanType.equals(TYPE_SIGNAL_RECEIVER)
                 ? Math.max(1, pulseTicks <= 0 ? DEFAULT_RECEIVER_PULSE_TICKS : pulseTicks)
                 : Math.max(0, pulseTicks);
@@ -68,7 +154,15 @@ public record SignalDeviceData(
                 cleanOffChannel,
                 cleanMode,
                 lastPowered,
-                Math.max(0, Math.min(15, lastPowerLevel))
+                Math.max(0, Math.min(15, lastPowerLevel)),
+                cleanConditionEnabled,
+                cleanConditionBlockId,
+                Map.copyOf(cleanConditionProperties),
+                cleanConditionRaw,
+                cleanConditionMode,
+                lastConditionMatched,
+                Math.max(0L, lastConditionCheckGameTime),
+                cleanConditionResult
         );
     }
 }

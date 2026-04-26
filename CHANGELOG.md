@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.8.0-blockstate-condition
+
+- 为 `virtual_block_device` 新增方块状态条件触发能力。
+- 新增 `/tzz signal blockDevice condition <x> <y> <z> <condition>`。
+- 新增 `/tzz signal blockDevice clearCondition <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice conditionMode <x> <y> <z> condition_enter|condition_exit|condition_both`。
+- 新增 `/tzz signal blockDevice conditionInfo <x> <y> <z>`。
+- 支持完整 BlockState 条件字符串，例如 `minecraft:lever[powered=true]`、`minecraft:redstone_lamp[lit=true]`、`minecraft:repeater[delay=4]`。
+- 条件设置时按当前运行时方块实际 `BlockState` 验证 block id、property 名和值，不硬编码 Wiki 属性白名单。
+- 方块不支持的状态会拒绝保存，例如 `minecraft:stone[waterlogged=true]`。
+- 非法状态值会拒绝保存，例如 `minecraft:repeater[delay=9]`。
+- `condition_enter` 支持条件从不满足变为满足时 emit `channel`。
+- `condition_exit` 支持条件从满足变为不满足时优先 emit `offChannel`，未设置时回退 `channel`。
+- `condition_both` 支持进入和退出条件都触发；`clearOffChannel` 后退出边沿回退使用 `channel` 属于设计行为。
+- `/tzz signal blockDevice info`、`/tzz signal device info`、`/tzz signal device debug` 会显示 condition 摘要与诊断信息。
+- tick 检测仍只遍历已登记的虚拟方块发射器，每个设备只读取自己的一个坐标，不扫描世界、区块或周围方块。
+- tick 时不重新解析 condition 字符串，状态不变不 emit，也不写 `signal_devices.json`。
+- 5.5 红石虚拟方块发射器功能保持兼容。
+- 5.7 交互触发、5.8 容器事件、5.9 多条件触发仍只是后续计划，本阶段未实现。
+
 ## v1.7.0-virtual-block-device
 
 - 新增 `virtual_block_device` 虚拟方块发射器设备类型。

@@ -23,7 +23,9 @@ import com.zcpu.tzzmod.signal.SignalListenerData;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.block.BlockState;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -149,6 +151,9 @@ public final class SignalDeviceCommand {
                 source.sendFeedback(() -> indentField("方块 ID", idText(device.blockId())), false);
                 source.sendFeedback(() -> indentField("断电频道", channelOrEmpty(device.offChannel())), false);
                 source.sendFeedback(() -> indentField("模式", modeText(device.mode())), false);
+                if (device.conditionEnabled()) {
+                    source.sendFeedback(() -> indentField("条件", conditionSummary(device)), false);
+                }
                 source.sendFeedback(() -> indentField("通电状态", boolText(device.lastPowered())
                         .append(Text.literal("，强度 ").formatted(Formatting.GRAY))
                         .append(number(device.lastPowerLevel()))), false);
@@ -613,6 +618,10 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("上次红石强度", number(device.lastPowerLevel())), false);
             source.sendFeedback(() -> field("断电频道", channelOrEmpty(device.offChannel())), false);
             source.sendFeedback(() -> field("模式", modeText(device.mode())), false);
+            source.sendFeedback(() -> field("方块状态条件", conditionSummary(device)), false);
+            source.sendFeedback(() -> field("条件模式", conditionModeText(device.conditionMode())), false);
+            source.sendFeedback(() -> field("上次条件满足", boolText(device.lastConditionMatched())), false);
+            source.sendFeedback(() -> field("当前条件满足", conditionMatchedText(source, device)), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
@@ -629,6 +638,7 @@ public final class SignalDeviceCommand {
         BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
         boolean chunkLoaded = world != null && world.isChunkLoaded(pos);
         VirtualBlockPowerState powerState = chunkLoaded ? VirtualBlockDeviceSupport.powerState(world, pos) : null;
+        BlockState currentState = chunkLoaded ? world.getBlockState(pos) : null;
         List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), device.channel());
         int receiverCount = receiverCountForChannel(source, device.channel());
         int relayCount = actionRelayCountForChannel(source, device.channel());
@@ -656,6 +666,20 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("频道", channelOrEmpty(device.channel())), false);
         source.sendFeedback(() -> field("断电频道", channelOrEmpty(device.offChannel())), false);
         source.sendFeedback(() -> field("模式", modeText(device.mode())), false);
+        source.sendFeedback(() -> field("方块状态条件", conditionSummary(device)), false);
+        source.sendFeedback(() -> field("条件模式", conditionModeText(device.conditionMode())), false);
+        source.sendFeedback(() -> field("条件方块 ID", device.conditionBlockId().isBlank() ? Text.literal("未设置").formatted(Formatting.YELLOW) : idText(device.conditionBlockId())), false);
+        source.sendFeedback(() -> field("条件属性", Text.literal(propertiesText(device.conditionProperties())).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("上次条件满足", boolText(device.lastConditionMatched())), false);
+        source.sendFeedback(() -> field("当前条件满足", conditionMatchedText(source, device)), false);
+        source.sendFeedback(() -> field("当前方块支持状态", supportedPropertiesText(source, device)), false);
+        List<String> conditionIssues = validateConditionIssues(source, device);
+        if (!conditionIssues.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("条件诊断：").formatted(Formatting.YELLOW), false);
+            for (String issue : conditionIssues) {
+                source.sendFeedback(() -> Text.literal("- " + issue).formatted(Formatting.YELLOW), false);
+            }
+        }
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("频道监听器", number(listeners.size())), false);
         source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
@@ -663,7 +687,7 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
 
-        List<Text> hints = virtualDebugHints(device, powerState, chunkLoaded, listeners, receiverCount, relayCount);
+        List<Text> hints = virtualDebugHints(device, powerState, currentState, chunkLoaded, listeners, receiverCount, relayCount);
         if (!hints.isEmpty()) {
             source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
             for (Text hint : hints) {
@@ -692,6 +716,7 @@ public final class SignalDeviceCommand {
     private static List<Text> virtualDebugHints(
             SignalDeviceData device,
             VirtualBlockPowerState powerState,
+            BlockState currentState,
             boolean chunkLoaded,
             List<SignalListenerData> listeners,
             int receiverCount,
@@ -719,6 +744,17 @@ public final class SignalDeviceCommand {
         }
         if (device.offChannel().isBlank() && VirtualBlockDeviceMode.fromId(device.mode()).triggersFalling()) {
             hints.add(Text.literal("offChannel 未设置，断电触发会使用主频道。").formatted(Formatting.YELLOW));
+        }
+        if (device.conditionEnabled()) {
+            if (device.offChannel().isBlank() && BlockStateConditionMode.fromId(device.conditionMode()).triggersExit()) {
+                hints.add(Text.literal("offChannel 未设置，条件退出边沿会使用主频道。").formatted(Formatting.YELLOW));
+            }
+            if (currentState != null) {
+                List<String> conditionIssues = BlockStateConditionParser.validateSavedCondition(device, currentState);
+                for (String issue : conditionIssues) {
+                    hints.add(Text.literal(issue).formatted(Formatting.YELLOW));
+                }
+            }
         }
         if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
             hints.add(Text.literal("频道没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。").formatted(Formatting.YELLOW));
@@ -963,6 +999,69 @@ public final class SignalDeviceCommand {
 
     private static MutableText modeText(String mode) {
         return Text.literal(VirtualBlockDeviceMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText conditionModeText(String mode) {
+        return Text.literal(BlockStateConditionMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text conditionSummary(SignalDeviceData device) {
+        return device.conditionEnabled()
+                ? Text.literal(device.conditionRaw()).formatted(Formatting.AQUA)
+                : Text.literal("未设置").formatted(Formatting.YELLOW);
+    }
+
+    private static Text conditionMatchedText(ServerCommandSource source, SignalDeviceData device) {
+        if (!device.conditionEnabled()) {
+            return Text.literal("未设置条件").formatted(Formatting.YELLOW);
+        }
+        BlockState state = currentBlockState(source, device);
+        if (state == null) {
+            return Text.literal("未知").formatted(Formatting.YELLOW);
+        }
+        return boolText(BlockStateConditionParser.matches(state, device));
+    }
+
+    private static Text supportedPropertiesText(ServerCommandSource source, SignalDeviceData device) {
+        BlockState state = currentBlockState(source, device);
+        if (state == null) {
+            return Text.literal("未知").formatted(Formatting.YELLOW);
+        }
+        String properties = BlockStateConditionParser.supportedProperties(state);
+        return properties.isBlank()
+                ? Text.literal("无").formatted(Formatting.YELLOW)
+                : Text.literal(properties).formatted(Formatting.AQUA);
+    }
+
+    private static List<String> validateConditionIssues(ServerCommandSource source, SignalDeviceData device) {
+        if (!device.conditionEnabled()) {
+            return List.of();
+        }
+        BlockState state = currentBlockState(source, device);
+        if (state == null) {
+            return List.of("当前方块状态不可用，可能是区块未加载。");
+        }
+        return BlockStateConditionParser.validateSavedCondition(device, state);
+    }
+
+    private static BlockState currentBlockState(ServerCommandSource source, SignalDeviceData device) {
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(source.getServer(), device);
+        if (world == null) {
+            return null;
+        }
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        return world.isChunkLoaded(pos) ? world.getBlockState(pos) : null;
+    }
+
+    private static String propertiesText(Map<String, String> properties) {
+        if (properties == null || properties.isEmpty()) {
+            return "未设置";
+        }
+        List<String> values = new ArrayList<>();
+        for (Map.Entry<String, String> entry : properties.entrySet()) {
+            values.add(entry.getKey() + "=" + entry.getValue());
+        }
+        return String.join(", ", values);
     }
 
     private static MutableText gtText(int ticks) {
