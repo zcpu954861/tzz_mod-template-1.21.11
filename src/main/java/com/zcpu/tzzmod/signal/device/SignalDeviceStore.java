@@ -6,6 +6,7 @@ import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -370,6 +371,35 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualInteractionItemMatcher(
+            ServerWorld world,
+            BlockPos pos,
+            ItemStackMatcherData matcher,
+            boolean enabled,
+            String result
+    ) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withInteractionItemMatcher(
+                existing,
+                enabled,
+                matcher == null ? ItemStackMatcherData.empty() : matcher,
+                false,
+                result
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData clearVirtualInteractionItemMatcher(ServerWorld world, BlockPos pos) {
+        return updateVirtualInteractionItemMatcher(world, pos, ItemStackMatcherData.empty(), false, "已清空交互主手物品匹配");
+    }
+
     public static synchronized SignalDeviceData updateVirtualContainerOpenChannel(ServerWorld world, BlockPos pos, String channel) {
         return updateVirtualContainerChannels(world, pos, SignalChannel.normalize(channel), null, null, null);
     }
@@ -712,7 +742,11 @@ public final class SignalDeviceStore {
                 conditioned.lastContainerPlayerUuid(),
                 resultMessage,
                 "item_condition",
-                conditioned.itemConditions()
+                conditioned.itemConditions(),
+                conditioned.interactionItemMatcherEnabled(),
+                conditioned.interactionItemMatcher(),
+                conditioned.lastInteractionItemMatched(),
+                conditioned.lastInteractionItemResult()
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
@@ -1115,7 +1149,11 @@ public final class SignalDeviceStore {
                 existing.lastContainerPlayerUuid(),
                 existing.lastContainerResult(),
                 existing.lastContainerEventType(),
-                existing.itemConditions()
+                existing.itemConditions(),
+                existing.interactionItemMatcherEnabled(),
+                existing.interactionItemMatcher(),
+                existing.lastInteractionItemMatched(),
+                existing.lastInteractionItemResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1241,7 +1279,11 @@ public final class SignalDeviceStore {
                 conditioned.lastContainerPlayerUuid(),
                 conditioned.lastContainerResult(),
                 conditioned.lastContainerEventType(),
-                conditioned.itemConditions()
+                conditioned.itemConditions(),
+                conditioned.interactionItemMatcherEnabled(),
+                conditioned.interactionItemMatcher(),
+                conditioned.lastInteractionItemMatched(),
+                conditioned.lastInteractionItemResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1340,7 +1382,11 @@ public final class SignalDeviceStore {
                 interacted.lastContainerPlayerUuid(),
                 interacted.lastContainerResult(),
                 interacted.lastContainerEventType(),
-                interacted.itemConditions()
+                interacted.itemConditions(),
+                interacted.interactionItemMatcherEnabled(),
+                interacted.interactionItemMatcher(),
+                interacted.interactionItemMatcherEnabled(),
+                interacted.interactionItemMatcherEnabled() ? "主手物品匹配通过" : interacted.lastInteractionItemResult()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1459,7 +1505,11 @@ public final class SignalDeviceStore {
                 updated.lastContainerPlayerUuid(),
                 updated.lastContainerResult(),
                 updated.lastContainerEventType(),
-                updated.itemConditions()
+                updated.itemConditions(),
+                updated.interactionItemMatcherEnabled(),
+                updated.interactionItemMatcher(),
+                updated.lastInteractionItemMatched(),
+                updated.lastInteractionItemResult()
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
@@ -1951,7 +2001,11 @@ public final class SignalDeviceStore {
                 existing == null ? "" : existing.lastContainerPlayerUuid(),
                 existing == null ? "" : existing.lastContainerResult(),
                 existing == null ? "" : existing.lastContainerEventType(),
-                existing == null ? List.of() : existing.itemConditions()
+                existing == null ? List.of() : existing.itemConditions(),
+                existing != null && existing.interactionItemMatcherEnabled(),
+                existing == null ? ItemStackMatcherData.empty() : existing.interactionItemMatcher(),
+                existing != null && existing.lastInteractionItemMatched(),
+                existing == null ? "" : existing.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2022,7 +2076,11 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2094,7 +2152,11 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2169,7 +2231,11 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2246,7 +2312,11 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2331,7 +2401,11 @@ public final class SignalDeviceStore {
                 lastContainerPlayerUuid,
                 lastContainerResult,
                 lastContainerEventType,
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 
@@ -2399,7 +2473,86 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                itemConditions == null ? List.of() : itemConditions
+                itemConditions == null ? List.of() : itemConditions,
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withInteractionItemMatcher(
+            SignalDeviceData device,
+            boolean interactionItemMatcherEnabled,
+            ItemStackMatcherData interactionItemMatcher,
+            boolean lastInteractionItemMatched,
+            String lastInteractionItemResult
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType(),
+                device.itemConditions(),
+                interactionItemMatcherEnabled,
+                interactionItemMatcher == null ? ItemStackMatcherData.empty() : interactionItemMatcher,
+                lastInteractionItemMatched,
+                lastInteractionItemResult == null ? "" : lastInteractionItemResult
         ).normalized();
     }
 
@@ -2464,7 +2617,11 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
                 device.lastContainerEventType(),
-                device.itemConditions()
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult()
         ).normalized();
     }
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.12.0-itemstack-matcher
+
+- 新增通用 `ItemStackMatcher`，供容器物品条件和右键交互主手物品匹配共用。
+- 新增 `slot_matcher` 和 `total_matcher` 容器物品条件类型。
+- 支持从执行者主手或容器槽位捕获 ItemStack 模板。
+- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> <countMode> <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> <countMode> <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> <countMode> <count> <channel>`。
+- 新增 `/tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> <countMode> <count> <channel>`。
+- 新增 `matcherInfo`、`matcherFromHand`、`matcherFromSlot`、`matcherOption`、`matcherCount` 管理命令。
+- 新增 `/tzz signal blockDevice interactionItem ...` 命令，用于给右键交互配置主手物品模板匹配。
+- 右键交互物品匹配只检查 `MAIN_HAND`，匹配失败时不 emit、不阻止原版交互、不显示失败提示、不消耗物品。
+- 当前 matcher 支持 item id、count、damage、自定义名称、lore、`custom_data` 和 data components 整体快照匹配。
+- 本阶段不实现任意 NBT path 查询、玩家背包扫描、副手匹配、消耗物品、失败提示、装备栏或盔甲栏匹配。
+- 保持 5.5 红石虚拟方块发射器、5.6 BlockState condition、5.7 interaction、5.8 container events、5.9 itemCondition id/count 行为兼容。
+
 ## v1.11.0-container-item-conditions
 
 - 为 `virtual_block_device` 新增容器槽位 / 物品条件触发能力。

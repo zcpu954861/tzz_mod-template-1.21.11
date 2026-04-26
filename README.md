@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.11.0-container-item-conditions`
-- 当前开发版本：`v1.11.0-container-item-conditions`（5.9 容器槽位 / 物品条件触发；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.12.0-itemstack-matcher`
+- 当前开发版本：`v1.12.0-itemstack-matcher`（5.10 物品数据匹配系统；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -434,9 +434,43 @@ minecraft:wheat[age=7]
 - 本阶段不比较 NBT、数据组件、lore、自定义名称或附魔，也不是通用 NBT 检测系统。
 - 如果 `containerChangeChannel` 和 itemCondition channel 指向同一 channel，内容变化和条件边沿可能各自发出 signal，这是配置结果，不是 bug。
 
-后续计划仍只记录，不在 5.9 实现：
+5.10 阶段新增可复用 `ItemStackMatcher`。容器物品条件和右键交互主手物品匹配共用同一套模板匹配逻辑，不再各自维护一套判断：
 
-- 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
+```text
+/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition matcherInfo <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition matcherFromHand <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition matcherFromSlot <x> <y> <z> <name> <slot>
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchDamage enable
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchCustomName disable
+/tzz signal blockDevice itemCondition matcherCount <x> <y> <z> <name> ignore
+```
+
+```text
+/tzz signal blockDevice interactionItem setFromHand <x> <y> <z>
+/tzz signal blockDevice interactionItem clear <x> <y> <z>
+/tzz signal blockDevice interactionItem enable <x> <y> <z>
+/tzz signal blockDevice interactionItem disable <x> <y> <z>
+/tzz signal blockDevice interactionItem option <x> <y> <z> matchLore enable
+/tzz signal blockDevice interactionItem count <x> <y> <z> at_least <count>
+/tzz signal blockDevice interactionItem count <x> <y> <z> ignore
+/tzz signal blockDevice interactionItem info <x> <y> <z>
+```
+
+`slot_matcher` 会用模板匹配指定槽位；`total_matcher` 会统计容器内所有匹配模板的 ItemStack 数量。模板可以从执行者主手捕获，也可以从同一容器的某个槽位捕获。交互物品匹配只检查右键玩家的 `MAIN_HAND`，匹配成功才 emit `interactChannel`；不匹配时不阻止原版交互、不显示失败提示、不消耗物品。
+
+当前 `ItemStackMatcher` 支持 item registry id、count、damage、自定义名称、lore、`custom_data` 和 data components 的整体快照匹配。默认只启用 item id 与数量规则；更严格的 damage / 名称 / lore / custom_data / components 需要管理员显式开启。本阶段不是任意 NBT path 查询系统，也不检测告示牌文字、命令方块命令、刷怪笼 NBT、BlockEntity NBT、玩家 NBT 或实体 NBT。
+
+后续计划仍只记录，不在 5.10 实现：
+
+- 玩家背包内是否包含匹配物品。
+- 玩家副手物品匹配。
+- 右键成功后消耗匹配物品。
+- 右键失败提示消息。
+- 匹配装备栏和盔甲栏。
 - 6.0 / 7.0 GUI / Admin UI：容器槽位和物品条件未来不应长期依赖超长命令，GUI 应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 
 ### SignalBridge 可观测性命令
