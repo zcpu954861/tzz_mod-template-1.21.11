@@ -611,6 +611,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - `consume` 只消耗右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏。
 - `consumeCount` 必须大于 0；主手数量不足时进入失败流程，不发成功频道、不发送成功反馈、不消耗。
 - `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不阻止原版交互。
+- 成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不额外播放触发动画。
 - 成功 / 失败 signal 都保留玩家上下文并走现有 SignalBridge 递归保护。
 
 边界：

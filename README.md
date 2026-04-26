@@ -464,7 +464,7 @@ minecraft:wheat[age=7]
 
 当前 `ItemStackMatcher` 支持 item registry id、count、damage、自定义名称、lore、`custom_data` 和 data components 的整体快照匹配。默认只启用 item id 与数量规则；更严格的 damage / 名称 / lore / custom_data / components 需要管理员显式开启。本阶段不是任意 NBT path 查询系统，也不检测告示牌文字、命令方块命令、刷怪笼 NBT、BlockEntity NBT、玩家 NBT 或实体 NBT。
 
-5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。冷却中不会 emit、不会反馈、不会消耗，也不会阻止原版右键行为。
+5.11 阶段增强了 interactionItem 主手匹配反馈。成功 / 失败频道、消息、音效和成功后消耗物品都可选配置，默认不显示消息、不播放音效、不触发失败频道、不消耗物品。`successChannel` 为空时成功回退使用 `interactChannel`；失败时 `failChannel` 为空则不 emit。成功和失败交互尝试都会播放 `MAIN_HAND` 主手挥手动画；冷却中不会 emit、不会反馈、不会消耗，也不会额外播放触发动画，也不会阻止原版右键行为。
 
 ```text
 /tzz signal blockDevice interactionItem successChannel <x> <y> <z> <channel>
