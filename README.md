@@ -381,7 +381,7 @@ minecraft:wheat[age=7]
 - `action_relay`：signal -> ActionEngine actions。
 - `SignalListener`：后台虚拟逻辑接收端。
 
-后续计划仍只记录，不在 5.7 实现：
+后续计划仍只记录，不在 5.8 实现：
 
 - 5.9 容器槽位 / 物品条件：第 N 格为空、第 N 格是某物品、数量满足条件、容器内总计包含某物品数量等。
 - 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
