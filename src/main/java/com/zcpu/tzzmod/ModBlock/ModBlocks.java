@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.ModBlock;
 
 import com.zcpu.tzzmod.ModBlock.custom.CatcherChestBlock;
+import com.zcpu.tzzmod.ModBlock.custom.ActionRelayBlock;
 import com.zcpu.tzzmod.ModBlock.custom.PasswordMachineBlock;
 import com.zcpu.tzzmod.ModBlock.custom.SilentSensorPlateBlock;
 import com.zcpu.tzzmod.ModBlock.custom.SignalEmitterBlock;
@@ -48,6 +49,12 @@ public class ModBlocks {
     public static final Block SIGNAL_RECEIVER = registerBlock(
             "signal_receiver",
             SignalReceiverBlock::new,
+            AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
+    );
+
+    public static final Block ACTION_RELAY = registerBlock(
+            "action_relay",
+            ActionRelayBlock::new,
             AbstractBlock.Settings.copy(Blocks.IRON_BLOCK).strength(3.0F).nonOpaque()
     );
 

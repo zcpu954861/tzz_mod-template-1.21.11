@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.6.0-action-relay
+
+- 新增 `action_relay` 动作继电器方块。
+- 支持 `signal -> action_relay -> ActionEngine actions`。
+- 新增 `ActionRelayBlockEntity`，保存 `channel`、`enabled`、`cooldownTicks`、`actions[]`、最近执行时间和最近结果。
+- `actions[]` 使用现有 `ActionConfig` 格式，不新增 action 类型。
+- 新增 `/tzz signal relay bind <x> <y> <z> <channel>`。
+- 新增 `/tzz signal relay addAction <x> <y> <z> command <command>`。
+- 新增 `/tzz signal relay addAction <x> <y> <z> message <message>`。
+- 新增 `/tzz signal relay addAction <x> <y> <z> sound <sound>`。
+- 新增 `/tzz signal relay addAction <x> <y> <z> signal <channel>`。
+- 新增 `/tzz signal relay listActions <x> <y> <z>`。
+- 新增 `/tzz signal relay removeAction <x> <y> <z> <index>`。
+- 新增 `/tzz signal relay clearActions <x> <y> <z>`。
+- 新增 `/tzz signal relay cooldown <x> <y> <z> <ticks>`。
+- 新增 `/tzz signal relay trigger <x> <y> <z>`。
+- 新增 `/tzz signal relay info <x> <y> <z>`。
+- `/tzz signal device bind/list/info/debug/test/enable/disable` 现在支持 `action_relay`。
+- 新增 `/tzz signal device cleanup`，用于清理已加载区块中的无效 Signal 设备索引。
+- Signal 设备被破坏后会自动从 `signal_devices.json` 移除，避免 `/tzz signal device list` 残留旧设备。
+- SignalBridge emit 现在会同时分发到 SignalListener、`signal_receiver` 和已加载的 `action_relay`。
+- `action_relay` 不输出红石，保持 SignalReceiver 作为实体红石输出端。
+- 保持 SignalListener 作为后台虚拟逻辑接收端，`action_relay` 是世界中可见的 ActionEngine 执行节点。
+- `action_relay` 使用与前两个 Signal 设备一致的多元素科技风模型，并采用绿色主题与短暂 active 高亮。
+
 ## v1.5.0-signal-receiver
 
 - 新增 `signal_receiver` 信号接收器方块。

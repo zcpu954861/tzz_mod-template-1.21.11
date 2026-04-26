@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.5.0-signal-receiver`
+- 最新发布版本：`v1.6.0-action-relay`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -18,6 +18,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - 封锁卡系统：保存触发条件和命令动作，并在命中实体或方块条件时执行。
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
+- Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
 
 ## 命令入口
 
@@ -174,6 +175,61 @@ world/tzz_mod/signal_devices.json
 ```
 
 该文件用于管理显示名、位置、最近触发/接收和调试信息。`SignalEmitterBlockEntity` 仍然保存实际 `channel`、`enabled` 和 `lastPowered`；`SignalReceiverBlockEntity` 保存实际 `channel`、`enabled`、`pulseTicks` 和当前脉冲状态。设备历史来自内存中的 SignalEventHistory，不写入 JSON。设备管理不会扫描未加载区块。
+
+### ActionRelay 动作继电器
+
+`action_relay` 是世界中可见的 ActionEngine 执行节点。它监听一个 SignalBridge channel，收到 signal 后执行自己保存的 `actions[]`：
+
+```text
+signal -> action_relay -> ActionEngine actions
+```
+
+职责边界：
+
+- `SignalListener` 是后台虚拟逻辑接收端。
+- `signal_receiver` 是世界实体红石输出端。
+- `action_relay` 是世界中可见的 ActionEngine 执行节点。
+- `action_relay` 不输出红石，也不是单纯命令方块；它执行的是 `actions[]`。
+- `action_relay` 不需要同一 channel 上存在 SignalListener 才能工作。
+- 动作继电器只处理已登记且已加载区块中的方块实体，不扫描世界，也不强制加载区块。
+
+新增命令：
+
+```text
+/tzz signal relay bind <x> <y> <z> <channel>
+/tzz signal relay addAction <x> <y> <z> command <command>
+/tzz signal relay addAction <x> <y> <z> message <message>
+/tzz signal relay addAction <x> <y> <z> sound <sound>
+/tzz signal relay addAction <x> <y> <z> signal <channel>
+/tzz signal relay listActions <x> <y> <z>
+/tzz signal relay removeAction <x> <y> <z> <index>
+/tzz signal relay clearActions <x> <y> <z>
+/tzz signal relay cooldown <x> <y> <z> <ticks>
+/tzz signal relay trigger <x> <y> <z>
+/tzz signal relay info <x> <y> <z>
+```
+
+`cooldown` 的单位是 GT，默认 `0 GT`，表示无冷却。命令参数只输入整数，不输入 `GT` 后缀。
+
+`/tzz signal device bind/info/list/debug/test/enable/disable` 现在也支持 `action_relay`。设备列表会显示动作数量、冷却时间和最近执行结果。
+
+设备维护命令：
+
+```text
+/tzz signal device cleanup
+```
+
+`cleanup` 只检查 `signal_devices.json` 中已经登记的设备，并且只处理所在区块已加载的记录。如果已加载位置不再是对应类型的 Signal 设备，就会移除该索引记录；未加载区块会跳过，不扫描世界，也不强制加载区块。Signal 设备被破坏后也会自动从 `signal_devices.json` 中移除，powered / pulse / active 等同方块状态变化不会误删索引。
+
+最小使用示例：
+
+```text
+/tzz signal relay bind <x> <y> <z> game.start
+/tzz signal relay addAction <x> <y> <z> command say 游戏开始
+/tzz signal emit game.start
+```
+
+`action_relay` 的 `actions[]` 直接使用 ActionEngine 的 `ActionConfig` 格式。后续 ActionEngine 增加新动作类型时，动作继电器可以继续复用同一套动作结构。`signal_devices.json` 继续作为设备管理索引，设备历史仍来自内存中的 SignalEventHistory，不新增永久 history JSON。
 
 ### SignalBridge 可观测性命令
 

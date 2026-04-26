@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=false": {
+      "model": "tzz_mod:block/action_relay"
+    },
+    "active=true": {
+      "model": "tzz_mod:block/action_relay_active"
+    }
+  }
+}

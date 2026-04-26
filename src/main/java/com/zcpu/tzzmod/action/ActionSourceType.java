@@ -7,6 +7,7 @@ public enum ActionSourceType {
     REGION_CONTROLLER("region_controller"),
     SIGNAL_BRIDGE("signal_bridge"),
     SIGNAL_DEVICE("signal_device"),
+    ACTION_RELAY("action_relay"),
     COMMAND("command"),
     UNKNOWN("unknown");
 
