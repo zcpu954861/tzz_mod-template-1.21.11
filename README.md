@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.13.0-interaction-item-feedback`
+- 最新发布版本：`v1.14.0-player-item-source`
 - 当前开发版本：`v1.14.0-player-item-source`（5.12 玩家物品来源匹配；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -503,6 +503,8 @@ minecraft:wheat[age=7]
 `inventory_contains` 会用同一套 `ItemStackMatcher` 先匹配非数量条件，再统计主背包 / 热键栏内匹配 ItemStack 的总数：`ignore` 表示至少存在一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于总数量，其中 `at_most` 要求总数大于 0，避免没有物品也满足条件。消耗仍只支持 `main_hand`；source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝，旧数据中出现不兼容配置时运行时不会消耗，并会在 debug 中提示。
 
 `vanillaInteraction` 默认是 `allow`，保持旧行为：即使 interactionItem 匹配失败，也不阻止箱子、门、按钮、拉杆等原版右键行为。管理员显式设置为 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会返回阻止原版 use 的结果，不触发成功频道、不消耗物品。`interactionCooldownTicks` 不会让这个锁失效；冷却中匹配失败仍会阻止箱子打开、门开关、按钮/拉杆切换等原版交互，只是不再 emit、不显示消息、不播放音效、不消耗、不额外挥手，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+
+门会按上下半格做最小归一化：如果管理员绑定门下半格，玩家右键上半格时会尝试匹配下半格设备；如果绑定上半格，右键下半格也会尝试匹配上半格设备。该逻辑只检查当前点击坐标和门的另一半坐标，不扫描世界，用于避免 `require_item_match` 被右键另一半门绕过。
 
 性能边界保持不变：只检查被右键的一个坐标，不扫描世界、区块或周围方块，不强制加载区块；`main_hand` 只读主手，`off_hand` 只读副手，`inventory_contains` 只读触发玩家的主背包 / 热键栏，不读取其他玩家、装备栏或盔甲栏。
 

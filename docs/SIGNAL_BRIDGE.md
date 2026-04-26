@@ -645,6 +645,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - `consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关；启用 consume 时仍必须满足消耗数量。
 - `consume` 只支持 `main_hand`。source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝；旧数据中出现不兼容配置时运行时不会消耗，并会进入失败流程或在 debug 中提示。
 - `vanillaInteraction` 默认 `allow`，不阻止原版右键行为。显式设置 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会阻止箱子打开、门开关、按钮/拉杆切换等原版 use。`interactionCooldownTicks` 不会让锁失效；冷却中匹配失败仍会阻止原版交互，只是不 emit、不反馈、不消耗、不额外播放触发动效，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
+- 对门使用 `require_item_match` 时，绑定上半格或下半格都可以；玩家右键另一半门时会尝试归一化到已绑定设备，避免通过门的另一半绕过锁。该逻辑只检查当前点击坐标和门的另一半坐标，不扫描世界。
 
 性能边界：
 

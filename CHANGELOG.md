@@ -16,6 +16,7 @@
 - 新增 `/tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> allow|require_item_match`。
 - `vanillaInteraction` 默认 `allow`，保持不阻止原版右键行为；显式设置 `require_item_match` 后，interactionItem 匹配失败会阻止原版 use，但仍可执行失败反馈。
 - `require_item_match` 可作为锁定策略；`interactionCooldownTicks` 不会让锁失效，冷却中匹配失败仍会阻止原版交互。
+- 对门使用 `require_item_match` 时支持上下半格归一化，绑定任一半格后右键另一半也会走同一设备锁定判断。
 - 冷却只抑制 success/fail signal、message、sound、consume、额外动画和结果/历史写入等副作用。
 - 成功 / 失败 signal 继续通过 SignalBridge emit，保留玩家上下文并记录到 SignalEventHistory / device history。
 - 本阶段不实现背包消耗、副手消耗、装备栏 / 盔甲栏匹配、多物品提交、GUI 或通用 NBT 查询。
