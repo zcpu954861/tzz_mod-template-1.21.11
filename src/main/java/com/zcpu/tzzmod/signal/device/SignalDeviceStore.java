@@ -370,6 +370,178 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualContainerOpenChannel(ServerWorld world, BlockPos pos, String channel) {
+        return updateVirtualContainerChannels(world, pos, SignalChannel.normalize(channel), null, null, null);
+    }
+
+    public static synchronized SignalDeviceData clearVirtualContainerOpenChannel(ServerWorld world, BlockPos pos) {
+        return updateVirtualContainerChannels(world, pos, "", null, null, null);
+    }
+
+    public static synchronized SignalDeviceData updateVirtualContainerCloseChannel(ServerWorld world, BlockPos pos, String channel) {
+        return updateVirtualContainerChannels(world, pos, null, SignalChannel.normalize(channel), null, null);
+    }
+
+    public static synchronized SignalDeviceData clearVirtualContainerCloseChannel(ServerWorld world, BlockPos pos) {
+        return updateVirtualContainerChannels(world, pos, null, "", null, null);
+    }
+
+    public static synchronized SignalDeviceData updateVirtualContainerChangeChannel(
+            ServerWorld world,
+            BlockPos pos,
+            String channel,
+            String fingerprint
+    ) {
+        return updateVirtualContainerChannels(world, pos, null, null, SignalChannel.normalize(channel), fingerprint);
+    }
+
+    public static synchronized SignalDeviceData clearVirtualContainerChangeChannel(ServerWorld world, BlockPos pos) {
+        return updateVirtualContainerChannels(world, pos, null, null, "", "");
+    }
+
+    public static synchronized SignalDeviceData updateVirtualContainerEnabled(ServerWorld world, BlockPos pos, boolean enabled) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withContainer(
+                existing,
+                enabled,
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                existing.containerCooldownTicks(),
+                existing.containerChangeCheckIntervalTicks(),
+                existing.lastContainerCheckGameTime(),
+                existing.lastContainerFingerprint(),
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                existing.lastContainerResult(),
+                existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualContainerCooldown(ServerWorld world, BlockPos pos, int cooldownTicks) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withContainer(
+                existing,
+                existing.containerEnabled(),
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                cooldownTicks,
+                existing.containerChangeCheckIntervalTicks(),
+                existing.lastContainerCheckGameTime(),
+                existing.lastContainerFingerprint(),
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                existing.lastContainerResult(),
+                existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualContainerCheckInterval(ServerWorld world, BlockPos pos, int ticks) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withContainer(
+                existing,
+                existing.containerEnabled(),
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                existing.containerCooldownTicks(),
+                ticks,
+                existing.lastContainerCheckGameTime(),
+                existing.lastContainerFingerprint(),
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                existing.lastContainerResult(),
+                existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    private static SignalDeviceData updateVirtualContainerChannels(
+            ServerWorld world,
+            BlockPos pos,
+            String openChannel,
+            String closeChannel,
+            String changeChannel,
+            String fingerprint
+    ) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        String nextOpen = openChannel == null ? existing.containerOpenChannel() : SignalChannel.normalize(openChannel);
+        String nextClose = closeChannel == null ? existing.containerCloseChannel() : SignalChannel.normalize(closeChannel);
+        String nextChange = changeChannel == null ? existing.containerChangeChannel() : SignalChannel.normalize(changeChannel);
+        boolean nextEnabled = existing.containerEnabled() || !nextOpen.isBlank() || !nextClose.isBlank() || !nextChange.isBlank();
+        SignalDeviceData updated = withContainer(
+                existing,
+                nextEnabled,
+                nextOpen,
+                nextClose,
+                nextChange,
+                existing.containerCooldownTicks(),
+                existing.containerChangeCheckIntervalTicks(),
+                fingerprint == null ? existing.lastContainerCheckGameTime() : world.getTime(),
+                fingerprint == null ? existing.lastContainerFingerprint() : fingerprint,
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                existing.lastContainerResult(),
+                existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
     public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, String name) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
@@ -704,7 +876,25 @@ public final class SignalDeviceStore {
                 existing.lastInteractionPlayerUuid(),
                 existing.lastInteractionResult(),
                 existing.lastInteractionHand(),
-                existing.lastInteractionSide()
+                existing.lastInteractionSide(),
+                existing.containerEnabled(),
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                existing.containerCooldownTicks(),
+                existing.containerChangeCheckIntervalTicks(),
+                existing.lastContainerCheckGameTime(),
+                existing.lastContainerFingerprint(),
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                existing.lastContainerResult(),
+                existing.lastContainerEventType()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -811,7 +1001,25 @@ public final class SignalDeviceStore {
                 conditioned.lastInteractionPlayerUuid(),
                 conditioned.lastInteractionResult(),
                 conditioned.lastInteractionHand(),
-                conditioned.lastInteractionSide()
+                conditioned.lastInteractionSide(),
+                conditioned.containerEnabled(),
+                conditioned.containerOpenChannel(),
+                conditioned.containerCloseChannel(),
+                conditioned.containerChangeChannel(),
+                conditioned.containerCooldownTicks(),
+                conditioned.containerChangeCheckIntervalTicks(),
+                conditioned.lastContainerCheckGameTime(),
+                conditioned.lastContainerFingerprint(),
+                conditioned.lastContainerOpenGameTime(),
+                conditioned.lastContainerOpenWallTimeMillis(),
+                conditioned.lastContainerCloseGameTime(),
+                conditioned.lastContainerCloseWallTimeMillis(),
+                conditioned.lastContainerChangeGameTime(),
+                conditioned.lastContainerChangeWallTimeMillis(),
+                conditioned.lastContainerPlayerName(),
+                conditioned.lastContainerPlayerUuid(),
+                conditioned.lastContainerResult(),
+                conditioned.lastContainerEventType()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -891,7 +1099,25 @@ public final class SignalDeviceStore {
                 interacted.lastInteractionPlayerUuid(),
                 interacted.lastInteractionResult(),
                 interacted.lastInteractionHand(),
-                interacted.lastInteractionSide()
+                interacted.lastInteractionSide(),
+                interacted.containerEnabled(),
+                interacted.containerOpenChannel(),
+                interacted.containerCloseChannel(),
+                interacted.containerChangeChannel(),
+                interacted.containerCooldownTicks(),
+                interacted.containerChangeCheckIntervalTicks(),
+                interacted.lastContainerCheckGameTime(),
+                interacted.lastContainerFingerprint(),
+                interacted.lastContainerOpenGameTime(),
+                interacted.lastContainerOpenWallTimeMillis(),
+                interacted.lastContainerCloseGameTime(),
+                interacted.lastContainerCloseWallTimeMillis(),
+                interacted.lastContainerChangeGameTime(),
+                interacted.lastContainerChangeWallTimeMillis(),
+                interacted.lastContainerPlayerName(),
+                interacted.lastContainerPlayerUuid(),
+                interacted.lastContainerResult(),
+                interacted.lastContainerEventType()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -903,6 +1129,170 @@ public final class SignalDeviceStore {
         }
         long elapsed = Math.max(0L, currentGameTime - device.lastInteractionGameTime());
         return Math.max(0L, device.interactionCooldownTicks() - elapsed);
+    }
+
+    public static synchronized void recordVirtualContainerEvent(
+            ServerWorld world,
+            SignalDeviceData device,
+            String eventType,
+            ServerPlayerEntity player,
+            ActionExecutionResult result,
+            String fingerprint
+    ) {
+        if (world == null || device == null || eventType == null || eventType.isBlank()) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        long gameTime = world.getTime();
+        boolean open = "open".equals(eventType);
+        boolean close = "close".equals(eventType);
+        boolean change = "change".equals(eventType);
+        SignalDeviceData updated = withContainer(
+                existing,
+                existing.containerEnabled(),
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                existing.containerCooldownTicks(),
+                existing.containerChangeCheckIntervalTicks(),
+                change ? gameTime : existing.lastContainerCheckGameTime(),
+                change && fingerprint != null ? fingerprint : existing.lastContainerFingerprint(),
+                open ? gameTime : existing.lastContainerOpenGameTime(),
+                open ? now : existing.lastContainerOpenWallTimeMillis(),
+                close ? gameTime : existing.lastContainerCloseGameTime(),
+                close ? now : existing.lastContainerCloseWallTimeMillis(),
+                change ? gameTime : existing.lastContainerChangeGameTime(),
+                change ? now : existing.lastContainerChangeWallTimeMillis(),
+                player == null ? "" : player.getName().getString(),
+                player == null ? "" : player.getUuidAsString(),
+                resultMessage,
+                eventType
+        );
+        SignalDeviceData triggered = new SignalDeviceData(
+                updated.id(),
+                updated.type(),
+                updated.name(),
+                updated.dimension(),
+                updated.x(),
+                updated.y(),
+                updated.z(),
+                updated.channel(),
+                updated.enabled(),
+                updated.pulseTicks(),
+                updated.remainingPulseTicks(),
+                updated.cooldownTicks(),
+                updated.actionCount(),
+                updated.createdWallTimeMillis(),
+                now,
+                gameTime,
+                now,
+                resultMessage,
+                updated.blockId(),
+                updated.offChannel(),
+                updated.mode(),
+                updated.lastPowered(),
+                updated.lastPowerLevel(),
+                updated.conditionEnabled(),
+                updated.conditionBlockId(),
+                updated.conditionProperties(),
+                updated.conditionRaw(),
+                updated.conditionMode(),
+                updated.lastConditionMatched(),
+                updated.lastConditionCheckGameTime(),
+                updated.lastConditionResult(),
+                updated.interactionEnabled(),
+                updated.interactChannel(),
+                updated.interactionCooldownTicks(),
+                updated.lastInteractionGameTime(),
+                updated.lastInteractionWallTimeMillis(),
+                updated.lastInteractionPlayerName(),
+                updated.lastInteractionPlayerUuid(),
+                updated.lastInteractionResult(),
+                updated.lastInteractionHand(),
+                updated.lastInteractionSide(),
+                updated.containerEnabled(),
+                updated.containerOpenChannel(),
+                updated.containerCloseChannel(),
+                updated.containerChangeChannel(),
+                updated.containerCooldownTicks(),
+                updated.containerChangeCheckIntervalTicks(),
+                updated.lastContainerCheckGameTime(),
+                updated.lastContainerFingerprint(),
+                updated.lastContainerOpenGameTime(),
+                updated.lastContainerOpenWallTimeMillis(),
+                updated.lastContainerCloseGameTime(),
+                updated.lastContainerCloseWallTimeMillis(),
+                updated.lastContainerChangeGameTime(),
+                updated.lastContainerChangeWallTimeMillis(),
+                updated.lastContainerPlayerName(),
+                updated.lastContainerPlayerUuid(),
+                updated.lastContainerResult(),
+                updated.lastContainerEventType()
+        ).normalized();
+        replaceOrAdd(state, triggered);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualContainerFingerprintState(
+            ServerWorld world,
+            SignalDeviceData device,
+            String fingerprint,
+            String resultMessage
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        SignalDeviceData updated = withContainer(
+                existing,
+                existing.containerEnabled(),
+                existing.containerOpenChannel(),
+                existing.containerCloseChannel(),
+                existing.containerChangeChannel(),
+                existing.containerCooldownTicks(),
+                existing.containerChangeCheckIntervalTicks(),
+                world.getTime(),
+                fingerprint == null ? "" : fingerprint,
+                existing.lastContainerOpenGameTime(),
+                existing.lastContainerOpenWallTimeMillis(),
+                existing.lastContainerCloseGameTime(),
+                existing.lastContainerCloseWallTimeMillis(),
+                existing.lastContainerChangeGameTime(),
+                existing.lastContainerChangeWallTimeMillis(),
+                existing.lastContainerPlayerName(),
+                existing.lastContainerPlayerUuid(),
+                resultMessage,
+                existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static long getRemainingContainerCooldownTicks(SignalDeviceData device, long currentGameTime) {
+        if (device == null || device.containerCooldownTicks() <= 0) {
+            return 0L;
+        }
+        long lastEvent = Math.max(device.lastContainerOpenGameTime(),
+                Math.max(device.lastContainerCloseGameTime(), device.lastContainerChangeGameTime()));
+        if (lastEvent <= 0L) {
+            return 0L;
+        }
+        long elapsed = Math.max(0L, currentGameTime - lastEvent);
+        return Math.max(0L, device.containerCooldownTicks() - elapsed);
     }
 
     public static synchronized List<SignalDeviceData> getEnabledReceiversForChannel(MinecraftServer server, String channel) {
@@ -1318,7 +1708,25 @@ public final class SignalDeviceStore {
                 existing == null ? "" : existing.lastInteractionPlayerUuid(),
                 existing == null ? "" : existing.lastInteractionResult(),
                 existing == null ? "" : existing.lastInteractionHand(),
-                existing == null ? "" : existing.lastInteractionSide()
+                existing == null ? "" : existing.lastInteractionSide(),
+                existing != null && existing.containerEnabled(),
+                existing == null ? "" : existing.containerOpenChannel(),
+                existing == null ? "" : existing.containerCloseChannel(),
+                existing == null ? "" : existing.containerChangeChannel(),
+                existing == null ? 0 : existing.containerCooldownTicks(),
+                existing == null ? 10 : existing.containerChangeCheckIntervalTicks(),
+                existing == null ? 0L : existing.lastContainerCheckGameTime(),
+                existing == null ? "" : existing.lastContainerFingerprint(),
+                existing == null ? 0L : existing.lastContainerOpenGameTime(),
+                existing == null ? 0L : existing.lastContainerOpenWallTimeMillis(),
+                existing == null ? 0L : existing.lastContainerCloseGameTime(),
+                existing == null ? 0L : existing.lastContainerCloseWallTimeMillis(),
+                existing == null ? 0L : existing.lastContainerChangeGameTime(),
+                existing == null ? 0L : existing.lastContainerChangeWallTimeMillis(),
+                existing == null ? "" : existing.lastContainerPlayerName(),
+                existing == null ? "" : existing.lastContainerPlayerUuid(),
+                existing == null ? "" : existing.lastContainerResult(),
+                existing == null ? "" : existing.lastContainerEventType()
         ).normalized();
     }
 
@@ -1370,7 +1778,25 @@ public final class SignalDeviceStore {
                 device.lastInteractionPlayerUuid(),
                 device.lastInteractionResult(),
                 device.lastInteractionHand(),
-                device.lastInteractionSide()
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType()
         ).normalized();
     }
 
@@ -1423,7 +1849,25 @@ public final class SignalDeviceStore {
                 device.lastInteractionPlayerUuid(),
                 device.lastInteractionResult(),
                 device.lastInteractionHand(),
-                device.lastInteractionSide()
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType()
         ).normalized();
     }
 
@@ -1479,7 +1923,25 @@ public final class SignalDeviceStore {
                 device.lastInteractionPlayerUuid(),
                 device.lastInteractionResult(),
                 device.lastInteractionHand(),
-                device.lastInteractionSide()
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType()
         ).normalized();
     }
 
@@ -1537,7 +1999,109 @@ public final class SignalDeviceStore {
                 lastInteractionPlayerUuid,
                 lastInteractionResult,
                 lastInteractionHand,
-                lastInteractionSide
+                lastInteractionSide,
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withContainer(
+            SignalDeviceData device,
+            boolean containerEnabled,
+            String containerOpenChannel,
+            String containerCloseChannel,
+            String containerChangeChannel,
+            int containerCooldownTicks,
+            int containerChangeCheckIntervalTicks,
+            long lastContainerCheckGameTime,
+            String lastContainerFingerprint,
+            long lastContainerOpenGameTime,
+            long lastContainerOpenWallTimeMillis,
+            long lastContainerCloseGameTime,
+            long lastContainerCloseWallTimeMillis,
+            long lastContainerChangeGameTime,
+            long lastContainerChangeWallTimeMillis,
+            String lastContainerPlayerName,
+            String lastContainerPlayerUuid,
+            String lastContainerResult,
+            String lastContainerEventType
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide(),
+                containerEnabled,
+                containerOpenChannel,
+                containerCloseChannel,
+                containerChangeChannel,
+                containerCooldownTicks,
+                containerChangeCheckIntervalTicks,
+                lastContainerCheckGameTime,
+                lastContainerFingerprint,
+                lastContainerOpenGameTime,
+                lastContainerOpenWallTimeMillis,
+                lastContainerCloseGameTime,
+                lastContainerCloseWallTimeMillis,
+                lastContainerChangeGameTime,
+                lastContainerChangeWallTimeMillis,
+                lastContainerPlayerName,
+                lastContainerPlayerUuid,
+                lastContainerResult,
+                lastContainerEventType
         ).normalized();
     }
 
@@ -1583,7 +2147,25 @@ public final class SignalDeviceStore {
                 device.lastInteractionPlayerUuid(),
                 device.lastInteractionResult(),
                 device.lastInteractionHand(),
-                device.lastInteractionSide()
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType()
         ).normalized();
     }
 

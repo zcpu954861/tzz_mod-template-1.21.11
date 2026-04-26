@@ -423,6 +423,48 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 一个虚拟方块发射器可以同时配置红石、BlockState condition 和 interaction 三种触发。如果这些触发都指向同一 channel，一次玩家右键可能因为原版状态变化和 interaction 同时产生多个 signal。这是可配置行为，管理员应按玩法需求使用不同 channel 或关闭不需要的触发。
 
+### 容器事件触发
+
+5.8 阶段新增容器事件触发。它只对已经登记为 `virtual_block_device` 的容器坐标生效，不是通用 NBT 检测，也不做槽位物品条件。
+
+```text
+/tzz signal blockDevice containerOpenChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerOpenChannel <x> <y> <z>
+/tzz signal blockDevice containerCloseChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerCloseChannel <x> <y> <z>
+/tzz signal blockDevice containerChangeChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerChangeChannel <x> <y> <z>
+/tzz signal blockDevice container <x> <y> <z> enable
+/tzz signal blockDevice container <x> <y> <z> disable
+/tzz signal blockDevice containerCooldown <x> <y> <z> <ticks>
+/tzz signal blockDevice containerCheckInterval <x> <y> <z> <ticks>
+/tzz signal blockDevice containerInfo <x> <y> <z>
+```
+
+容器事件规则：
+
+- `containerOpenChannel` 在玩家实际打开对应容器 screen 后 emit。
+- `containerCloseChannel` 在对应 screen session 关闭时 emit。
+- `containerChangeChannel` 在容器内容指纹发生变化时 emit。
+- `container enable` 要求至少已经设置一个容器事件 channel。
+- `containerCooldownTicks` 单位是 GT，默认 `0 GT`，表示无冷却。
+- `containerChangeCheckIntervalTicks` 单位是 GT，默认 `10 GT`；建议使用 `10-20 GT`，避免过高频率。
+- 命令参数只输入整数，不输入 `GT` 后缀。
+
+内容变化的 MVP 指纹只包含每个 slot 的物品 registry id、数量和 damage。它不会匹配第几格是什么物品，不会匹配物品名称、lore、NBT 或新版数据组件，也不会读取告示牌文字、命令方块命令或任意 BlockEntity NBT path。
+
+性能边界：
+
+- open / close 使用右键候选和实际 screen session 确认，不把普通右键直接当作打开。
+- content changed 只检查已登记且启用了 `containerChangeChannel` 的绑定容器。
+- 每次检查只读取该设备自己的一个容器坐标。
+- 不扫描世界、区块或周围方块。
+- 不自动寻找箱子、木桶、潜影盒或其他容器。
+- 不强制加载区块，未加载区块直接跳过。
+- 内容不变不 emit，也不写 `signal_devices.json`。
+
+一个虚拟方块发射器可以同时配置红石、BlockState condition、interaction 和 container 事件。如果多个触发指向同一 channel，可能出现多个 signal，这是配置结果，不是 bug。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -438,7 +480,7 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 ```
 
 `device info` 和 `device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道、condition 摘要和常见问题提示。
-5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition 和 interaction 触发记录。
+5.7 后也会显示 interaction 摘要、`interactChannel`、交互冷却、最近交互玩家和最近交互结果。5.8 后会显示 container 摘要、open / close / change channel、容器冷却、内容检查间隔、最近容器事件和最近结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition、interaction 和 container 触发记录。
 
 `cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。condition 不合法时也不会自动删除记录，只在 debug 中提示重新设置 condition 或 `clearCondition`。
 
@@ -473,10 +515,11 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.7 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.8 MVP 实现：
 
-- 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
-- 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
+- 5.9 容器槽位 / 物品条件：第 N 格为空、第 N 格是某物品、第 N 格数量满足条件、容器内总计包含某物品数量。
+- 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
+- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine，容器槽位和物品条件不应长期依赖超长命令。
 
 ## cooldown
 

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.9.0-block-interaction`
-- 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
+- 最新发布版本：`v1.10.0-container-events`
+- 当前开发版本：下一阶段待定（以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -343,6 +343,36 @@ minecraft:wheat[age=7]
 `device info` 和 `device debug` 会显示 condition 摘要与诊断信息。`cleanup` 对虚拟方块发射器采用保守策略：如果已加载位置变成空气，会删除记录；如果当前方块 ID 与绑定时不一致但不是空气，只在 debug 中提示，不自动删除。condition 无效时也不会自动删除记录，只会提示重新设置 condition 或 `clearCondition`。
 `device info` 和 `device debug` 也会显示 interaction 摘要、交互冷却、最近交互玩家和最近交互结果。`device history` 可查看来源为 `virtual_block_device` 的红石、condition 和 interaction 触发记录。
 
+5.8 阶段为虚拟方块发射器增加了容器事件触发。它不是通用 NBT 检测系统，只处理已绑定容器方块的打开、关闭和内容变化事件：
+
+```text
+/tzz signal blockDevice containerOpenChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerOpenChannel <x> <y> <z>
+/tzz signal blockDevice containerCloseChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerCloseChannel <x> <y> <z>
+/tzz signal blockDevice containerChangeChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearContainerChangeChannel <x> <y> <z>
+/tzz signal blockDevice container <x> <y> <z> enable
+/tzz signal blockDevice container <x> <y> <z> disable
+/tzz signal blockDevice containerCooldown <x> <y> <z> <ticks>
+/tzz signal blockDevice containerCheckInterval <x> <y> <z> <ticks>
+/tzz signal blockDevice containerInfo <x> <y> <z>
+```
+
+`containerOpenChannel` 和 `containerCloseChannel` 会在玩家实际打开或关闭对应容器 screen 时触发；`containerChangeChannel` 使用轻量内容指纹检测内容变化。MVP 指纹只包含每个 slot 的物品 registry id、数量和 damage，不做槽位物品条件、物品名称、lore、NBT 或数据组件匹配。
+
+容器事件只对已登记的 `virtual_block_device` 生效，当前方块必须是容器。open / close 使用右键候选加实际 screen 状态确认，不把普通右键直接当作打开；change 只按 `containerChangeCheckIntervalTicks` 轮询已经配置 change channel 的绑定容器。容器事件会带玩家上下文；如果内容变化无法确定玩家，则允许无玩家上下文。
+
+性能边界：
+
+- 不扫描世界、区块或周围方块。
+- 不自动寻找箱子、木桶、潜影盒或其他容器。
+- 不强制加载区块，未加载区块直接跳过。
+- open / close 按玩家实际 screen session 处理。
+- content changed 只检查已登记且配置了 change channel 的一个容器坐标。
+- 内容不变不 emit，也不写 `signal_devices.json`。
+- `containerCooldownTicks` 和 `containerChangeCheckIntervalTicks` 单位都是 GT，命令参数只输入整数，不输入 `GT` 后缀。
+
 职责边界：
 
 - `signal_emitter`：专用方块，红石 / 交互 -> signal。
@@ -353,8 +383,9 @@ minecraft:wheat[age=7]
 
 后续计划仍只记录，不在 5.7 实现：
 
-- 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
-- 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
+- 5.9 容器槽位 / 物品条件：第 N 格为空、第 N 格是某物品、数量满足条件、容器内总计包含某物品数量等。
+- 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
+- 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine。
 
 ### SignalBridge 可观测性命令
 

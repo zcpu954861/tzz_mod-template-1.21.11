@@ -24,6 +24,8 @@ import net.minecraft.util.math.Vec3d;
 
 public final class VirtualBlockDeviceCommand {
     private static final int MAX_INTERACTION_COOLDOWN_TICKS = 72_000;
+    private static final int MAX_CONTAINER_COOLDOWN_TICKS = 72_000;
+    private static final int MAX_CONTAINER_CHECK_INTERVAL_TICKS = 72_000;
 
     private VirtualBlockDeviceCommand() {
     }
@@ -151,6 +153,84 @@ public final class VirtualBlockDeviceCommand {
                 .then(CommandManager.literal("interactionInfo")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeInteractionInfo(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("containerOpenChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeContainerOpenChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel")
+                                        )))))
+                .then(CommandManager.literal("clearContainerOpenChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeClearContainerOpenChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("containerCloseChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeContainerCloseChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel")
+                                        )))))
+                .then(CommandManager.literal("clearContainerCloseChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeClearContainerCloseChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("containerChangeChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("channel", StringArgumentType.string())
+                                        .executes(context -> executeContainerChangeChannel(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "channel")
+                                        )))))
+                .then(CommandManager.literal("clearContainerChangeChannel")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeClearContainerChangeChannel(
+                                        context.getSource(),
+                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos")
+                                ))))
+                .then(CommandManager.literal("container")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.literal("enable")
+                                        .executes(context -> executeContainerEnabled(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                true
+                                        )))
+                                .then(CommandManager.literal("disable")
+                                        .executes(context -> executeContainerEnabled(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                false
+                                        )))))
+                .then(CommandManager.literal("containerCooldown")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("ticks", IntegerArgumentType.integer(0, MAX_CONTAINER_COOLDOWN_TICKS))
+                                        .executes(context -> executeContainerCooldown(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                IntegerArgumentType.getInteger(context, "ticks")
+                                        )))))
+                .then(CommandManager.literal("containerCheckInterval")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("ticks", IntegerArgumentType.integer(1, MAX_CONTAINER_CHECK_INTERVAL_TICKS))
+                                        .executes(context -> executeContainerCheckInterval(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                IntegerArgumentType.getInteger(context, "ticks")
+                                        )))))
+                .then(CommandManager.literal("containerInfo")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .executes(context -> executeContainerInfo(
                                         context.getSource(),
                                         BlockPosArgumentType.getLoadedBlockPos(context, "pos")
                                 ))))
@@ -408,6 +488,147 @@ public final class VirtualBlockDeviceCommand {
         return 1;
     }
 
+    private static int executeContainerOpenChannel(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        if (!validateContainerTarget(source, pos, false)) {
+            return 0;
+        }
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            sendError(source, SignalChannel.validationError(rawChannel));
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerOpenChannel(source.getWorld(), pos, channel);
+        sendContainerChannelFeedback(source, "已设置容器打开频道", pos, "打开频道", device.containerOpenChannel());
+        return 1;
+    }
+
+    private static int executeClearContainerOpenChannel(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.clearVirtualContainerOpenChannel(source.getWorld(), pos);
+        sendContainerChannelFeedback(source, "已清空容器打开频道", pos, "打开频道", device.containerOpenChannel());
+        return 1;
+    }
+
+    private static int executeContainerCloseChannel(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        if (!validateContainerTarget(source, pos, false)) {
+            return 0;
+        }
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            sendError(source, SignalChannel.validationError(rawChannel));
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerCloseChannel(source.getWorld(), pos, channel);
+        sendContainerChannelFeedback(source, "已设置容器关闭频道", pos, "关闭频道", device.containerCloseChannel());
+        return 1;
+    }
+
+    private static int executeClearContainerCloseChannel(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.clearVirtualContainerCloseChannel(source.getWorld(), pos);
+        sendContainerChannelFeedback(source, "已清空容器关闭频道", pos, "关闭频道", device.containerCloseChannel());
+        return 1;
+    }
+
+    private static int executeContainerChangeChannel(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        if (!validateContainerTarget(source, pos, true)) {
+            return 0;
+        }
+        String channel = SignalChannel.normalize(rawChannel);
+        if (!SignalChannel.isValid(channel)) {
+            sendError(source, SignalChannel.validationError(rawChannel));
+            return 0;
+        }
+
+        String fingerprint = ContainerDeviceSupport.fingerprint(source.getWorld(), pos);
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerChangeChannel(source.getWorld(), pos, channel, fingerprint);
+        sendContainerChannelFeedback(source, "已设置容器内容变化频道", pos, "内容变化频道", device.containerChangeChannel());
+        source.sendFeedback(() -> field("槽位数量", number(ContainerDeviceSupport.slotCount(source.getWorld(), pos))), false);
+        source.sendFeedback(() -> field("检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+        return 1;
+    }
+
+    private static int executeClearContainerChangeChannel(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.clearVirtualContainerChangeChannel(source.getWorld(), pos);
+        sendContainerChannelFeedback(source, "已清空容器内容变化频道", pos, "内容变化频道", device.containerChangeChannel());
+        return 1;
+    }
+
+    private static int executeContainerEnabled(ServerCommandSource source, BlockPos pos, boolean enabled) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+        if (enabled
+                && existing.containerOpenChannel().isBlank()
+                && existing.containerCloseChannel().isBlank()
+                && existing.containerChangeChannel().isBlank()) {
+            sendError(source, Text.literal("请先设置至少一个容器事件频道。"));
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerEnabled(source.getWorld(), pos, enabled);
+        sendHeader(source, Text.literal(enabled ? "已启用容器事件触发" : "已禁用容器事件触发").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
+        source.sendFeedback(() -> field("打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+        source.sendFeedback(() -> field("关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+        source.sendFeedback(() -> field("内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+        return 1;
+    }
+
+    private static int executeContainerCooldown(ServerCommandSource source, BlockPos pos, int ticks) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerCooldown(source.getWorld(), pos, ticks);
+        sendHeader(source, Text.literal("已设置容器事件冷却").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("容器冷却", gtText(device.containerCooldownTicks())), false);
+        return 1;
+    }
+
+    private static int executeContainerCheckInterval(ServerCommandSource source, BlockPos pos, int ticks) {
+        SignalDeviceData existing = getVirtualDevice(source, pos);
+        if (existing == null) {
+            return 0;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.updateVirtualContainerCheckInterval(source.getWorld(), pos, ticks);
+        sendHeader(source, Text.literal("已设置容器内容变化检查间隔").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+        source.sendFeedback(() -> warning("建议使用 10-20 GT，过低的间隔会增加容器检查频率。"), false);
+        return 1;
+    }
+
+    private static int executeContainerInfo(ServerCommandSource source, BlockPos pos) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null) {
+            return 0;
+        }
+
+        sendContainerInfo(source, device, pos);
+        return 1;
+    }
+
     private static int executeInfo(ServerCommandSource source, BlockPos pos) {
         SignalDeviceData device = getVirtualDevice(source, pos);
         if (device == null) {
@@ -501,6 +722,47 @@ public final class VirtualBlockDeviceCommand {
         return device;
     }
 
+    private static boolean validateContainerTarget(ServerCommandSource source, BlockPos pos, boolean requireInventory) {
+        SignalDeviceData device = getVirtualDevice(source, pos);
+        if (device == null) {
+            return false;
+        }
+
+        BlockState state = source.getWorld().getBlockState(pos);
+        if (state.isAir()) {
+            sendError(source, Text.literal("当前位置是空气，不能配置容器事件。"));
+            return false;
+        }
+        String currentBlockId = VirtualBlockDeviceSupport.blockId(state);
+        if (!currentBlockId.equals(device.blockId())) {
+            sendError(source, Text.literal("当前方块 ID 与绑定时不一致，请先 refresh 或重新 bind。"));
+            return false;
+        }
+        if (!ContainerDeviceSupport.isContainer(source.getWorld(), pos)) {
+            sendError(source, Text.literal("当前方块不是可打开的容器，无法配置容器事件。"));
+            return false;
+        }
+        if (requireInventory && !ContainerDeviceSupport.hasInventory(source.getWorld(), pos)) {
+            sendError(source, Text.literal("当前容器不能读取 Inventory，无法配置内容变化事件。"));
+            return false;
+        }
+        return true;
+    }
+
+    private static void sendContainerChannelFeedback(
+            ServerCommandSource source,
+            String title,
+            BlockPos pos,
+            String channelLabel,
+            String channel
+    ) {
+        BlockState state = source.getWorld().getBlockState(pos);
+        sendHeader(source, Text.literal(title).formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("方块 ID", idText(VirtualBlockDeviceSupport.blockId(state))), false);
+        source.sendFeedback(() -> field(channelLabel, channelOrEmpty(channel)), false);
+    }
+
     private static void sendInfo(ServerCommandSource source, SignalDeviceData device) {
         BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
         boolean chunkLoaded = source.getWorld().isChunkLoaded(pos);
@@ -528,6 +790,16 @@ public final class VirtualBlockDeviceCommand {
         source.sendFeedback(() -> field("交互冷却", gtText(device.interactionCooldownTicks())), false);
         source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
+        source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
+        source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+        source.sendFeedback(() -> field("容器关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+        source.sendFeedback(() -> field("容器内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+        source.sendFeedback(() -> field("容器冷却", gtText(device.containerCooldownTicks())), false);
+        source.sendFeedback(() -> field("内容检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+        source.sendFeedback(() -> field("最近容器事件", device.lastContainerEventType().isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
@@ -587,6 +859,38 @@ public final class VirtualBlockDeviceCommand {
         source.sendFeedback(() -> field("方块一致性", Text.literal(currentBlockId.equals(device.blockId()) ? "一致" : "不一致")
                 .formatted(currentBlockId.equals(device.blockId()) ? Formatting.GREEN : Formatting.YELLOW)), false);
         source.sendFeedback(() -> field("设备状态", enabledText(device.enabled())), false);
+    }
+
+    private static void sendContainerInfo(ServerCommandSource source, SignalDeviceData device, BlockPos pos) {
+        BlockState state = source.getWorld().getBlockState(pos);
+        String currentBlockId = VirtualBlockDeviceSupport.blockId(state);
+        boolean blockMatches = currentBlockId.equals(device.blockId());
+        boolean isContainer = !state.isAir() && ContainerDeviceSupport.isContainer(source.getWorld(), pos);
+        int slotCount = isContainer ? ContainerDeviceSupport.slotCount(source.getWorld(), pos) : -1;
+        long remainingCooldown = SignalDeviceStore.getRemainingContainerCooldownTicks(device, source.getWorld().getTime());
+
+        sendHeader(source, Text.literal("虚拟方块容器事件详情").formatted(Formatting.GOLD));
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
+        source.sendFeedback(() -> field("打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+        source.sendFeedback(() -> field("关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+        source.sendFeedback(() -> field("内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+        source.sendFeedback(() -> field("容器冷却", gtText(device.containerCooldownTicks())), false);
+        source.sendFeedback(() -> field("当前冷却剩余", cooldownText(remainingCooldown)), false);
+        source.sendFeedback(() -> field("内容检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+        source.sendFeedback(() -> field("当前方块 ID", idText(currentBlockId)), false);
+        source.sendFeedback(() -> field("绑定时方块 ID", idText(device.blockId())), false);
+        source.sendFeedback(() -> field("方块一致", boolText(blockMatches)), false);
+        source.sendFeedback(() -> field("当前是否容器", boolText(isContainer)), false);
+        source.sendFeedback(() -> field("槽位数量", slotCount < 0 ? unknownText() : number(slotCount)), false);
+        source.sendFeedback(() -> field("最近容器事件", device.lastContainerEventType().isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("最近打开", elapsedOrNever(device.lastContainerOpenWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近关闭", elapsedOrNever(device.lastContainerCloseWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近内容变化", elapsedOrNever(device.lastContainerChangeWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近玩家", playerOrNever(device.lastContainerPlayerName())), false);
+        source.sendFeedback(() -> field("最近结果", resultText(device.lastContainerResult())), false);
     }
 
     private static void sendHeader(ServerCommandSource source, Text title) {

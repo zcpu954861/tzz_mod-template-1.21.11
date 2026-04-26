@@ -13,6 +13,19 @@ public record SignalEvent(
         ActionSourceType sourceType,
         String sourceId,
         int depth,
-        long gameTime
+        long gameTime,
+        String detail
 ) {
+    public SignalEvent(
+            String channel,
+            ServerPlayerEntity player,
+            ServerWorld world,
+            Vec3d position,
+            ActionSourceType sourceType,
+            String sourceId,
+            int depth,
+            long gameTime
+    ) {
+        this(channel, player, world, position, sourceType, sourceId, depth, gameTime, "");
+    }
 }

@@ -159,6 +159,16 @@ public final class SignalDeviceCommand {
                     source.sendFeedback(() -> indentField("交互触发", boolText(device.interactionEnabled())), false);
                     source.sendFeedback(() -> indentField("交互冷却", gtText(device.interactionCooldownTicks())), false);
                 }
+                if (device.containerEnabled()
+                        || !device.containerOpenChannel().isBlank()
+                        || !device.containerCloseChannel().isBlank()
+                        || !device.containerChangeChannel().isBlank()) {
+                    source.sendFeedback(() -> indentField("容器事件", boolText(device.containerEnabled())), false);
+                    source.sendFeedback(() -> indentField("打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+                    source.sendFeedback(() -> indentField("关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+                    source.sendFeedback(() -> indentField("内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+                    source.sendFeedback(() -> indentField("检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+                }
                 source.sendFeedback(() -> indentField("通电状态", boolText(device.lastPowered())
                         .append(Text.literal("，强度 ").formatted(Formatting.GRAY))
                         .append(number(device.lastPowerLevel()))), false);
@@ -633,6 +643,16 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("交互冷却剩余", remainingInteractionCooldownText(device, source.getWorld().getTime())), false);
             source.sendFeedback(() -> field("最近交互", elapsedOrNever(device.lastInteractionWallTimeMillis())), false);
             source.sendFeedback(() -> field("最近交互玩家", playerOrNever(device.lastInteractionPlayerName())), false);
+            source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
+            source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+            source.sendFeedback(() -> field("容器关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+            source.sendFeedback(() -> field("容器内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+            source.sendFeedback(() -> field("容器冷却", gtText(device.containerCooldownTicks())), false);
+            source.sendFeedback(() -> field("内容检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+            source.sendFeedback(() -> field("最近容器事件", device.lastContainerEventType().isBlank()
+                    ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                    : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
+            source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
@@ -659,6 +679,10 @@ public final class SignalDeviceCommand {
         int interactionReceiverCount = receiverCountForChannel(source, device.interactChannel());
         int interactionRelayCount = actionRelayCountForChannel(source, device.interactChannel());
         long remainingInteractionCooldown = SignalDeviceStore.getRemainingInteractionCooldownTicks(device, source.getWorld().getTime());
+        long remainingContainerCooldown = SignalDeviceStore.getRemainingContainerCooldownTicks(device, source.getWorld().getTime());
+        boolean containerAvailable = chunkLoaded && currentState != null && !currentState.isAir()
+                && ContainerDeviceSupport.isContainer(world, pos);
+        int containerSlotCount = containerAvailable ? ContainerDeviceSupport.slotCount(world, pos) : -1;
 
         sendHeader(source, Text.literal("虚拟方块发射器调试信息").formatted(Formatting.GOLD));
         source.sendFeedback(() -> field("名称", nameText(SignalDeviceStore.displayName(device))), false);
@@ -707,6 +731,20 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("交互频道监听器", number(interactionListeners.size())), false);
         source.sendFeedback(() -> field("交互频道接收器", number(interactionReceiverCount)), false);
         source.sendFeedback(() -> field("交互频道动作继电器", number(interactionRelayCount)), false);
+        source.sendFeedback(() -> field("容器事件", boolText(device.containerEnabled())), false);
+        source.sendFeedback(() -> field("容器打开频道", channelOrEmpty(device.containerOpenChannel())), false);
+        source.sendFeedback(() -> field("容器关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
+        source.sendFeedback(() -> field("容器内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
+        source.sendFeedback(() -> field("容器冷却", gtText(device.containerCooldownTicks())), false);
+        source.sendFeedback(() -> field("容器冷却剩余", cooldownText(remainingContainerCooldown)), false);
+        source.sendFeedback(() -> field("内容检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+        source.sendFeedback(() -> field("当前是否容器", boolText(containerAvailable)), false);
+        source.sendFeedback(() -> field("容器槽位", containerSlotCount < 0 ? unknownText() : number(containerSlotCount)), false);
+        source.sendFeedback(() -> field("最近容器事件", device.lastContainerEventType().isBlank()
+                ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
+                : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("最近容器玩家", playerOrNever(device.lastContainerPlayerName())), false);
+        source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("频道监听器", number(listeners.size())), false);
         source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
@@ -725,7 +763,9 @@ public final class SignalDeviceCommand {
                 interactionListeners.size(),
                 interactionReceiverCount,
                 interactionRelayCount,
-                remainingInteractionCooldown
+                remainingInteractionCooldown,
+                remainingContainerCooldown,
+                containerAvailable
         );
         if (!hints.isEmpty()) {
             source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
@@ -763,7 +803,9 @@ public final class SignalDeviceCommand {
             int interactionListenerCount,
             int interactionReceiverCount,
             int interactionRelayCount,
-            long remainingInteractionCooldown
+            long remainingInteractionCooldown,
+            long remainingContainerCooldown,
+            boolean containerAvailable
     ) {
         List<Text> hints = new ArrayList<>();
         if (device.channel().isBlank()) {
@@ -817,6 +859,30 @@ public final class SignalDeviceCommand {
                 && interactionRelayCount <= 0) {
             hints.add(Text.literal("interactChannel 没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。")
                     .formatted(Formatting.YELLOW));
+        }
+        boolean hasContainerChannel = !device.containerOpenChannel().isBlank()
+                || !device.containerCloseChannel().isBlank()
+                || !device.containerChangeChannel().isBlank();
+        if (device.containerEnabled() && !hasContainerChannel) {
+            hints.add(Text.literal("容器事件已启用，但没有设置任何 container channel。").formatted(Formatting.YELLOW));
+        }
+        if (!device.containerEnabled() && hasContainerChannel) {
+            hints.add(Text.literal("容器事件已禁用。").formatted(Formatting.YELLOW));
+        }
+        if (hasContainerChannel && !containerAvailable) {
+            hints.add(Text.literal("当前方块不是可用容器、方块未加载或 ID 不一致。").formatted(Formatting.YELLOW));
+        }
+        if (!device.containerOpenChannel().isBlank() && !SignalChannel.isValid(device.containerOpenChannel())) {
+            hints.add(Text.literal("containerOpenChannel 名称无效。").formatted(Formatting.RED));
+        }
+        if (!device.containerCloseChannel().isBlank() && !SignalChannel.isValid(device.containerCloseChannel())) {
+            hints.add(Text.literal("containerCloseChannel 名称无效。").formatted(Formatting.RED));
+        }
+        if (!device.containerChangeChannel().isBlank() && !SignalChannel.isValid(device.containerChangeChannel())) {
+            hints.add(Text.literal("containerChangeChannel 名称无效。").formatted(Formatting.RED));
+        }
+        if (remainingContainerCooldown > 0L) {
+            hints.add(Text.literal("正处于 container cooldown。").formatted(Formatting.YELLOW));
         }
         if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
             hints.add(Text.literal("频道没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。").formatted(Formatting.YELLOW));
