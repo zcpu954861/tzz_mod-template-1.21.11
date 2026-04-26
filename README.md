@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.7.0-virtual-block-device`
+- 最新发布版本：`v1.8.0-blockstate-condition`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -264,6 +264,39 @@ signal -> action_relay -> ActionEngine actions
 
 因此执行 `clearOffChannel` 后，如果模式仍是 `redstone_both`，通电和断电都会发出主 `channel`，这是预期行为。
 
+5.6 阶段为虚拟方块发射器增加了方块状态条件触发。它检测的是当前方块公开的 BlockState 属性，不检测方块实体 NBT、容器内容、告示牌文字、命令方块命令或玩家右键交互。
+
+```text
+/tzz signal blockDevice condition <x> <y> <z> <condition>
+/tzz signal blockDevice clearCondition <x> <y> <z>
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_enter
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_exit
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_both
+/tzz signal blockDevice conditionInfo <x> <y> <z>
+```
+
+条件使用完整 BlockState 字符串，例如：
+
+```text
+minecraft:lever[powered=true]
+minecraft:oak_door[open=true]
+minecraft:oak_stairs[waterlogged=true,facing=north]
+minecraft:redstone_lamp[lit=true]
+minecraft:repeater[delay=4]
+minecraft:comparator[mode=subtract]
+minecraft:wheat[age=7]
+```
+
+代码不会硬编码 Wiki 属性白名单，运行时以当前方块实际拥有的 `BlockState.getProperties()` 为准。方块不支持某个属性时会拒绝添加条件，例如 `minecraft:stone[waterlogged=true]`。属性值不在允许值中也会拒绝，例如 `minecraft:repeater[delay=9]`。
+
+条件触发模式：
+
+- `condition_enter`：不满足 -> 满足时发出 `channel`。
+- `condition_exit`：满足 -> 不满足时优先发出 `offChannel`，未设置时发出 `channel`。
+- `condition_both`：进入条件发出 `channel`，退出条件优先发出 `offChannel`，未设置时回退发出 `channel`。
+
+因此执行 `clearOffChannel` 后，如果模式是 `condition_both`，进入和退出条件都会发出主 `channel`，这是预期行为。
+
 性能边界：
 
 - 不扫描世界。
@@ -273,6 +306,7 @@ signal -> action_relay -> ActionEngine actions
 - 不强制加载区块。
 - 只检测 `signal_devices.json` 中登记过的 `virtual_block_device`。
 - 每个设备每次只检测自己的一个坐标。
+- 有 condition 时 tick 不重新解析 condition 字符串，只比较保存后的 property/value。
 - 状态不变不 emit，也不写 JSON。
 - `signal_devices.json` 写入已节流，服务端停止时会强制保存。
 
@@ -288,7 +322,7 @@ signal -> action_relay -> ActionEngine actions
 /tzz signal device cleanup
 ```
 
-`cleanup` 对虚拟方块发射器采用保守策略：如果已加载位置变成空气，会删除记录；如果当前方块 ID 与绑定时不一致但不是空气，只在 debug 中提示，不自动删除。
+`device info` 和 `device debug` 会显示 condition 摘要与诊断信息。`cleanup` 对虚拟方块发射器采用保守策略：如果已加载位置变成空气，会删除记录；如果当前方块 ID 与绑定时不一致但不是空气，只在 debug 中提示，不自动删除。condition 无效时也不会自动删除记录，只会提示重新设置 condition 或 `clearCondition`。
 
 职责边界：
 
@@ -297,6 +331,12 @@ signal -> action_relay -> ActionEngine actions
 - `signal_receiver`：signal -> 红石输出。
 - `action_relay`：signal -> ActionEngine actions。
 - `SignalListener`：后台虚拟逻辑接收端。
+
+后续计划仍只记录，不在 5.6 实现：
+
+- 5.7 交互触发：右键已绑定方块发 signal。
+- 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
+- 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
 
 ### SignalBridge 可观测性命令
 

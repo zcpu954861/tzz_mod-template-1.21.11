@@ -313,6 +313,12 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 /tzz signal blockDevice test <x> <y> <z>
 /tzz signal blockDevice unbind <x> <y> <z>
 /tzz signal blockDevice refresh <x> <y> <z>
+/tzz signal blockDevice condition <x> <y> <z> <condition>
+/tzz signal blockDevice clearCondition <x> <y> <z>
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_enter
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_exit
+/tzz signal blockDevice conditionMode <x> <y> <z> condition_both
+/tzz signal blockDevice conditionInfo <x> <y> <z>
 ```
 
 `bind` 会记录当前位置的方块 ID、当前是否通电和当前红石强度，避免绑定瞬间误触发。`refresh` 用于管理员更换该坐标方块后重新读取当前方块 ID 和红石状态。
@@ -335,6 +341,59 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 `test` 命令只手动 emit 主频道，不改变 `lastPowered`，也不模拟红石边沿。
 
+### BlockState 条件触发
+
+5.6 阶段新增方块状态条件触发。它检测当前绑定坐标方块公开的 BlockState 属性，例如 `powered`、`open`、`lit`、`waterlogged`、`facing`、`age`、`level`、`delay`、`mode` 等当前运行时方块实际拥有的属性。
+
+它不检测：
+
+- 箱子、木桶、潜影盒里有什么物品。
+- 告示牌写了什么字。
+- 命令方块里的命令。
+- 方块实体 NBT。
+- 容器是否被玩家打开。
+- 玩家是否右键了方块。
+- 周围方块状态或红石网络结构。
+
+完整格式示例：
+
+```text
+/tzz signal blockDevice condition <x> <y> <z> minecraft:lever[powered=true]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:oak_door[open=true]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:oak_stairs[waterlogged=true,facing=north]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:redstone_lamp[lit=true]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:repeater[delay=4]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:comparator[mode=subtract]
+/tzz signal blockDevice condition <x> <y> <z> minecraft:wheat[age=7]
+```
+
+条件设置时会做一次解析和验证：
+
+- 方块 ID 必须存在，并且必须与当前坐标的当前方块一致。
+- 当前方块必须拥有条件中写到的每个 property。
+- 每个 value 必须是该 property 允许的值。
+- 条件中重复 property 会被拒绝。
+- 格式错误会给中文错误提示，不会写入 `signal_devices.json`。
+
+例如：
+
+- `minecraft:stone[waterlogged=true]` 会被拒绝，因为 stone 不支持 `waterlogged`。
+- `minecraft:stone[open=true]` 会被拒绝，因为 stone 不支持 `open`。
+- `minecraft:repeater[delay=9]` 会被拒绝，因为 `delay` 不支持 `9`。
+- `minecraft:comparator[mode=abc]` 会被拒绝，因为 `mode` 不支持 `abc`。
+
+代码不会硬编码 Wiki 的 BlockState 属性表。公开 Wiki 的 Java Edition data values 页面可以作为测试参考，但运行时当前方块的 `BlockState.getProperties()` 才是权威来源，因此也能兼容版本差异和其他模组方块。
+
+条件触发模式：
+
+- `condition_enter`：`lastConditionMatched=false` 且 `currentMatched=true` 时发出 `channel`。
+- `condition_exit`：`lastConditionMatched=true` 且 `currentMatched=false` 时优先发出 `offChannel`；未设置 `offChannel` 时发出 `channel`。
+- `condition_both`：进入条件发出 `channel`，退出条件优先发出 `offChannel`；未设置 `offChannel` 时回退发出 `channel`。
+
+因此执行 `clearOffChannel` 后，如果模式是 `condition_both`，进入和退出条件都会发出主 `channel`，这是预期行为。
+
+`clearCondition` 只清空 BlockState 条件，不影响 5.5 的红石状态检测配置。`conditionInfo` 会显示当前方块 ID、条件方块 ID、条件属性、当前方块支持的 property 列表、上次满足状态和当前满足状态。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -349,9 +408,9 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 /tzz signal device cleanup
 ```
 
-`device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道和常见问题提示。
+`device info` 和 `device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道、condition 摘要和常见问题提示。
 
-`cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。
+`cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。condition 不合法时也不会自动删除记录，只在 debug 中提示重新设置 condition 或 `clearCondition`。
 
 ### 性能边界
 
@@ -365,6 +424,7 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 - 不强制加载未加载区块。
 - 未加载区块直接跳过。
 - 每个设备每次只检测自己的一个坐标。
+- 有 condition 时 tick 不重新解析 condition 字符串，只比较保存后的 property/value。
 - 状态不变不 emit。
 - 状态不变不写 JSON。
 - `signal_devices.json` 写入已节流，服务端停止时强制保存。
@@ -379,9 +439,8 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，5.5 MVP 未实现：
+以下内容只作为后续阶段计划记录，不在 5.6 MVP 实现：
 
-- 5.6 BlockState 条件触发：例如 `/tzz signal blockDevice condition <pos> minecraft:lever[powered=true]`，支持 `open=true`、`lit=true`、`powered=true` 等状态条件。
 - 5.7 交互触发：右键已绑定方块发 signal，适合告示牌、任务终端、装饰按钮等。
 - 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
 - 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。

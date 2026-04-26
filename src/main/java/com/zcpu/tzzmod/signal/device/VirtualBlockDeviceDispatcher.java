@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
+import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -44,6 +45,11 @@ public final class VirtualBlockDeviceDispatcher {
             return;
         }
 
+        BlockState state = world.getBlockState(pos);
+        if (device.conditionEnabled()) {
+            tickCondition(world, pos, device, state);
+        }
+
         if (powerState.currentPowered() == device.lastPowered()) {
             return;
         }
@@ -79,5 +85,56 @@ public final class VirtualBlockDeviceDispatcher {
             result = ActionExecutionResult.failure(SignalChannel.validationError(channel));
         }
         SignalDeviceStore.recordVirtualBlockTrigger(world, device, powerState, result);
+    }
+
+    private static void tickCondition(ServerWorld world, BlockPos pos, SignalDeviceData device, BlockState state) {
+        if (!device.conditionEnabled()) {
+            return;
+        }
+        if (!VirtualBlockDeviceSupport.blockId(state).equals(device.conditionBlockId())) {
+            return;
+        }
+
+        boolean currentMatched = BlockStateConditionParser.matches(state, device);
+        if (currentMatched == device.lastConditionMatched()) {
+            return;
+        }
+
+        boolean entering = !device.lastConditionMatched() && currentMatched;
+        boolean exiting = device.lastConditionMatched() && !currentMatched;
+        BlockStateConditionMode mode = BlockStateConditionMode.fromId(device.conditionMode());
+        String channel = null;
+        if (entering && mode.triggersEnter()) {
+            channel = device.channel();
+        } else if (exiting && mode.triggersExit()) {
+            channel = device.offChannel().isBlank() ? device.channel() : device.offChannel();
+        }
+
+        if (channel == null || channel.isBlank()) {
+            SignalDeviceStore.recordVirtualConditionState(
+                    world,
+                    device,
+                    currentMatched,
+                    currentMatched ? "当前满足方块状态条件" : "当前不满足方块状态条件"
+            );
+            return;
+        }
+
+        ActionExecutionResult result;
+        if (SignalChannel.isValid(channel)) {
+            result = SignalBridgeServer.emit(new SignalEvent(
+                    channel,
+                    null,
+                    world,
+                    Vec3d.ofCenter(pos),
+                    ActionSourceType.VIRTUAL_BLOCK_DEVICE,
+                    device.id(),
+                    SignalBridgeServer.currentDepth(),
+                    world.getTime()
+            ));
+        } else {
+            result = ActionExecutionResult.failure(SignalChannel.validationError(channel));
+        }
+        SignalDeviceStore.recordVirtualConditionTrigger(world, device, currentMatched, result);
     }
 }
