@@ -9,6 +9,9 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherCommandSupport;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -16,6 +19,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -55,6 +59,46 @@ public final class ContainerItemConditionCommand {
                                 .then(CommandManager.argument("name", StringArgumentType.string())
                                         .then(totalItemArgument((source, pos, name, itemId, mode, count, channel) ->
                                                 executeAddTotalItem(source, pos, name, itemId, mode, count, channel))))))
+                .then(CommandManager.literal("addSlotMatchFromHand")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(CommandManager.argument("slot", IntegerArgumentType.integer(0))
+                                                .then(slotMatcherModeBranch(ContainerItemCountMode.AT_LEAST, (source, pos, name, slot, mode, count, channel) ->
+                                                        executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))
+                                                .then(slotMatcherModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, slot, mode, count, channel) ->
+                                                        executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))
+                                                .then(slotMatcherModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, slot, mode, count, channel) ->
+                                                        executeAddSlotMatcher(source, pos, name, slot, null, mode, count, channel, true)))))))
+                .then(CommandManager.literal("addSlotMatchFromSlot")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(CommandManager.argument("targetSlot", IntegerArgumentType.integer(0))
+                                                .then(CommandManager.argument("templateSlot", IntegerArgumentType.integer(0))
+                                                        .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.AT_LEAST, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
+                                                                executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false)))
+                                                        .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
+                                                                executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false)))
+                                                        .then(slotMatcherFromSlotModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, targetSlot, templateSlot, mode, count, channel) ->
+                                                                executeAddSlotMatcher(source, pos, name, targetSlot, templateSlot, mode, count, channel, false))))))))
+                .then(CommandManager.literal("addTotalMatchFromHand")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(totalMatcherModeBranch(ContainerItemCountMode.AT_LEAST, (source, pos, name, mode, count, channel) ->
+                                                executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true)))
+                                        .then(totalMatcherModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, mode, count, channel) ->
+                                                executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true)))
+                                        .then(totalMatcherModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, mode, count, channel) ->
+                                                executeAddTotalMatcher(source, pos, name, null, mode, count, channel, true))))))
+                .then(CommandManager.literal("addTotalMatchFromSlot")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(CommandManager.argument("templateSlot", IntegerArgumentType.integer(0))
+                                                .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.AT_LEAST, (source, pos, name, templateSlot, mode, count, channel) ->
+                                                        executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))
+                                                .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.EXACTLY, (source, pos, name, templateSlot, mode, count, channel) ->
+                                                        executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))
+                                                .then(totalMatcherFromSlotModeBranch(ContainerItemCountMode.AT_MOST, (source, pos, name, templateSlot, mode, count, channel) ->
+                                                        executeAddTotalMatcher(source, pos, name, templateSlot, mode, count, channel, false)))))))
                 .then(CommandManager.literal("list")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeList(
@@ -158,7 +202,65 @@ public final class ContainerItemConditionCommand {
                                                 context.getSource(),
                                                 BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
                                                 StringArgumentType.getString(context, "name")
-                                        )))));
+                                        )))))
+                .then(CommandManager.literal("matcherInfo")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .executes(context -> executeMatcherInfo(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "name")
+                                        )))))
+                .then(CommandManager.literal("matcherFromHand")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .executes(context -> executeMatcherFromHand(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                StringArgumentType.getString(context, "name")
+                                        )))))
+                .then(CommandManager.literal("matcherFromSlot")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(CommandManager.argument("slot", IntegerArgumentType.integer(0))
+                                                .executes(context -> executeMatcherFromSlot(
+                                                        context.getSource(),
+                                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                        StringArgumentType.getString(context, "name"),
+                                                        IntegerArgumentType.getInteger(context, "slot")
+                                                ))))))
+                .then(CommandManager.literal("matcherOption")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(CommandManager.literal("matchDamage")
+                                                .then(matcherOptionStateBranch("matchDamage", true))
+                                                .then(matcherOptionStateBranch("matchDamage", false)))
+                                        .then(CommandManager.literal("matchCustomName")
+                                                .then(matcherOptionStateBranch("matchCustomName", true))
+                                                .then(matcherOptionStateBranch("matchCustomName", false)))
+                                        .then(CommandManager.literal("matchLore")
+                                                .then(matcherOptionStateBranch("matchLore", true))
+                                                .then(matcherOptionStateBranch("matchLore", false)))
+                                        .then(CommandManager.literal("matchCustomData")
+                                                .then(matcherOptionStateBranch("matchCustomData", true))
+                                                .then(matcherOptionStateBranch("matchCustomData", false)))
+                                        .then(CommandManager.literal("matchComponents")
+                                                .then(matcherOptionStateBranch("matchComponents", true))
+                                                .then(matcherOptionStateBranch("matchComponents", false))))))
+                .then(CommandManager.literal("matcherCount")
+                        .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
+                                .then(CommandManager.argument("name", StringArgumentType.string())
+                                        .then(matcherCountBranch(ContainerItemCountMode.AT_LEAST))
+                                        .then(matcherCountBranch(ContainerItemCountMode.EXACTLY))
+                                        .then(matcherCountBranch(ContainerItemCountMode.AT_MOST))
+                                        .then(CommandManager.literal(ContainerItemCountMode.IGNORE.id())
+                                                .executes(context -> executeMatcherCount(
+                                                        context.getSource(),
+                                                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                        StringArgumentType.getString(context, "name"),
+                                                        ContainerItemCountMode.IGNORE,
+                                                        0
+                                                ))))));
     }
 
     private static RequiredArgumentBuilder<ServerCommandSource, Identifier> slotItemArgument(
@@ -214,6 +316,129 @@ public final class ContainerItemConditionCommand {
                                         IntegerArgumentType.getInteger(context, "count"),
                                         StringArgumentType.getString(context, "channel")
                                 ))));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> slotMatcherModeBranch(
+            ContainerItemCountMode mode,
+            SlotMatcherExecutor executor
+    ) {
+        return CommandManager.literal(mode.id())
+                .then(slotMatcherCountBranch(mode, executor));
+    }
+
+    private static RequiredArgumentBuilder<ServerCommandSource, Integer> slotMatcherCountBranch(
+            ContainerItemCountMode mode,
+            SlotMatcherExecutor executor
+    ) {
+        return CommandManager.argument("count", IntegerArgumentType.integer(1))
+                .then(CommandManager.argument("channel", StringArgumentType.string())
+                        .executes(context -> executor.execute(
+                                context.getSource(),
+                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                StringArgumentType.getString(context, "name"),
+                                IntegerArgumentType.getInteger(context, "slot"),
+                                mode,
+                                IntegerArgumentType.getInteger(context, "count"),
+                                StringArgumentType.getString(context, "channel")
+                        )));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> slotMatcherFromSlotModeBranch(
+            ContainerItemCountMode mode,
+            SlotMatcherFromSlotExecutor executor
+    ) {
+        return CommandManager.literal(mode.id())
+                .then(slotMatcherFromSlotCountBranch(mode, executor));
+    }
+
+    private static RequiredArgumentBuilder<ServerCommandSource, Integer> slotMatcherFromSlotCountBranch(
+            ContainerItemCountMode mode,
+            SlotMatcherFromSlotExecutor executor
+    ) {
+        return CommandManager.argument("count", IntegerArgumentType.integer(1))
+                .then(CommandManager.argument("channel", StringArgumentType.string())
+                        .executes(context -> executor.execute(
+                                context.getSource(),
+                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                StringArgumentType.getString(context, "name"),
+                                IntegerArgumentType.getInteger(context, "targetSlot"),
+                                IntegerArgumentType.getInteger(context, "templateSlot"),
+                                mode,
+                                IntegerArgumentType.getInteger(context, "count"),
+                                StringArgumentType.getString(context, "channel")
+                        )));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> totalMatcherModeBranch(
+            ContainerItemCountMode mode,
+            TotalMatcherExecutor executor
+    ) {
+        return CommandManager.literal(mode.id())
+                .then(totalMatcherCountBranch(mode, executor));
+    }
+
+    private static RequiredArgumentBuilder<ServerCommandSource, Integer> totalMatcherCountBranch(
+            ContainerItemCountMode mode,
+            TotalMatcherExecutor executor
+    ) {
+        return CommandManager.argument("count", IntegerArgumentType.integer(1))
+                .then(CommandManager.argument("channel", StringArgumentType.string())
+                        .executes(context -> executor.execute(
+                                context.getSource(),
+                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                StringArgumentType.getString(context, "name"),
+                                mode,
+                                IntegerArgumentType.getInteger(context, "count"),
+                                StringArgumentType.getString(context, "channel")
+                        )));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> totalMatcherFromSlotModeBranch(
+            ContainerItemCountMode mode,
+            TotalMatcherFromSlotExecutor executor
+    ) {
+        return CommandManager.literal(mode.id())
+                .then(totalMatcherFromSlotCountBranch(mode, executor));
+    }
+
+    private static RequiredArgumentBuilder<ServerCommandSource, Integer> totalMatcherFromSlotCountBranch(
+            ContainerItemCountMode mode,
+            TotalMatcherFromSlotExecutor executor
+    ) {
+        return CommandManager.argument("count", IntegerArgumentType.integer(1))
+                .then(CommandManager.argument("channel", StringArgumentType.string())
+                        .executes(context -> executor.execute(
+                                context.getSource(),
+                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                StringArgumentType.getString(context, "name"),
+                                IntegerArgumentType.getInteger(context, "templateSlot"),
+                                mode,
+                                IntegerArgumentType.getInteger(context, "count"),
+                                StringArgumentType.getString(context, "channel")
+                        )));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> matcherOptionStateBranch(String option, boolean enabled) {
+        return CommandManager.literal(enabled ? "enable" : "disable")
+                .executes(context -> executeMatcherOption(
+                        context.getSource(),
+                        BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                        StringArgumentType.getString(context, "name"),
+                        option,
+                        enabled
+                ));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> matcherCountBranch(ContainerItemCountMode mode) {
+        return CommandManager.literal(mode.id())
+                .then(CommandManager.argument("count", IntegerArgumentType.integer(1))
+                        .executes(context -> executeMatcherCount(
+                                context.getSource(),
+                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                StringArgumentType.getString(context, "name"),
+                                mode,
+                                IntegerArgumentType.getInteger(context, "count")
+                        )));
     }
 
     private static int executeAddSlotEmpty(ServerCommandSource source, BlockPos pos, String rawName, int slot, String rawChannel) {
@@ -323,6 +548,83 @@ public final class ContainerItemConditionCommand {
                 false
         );
         condition = condition.withMatched(ContainerItemConditionSupport.matches(target.inventory(), condition), source.getWorld().getTime(), "已初始化物品条件状态");
+        SignalDeviceStore.addVirtualItemCondition(source.getWorld(), pos, condition);
+        sendCreatedFeedback(source, pos, condition);
+        return 1;
+    }
+
+    private static int executeAddSlotMatcher(
+            ServerCommandSource source,
+            BlockPos pos,
+            String rawName,
+            int targetSlot,
+            Integer templateSlot,
+            ContainerItemCountMode countMode,
+            int count,
+            String rawChannel,
+            boolean fromHand
+    ) {
+        Target target = validateTarget(source, pos);
+        if (target == null || !validateNameAndChannel(source, target.device(), rawName, rawChannel, true)) {
+            return 0;
+        }
+        if (!ContainerItemConditionSupport.isSlotInRange(target.inventory(), targetSlot)) {
+            sendError(source, Text.literal("槽位 " + targetSlot + " 超出当前容器范围。"));
+            return 0;
+        }
+        ItemStack template = templateStack(source, target.inventory(), templateSlot, fromHand);
+        if (template.isEmpty()) {
+            sendError(source, Text.literal(fromHand ? "主手物品不能为空。" : "模板槽位不能为空。"));
+            return 0;
+        }
+
+        String name = cleanUserText(rawName);
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.captureTemplate(template, countMode, count);
+        ContainerItemConditionData condition = newMatcherCondition(
+                name,
+                ContainerItemConditionType.SLOT_MATCHER,
+                targetSlot,
+                matcher,
+                rawChannel,
+                false
+        );
+        condition = condition.withMatched(ContainerItemConditionSupport.matches(target.inventory(), condition), source.getWorld().getTime(), "已初始化物品模板条件状态");
+        SignalDeviceStore.addVirtualItemCondition(source.getWorld(), pos, condition);
+        sendCreatedFeedback(source, pos, condition);
+        return 1;
+    }
+
+    private static int executeAddTotalMatcher(
+            ServerCommandSource source,
+            BlockPos pos,
+            String rawName,
+            Integer templateSlot,
+            ContainerItemCountMode countMode,
+            int count,
+            String rawChannel,
+            boolean fromHand
+    ) {
+        Target target = validateTarget(source, pos);
+        if (target == null || !validateNameAndChannel(source, target.device(), rawName, rawChannel, true)) {
+            return 0;
+        }
+        ItemStack template = templateStack(source, target.inventory(), templateSlot, fromHand);
+        if (template.isEmpty()) {
+            sendError(source, Text.literal(fromHand ? "主手物品不能为空。" : "模板槽位不能为空。"));
+            return 0;
+        }
+
+        String name = cleanUserText(rawName);
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.captureTemplate(template, countMode, count);
+        ContainerItemConditionData condition = newMatcherCondition(
+                name,
+                ContainerItemConditionType.TOTAL_MATCHER,
+                0,
+                matcher,
+                rawChannel,
+                false
+        );
+        condition = condition.withMatched(ContainerItemConditionSupport.matches(target.inventory(), condition), source.getWorld().getTime(), "已初始化物品模板条件状态");
         SignalDeviceStore.addVirtualItemCondition(source.getWorld(), pos, condition);
         sendCreatedFeedback(source, pos, condition);
         return 1;
@@ -536,6 +838,130 @@ public final class ContainerItemConditionCommand {
         return 1;
     }
 
+    private static int executeMatcherInfo(ServerCommandSource source, BlockPos pos, String rawName) {
+        Target target = validateTarget(source, pos);
+        if (target == null) {
+            return 0;
+        }
+        ContainerItemConditionData condition = findCondition(target.device(), rawName);
+        if (condition == null) {
+            sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
+            return 0;
+        }
+        if (!isMatcherCondition(condition)) {
+            sendError(source, Text.literal("该物品条件不是 ItemStack 模板条件。"));
+            return 0;
+        }
+        sendMatcherInfo(source, condition);
+        return 1;
+    }
+
+    private static int executeMatcherFromHand(ServerCommandSource source, BlockPos pos, String rawName) {
+        Target target = validateTarget(source, pos);
+        if (target == null) {
+            return 0;
+        }
+        ContainerItemConditionData condition = findCondition(target.device(), rawName);
+        if (condition == null) {
+            sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
+            return 0;
+        }
+        if (!isMatcherCondition(condition)) {
+            sendError(source, Text.literal("该物品条件不是 ItemStack 模板条件。"));
+            return 0;
+        }
+        ItemStack template = templateStack(source, target.inventory(), null, true);
+        if (template.isEmpty()) {
+            sendError(source, Text.literal("主手物品不能为空。"));
+            return 0;
+        }
+        ContainerItemConditionData updated = updateMatcher(source, pos, target.inventory(), condition, template);
+        sendHeader(source, Text.literal("已从主手更新物品模板").formatted(Formatting.GREEN));
+        sendMatcherInfo(source, updated);
+        return 1;
+    }
+
+    private static int executeMatcherFromSlot(ServerCommandSource source, BlockPos pos, String rawName, int slot) {
+        Target target = validateTarget(source, pos);
+        if (target == null) {
+            return 0;
+        }
+        ContainerItemConditionData condition = findCondition(target.device(), rawName);
+        if (condition == null) {
+            sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
+            return 0;
+        }
+        if (!isMatcherCondition(condition)) {
+            sendError(source, Text.literal("该物品条件不是 ItemStack 模板条件。"));
+            return 0;
+        }
+        if (!ContainerItemConditionSupport.isSlotInRange(target.inventory(), slot)) {
+            sendError(source, Text.literal("槽位 " + slot + " 超出当前容器范围。"));
+            return 0;
+        }
+        ItemStack template = target.inventory().getStack(slot);
+        if (template.isEmpty()) {
+            sendError(source, Text.literal("模板槽位不能为空。"));
+            return 0;
+        }
+        ContainerItemConditionData updated = updateMatcher(source, pos, target.inventory(), condition, template);
+        sendHeader(source, Text.literal("已从容器槽位更新物品模板").formatted(Formatting.GREEN));
+        sendMatcherInfo(source, updated);
+        return 1;
+    }
+
+    private static int executeMatcherOption(ServerCommandSource source, BlockPos pos, String rawName, String option, boolean enabled) {
+        Target target = validateTarget(source, pos);
+        if (target == null) {
+            return 0;
+        }
+        ContainerItemConditionData condition = findCondition(target.device(), rawName);
+        if (condition == null) {
+            sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
+            return 0;
+        }
+        if (!isMatcherCondition(condition)) {
+            sendError(source, Text.literal("该物品条件不是 ItemStack 模板条件。"));
+            return 0;
+        }
+        if (!ItemStackMatcherCommandSupport.isOption(option)) {
+            sendError(source, Text.literal("未知匹配选项：" + option));
+            return 0;
+        }
+        ItemStackMatcherData matcher = ItemStackMatcherCommandSupport.withOption(condition.matcher(), option, enabled);
+        ContainerItemConditionData updated = withMatcher(condition, matcher);
+        boolean currentMatched = ContainerItemConditionSupport.matches(target.inventory(), updated);
+        updated = updated.withMatched(currentMatched, source.getWorld().getTime(), "已更新物品模板匹配选项");
+        SignalDeviceStore.updateVirtualItemCondition(source.getWorld(), pos, updated);
+        sendHeader(source, Text.literal("已更新物品模板匹配选项").formatted(Formatting.GREEN));
+        sendMatcherInfo(source, updated);
+        return 1;
+    }
+
+    private static int executeMatcherCount(ServerCommandSource source, BlockPos pos, String rawName, ContainerItemCountMode mode, int count) {
+        Target target = validateTarget(source, pos);
+        if (target == null) {
+            return 0;
+        }
+        ContainerItemConditionData condition = findCondition(target.device(), rawName);
+        if (condition == null) {
+            sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
+            return 0;
+        }
+        if (!isMatcherCondition(condition)) {
+            sendError(source, Text.literal("该物品条件不是 ItemStack 模板条件。"));
+            return 0;
+        }
+        ItemStackMatcherData matcher = ItemStackMatcherSupport.withCount(condition.matcher(), mode, count);
+        ContainerItemConditionData updated = withMatcher(condition, matcher);
+        boolean currentMatched = ContainerItemConditionSupport.matches(target.inventory(), updated);
+        updated = updated.withMatched(currentMatched, source.getWorld().getTime(), "已更新物品模板数量规则");
+        SignalDeviceStore.updateVirtualItemCondition(source.getWorld(), pos, updated);
+        sendHeader(source, Text.literal("已更新物品模板数量规则").formatted(Formatting.GREEN));
+        sendMatcherInfo(source, updated);
+        return 1;
+    }
+
     private static ContainerItemConditionData newCondition(
             String name,
             ContainerItemConditionType type,
@@ -566,6 +992,36 @@ public final class ContainerItemConditionCommand {
         ).normalized();
     }
 
+    private static ContainerItemConditionData newMatcherCondition(
+            String name,
+            ContainerItemConditionType type,
+            int slot,
+            ItemStackMatcherData matcher,
+            String channel,
+            boolean matched
+    ) {
+        ItemStackMatcherData cleanMatcher = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return new ContainerItemConditionData(
+                UUID.randomUUID().toString(),
+                name,
+                true,
+                type.id(),
+                slot,
+                cleanMatcher.templateItemId(),
+                cleanMatcher.countMode(),
+                cleanMatcher.requiredCount(),
+                SignalChannel.normalize(channel),
+                "",
+                BlockStateConditionMode.CONDITION_ENTER.id(),
+                matched,
+                0L,
+                0L,
+                0L,
+                "已初始化物品模板条件状态",
+                cleanMatcher
+        ).normalized();
+    }
+
     private static ContainerItemConditionData copyCondition(
             ContainerItemConditionData condition,
             boolean enabled,
@@ -589,8 +1045,93 @@ public final class ContainerItemConditionCommand {
                 condition.lastCheckGameTime(),
                 condition.lastTriggerGameTime(),
                 condition.lastTriggerWallTimeMillis(),
-                condition.lastResult()
+                condition.lastResult(),
+                condition.matcher()
         ).normalized();
+    }
+
+    private static ContainerItemConditionData withMatcher(
+            ContainerItemConditionData condition,
+            ItemStackMatcherData matcher
+    ) {
+        ItemStackMatcherData cleanMatcher = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return new ContainerItemConditionData(
+                condition.id(),
+                condition.name(),
+                condition.enabled(),
+                condition.type(),
+                condition.slot(),
+                cleanMatcher.templateItemId(),
+                cleanMatcher.countMode(),
+                cleanMatcher.requiredCount(),
+                condition.channel(),
+                condition.offChannel(),
+                condition.mode(),
+                condition.lastMatched(),
+                condition.lastCheckGameTime(),
+                condition.lastTriggerGameTime(),
+                condition.lastTriggerWallTimeMillis(),
+                condition.lastResult(),
+                cleanMatcher
+        ).normalized();
+    }
+
+    private static ContainerItemConditionData updateMatcher(
+            ServerCommandSource source,
+            BlockPos pos,
+            Inventory inventory,
+            ContainerItemConditionData condition,
+            ItemStack template
+    ) {
+        ItemStackMatcherData existing = condition.matcher() == null ? ItemStackMatcherData.empty() : condition.matcher().normalized();
+        ContainerItemCountMode mode = ContainerItemCountMode.fromId(existing.countMode());
+        int count = ContainerItemCountMode.IGNORE.id().equals(existing.countMode()) ? 0 : existing.requiredCount();
+        ItemStackMatcherData captured = ItemStackMatcherSupport.captureTemplate(template, mode, count);
+        captured = new ItemStackMatcherData(
+                captured.enabled(),
+                captured.templateItemId(),
+                captured.templateCount(),
+                captured.countMode(),
+                captured.requiredCount(),
+                captured.matchItemId(),
+                existing.matchDamage(),
+                existing.matchCustomName(),
+                existing.matchLore(),
+                existing.matchCustomData(),
+                existing.matchComponents(),
+                captured.templateDamage(),
+                captured.templateCustomName(),
+                captured.templateLore(),
+                captured.templateCustomData(),
+                captured.templateComponents(),
+                captured.templateSummary(),
+                existing.createdWallTimeMillis() > 0L ? existing.createdWallTimeMillis() : captured.createdWallTimeMillis(),
+                System.currentTimeMillis()
+        ).normalized();
+        ContainerItemConditionData updated = withMatcher(condition, captured);
+        boolean currentMatched = ContainerItemConditionSupport.matches(inventory, updated);
+        updated = updated.withMatched(currentMatched, source.getWorld().getTime(), "已刷新物品模板匹配状态");
+        SignalDeviceStore.updateVirtualItemCondition(source.getWorld(), pos, updated);
+        return updated;
+    }
+
+    private static ItemStack templateStack(ServerCommandSource source, Inventory inventory, Integer slot, boolean fromHand) {
+        if (fromHand) {
+            if (source.getEntity() instanceof ServerPlayerEntity player) {
+                return player.getMainHandStack();
+            }
+            return ItemStack.EMPTY;
+        }
+        if (slot == null || !ContainerItemConditionSupport.isSlotInRange(inventory, slot)) {
+            return ItemStack.EMPTY;
+        }
+        return inventory.getStack(slot);
+    }
+
+    private static boolean isMatcherCondition(ContainerItemConditionData condition) {
+        String type = condition == null ? "" : ContainerItemConditionType.normalize(condition.type());
+        return ContainerItemConditionType.SLOT_MATCHER.id().equals(type)
+                || ContainerItemConditionType.TOTAL_MATCHER.id().equals(type);
     }
 
     private static boolean validateNameAndChannel(
@@ -701,6 +1242,25 @@ public final class ContainerItemConditionCommand {
                 source.sendFeedback(() -> Text.literal("- " + issue).formatted(Formatting.YELLOW), false);
             }
         }
+    }
+
+    private static void sendMatcherInfo(ServerCommandSource source, ContainerItemConditionData condition) {
+        ItemStackMatcherData matcher = condition.matcher() == null ? ItemStackMatcherData.empty() : condition.matcher().normalized();
+        sendHeader(source, Text.literal("ItemStack 模板匹配详情").formatted(Formatting.GOLD));
+        source.sendFeedback(() -> field("条件名称", nameText(condition.name())), false);
+        source.sendFeedback(() -> field("条件类型", typeText(condition.type())), false);
+        source.sendFeedback(() -> field("模板", Text.literal(ItemStackMatcherSupport.summary(matcher)).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("物品 ID", Text.literal(matcher.templateItemId().isBlank() ? "未设置" : matcher.templateItemId()).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("数量模式", Text.literal(matcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("要求数量", Text.literal(Integer.toString(matcher.requiredCount())).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("匹配物品 ID", boolText(matcher.matchItemId())), false);
+        source.sendFeedback(() -> field("匹配耐久", boolText(matcher.matchDamage())), false);
+        source.sendFeedback(() -> field("匹配自定义名称", boolText(matcher.matchCustomName())), false);
+        source.sendFeedback(() -> field("匹配 lore", boolText(matcher.matchLore())), false);
+        source.sendFeedback(() -> field("匹配 custom_data", boolText(matcher.matchCustomData())), false);
+        source.sendFeedback(() -> field("匹配 data components", boolText(matcher.matchComponents())), false);
+        source.sendFeedback(() -> field("上次满足", boolText(condition.lastMatched())), false);
+        source.sendFeedback(() -> field("最近结果", resultText(condition.lastResult())), false);
     }
 
     private static String cleanUserText(String raw) {
@@ -814,6 +1374,54 @@ public final class ContainerItemConditionCommand {
                 BlockPos pos,
                 String name,
                 String itemId,
+                ContainerItemCountMode mode,
+                int count,
+                String channel
+        );
+    }
+
+    private interface SlotMatcherExecutor {
+        int execute(
+                ServerCommandSource source,
+                BlockPos pos,
+                String name,
+                int slot,
+                ContainerItemCountMode mode,
+                int count,
+                String channel
+        );
+    }
+
+    private interface SlotMatcherFromSlotExecutor {
+        int execute(
+                ServerCommandSource source,
+                BlockPos pos,
+                String name,
+                int targetSlot,
+                int templateSlot,
+                ContainerItemCountMode mode,
+                int count,
+                String channel
+        );
+    }
+
+    private interface TotalMatcherExecutor {
+        int execute(
+                ServerCommandSource source,
+                BlockPos pos,
+                String name,
+                ContainerItemCountMode mode,
+                int count,
+                String channel
+        );
+    }
+
+    private interface TotalMatcherFromSlotExecutor {
+        int execute(
+                ServerCommandSource source,
+                BlockPos pos,
+                String name,
+                int templateSlot,
                 ContainerItemCountMode mode,
                 int count,
                 String channel

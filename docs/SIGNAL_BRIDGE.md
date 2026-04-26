@@ -526,6 +526,60 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 5.8 的 `containerChangeChannel` 和 5.9 的 itemCondition 可以同时存在：前者表示“任意内容变化”，后者表示“具体条件进入 / 退出”。如果两个配置指向同一 channel，可能出现多个 signal，这是配置结果，不是 bug。
 
+### ItemStack Matcher 物品数据匹配
+
+5.10 阶段新增 `ItemStackMatcher`。它是可复用的 ItemStack 模板匹配核心，容器 `slot_matcher` / `total_matcher` 和右键交互主手物品匹配都使用同一套数据结构和判断逻辑。
+
+容器模板条件命令：
+
+```text
+/tzz signal blockDevice itemCondition addSlotMatchFromHand <x> <y> <z> <name> <slot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition addSlotMatchFromSlot <x> <y> <z> <name> <targetSlot> <templateSlot> exactly <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromHand <x> <y> <z> <name> at_most <count> <channel>
+/tzz signal blockDevice itemCondition addTotalMatchFromSlot <x> <y> <z> <name> <templateSlot> at_least <count> <channel>
+/tzz signal blockDevice itemCondition matcherInfo <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition matcherFromHand <x> <y> <z> <name>
+/tzz signal blockDevice itemCondition matcherFromSlot <x> <y> <z> <name> <slot>
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchDamage enable
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchCustomName disable
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchLore enable
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchCustomData enable
+/tzz signal blockDevice itemCondition matcherOption <x> <y> <z> <name> matchComponents enable
+/tzz signal blockDevice itemCondition matcherCount <x> <y> <z> <name> at_least <count>
+/tzz signal blockDevice itemCondition matcherCount <x> <y> <z> <name> ignore
+```
+
+右键交互主手物品匹配命令：
+
+```text
+/tzz signal blockDevice interactionItem setFromHand <x> <y> <z>
+/tzz signal blockDevice interactionItem clear <x> <y> <z>
+/tzz signal blockDevice interactionItem enable <x> <y> <z>
+/tzz signal blockDevice interactionItem disable <x> <y> <z>
+/tzz signal blockDevice interactionItem option <x> <y> <z> matchDamage enable
+/tzz signal blockDevice interactionItem option <x> <y> <z> matchLore disable
+/tzz signal blockDevice interactionItem count <x> <y> <z> exactly <count>
+/tzz signal blockDevice interactionItem count <x> <y> <z> ignore
+/tzz signal blockDevice interactionItem info <x> <y> <z>
+```
+
+匹配能力：
+
+- 默认匹配 item registry id 和数量规则。
+- `countMode` 支持 `at_least`、`exactly`、`at_most` 和 `ignore`。
+- 可选匹配 damage、自定义名称、lore、`custom_data` 和 data components 整体快照。
+- 所有启用的匹配项都必须满足；未启用的匹配项不参与判断。
+- 模板可以从玩家主手捕获，也可以从容器槽位捕获。
+
+边界：
+
+- 本阶段不是任意 NBT path 查询系统。
+- 不检测告示牌文字、命令方块命令、刷怪笼 NBT、任意 BlockEntity NBT、玩家 NBT 或实体 NBT。
+- 不扫描玩家背包，不检查副手，不检查装备栏或盔甲栏。
+- 右键交互匹配失败时不 emit、不阻止原版交互、不显示失败提示、不消耗物品。
+- 容器 slot matcher 只读取指定 slot；total matcher 只遍历该绑定容器自身 slot。
+- 不扫描世界、区块或周围方块，不强制加载区块，状态不变不写 `signal_devices.json`。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -576,9 +630,13 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.9 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.10 MVP 实现：
 
-- 5.10 物品数据 / NBT / 数据组件条件：匹配物品名称、lore、自定义数据、NBT 或新版数据组件。
+- 玩家背包内是否包含匹配物品。
+- 玩家副手物品匹配。
+- 右键成功后消耗匹配物品。
+- 右键失败提示消息。
+- 匹配装备栏和盔甲栏。
 - 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine；容器槽位和物品条件不应长期依赖超长命令，未来应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 
 ## cooldown

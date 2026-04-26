@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import java.util.Locale;
 
 public record ContainerItemConditionData(
@@ -19,8 +20,48 @@ public record ContainerItemConditionData(
         long lastCheckGameTime,
         long lastTriggerGameTime,
         long lastTriggerWallTimeMillis,
-        String lastResult
+        String lastResult,
+        ItemStackMatcherData matcher
 ) {
+    public ContainerItemConditionData(
+            String id,
+            String name,
+            boolean enabled,
+            String type,
+            int slot,
+            String itemId,
+            String countMode,
+            int count,
+            String channel,
+            String offChannel,
+            String mode,
+            boolean lastMatched,
+            long lastCheckGameTime,
+            long lastTriggerGameTime,
+            long lastTriggerWallTimeMillis,
+            String lastResult
+    ) {
+        this(
+                id,
+                name,
+                enabled,
+                type,
+                slot,
+                itemId,
+                countMode,
+                count,
+                channel,
+                offChannel,
+                mode,
+                lastMatched,
+                lastCheckGameTime,
+                lastTriggerGameTime,
+                lastTriggerWallTimeMillis,
+                lastResult,
+                ItemStackMatcherData.empty()
+        );
+    }
+
     public ContainerItemConditionData normalized() {
         String cleanName = name == null ? "" : name.trim();
         String cleanId = id == null || id.isBlank()
@@ -33,14 +74,22 @@ public record ContainerItemConditionData(
         String cleanOffChannel = SignalChannel.normalize(offChannel);
         String cleanMode = BlockStateConditionMode.normalize(mode);
         String cleanResult = lastResult == null ? "" : lastResult.trim();
+        ItemStackMatcherData cleanMatcher = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
         int cleanSlot = Math.max(0, slot);
         int cleanCount = Math.max(0, count);
         if (ContainerItemConditionType.SLOT_EMPTY.id().equals(cleanType)) {
             cleanItemId = "";
             cleanCountMode = ContainerItemCountMode.AT_LEAST.id();
             cleanCount = 0;
+            cleanMatcher = ItemStackMatcherData.empty();
+        } else if (ContainerItemConditionType.SLOT_MATCHER.id().equals(cleanType)
+                || ContainerItemConditionType.TOTAL_MATCHER.id().equals(cleanType)) {
+            cleanItemId = cleanMatcher.templateItemId();
+            cleanCountMode = cleanMatcher.countMode();
+            cleanCount = cleanMatcher.requiredCount();
         } else {
             cleanCount = Math.max(1, cleanCount);
+            cleanMatcher = ItemStackMatcherData.empty();
         }
         return new ContainerItemConditionData(
                 cleanId,
@@ -58,7 +107,8 @@ public record ContainerItemConditionData(
                 Math.max(0L, lastCheckGameTime),
                 Math.max(0L, lastTriggerGameTime),
                 Math.max(0L, lastTriggerWallTimeMillis),
-                cleanResult
+                cleanResult,
+                cleanMatcher
         );
     }
 
@@ -80,7 +130,8 @@ public record ContainerItemConditionData(
                 gameTime,
                 normalized.lastTriggerGameTime(),
                 normalized.lastTriggerWallTimeMillis(),
-                result == null ? "" : result.trim()
+                result == null ? "" : result.trim(),
+                normalized.matcher()
         ).normalized();
     }
 
@@ -102,7 +153,8 @@ public record ContainerItemConditionData(
                 gameTime,
                 gameTime,
                 wallTimeMillis,
-                result == null ? "" : result.trim()
+                result == null ? "" : result.trim(),
+                normalized.matcher()
         ).normalized();
     }
 

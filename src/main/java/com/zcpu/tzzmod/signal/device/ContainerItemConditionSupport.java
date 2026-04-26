@@ -1,5 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcher;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,6 +47,8 @@ public final class ContainerItemConditionSupport {
             case SLOT_EMPTY -> matchesSlotEmpty(inventory, condition.slot());
             case SLOT_ITEM -> matchesSlotItem(inventory, condition);
             case TOTAL_ITEM -> matchesTotalItem(inventory, condition);
+            case SLOT_MATCHER -> matchesSlotMatcher(inventory, condition);
+            case TOTAL_MATCHER -> matchesTotalMatcher(inventory, condition);
         };
     }
 
@@ -62,7 +66,9 @@ public final class ContainerItemConditionSupport {
             issues.add("物品条件频道为空。");
         }
         ContainerItemConditionType type = ContainerItemConditionType.fromId(condition.type());
-        if ((type == ContainerItemConditionType.SLOT_EMPTY || type == ContainerItemConditionType.SLOT_ITEM)
+        if ((type == ContainerItemConditionType.SLOT_EMPTY
+                || type == ContainerItemConditionType.SLOT_ITEM
+                || type == ContainerItemConditionType.SLOT_MATCHER)
                 && !isSlotInRange(inventory, condition.slot())) {
             issues.add("槽位 " + condition.slot() + " 超出当前容器范围。");
         }
@@ -73,6 +79,10 @@ public final class ContainerItemConditionSupport {
         if ((type == ContainerItemConditionType.SLOT_ITEM || type == ContainerItemConditionType.TOTAL_ITEM)
                 && condition.count() < 1) {
             issues.add("物品数量必须大于等于 1。");
+        }
+        if ((type == ContainerItemConditionType.SLOT_MATCHER || type == ContainerItemConditionType.TOTAL_MATCHER)
+                && (condition.matcher() == null || !condition.matcher().normalized().enabled())) {
+            issues.add("ItemStack matcher 模板未配置。");
         }
         return issues;
     }
@@ -140,6 +150,10 @@ public final class ContainerItemConditionSupport {
             case TOTAL_ITEM -> "total_item item=" + condition.itemId()
                     + " " + condition.countMode()
                     + " " + condition.count();
+            case SLOT_MATCHER -> "slot_matcher slot=" + condition.slot()
+                    + " " + ItemStackMatcherSupport.summary(condition.matcher());
+            case TOTAL_MATCHER -> "total_matcher "
+                    + ItemStackMatcherSupport.summary(condition.matcher());
         };
     }
 
@@ -166,6 +180,23 @@ public final class ContainerItemConditionSupport {
         }
         return ContainerItemCountMode.fromId(condition.countMode())
                 .matches(totalItemCount(inventory, condition.itemId()), condition.count());
+    }
+
+    private static boolean matchesSlotMatcher(Inventory inventory, ContainerItemConditionData condition) {
+        return isSlotInRange(inventory, condition.slot())
+                && ItemStackMatcher.matches(inventory.getStack(condition.slot()), condition.matcher());
+    }
+
+    private static boolean matchesTotalMatcher(Inventory inventory, ContainerItemConditionData condition) {
+        int total = 0;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = inventory.getStack(slot);
+            if (!stack.isEmpty() && ItemStackMatcher.matchesIgnoringCount(stack, condition.matcher())) {
+                total += stack.getCount();
+            }
+        }
+        return ContainerItemCountMode.fromId(condition.matcher().countMode())
+                .matches(total, condition.matcher().requiredCount());
     }
 
     private static int totalItemCount(Inventory inventory, String itemId) {

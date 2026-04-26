@@ -3,7 +3,8 @@ package com.zcpu.tzzmod.signal.device;
 public enum ContainerItemCountMode {
     AT_LEAST("at_least"),
     EXACTLY("exactly"),
-    AT_MOST("at_most");
+    AT_MOST("at_most"),
+    IGNORE("ignore");
 
     private final String id;
 
@@ -20,6 +21,7 @@ public enum ContainerItemCountMode {
             case AT_LEAST -> actual >= expected;
             case EXACTLY -> actual == expected;
             case AT_MOST -> actual <= expected;
+            case IGNORE -> true;
         };
     }
 

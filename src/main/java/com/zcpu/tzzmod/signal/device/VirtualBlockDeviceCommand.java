@@ -156,6 +156,7 @@ public final class VirtualBlockDeviceCommand {
                                         context.getSource(),
                                         BlockPosArgumentType.getLoadedBlockPos(context, "pos")
                                 ))))
+                .then(VirtualBlockInteractionItemCommand.build())
                 .then(CommandManager.literal("containerOpenChannel")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .then(CommandManager.argument("channel", StringArgumentType.string())

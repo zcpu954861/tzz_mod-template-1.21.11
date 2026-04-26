@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,7 +67,11 @@ public record SignalDeviceData(
         String lastContainerPlayerUuid,
         String lastContainerResult,
         String lastContainerEventType,
-        List<ContainerItemConditionData> itemConditions
+        List<ContainerItemConditionData> itemConditions,
+        boolean interactionItemMatcherEnabled,
+        ItemStackMatcherData interactionItemMatcher,
+        boolean lastInteractionItemMatched,
+        String lastInteractionItemResult
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
     public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
@@ -159,7 +164,11 @@ public record SignalDeviceData(
                 "",
                 "",
                 "",
-                List.of()
+                List.of(),
+                false,
+                ItemStackMatcherData.empty(),
+                false,
+                ""
         );
     }
 
@@ -266,7 +275,141 @@ public record SignalDeviceData(
                 "",
                 "",
                 "",
-                List.of()
+                List.of(),
+                false,
+                ItemStackMatcherData.empty(),
+                false,
+                ""
+        );
+    }
+
+    public SignalDeviceData(
+            String id,
+            String type,
+            String name,
+            String dimension,
+            int x,
+            int y,
+            int z,
+            String channel,
+            boolean enabled,
+            int pulseTicks,
+            int remainingPulseTicks,
+            int cooldownTicks,
+            int actionCount,
+            long createdWallTimeMillis,
+            long updatedWallTimeMillis,
+            long lastTriggerGameTime,
+            long lastTriggerWallTimeMillis,
+            String lastResult,
+            String blockId,
+            String offChannel,
+            String mode,
+            boolean lastPowered,
+            int lastPowerLevel,
+            boolean conditionEnabled,
+            String conditionBlockId,
+            Map<String, String> conditionProperties,
+            String conditionRaw,
+            String conditionMode,
+            boolean lastConditionMatched,
+            long lastConditionCheckGameTime,
+            String lastConditionResult,
+            boolean interactionEnabled,
+            String interactChannel,
+            int interactionCooldownTicks,
+            long lastInteractionGameTime,
+            long lastInteractionWallTimeMillis,
+            String lastInteractionPlayerName,
+            String lastInteractionPlayerUuid,
+            String lastInteractionResult,
+            String lastInteractionHand,
+            String lastInteractionSide,
+            boolean containerEnabled,
+            String containerOpenChannel,
+            String containerCloseChannel,
+            String containerChangeChannel,
+            int containerCooldownTicks,
+            int containerChangeCheckIntervalTicks,
+            long lastContainerCheckGameTime,
+            String lastContainerFingerprint,
+            long lastContainerOpenGameTime,
+            long lastContainerOpenWallTimeMillis,
+            long lastContainerCloseGameTime,
+            long lastContainerCloseWallTimeMillis,
+            long lastContainerChangeGameTime,
+            long lastContainerChangeWallTimeMillis,
+            String lastContainerPlayerName,
+            String lastContainerPlayerUuid,
+            String lastContainerResult,
+            String lastContainerEventType,
+            List<ContainerItemConditionData> itemConditions
+    ) {
+        this(
+                id,
+                type,
+                name,
+                dimension,
+                x,
+                y,
+                z,
+                channel,
+                enabled,
+                pulseTicks,
+                remainingPulseTicks,
+                cooldownTicks,
+                actionCount,
+                createdWallTimeMillis,
+                updatedWallTimeMillis,
+                lastTriggerGameTime,
+                lastTriggerWallTimeMillis,
+                lastResult,
+                blockId,
+                offChannel,
+                mode,
+                lastPowered,
+                lastPowerLevel,
+                conditionEnabled,
+                conditionBlockId,
+                conditionProperties,
+                conditionRaw,
+                conditionMode,
+                lastConditionMatched,
+                lastConditionCheckGameTime,
+                lastConditionResult,
+                interactionEnabled,
+                interactChannel,
+                interactionCooldownTicks,
+                lastInteractionGameTime,
+                lastInteractionWallTimeMillis,
+                lastInteractionPlayerName,
+                lastInteractionPlayerUuid,
+                lastInteractionResult,
+                lastInteractionHand,
+                lastInteractionSide,
+                containerEnabled,
+                containerOpenChannel,
+                containerCloseChannel,
+                containerChangeChannel,
+                containerCooldownTicks,
+                containerChangeCheckIntervalTicks,
+                lastContainerCheckGameTime,
+                lastContainerFingerprint,
+                lastContainerOpenGameTime,
+                lastContainerOpenWallTimeMillis,
+                lastContainerCloseGameTime,
+                lastContainerCloseWallTimeMillis,
+                lastContainerChangeGameTime,
+                lastContainerChangeWallTimeMillis,
+                lastContainerPlayerName,
+                lastContainerPlayerUuid,
+                lastContainerResult,
+                lastContainerEventType,
+                itemConditions,
+                false,
+                ItemStackMatcherData.empty(),
+                false,
+                ""
         );
     }
 
@@ -297,6 +440,10 @@ public record SignalDeviceData(
         String cleanContainerPlayerUuid = lastContainerPlayerUuid == null ? "" : lastContainerPlayerUuid.trim();
         String cleanContainerResult = lastContainerResult == null ? "" : lastContainerResult.trim();
         String cleanContainerEventType = lastContainerEventType == null ? "" : lastContainerEventType.trim();
+        ItemStackMatcherData cleanInteractionItemMatcher = interactionItemMatcher == null
+                ? ItemStackMatcherData.empty()
+                : interactionItemMatcher.normalized();
+        String cleanInteractionItemResult = lastInteractionItemResult == null ? "" : lastInteractionItemResult.trim();
         List<ContainerItemConditionData> cleanItemConditions = new ArrayList<>();
         if (itemConditions != null) {
             for (ContainerItemConditionData condition : itemConditions) {
@@ -388,7 +535,11 @@ public record SignalDeviceData(
                 cleanContainerPlayerUuid,
                 cleanContainerResult,
                 cleanContainerEventType,
-                List.copyOf(cleanItemConditions)
+                List.copyOf(cleanItemConditions),
+                interactionItemMatcherEnabled && cleanInteractionItemMatcher.enabled(),
+                cleanInteractionItemMatcher,
+                lastInteractionItemMatched,
+                cleanInteractionItemResult
         );
     }
 }

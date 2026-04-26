@@ -3,7 +3,9 @@ package com.zcpu.tzzmod.signal.device;
 public enum ContainerItemConditionType {
     SLOT_EMPTY("slot_empty"),
     SLOT_ITEM("slot_item"),
-    TOTAL_ITEM("total_item");
+    TOTAL_ITEM("total_item"),
+    SLOT_MATCHER("slot_matcher"),
+    TOTAL_MATCHER("total_matcher");
 
     private final String id;
 

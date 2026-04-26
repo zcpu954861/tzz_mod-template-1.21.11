@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcher;
 import com.zcpu.tzzmod.util.NullSafety;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.BlockState;
@@ -52,6 +53,11 @@ public final class VirtualBlockDeviceInteractionHandler {
             }
 
             if (SignalDeviceStore.getRemainingInteractionCooldownTicks(device, serverWorld.getTime()) > 0L) {
+                return NullSafety.requireNonNull(ActionResult.PASS);
+            }
+
+            if (device.interactionItemMatcherEnabled()
+                    && !ItemStackMatcher.matches(serverPlayer.getMainHandStack(), device.interactionItemMatcher())) {
                 return NullSafety.requireNonNull(ActionResult.PASS);
             }
 
