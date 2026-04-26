@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.15.0-equipment-armor-source
+
+- 扩展 `virtual_block_device` 的 `interactionItem` 玩家物品来源匹配。
+- 新增 `/tzz signal blockDevice interactionItem source <x> <y> <z> armor_head|armor_chest|armor_legs|armor_feet|armor_any`。
+- `main_hand` 仍为默认来源，保持 5.10 / 5.11 / 5.12 旧配置兼容。
+- `armor_head` / `armor_chest` / `armor_legs` / `armor_feet` 只读取触发玩家对应盔甲槽位。
+- `armor_any` 只检查头盔、胸甲、护腿、靴子四个盔甲槽，并记录第一个匹配槽位。
+- 右键事件仍只处理 `MAIN_HAND`；armor 来源只是匹配槽位 ItemStack，不处理装备事件。
+- `consume` 仍只支持 `main_hand`；source 为 `armor_*` 时启用 consume 会被拒绝。
+- 运行时遇到旧数据中 `armor_*` source 与 `consumeEnabled=true` 不兼容时不会消耗，并按失败流程处理或在 debug 中提示。
+- `require_item_match` 锁定策略对 `armor_*` 同样生效；`interactionCooldownTicks` 不会让锁失效。
+- `allow` 模式继续保持不阻止原版右键交互的兼容行为。
+- `interactionItem info`、`device info` 和 `device debug` 显示 armor source、最近匹配槽位和匹配数量。
+- 本阶段不实现装备 / 盔甲消耗、背包消耗、副手消耗、多物品提交、复杂条件组、GUI 或通用 NBT 查询。
+- 后续计划仅记录：5.14 消耗策略 / 多物品提交、5.15 稳定化 / GUI 前置整理版、复杂 ConditionEngine / ConditionGroup 和 GUI / Admin UI。
+
 ## v1.14.0-player-item-source
 
 - 增强 `virtual_block_device` 的 `interactionItem` 玩家物品来源匹配。
