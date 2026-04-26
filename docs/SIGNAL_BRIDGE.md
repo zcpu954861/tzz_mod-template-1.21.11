@@ -580,6 +580,46 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - 容器 slot matcher 只读取指定 slot；total matcher 只遍历该绑定容器自身 slot。
 - 不扫描世界、区块或周围方块，不强制加载区块，状态不变不写 `signal_devices.json`。
 
+### 右键物品匹配增强
+
+5.11 阶段增强 `interactionItem` 主手物品匹配。所有成功 / 失败反馈都是可选配置：默认不显示消息、不播放音效、不触发失败频道、不消耗物品。
+
+```text
+/tzz signal blockDevice interactionItem successChannel <x> <y> <z> <channel>
+/tzz signal blockDevice interactionItem clearSuccessChannel <x> <y> <z>
+/tzz signal blockDevice interactionItem failChannel <x> <y> <z> <channel>
+/tzz signal blockDevice interactionItem clearFailChannel <x> <y> <z>
+/tzz signal blockDevice interactionItem successMessage <x> <y> <z> <message>
+/tzz signal blockDevice interactionItem clearSuccessMessage <x> <y> <z>
+/tzz signal blockDevice interactionItem failMessage <x> <y> <z> <message>
+/tzz signal blockDevice interactionItem clearFailMessage <x> <y> <z>
+/tzz signal blockDevice interactionItem successSound <x> <y> <z> <soundId> <volume> <pitch>
+/tzz signal blockDevice interactionItem clearSuccessSound <x> <y> <z>
+/tzz signal blockDevice interactionItem failSound <x> <y> <z> <soundId> <volume> <pitch>
+/tzz signal blockDevice interactionItem clearFailSound <x> <y> <z>
+/tzz signal blockDevice interactionItem consume <x> <y> <z> enable
+/tzz signal blockDevice interactionItem consume <x> <y> <z> disable
+/tzz signal blockDevice interactionItem consumeCount <x> <y> <z> <count>
+```
+
+规则：
+
+- `successChannel` 为空时，匹配成功回退使用 `interactChannel`。
+- `failChannel` 为空时，匹配失败不 emit signal。
+- success / fail message 完全由管理员配置，未配置时不发送。
+- success / fail sound 只播放给触发玩家，未配置时不播放。
+- `consume` 只消耗右键玩家 `MAIN_HAND`，不搜索背包、副手、装备栏或盔甲栏。
+- `consumeCount` 必须大于 0；主手数量不足时进入失败流程，不发成功频道、不发送成功反馈、不消耗。
+- `interactionCooldownTicks` 同时限制成功和失败反馈；冷却中不 emit、不反馈、不消耗、不阻止原版交互。
+- 成功 / 失败 signal 都保留玩家上下文并走现有 SignalBridge 递归保护。
+
+边界：
+
+- 本阶段只增强 interactionItem 主手匹配。
+- 不做玩家背包检测、副手匹配、装备栏 / 盔甲栏匹配、复杂多物品条件或 GUI。
+- 不做通用 NBT 查询，不检测告示牌文字、命令方块命令、刷怪笼 NBT、任意 BlockEntity NBT、玩家 NBT 或实体 NBT。
+- 未来 GUI / Admin UI 应覆盖 success/fail channel、message、sound、consume 和 consumeCount；也可以拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器和 debug/doctor 工具。
+
 ### 统一设备命令
 
 统一设备命令也支持虚拟方块发射器：
@@ -634,8 +674,7 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 - 玩家背包内是否包含匹配物品。
 - 玩家副手物品匹配。
-- 右键成功后消耗匹配物品。
-- 右键失败提示消息。
+- 更复杂的消耗规则和失败提示策略。
 - 匹配装备栏和盔甲栏。
 - 6.0 / 7.0 GUI / Admin UI：通过配置界面管理 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 和 ActionEngine；容器槽位和物品条件不应长期依赖超长命令，未来应允许打开配置页面、选择槽位，并把目标物品放入配置槽作为匹配模板。
 

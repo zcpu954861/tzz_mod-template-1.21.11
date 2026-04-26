@@ -73,6 +73,18 @@ public final class ItemStackMatcherSupport {
                 data.templateCustomData(),
                 data.templateComponents(),
                 data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
                 data.createdWallTimeMillis(),
                 now
         ).normalized();
@@ -101,6 +113,131 @@ public final class ItemStackMatcherSupport {
                 data.templateCustomData(),
                 data.templateComponents(),
                 data.templateSummary(),
+                data.successChannel(),
+                data.failChannel(),
+                data.successMessage(),
+                data.failMessage(),
+                data.successSoundId(),
+                data.successSoundVolume(),
+                data.successSoundPitch(),
+                data.failSoundId(),
+                data.failSoundVolume(),
+                data.failSoundPitch(),
+                data.consumeEnabled(),
+                data.consumeCount(),
+                data.createdWallTimeMillis(),
+                now
+        ).normalized();
+    }
+
+    public static ItemStackMatcherData withSuccessChannel(ItemStackMatcherData matcher, String channel) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, channel, data.failChannel(), data.successMessage(), data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withFailChannel(ItemStackMatcherData matcher, String channel) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), channel, data.successMessage(), data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withSuccessMessage(ItemStackMatcherData matcher, String message) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), message, data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withFailMessage(ItemStackMatcherData matcher, String message) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), data.successMessage(), message,
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withSuccessSound(ItemStackMatcherData matcher, String soundId, float volume, float pitch) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), data.successMessage(), data.failMessage(),
+                soundId, volume, pitch, data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withFailSound(ItemStackMatcherData matcher, String soundId, float volume, float pitch) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), data.successMessage(), data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(), soundId, volume, pitch,
+                data.consumeEnabled(), data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withConsume(ItemStackMatcherData matcher, boolean enabled) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), data.successMessage(), data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                enabled, data.consumeCount());
+    }
+
+    public static ItemStackMatcherData withConsumeCount(ItemStackMatcherData matcher, int count) {
+        ItemStackMatcherData data = matcher == null ? ItemStackMatcherData.empty() : matcher.normalized();
+        return copyFeedback(data, data.successChannel(), data.failChannel(), data.successMessage(), data.failMessage(),
+                data.successSoundId(), data.successSoundVolume(), data.successSoundPitch(),
+                data.failSoundId(), data.failSoundVolume(), data.failSoundPitch(),
+                data.consumeEnabled(), Math.max(1, count));
+    }
+
+    private static ItemStackMatcherData copyFeedback(
+            ItemStackMatcherData data,
+            String successChannel,
+            String failChannel,
+            String successMessage,
+            String failMessage,
+            String successSoundId,
+            float successSoundVolume,
+            float successSoundPitch,
+            String failSoundId,
+            float failSoundVolume,
+            float failSoundPitch,
+            boolean consumeEnabled,
+            int consumeCount
+    ) {
+        long now = System.currentTimeMillis();
+        return new ItemStackMatcherData(
+                data.enabled(),
+                data.templateItemId(),
+                data.templateCount(),
+                data.countMode(),
+                data.requiredCount(),
+                data.matchItemId(),
+                data.matchDamage(),
+                data.matchCustomName(),
+                data.matchLore(),
+                data.matchCustomData(),
+                data.matchComponents(),
+                data.templateDamage(),
+                data.templateCustomName(),
+                data.templateLore(),
+                data.templateCustomData(),
+                data.templateComponents(),
+                data.templateSummary(),
+                successChannel,
+                failChannel,
+                successMessage,
+                failMessage,
+                successSoundId,
+                successSoundVolume,
+                successSoundPitch,
+                failSoundId,
+                failSoundVolume,
+                failSoundPitch,
+                consumeEnabled,
+                consumeCount,
                 data.createdWallTimeMillis(),
                 now
         ).normalized();

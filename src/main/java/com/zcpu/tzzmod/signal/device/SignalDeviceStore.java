@@ -1400,6 +1400,121 @@ public final class SignalDeviceStore {
         return Math.max(0L, device.interactionCooldownTicks() - elapsed);
     }
 
+    public static synchronized void recordVirtualInteractionItemResult(
+            ServerWorld world,
+            SignalDeviceData device,
+            ServerPlayerEntity player,
+            String handName,
+            String sideName,
+            boolean matched,
+            String feedbackResult,
+            int consumedCount,
+            ActionExecutionResult signalResult
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String signalMessage = signalResult == null || signalResult.message() == null ? "" : signalResult.message().getString();
+        String resultMessage = feedbackResult == null ? "" : feedbackResult.trim();
+        if (!signalMessage.isBlank()) {
+            resultMessage = resultMessage.isBlank() ? signalMessage : resultMessage + "；" + signalMessage;
+        }
+        if (consumedCount > 0) {
+            resultMessage = resultMessage.isBlank()
+                    ? "已消耗 " + consumedCount + " 个物品"
+                    : resultMessage + "；已消耗 " + consumedCount + " 个物品";
+        }
+        long now = System.currentTimeMillis();
+        SignalDeviceData interacted = withInteraction(
+                existing,
+                existing.interactionEnabled(),
+                existing.interactChannel(),
+                existing.interactionCooldownTicks(),
+                world.getTime(),
+                now,
+                player == null ? "" : player.getName().getString(),
+                player == null ? "" : player.getUuidAsString(),
+                resultMessage,
+                handName,
+                sideName
+        );
+        SignalDeviceData updated = new SignalDeviceData(
+                interacted.id(),
+                interacted.type(),
+                interacted.name(),
+                interacted.dimension(),
+                interacted.x(),
+                interacted.y(),
+                interacted.z(),
+                interacted.channel(),
+                interacted.enabled(),
+                interacted.pulseTicks(),
+                interacted.remainingPulseTicks(),
+                interacted.cooldownTicks(),
+                interacted.actionCount(),
+                interacted.createdWallTimeMillis(),
+                now,
+                signalResult == null ? interacted.lastTriggerGameTime() : world.getTime(),
+                signalResult == null ? interacted.lastTriggerWallTimeMillis() : now,
+                signalResult == null ? interacted.lastResult() : resultMessage,
+                interacted.blockId(),
+                interacted.offChannel(),
+                interacted.mode(),
+                interacted.lastPowered(),
+                interacted.lastPowerLevel(),
+                interacted.conditionEnabled(),
+                interacted.conditionBlockId(),
+                interacted.conditionProperties(),
+                interacted.conditionRaw(),
+                interacted.conditionMode(),
+                interacted.lastConditionMatched(),
+                interacted.lastConditionCheckGameTime(),
+                interacted.lastConditionResult(),
+                interacted.interactionEnabled(),
+                interacted.interactChannel(),
+                interacted.interactionCooldownTicks(),
+                interacted.lastInteractionGameTime(),
+                interacted.lastInteractionWallTimeMillis(),
+                interacted.lastInteractionPlayerName(),
+                interacted.lastInteractionPlayerUuid(),
+                interacted.lastInteractionResult(),
+                interacted.lastInteractionHand(),
+                interacted.lastInteractionSide(),
+                interacted.containerEnabled(),
+                interacted.containerOpenChannel(),
+                interacted.containerCloseChannel(),
+                interacted.containerChangeChannel(),
+                interacted.containerCooldownTicks(),
+                interacted.containerChangeCheckIntervalTicks(),
+                interacted.lastContainerCheckGameTime(),
+                interacted.lastContainerFingerprint(),
+                interacted.lastContainerOpenGameTime(),
+                interacted.lastContainerOpenWallTimeMillis(),
+                interacted.lastContainerCloseGameTime(),
+                interacted.lastContainerCloseWallTimeMillis(),
+                interacted.lastContainerChangeGameTime(),
+                interacted.lastContainerChangeWallTimeMillis(),
+                interacted.lastContainerPlayerName(),
+                interacted.lastContainerPlayerUuid(),
+                interacted.lastContainerResult(),
+                interacted.lastContainerEventType(),
+                interacted.itemConditions(),
+                interacted.interactionItemMatcherEnabled(),
+                interacted.interactionItemMatcher(),
+                matched,
+                resultMessage
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
     public static synchronized void recordVirtualContainerEvent(
             ServerWorld world,
             SignalDeviceData device,
