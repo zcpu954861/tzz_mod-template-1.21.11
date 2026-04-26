@@ -5,11 +5,17 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
+import com.zcpu.tzzmod.signal.device.item.InteractionItemConsumeSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
+import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcher;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.util.NullSafety;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.DoorBlock;
@@ -32,6 +38,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 public final class VirtualBlockDeviceInteractionHandler {
+    private static final String MAIN_HAND_KEY = "main_hand";
+    private static final String OFF_HAND_KEY = "off_hand";
     private static boolean registered;
 
     private VirtualBlockDeviceInteractionHandler() {
@@ -71,9 +79,17 @@ public final class VirtualBlockDeviceInteractionHandler {
             }
 
             BlockPos devicePos = target.devicePos();
-            if (device.interactionItemMatcherEnabled()) {
+            if (device.interactionItemMatcherEnabled() || device.itemSubmitEnabled()) {
                 boolean inCooldown = SignalDeviceStore.getRemainingInteractionCooldownTicks(device, serverWorld.getTime()) > 0L;
-                return NullSafety.requireNonNull(handleItemMatchedInteraction(serverWorld, serverPlayer, hand, hitResult.getSide().asString(), devicePos, device, inCooldown));
+                return NullSafety.requireNonNull(handleItemMatchedInteraction(
+                        serverWorld,
+                        serverPlayer,
+                        hand,
+                        hitResult.getSide().asString(),
+                        devicePos,
+                        device,
+                        inCooldown
+                ));
             }
 
             if (SignalDeviceStore.getRemainingInteractionCooldownTicks(device, serverWorld.getTime()) > 0L) {
@@ -142,25 +158,44 @@ public final class VirtualBlockDeviceInteractionHandler {
             boolean inCooldown
     ) {
         ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
-        InteractionItemMatch match = evaluateInteractionItemMatch(player, matcher);
-        if (!match.matched()) {
-            if (inCooldown) {
-                return vanillaFailureResult(matcher);
-            }
-            return runFailureFeedback(world, player, hand, sideName, device, match.source(), match.matchedSlot(), match.matchedCount(), "物品不匹配");
+        boolean itemSubmitMode = device.itemSubmitEnabled();
+        boolean hasItemMatcher = !itemSubmitMode && device.interactionItemMatcherEnabled() && matcher.enabled();
+        if (!itemSubmitMode && !hasItemMatcher) {
+            return ActionResult.PASS;
         }
-        if (matcher.consumeEnabled() && !InteractionItemSource.supportsConsume(match.source())) {
-            if (inCooldown) {
-                return vanillaFailureResult(matcher);
-            }
-            return runFailureFeedback(world, player, hand, sideName, device, match.source(), match.matchedSlot(), match.matchedCount(), "consume_source_unsupported");
+
+        InteractionItemMatch match = hasItemMatcher ? evaluateInteractionItemMatch(player, matcher) : InteractionItemMatch.itemSubmit();
+        if (!itemSubmitMode && hasItemMatcher && !match.matched()) {
+            return fail(world, player, hand, sideName, device, matcher, inCooldown, match.source(), match.matchedSlot(), match.matchedCount(), "item_not_matched");
         }
-        if (matcher.consumeEnabled() && match.stackForConsume().getCount() < matcher.consumeCount()) {
-            if (inCooldown) {
-                return vanillaFailureResult(matcher);
+
+        if (itemSubmitMode) {
+            ItemSubmitEvaluation submitEvaluation = evaluateItemSubmit(player, device, !inCooldown);
+            if (!submitEvaluation.ok()) {
+                return fail(world, player, hand, sideName, device, matcher, inCooldown, "item_submit", -1, 0, submitEvaluation.failureReason());
             }
-            return runFailureFeedback(world, player, hand, sideName, device, match.source(), match.matchedSlot(), match.matchedCount(), "not_enough_items_to_consume");
         }
+
+        ConsumePlan consumePlan = new ConsumePlan();
+        if (!itemSubmitMode && hasItemMatcher && matcher.consumeEnabled()) {
+            String failure = stageInteractionConsumePlan(player, matcher, match, consumePlan);
+            if (!failure.isBlank()) {
+                return fail(world, player, hand, sideName, device, matcher, inCooldown, match.source(), match.matchedSlot(), match.matchedCount(), failure);
+            }
+        }
+        if (itemSubmitMode && device.itemSubmitConsumeEnabled()) {
+            String failure = stageItemSubmitConsumePlan(player, device, consumePlan);
+            if (!failure.isBlank()) {
+                return fail(world, player, hand, sideName, device, matcher, inCooldown, "item_submit", -1, 0, failure);
+            }
+        }
+
+        String consumedSlots = "";
+        if (!consumePlan.isEmpty()) {
+            consumedSlots = consumePlan.summary();
+            consumePlan.apply(player);
+        }
+
         if (inCooldown) {
             return ActionResult.PASS;
         }
@@ -185,16 +220,17 @@ public final class VirtualBlockDeviceInteractionHandler {
         }
         playConfiguredSound(player, matcher.successSoundId(), matcher.successSoundVolume(), matcher.successSoundPitch());
 
-        int consumed = 0;
-        if (matcher.consumeEnabled()) {
-            consumed = matcher.consumeCount();
-            match.stackForConsume().decrement(consumed);
-            if (match.stackForConsume().isEmpty()) {
-                player.setStackInHand(hand, ItemStack.EMPTY);
-            }
-        }
-
         swingInteractionHand(player, hand);
+        if (itemSubmitMode) {
+            SignalDeviceStore.recordVirtualItemSubmitResult(
+                    world,
+                    device,
+                    true,
+                    "",
+                    consumedSlots,
+                    "itemSubmit success"
+            );
+        }
         SignalDeviceStore.recordVirtualInteractionItemResult(
                 world,
                 device,
@@ -202,14 +238,68 @@ public final class VirtualBlockDeviceInteractionHandler {
                 hand.name(),
                 sideName,
                 true,
-                channel.isBlank() ? "匹配成功，但未配置成功频道" : "匹配成功",
-                consumed,
+                channel.isBlank() ? "match_success_no_channel" : "match_success",
+                consumePlan.totalCount(),
                 match.source(),
                 match.matchedSlot(),
                 match.matchedCount(),
+                consumePlan.primarySource(),
+                consumedSlots,
+                consumePlan.isEmpty() ? "" : "consume_success",
                 result
         );
         return ActionResult.PASS;
+    }
+
+    private static String stageInteractionConsumePlan(
+            ServerPlayerEntity player,
+            ItemStackMatcherData matcher,
+            InteractionItemMatch match,
+            ConsumePlan plan
+    ) {
+        ConsumePlan staged = plan.copy();
+        String failure = addInteractionConsumePlan(player, matcher, match, staged);
+        if (!failure.isBlank()) {
+            return failure;
+        }
+        plan.replaceWith(staged);
+        return "";
+    }
+
+    private static String stageItemSubmitConsumePlan(
+            ServerPlayerEntity player,
+            SignalDeviceData device,
+            ConsumePlan plan
+    ) {
+        ConsumePlan staged = plan.copy();
+        String failure = addItemSubmitConsumePlan(player, device, staged);
+        if (!failure.isBlank()) {
+            return "item_submit_consume_plan_failed:" + failure;
+        }
+        plan.replaceWith(staged);
+        return "";
+    }
+
+    private static ActionResult fail(
+            ServerWorld world,
+            ServerPlayerEntity player,
+            Hand hand,
+            String sideName,
+            SignalDeviceData device,
+            ItemStackMatcherData matcher,
+            boolean inCooldown,
+            String sourceName,
+            int matchedSlot,
+            int matchedCount,
+            String failureReason
+    ) {
+        if (inCooldown) {
+            return vanillaFailureResult(matcher);
+        }
+        if (device.itemSubmitEnabled()) {
+            SignalDeviceStore.recordVirtualItemSubmitResult(world, device, false, failureReason, "", "itemSubmit failed");
+        }
+        return runFailureFeedback(world, player, hand, sideName, device, sourceName, matchedSlot, matchedCount, failureReason);
     }
 
     private static ActionResult runFailureFeedback(
@@ -252,17 +342,18 @@ public final class VirtualBlockDeviceInteractionHandler {
                     hand.name(),
                     sideName,
                     false,
-                    "匹配失败：" + failureReason,
+                    "match_failed:" + failureReason,
                     0,
                     sourceName,
                     matchedSlot,
                     matchedCount,
+                    "",
+                    "",
+                    "",
                     result
             );
         }
-        return InteractionItemVanillaPolicy.blocksVanillaOnFailure(matcher.interactionItemVanillaPolicy())
-                ? ActionResult.FAIL
-                : ActionResult.PASS;
+        return vanillaFailureResult(matcher);
     }
 
     private static ActionResult vanillaFailureResult(ItemStackMatcherData matcher) {
@@ -271,18 +362,175 @@ public final class VirtualBlockDeviceInteractionHandler {
                 : ActionResult.PASS;
     }
 
+    private static String addInteractionConsumePlan(
+            ServerPlayerEntity player,
+            ItemStackMatcherData matcher,
+            InteractionItemMatch match,
+            ConsumePlan plan
+    ) {
+        String consumeSource = resolveConsumeSource(matcher, match);
+        if (consumeSource.isBlank()) {
+            return "consume_source_unsupported";
+        }
+        int consumeCount = Math.max(1, matcher.consumeCount());
+        return switch (consumeSource) {
+            case InteractionItemConsumeSource.MAIN_HAND -> addHandConsumePlan(player, matcher, Hand.MAIN_HAND, consumeCount, plan);
+            case InteractionItemConsumeSource.OFF_HAND -> addHandConsumePlan(player, matcher, Hand.OFF_HAND, consumeCount, plan);
+            case InteractionItemConsumeSource.INVENTORY -> addInventoryConsumePlan(player, matcher, consumeCount, matcher.interactionItemInventoryConsumeOrder(), plan, "interactionItem");
+            default -> "consume_source_unsupported";
+        };
+    }
+
+    private static String resolveConsumeSource(ItemStackMatcherData matcher, InteractionItemMatch match) {
+        String configured = InteractionItemConsumeSource.normalize(matcher.interactionItemConsumeSource());
+        if (!InteractionItemConsumeSource.MATCHED_SOURCE.equals(configured)) {
+            return configured;
+        }
+        return switch (InteractionItemSource.normalize(match.source())) {
+            case InteractionItemSource.MAIN_HAND -> InteractionItemConsumeSource.MAIN_HAND;
+            case InteractionItemSource.OFF_HAND -> InteractionItemConsumeSource.OFF_HAND;
+            case InteractionItemSource.INVENTORY_CONTAINS -> InteractionItemConsumeSource.INVENTORY;
+            default -> "";
+        };
+    }
+
+    private static String addHandConsumePlan(
+            ServerPlayerEntity player,
+            ItemStackMatcherData matcher,
+            Hand consumeHand,
+            int count,
+            ConsumePlan plan
+    ) {
+        ItemStack stack = consumeHand == Hand.OFF_HAND ? player.getOffHandStack() : player.getMainHandStack();
+        String key = consumeHand == Hand.OFF_HAND ? OFF_HAND_KEY : MAIN_HAND_KEY;
+        if (!ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
+            return "consume_source_not_matched";
+        }
+        int available = stack.getCount() - plan.reserved(key);
+        if (available < count) {
+            return "not_enough_items_to_consume";
+        }
+        plan.add(new ConsumeEntry(key, consumeHand, -1, stack, count, key));
+        return "";
+    }
+
+    private static String addInventoryConsumePlan(
+            ServerPlayerEntity player,
+            ItemStackMatcherData matcher,
+            int count,
+            String order,
+            ConsumePlan plan,
+            String label
+    ) {
+        int remaining = count;
+        List<ItemStack> stacks = player.getInventory().getMainStacks();
+        for (int slot : inventorySlotOrder(stacks.size(), order)) {
+            ItemStack stack = stacks.get(slot);
+            if (!ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
+                continue;
+            }
+            String key = inventoryKey(slot);
+            int available = stack.getCount() - plan.reserved(key);
+            if (available <= 0) {
+                continue;
+            }
+            int take = Math.min(available, remaining);
+            plan.add(new ConsumeEntry(key, null, slot, stack, take, label + ":slot" + slot));
+            remaining -= take;
+            if (remaining <= 0) {
+                return "";
+            }
+        }
+        return "not_enough_items_to_consume";
+    }
+
+    private static String addItemSubmitConsumePlan(ServerPlayerEntity player, SignalDeviceData device, ConsumePlan plan) {
+        String order = device.itemSubmitConsumeOrder();
+        for (ItemSubmitRequirementData rawRequirement : device.itemSubmitRequirements()) {
+            ItemSubmitRequirementData requirement = rawRequirement.normalized();
+            if (!requirement.enabled()) {
+                continue;
+            }
+            String failure = addInventoryConsumePlan(
+                    player,
+                    requirement.matcher(),
+                    requirement.consumeCount(),
+                    order,
+                    plan,
+                    "submit:" + requirement.name()
+            );
+            if (!failure.isBlank()) {
+                return failure + ":" + requirement.name();
+            }
+        }
+        return "";
+    }
+
+    private static ItemSubmitEvaluation evaluateItemSubmit(ServerPlayerEntity player, SignalDeviceData device, boolean recordResults) {
+        if (!device.itemSubmitEnabled()) {
+            return ItemSubmitEvaluation.passed();
+        }
+        int enabledCount = 0;
+        long gameTime = player.getCommandSource().getWorld().getTime();
+        List<ItemSubmitRequirementData> updated = new ArrayList<>();
+        for (ItemSubmitRequirementData rawRequirement : device.itemSubmitRequirements()) {
+            ItemSubmitRequirementData requirement = rawRequirement.normalized();
+            if (!requirement.enabled()) {
+                updated.add(requirement);
+                continue;
+            }
+            enabledCount++;
+            int matchedCount = inventoryMatchedCount(player, requirement.matcher());
+            boolean matched = matchesInventoryCount(matchedCount, requirement.matcher());
+            updated.add(requirement.withResult(matched, matchedCount, gameTime, matched ? "matched" : "not_matched"));
+            if (!matched) {
+                if (recordResults) {
+                    SignalDeviceStore.updateVirtualItemSubmit(
+                            player.getCommandSource().getWorld(),
+                            new BlockPos(device.x(), device.y(), device.z()),
+                            device.itemSubmitEnabled(),
+                            device.itemSubmitConsumeEnabled(),
+                            device.itemSubmitConsumeOrder(),
+                            updated,
+                            "itemSubmit requirement failed: " + requirement.name()
+                    );
+                }
+                return ItemSubmitEvaluation.failed("submit_requirement_not_matched:" + requirement.name());
+            }
+        }
+        if (enabledCount == 0) {
+            return ItemSubmitEvaluation.failed("item_submit_no_enabled_requirements");
+        }
+        if (recordResults) {
+            SignalDeviceStore.updateVirtualItemSubmit(
+                    player.getCommandSource().getWorld(),
+                    new BlockPos(device.x(), device.y(), device.z()),
+                    device.itemSubmitEnabled(),
+                    device.itemSubmitConsumeEnabled(),
+                    device.itemSubmitConsumeOrder(),
+                    updated,
+                    "itemSubmit matched"
+            );
+        }
+        return ItemSubmitEvaluation.passed();
+    }
+
+    private static int inventoryMatchedCount(ServerPlayerEntity player, ItemStackMatcherData matcher) {
+        int total = 0;
+        for (ItemStack stack : player.getInventory().getMainStacks()) {
+            if (ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
+                total += stack.getCount();
+            }
+        }
+        return total;
+    }
+
     private static InteractionItemMatch evaluateInteractionItemMatch(ServerPlayerEntity player, ItemStackMatcherData matcher) {
         String source = InteractionItemSource.normalize(matcher.interactionItemSource());
         if (InteractionItemSource.OFF_HAND.equals(source)) {
             ItemStack stack = player.getOffHandStack();
             boolean matched = ItemStackMatcher.matches(stack, matcher);
-            return new InteractionItemMatch(
-                    matched,
-                    source,
-                    -1,
-                    matched && stack != null && !stack.isEmpty() ? stack.getCount() : 0,
-                    ItemStack.EMPTY
-            );
+            return new InteractionItemMatch(matched, source, -1, matched && !stack.isEmpty() ? stack.getCount() : 0);
         }
         if (InteractionItemSource.INVENTORY_CONTAINS.equals(source)) {
             int firstSlot = -1;
@@ -298,13 +546,7 @@ public final class VirtualBlockDeviceInteractionHandler {
                 }
                 totalCount += stack.getCount();
             }
-            return new InteractionItemMatch(
-                    matchesInventoryCount(totalCount, matcher),
-                    source,
-                    firstSlot,
-                    totalCount,
-                    ItemStack.EMPTY
-            );
+            return new InteractionItemMatch(matchesInventoryCount(totalCount, matcher), source, firstSlot, totalCount);
         }
         if (InteractionItemSource.ARMOR_HEAD.equals(source)) {
             return evaluateEquippedStack(player, matcher, EquipmentSlot.HEAD, InteractionItemSource.ARMOR_HEAD);
@@ -319,29 +561,13 @@ public final class VirtualBlockDeviceInteractionHandler {
             return evaluateEquippedStack(player, matcher, EquipmentSlot.FEET, InteractionItemSource.ARMOR_FEET);
         }
         if (InteractionItemSource.ARMOR_ANY.equals(source)) {
-            InteractionItemMatch head = evaluateEquippedStack(player, matcher, EquipmentSlot.HEAD, InteractionItemSource.ARMOR_HEAD);
-            if (head.matched()) {
-                return head;
+            for (ArmorSource armorSource : ARMOR_SOURCES) {
+                InteractionItemMatch match = evaluateEquippedStack(player, matcher, armorSource.slot(), armorSource.source());
+                if (match.matched()) {
+                    return match;
+                }
             }
-            InteractionItemMatch chest = evaluateEquippedStack(player, matcher, EquipmentSlot.CHEST, InteractionItemSource.ARMOR_CHEST);
-            if (chest.matched()) {
-                return chest;
-            }
-            InteractionItemMatch legs = evaluateEquippedStack(player, matcher, EquipmentSlot.LEGS, InteractionItemSource.ARMOR_LEGS);
-            if (legs.matched()) {
-                return legs;
-            }
-            InteractionItemMatch feet = evaluateEquippedStack(player, matcher, EquipmentSlot.FEET, InteractionItemSource.ARMOR_FEET);
-            if (feet.matched()) {
-                return feet;
-            }
-            return new InteractionItemMatch(
-                    false,
-                    InteractionItemSource.ARMOR_ANY,
-                    -1,
-                    0,
-                    ItemStack.EMPTY
-            );
+            return new InteractionItemMatch(false, InteractionItemSource.ARMOR_ANY, -1, 0);
         }
 
         ItemStack stack = player.getMainHandStack();
@@ -350,8 +576,7 @@ public final class VirtualBlockDeviceInteractionHandler {
                 matched,
                 InteractionItemSource.MAIN_HAND,
                 player.getInventory().getSelectedSlot(),
-                matched && stack != null && !stack.isEmpty() ? stack.getCount() : 0,
-                stack
+                matched && !stack.isEmpty() ? stack.getCount() : 0
         );
     }
 
@@ -363,13 +588,7 @@ public final class VirtualBlockDeviceInteractionHandler {
     ) {
         ItemStack stack = player.getEquippedStack(slot);
         boolean matched = ItemStackMatcher.matches(stack, matcher);
-        return new InteractionItemMatch(
-                matched,
-                source,
-                -1,
-                matched && stack != null && !stack.isEmpty() ? stack.getCount() : 0,
-                ItemStack.EMPTY
-        );
+        return new InteractionItemMatch(matched, source, -1, matched && !stack.isEmpty() ? stack.getCount() : 0);
     }
 
     private static boolean matchesInventoryCount(int totalCount, ItemStackMatcherData matcher) {
@@ -383,26 +602,35 @@ public final class VirtualBlockDeviceInteractionHandler {
         return ContainerItemCountMode.fromId(mode).matches(totalCount, matcher.requiredCount());
     }
 
+    private static List<Integer> inventorySlotOrder(int size, String rawOrder) {
+        List<Integer> slots = new ArrayList<>(size);
+        String order = InventoryConsumeOrder.normalize(rawOrder);
+        if (InventoryConsumeOrder.MAIN_INVENTORY_FIRST.equals(order)) {
+            for (int i = 9; i < size; i++) {
+                slots.add(i);
+            }
+            for (int i = 0; i < Math.min(9, size); i++) {
+                slots.add(i);
+            }
+            return slots;
+        }
+        for (int i = 0; i < Math.min(9, size); i++) {
+            slots.add(i);
+        }
+        for (int i = 9; i < size; i++) {
+            slots.add(i);
+        }
+        return slots;
+    }
+
+    private static String inventoryKey(int slot) {
+        return "inv:" + slot;
+    }
+
     private static void swingInteractionHand(ServerPlayerEntity player, Hand hand) {
         if (player != null && hand == Hand.MAIN_HAND) {
             player.swingHand(hand, true);
         }
-    }
-
-    private record InteractionItemMatch(
-            boolean matched,
-            String source,
-            int matchedSlot,
-            int matchedCount,
-            ItemStack stackForConsume
-    ) {
-    }
-
-    private record InteractionTarget(
-            SignalDeviceData device,
-            BlockPos devicePos,
-            BlockState clickedState
-    ) {
     }
 
     private static void playConfiguredSound(ServerPlayerEntity player, String soundId, float volume, float pitch) {
@@ -427,5 +655,110 @@ public final class VirtualBlockDeviceInteractionHandler {
                 pitch,
                 player.getRandom().nextLong()
         ));
+    }
+
+    private static final List<ArmorSource> ARMOR_SOURCES = List.of(
+            new ArmorSource(EquipmentSlot.HEAD, InteractionItemSource.ARMOR_HEAD),
+            new ArmorSource(EquipmentSlot.CHEST, InteractionItemSource.ARMOR_CHEST),
+            new ArmorSource(EquipmentSlot.LEGS, InteractionItemSource.ARMOR_LEGS),
+            new ArmorSource(EquipmentSlot.FEET, InteractionItemSource.ARMOR_FEET)
+    );
+
+    private record ArmorSource(EquipmentSlot slot, String source) {
+    }
+
+    private record InteractionItemMatch(boolean matched, String source, int matchedSlot, int matchedCount) {
+        private static InteractionItemMatch empty() {
+            return new InteractionItemMatch(true, "", -1, 0);
+        }
+
+        private static InteractionItemMatch itemSubmit() {
+            return new InteractionItemMatch(true, "item_submit", -1, 0);
+        }
+    }
+
+    private record ItemSubmitEvaluation(boolean ok, String failureReason) {
+        private static ItemSubmitEvaluation passed() {
+            return new ItemSubmitEvaluation(true, "");
+        }
+
+        private static ItemSubmitEvaluation failed(String failureReason) {
+            return new ItemSubmitEvaluation(false, failureReason == null ? "item_submit_failed" : failureReason);
+        }
+    }
+
+    private record InteractionTarget(SignalDeviceData device, BlockPos devicePos, BlockState clickedState) {
+    }
+
+    private record ConsumeEntry(String key, Hand hand, int inventorySlot, ItemStack stack, int count, String label) {
+    }
+
+    private static final class ConsumePlan {
+        private final List<ConsumeEntry> entries = new ArrayList<>();
+        private final Map<String, Integer> reserved = new HashMap<>();
+
+        ConsumePlan copy() {
+            ConsumePlan copy = new ConsumePlan();
+            copy.entries.addAll(entries);
+            copy.reserved.putAll(reserved);
+            return copy;
+        }
+
+        void replaceWith(ConsumePlan other) {
+            entries.clear();
+            reserved.clear();
+            if (other != null) {
+                entries.addAll(other.entries);
+                reserved.putAll(other.reserved);
+            }
+        }
+
+        void add(ConsumeEntry entry) {
+            entries.add(entry);
+            reserved.put(entry.key(), reserved(entry.key()) + entry.count());
+        }
+
+        int reserved(String key) {
+            return reserved.getOrDefault(key, 0);
+        }
+
+        boolean isEmpty() {
+            return entries.isEmpty();
+        }
+
+        int totalCount() {
+            int total = 0;
+            for (ConsumeEntry entry : entries) {
+                total += entry.count();
+            }
+            return total;
+        }
+
+        String primarySource() {
+            return entries.isEmpty() ? "" : entries.get(0).key();
+        }
+
+        String summary() {
+            if (entries.isEmpty()) {
+                return "";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (ConsumeEntry entry : entries) {
+                if (!builder.isEmpty()) {
+                    builder.append(", ");
+                }
+                builder.append(entry.label()).append(" x").append(entry.count());
+            }
+            return builder.toString();
+        }
+
+        void apply(ServerPlayerEntity player) {
+            for (ConsumeEntry entry : entries) {
+                entry.stack().decrement(entry.count());
+                if (entry.stack().isEmpty() && entry.hand() != null) {
+                    player.setStackInHand(entry.hand(), ItemStack.EMPTY);
+                }
+            }
+        }
     }
 }

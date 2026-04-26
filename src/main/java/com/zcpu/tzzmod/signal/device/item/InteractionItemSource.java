@@ -30,7 +30,10 @@ public final class InteractionItemSource {
     }
 
     public static boolean supportsConsume(String source) {
-        return MAIN_HAND.equals(normalize(source));
+        return switch (normalize(source)) {
+            case MAIN_HAND, OFF_HAND, INVENTORY_CONTAINS -> true;
+            default -> false;
+        };
     }
 
     public static boolean isArmorSource(String source) {

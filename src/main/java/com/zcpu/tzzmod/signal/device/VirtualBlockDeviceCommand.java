@@ -236,6 +236,7 @@ public final class VirtualBlockDeviceCommand {
                                         BlockPosArgumentType.getLoadedBlockPos(context, "pos")
                                 ))))
                 .then(ContainerItemConditionCommand.build())
+                .then(VirtualBlockItemSubmitCommand.build())
                 .then(CommandManager.literal("info")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeInfo(
