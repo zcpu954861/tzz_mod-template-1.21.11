@@ -1,0 +1,6 @@
+{
+  "parent": "tzz_mod:block/action_relay",
+  "textures": {
+    "panel": "tzz_mod:block/action_relay_panel_on"
+  }
+}

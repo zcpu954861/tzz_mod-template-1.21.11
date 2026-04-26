@@ -5,9 +5,12 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
+import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalChannelInspector;
@@ -40,6 +43,8 @@ public final class SignalDeviceCommand {
         return CommandManager.literal("device")
                 .then(CommandManager.literal("list")
                         .executes(context -> executeList(context.getSource())))
+                .then(CommandManager.literal("cleanup")
+                        .executes(context -> executeCleanup(context.getSource())))
                 .then(CommandManager.literal("bind")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .then(CommandManager.argument("channel", StringArgumentType.string())
@@ -133,13 +138,24 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> indentField("状态", enabledText(device.enabled())), false);
             if (isReceiver(device)) {
                 source.sendFeedback(() -> indentField("脉冲时长", gtText(device.pulseTicks())), false);
+            } else if (isActionRelay(device)) {
+                source.sendFeedback(() -> indentField("动作数量", number(device.actionCount())), false);
+                source.sendFeedback(() -> indentField("冷却", gtText(device.cooldownTicks())), false);
             }
-            source.sendFeedback(() -> indentField(isReceiver(device) ? "最近接收" : "最近触发",
+            source.sendFeedback(() -> indentField(isReceiver(device) ? "最近接收" : isActionRelay(device) ? "最近执行" : "最近触发",
                     elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         }
         if (devices.size() > shown) {
             source.sendFeedback(() -> warning("仅显示前 " + shown + " 个，共 " + devices.size() + " 个。"), false);
         }
+        return 1;
+    }
+
+    private static int executeCleanup(ServerCommandSource source) {
+        int removed = SignalDeviceStore.cleanupInvalidLoadedDevices(source.getServer());
+        sendHeader(source, Text.literal("已清理无效信号设备记录").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("清理数量", number(removed)), false);
+        source.sendFeedback(() -> warning("仅检查已登记且所在区块已加载的设备；未加载区块不会被强制加载。"), false);
         return 1;
     }
 
@@ -159,9 +175,12 @@ public final class SignalDeviceCommand {
         if (loadedDevice.emitter() != null) {
             loadedDevice.emitter().setChannel(channel);
             device = SignalDeviceStore.updateChannel(source.getWorld(), pos, loadedDevice.emitter());
-        } else {
+        } else if (loadedDevice.receiver() != null) {
             loadedDevice.receiver().setChannel(channel);
             device = SignalDeviceStore.updateChannel(source.getWorld(), pos, loadedDevice.receiver());
+        } else {
+            loadedDevice.relay().setChannel(channel);
+            device = SignalDeviceStore.updateChannel(source.getWorld(), pos, loadedDevice.relay());
         }
 
         sendHeader(source, Text.literal("已绑定信号设备频道").formatted(Formatting.GREEN));
@@ -185,7 +204,9 @@ public final class SignalDeviceCommand {
 
         SignalDeviceData device = loadedDevice.emitter() != null
                 ? SignalDeviceStore.setName(source.getWorld(), pos, loadedDevice.emitter(), name)
-                : SignalDeviceStore.setName(source.getWorld(), pos, loadedDevice.receiver(), name);
+                : loadedDevice.receiver() != null
+                        ? SignalDeviceStore.setName(source.getWorld(), pos, loadedDevice.receiver(), name)
+                        : SignalDeviceStore.setName(source.getWorld(), pos, loadedDevice.relay(), name);
         sendHeader(source, Text.literal("已命名信号设备").formatted(Formatting.GREEN));
         source.sendFeedback(() -> field("位置", positionText(device)), false);
         source.sendFeedback(() -> field("名称", nameText(device.name())), false);
@@ -276,6 +297,7 @@ public final class SignalDeviceCommand {
         SignalDeviceData device = SignalDeviceStore.refreshLoadedState(source.getServer(), resolved.device());
         SignalEmitterBlockEntity emitter = SignalDeviceStore.getLoadedEmitter(source.getServer(), device);
         SignalReceiverBlockEntity receiver = SignalDeviceStore.getLoadedReceiver(source.getServer(), device);
+        ActionRelayBlockEntity relay = SignalDeviceStore.getLoadedActionRelay(source.getServer(), device);
         List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), device.channel());
         int enabledListeners = 0;
         int actionCount = 0;
@@ -286,6 +308,8 @@ public final class SignalDeviceCommand {
             actionCount += listener.actions() == null ? 0 : listener.actions().size();
         }
         int receiverCount = receiverCountForChannel(source, device.channel());
+        int relayCount = actionRelayCountForChannel(source, device.channel());
+        int invalidActionCount = relay == null ? 0 : invalidActionCount(relay);
         int finalEnabledListeners = enabledListeners;
         int finalActionCount = actionCount;
 
@@ -301,16 +325,21 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("脉冲时长", gtText(device.pulseTicks())), false);
             source.sendFeedback(() -> field("剩余脉冲", number(device.remainingPulseTicks()).append(Text.literal(" GT").formatted(Formatting.GRAY))), false);
             source.sendFeedback(() -> field("红石输出", receiverOutputText(source, device)), false);
+        } else if (isActionRelay(device)) {
+            source.sendFeedback(() -> field("冷却", gtText(device.cooldownTicks())), false);
+            source.sendFeedback(() -> field("当前冷却剩余", gtText(relay == null ? 0 : (int) relay.remainingCooldownTicks(source.getWorld().getTime()))), false);
+            source.sendFeedback(() -> field("动作数量", number(device.actionCount())), false);
+            source.sendFeedback(() -> field("动作配置异常", number(invalidActionCount)), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
         }
-        source.sendFeedback(() -> field(isReceiver(device) ? "最近接收" : "最近触发",
+        source.sendFeedback(() -> field(isReceiver(device) ? "最近接收" : isActionRelay(device) ? "最近执行" : "最近触发",
                 elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
-        source.sendFeedback(() -> field("方块实体", emitter == null && receiver == null
+        source.sendFeedback(() -> field("方块实体", emitter == null && receiver == null && relay == null
                 ? Text.literal("方块未加载或已不存在").formatted(Formatting.YELLOW)
                 : Text.literal("已加载并匹配").formatted(Formatting.GREEN)), false);
-        source.sendFeedback(() -> field("状态一致性", consistencyText(device, emitter, receiver)), false);
+        source.sendFeedback(() -> field("状态一致性", consistencyText(device, emitter, receiver, relay)), false);
         source.sendFeedback(() -> field("频道有效性", SignalChannel.isValid(device.channel())
                 ? Text.literal("有效").formatted(Formatting.GREEN)
                 : Text.literal("无效或未绑定").formatted(Formatting.YELLOW)), false);
@@ -322,9 +351,12 @@ public final class SignalDeviceCommand {
                 .append(Text.literal(" 个").formatted(Formatting.GRAY))), false);
         if (isReceiver(device)) {
             source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
+        } else if (isActionRelay(device)) {
+            source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
+            source.sendFeedback(() -> field("同频道动作继电器", number(relayCount)), false);
         }
 
-        List<Text> hints = debugHints(device, emitter, receiver, listeners, receiverCount);
+        List<Text> hints = debugHints(device, emitter, receiver, relay, listeners, receiverCount, relayCount, source.getWorld().getTime());
         if (!hints.isEmpty()) {
             source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
             for (Text hint : hints) {
@@ -368,9 +400,13 @@ public final class SignalDeviceCommand {
                 SignalDeviceStore.recordTrigger(source.getWorld(), pos, loadedDevice.emitter(), result);
             }
             device = SignalDeviceStore.upsertEmitter(source.getWorld(), pos, loadedDevice.emitter());
-        } else {
+        } else if (loadedDevice.receiver() != null) {
             result = loadedDevice.receiver().receiveSignal(source.getWorld());
             device = SignalDeviceStore.upsertReceiver(source.getWorld(), pos, loadedDevice.receiver());
+        } else {
+            ServerPlayerEntity player = source.getEntity() instanceof ServerPlayerEntity serverPlayer ? serverPlayer : null;
+            result = loadedDevice.relay().executeRelayActions(source.getWorld(), player, true);
+            device = SignalDeviceStore.upsertActionRelay(source.getWorld(), pos, loadedDevice.relay());
         }
 
         if (!result.success()) {
@@ -378,7 +414,8 @@ public final class SignalDeviceCommand {
             return 0;
         }
 
-        sendHeader(source, Text.literal(loadedDevice.emitter() != null ? "已测试信号发射器" : "已测试信号接收器")
+        sendHeader(source, Text.literal(loadedDevice.emitter() != null ? "已测试信号发射器"
+                        : loadedDevice.receiver() != null ? "已测试信号接收器" : "已测试动作继电器")
                 .formatted(Formatting.GREEN));
         source.sendFeedback(() -> field("类型", typeText(device)), false);
         source.sendFeedback(() -> field("位置", posText(pos)), false);
@@ -397,9 +434,12 @@ public final class SignalDeviceCommand {
         if (loadedDevice.emitter() != null) {
             loadedDevice.emitter().setEnabled(enabled);
             device = SignalDeviceStore.updateEnabled(source.getWorld(), pos, loadedDevice.emitter());
-        } else {
+        } else if (loadedDevice.receiver() != null) {
             loadedDevice.receiver().setEnabled(enabled);
             device = SignalDeviceStore.updateEnabled(source.getWorld(), pos, loadedDevice.receiver());
+        } else {
+            loadedDevice.relay().setEnabled(enabled);
+            device = SignalDeviceStore.updateEnabled(source.getWorld(), pos, loadedDevice.relay());
         }
 
         sendHeader(source, Text.literal(enabled ? "已启用信号设备" : "已禁用信号设备")
@@ -412,10 +452,13 @@ public final class SignalDeviceCommand {
 
     private static LoadedDevice getDeviceAt(ServerCommandSource source, BlockPos pos) {
         if (source.getWorld().getBlockEntity(pos) instanceof SignalEmitterBlockEntity emitter) {
-            return new LoadedDevice(emitter, null);
+            return new LoadedDevice(emitter, null, null);
         }
         if (source.getWorld().getBlockEntity(pos) instanceof SignalReceiverBlockEntity receiver) {
-            return new LoadedDevice(null, receiver);
+            return new LoadedDevice(null, receiver, null);
+        }
+        if (source.getWorld().getBlockEntity(pos) instanceof ActionRelayBlockEntity relay) {
+            return new LoadedDevice(null, null, relay);
         }
 
         sendError(source, Text.literal("该位置不是信号设备。"));
@@ -425,7 +468,9 @@ public final class SignalDeviceCommand {
     private static SignalDeviceData upsertLoaded(ServerWorld world, BlockPos pos, LoadedDevice loadedDevice) {
         return loadedDevice.emitter() != null
                 ? SignalDeviceStore.upsertEmitter(world, pos, loadedDevice.emitter())
-                : SignalDeviceStore.upsertReceiver(world, pos, loadedDevice.receiver());
+                : loadedDevice.receiver() != null
+                        ? SignalDeviceStore.upsertReceiver(world, pos, loadedDevice.receiver())
+                        : SignalDeviceStore.upsertActionRelay(world, pos, loadedDevice.relay());
     }
 
     private static SignalDeviceStore.ResolveResult resolveDevice(ServerCommandSource source, String deviceRef) {
@@ -464,6 +509,10 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("当前输出", receiverOutputText(source, device)), false);
             source.sendFeedback(() -> field("剩余 ticks", number(device.remainingPulseTicks())), false);
             source.sendFeedback(() -> field("最近接收", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
+        } else if (isActionRelay(device)) {
+            source.sendFeedback(() -> field("冷却", gtText(device.cooldownTicks())), false);
+            source.sendFeedback(() -> field("动作数量", number(device.actionCount())), false);
+            source.sendFeedback(() -> field("最近执行", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
@@ -478,8 +527,11 @@ public final class SignalDeviceCommand {
             SignalDeviceData device,
             SignalEmitterBlockEntity emitter,
             SignalReceiverBlockEntity receiver,
+            ActionRelayBlockEntity relay,
             List<SignalListenerData> listeners,
-            int receiverCount
+            int receiverCount,
+            int relayCount,
+            long currentGameTime
     ) {
         List<Text> hints = new ArrayList<>();
         if (device.channel().isBlank()) {
@@ -509,6 +561,26 @@ public final class SignalDeviceCommand {
             if (!device.channel().isBlank() && receiverCount <= 0) {
                 hints.add(Text.literal("当前登记表没有启用的同频道接收器。").formatted(Formatting.YELLOW));
             }
+        } else if (isActionRelay(device)) {
+            if (relay == null) {
+                hints.add(Text.literal("方块未加载或已不存在。").formatted(Formatting.YELLOW));
+            } else {
+                if (!SignalChannel.normalize(relay.channel()).equals(SignalChannel.normalize(device.channel()))
+                        || relay.enabled() != device.enabled()
+                        || relay.cooldownTicks() != device.cooldownTicks()
+                        || relay.actions().size() != device.actionCount()) {
+                    hints.add(Text.literal("registry 与 BlockEntity 状态不一致。").formatted(Formatting.YELLOW));
+                }
+                if (relay.actions().isEmpty()) {
+                    hints.add(Text.literal("没有配置 actions。").formatted(Formatting.YELLOW));
+                }
+                if (relay.remainingCooldownTicks(currentGameTime) > 0L) {
+                    hints.add(Text.literal("动作继电器可能处于冷却中。").formatted(Formatting.YELLOW));
+                }
+            }
+            if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 1) {
+                hints.add(Text.literal("频道没有其他 listener/receiver；动作继电器仍可独立工作。").formatted(Formatting.YELLOW));
+            }
         } else {
             if (emitter == null) {
                 hints.add(Text.literal("方块未加载或已不存在。").formatted(Formatting.YELLOW));
@@ -516,8 +588,8 @@ public final class SignalDeviceCommand {
                     || emitter.enabled() != device.enabled()) {
                 hints.add(Text.literal("registry 与 BlockEntity 状态不一致。").formatted(Formatting.YELLOW));
             }
-            if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0) {
-                hints.add(Text.literal("频道没有 listener，也没有启用的接收器。").formatted(Formatting.YELLOW));
+            if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
+                hints.add(Text.literal("频道没有 listener、接收器或动作继电器。").formatted(Formatting.YELLOW));
             }
         }
         return hints;
@@ -528,6 +600,11 @@ public final class SignalDeviceCommand {
         for (SignalEventRecord record : SignalEventHistory.snapshot()) {
             if (isReceiver(device)) {
                 if (SignalChannel.normalize(record.channel()).equals(SignalChannel.normalize(device.channel()))) {
+                    matches.add(record);
+                }
+            } else if (isActionRelay(device)) {
+                if (device.id().equals(record.sourceId())
+                        || SignalChannel.normalize(record.channel()).equals(SignalChannel.normalize(device.channel()))) {
                     matches.add(record);
                 }
             } else if ("signal_device".equals(record.sourceType()) && device.id().equals(record.sourceId())) {
@@ -549,7 +626,33 @@ public final class SignalDeviceCommand {
         return count;
     }
 
+    private static int actionRelayCountForChannel(ServerCommandSource source, String channel) {
+        String normalizedChannel = SignalChannel.normalize(channel);
+        int count = 0;
+        for (SignalDeviceData device : SignalDeviceStore.getSnapshot(source.getServer())) {
+            if (isActionRelay(device) && device.enabled() && SignalChannel.normalize(device.channel()).equals(normalizedChannel)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int invalidActionCount(ActionRelayBlockEntity relay) {
+        int count = 0;
+        for (ActionConfig action : relay.actions()) {
+            if (action == null || !action.isUsable()) {
+                count++;
+            } else if (action.type() == ActionType.SIGNAL && !SignalChannel.isValid(action.value())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static boolean isLoaded(ServerCommandSource source, SignalDeviceData device) {
+        if (isActionRelay(device)) {
+            return SignalDeviceStore.getLoadedActionRelay(source.getServer(), device) != null;
+        }
         return isReceiver(device)
                 ? SignalDeviceStore.getLoadedReceiver(source.getServer(), device) != null
                 : SignalDeviceStore.getLoadedEmitter(source.getServer(), device) != null;
@@ -557,6 +660,10 @@ public final class SignalDeviceCommand {
 
     private static boolean isReceiver(SignalDeviceData device) {
         return device != null && SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(device.type());
+    }
+
+    private static boolean isActionRelay(SignalDeviceData device) {
+        return device != null && SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type());
     }
 
     private static CompletableFuture<Suggestions> suggestDevices(ServerCommandSource source, SuggestionsBuilder builder) {
@@ -614,7 +721,7 @@ public final class SignalDeviceCommand {
     }
 
     private static MutableText typeText(SignalDeviceData device) {
-        return Text.literal(device.type()).formatted(isReceiver(device) ? Formatting.RED : Formatting.WHITE);
+        return Text.literal(device.type()).formatted(isActionRelay(device) ? Formatting.GREEN : isReceiver(device) ? Formatting.RED : Formatting.WHITE);
     }
 
     private static MutableText positionText(SignalDeviceData device) {
@@ -658,8 +765,20 @@ public final class SignalDeviceCommand {
     private static MutableText consistencyText(
             SignalDeviceData device,
             SignalEmitterBlockEntity emitter,
-            SignalReceiverBlockEntity receiver
+            SignalReceiverBlockEntity receiver,
+            ActionRelayBlockEntity relay
     ) {
+        if (isActionRelay(device)) {
+            if (relay == null) {
+                return Text.literal("无法比较").formatted(Formatting.YELLOW);
+            }
+            boolean same = SignalChannel.normalize(relay.channel()).equals(SignalChannel.normalize(device.channel()))
+                    && relay.enabled() == device.enabled()
+                    && relay.cooldownTicks() == device.cooldownTicks()
+                    && relay.actions().size() == device.actionCount();
+            return Text.literal(same ? "一致" : "不一致").formatted(same ? Formatting.GREEN : Formatting.YELLOW);
+        }
+
         if (isReceiver(device)) {
             if (receiver == null) {
                 return Text.literal("无法比较").formatted(Formatting.YELLOW);
@@ -736,7 +855,8 @@ public final class SignalDeviceCommand {
 
     private record LoadedDevice(
             SignalEmitterBlockEntity emitter,
-            SignalReceiverBlockEntity receiver
+            SignalReceiverBlockEntity receiver,
+            ActionRelayBlockEntity relay
     ) {
     }
 }

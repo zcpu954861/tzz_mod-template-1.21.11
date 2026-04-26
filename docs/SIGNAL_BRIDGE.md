@@ -213,6 +213,81 @@ signal -> signal_receiver -> 红石输出
 
 `signal_devices.json` 继续作为设备管理索引。`SignalReceiverBlockEntity` 保存实际 `channel`、`enabled`、`pulseTicks` 和当前脉冲状态；索引用于显示名称、位置、最近接收和 debug 信息。receiver 的历史展示来自内存 SignalEventHistory，不写入新的 JSON。
 
+## ActionRelay 动作继电器方块
+
+`action_relay` 是世界中可见的 ActionEngine 执行节点。它监听一个 SignalBridge channel，收到 signal 后执行自己保存的 `actions[]`：
+
+```text
+signal -> action_relay -> ActionEngine actions
+```
+
+职责边界：
+
+- `SignalListener` 是后台虚拟逻辑接收端。
+- `signal_receiver` 是实体红石输出端。
+- `action_relay` 是实体可见 ActionEngine 执行节点。
+- `action_relay` 不是单纯命令方块，而是执行 `actions[]`。
+- `action_relay` 不输出红石。
+- `action_relay` 没有 SignalListener 也能工作。
+- `action_relay` 只处理已登记且已加载区块中的方块实体，不扫描世界，不强制加载区块。
+
+继电器专用命令：
+
+```text
+/tzz signal relay bind <x> <y> <z> <channel>
+/tzz signal relay addAction <x> <y> <z> command <command>
+/tzz signal relay addAction <x> <y> <z> message <message>
+/tzz signal relay addAction <x> <y> <z> sound <sound>
+/tzz signal relay addAction <x> <y> <z> signal <channel>
+/tzz signal relay listActions <x> <y> <z>
+/tzz signal relay removeAction <x> <y> <z> <index>
+/tzz signal relay clearActions <x> <y> <z>
+/tzz signal relay cooldown <x> <y> <z> <ticks>
+/tzz signal relay trigger <x> <y> <z>
+/tzz signal relay info <x> <y> <z>
+```
+
+`cooldownTicks` 的单位是 GT，默认 `0 GT`，表示无冷却。命令参数只输入整数，不输入 `GT` 后缀。
+
+`addAction` 复用现有 ActionEngine 支持的动作类型。当前可添加 command、message、sound 和 signal 动作；其中 signal 动作会继续走 SignalBridge 的递归保护。
+
+最小使用流程：
+
+```text
+/tzz signal relay bind <x> <y> <z> game.start
+/tzz signal relay addAction <x> <y> <z> command say 游戏开始
+/tzz signal emit game.start
+```
+
+由发射器驱动动作继电器：
+
+```text
+/tzz signal device bind <emitter-x> <emitter-y> <emitter-z> game.start
+/tzz signal relay bind <relay-x> <relay-y> <relay-z> game.start
+/tzz signal relay addAction <relay-x> <relay-y> <relay-z> command say 游戏开始
+```
+
+之后给 `signal_emitter` 通电，`action_relay` 会收到 `game.start` 并把动作交给 ActionEngine 执行。
+
+设备管理命令也支持动作继电器：
+
+```text
+/tzz signal device bind <x> <y> <z> <channel>
+/tzz signal device list
+/tzz signal device info <device>
+/tzz signal device debug <device>
+/tzz signal device test <x> <y> <z>
+/tzz signal device enable <x> <y> <z>
+/tzz signal device disable <x> <y> <z>
+/tzz signal device cleanup
+```
+
+`signal_devices.json` 继续作为设备管理索引。`ActionRelayBlockEntity` 保存实际 `channel`、`enabled`、`cooldownTicks` 和 `actions[]`；索引用于显示名称、位置、最近执行和 debug 信息。历史展示仍使用内存 SignalEventHistory / 设备管理机制，不新增永久 history JSON。
+
+Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz signal device cleanup` 用于维护已有索引：它只遍历已登记设备，只检查当前已加载区块，如果已加载位置不再是对应设备类型，就删除该记录；未加载区块会跳过，不扫描世界，也不强制加载区块。powered / pulse / active 等同方块状态变化不会删除索引。
+
+`action_relay` 外观复用 `signal_emitter` / `signal_receiver` 的多元素科技风模型结构，但使用绿色主题。执行动作后会短暂进入 active 高亮状态；active 只表示最近执行过动作，不输出红石。
+
 ## cooldown
 
 listener 可以设置全局冷却时间，避免高频 signal 重复执行动作。

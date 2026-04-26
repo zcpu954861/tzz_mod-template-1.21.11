@@ -104,6 +104,14 @@ public class SignalReceiverBlock extends BlockWithEntity {
     }
 
     @Override
+    protected void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean moved) {
+        if (!(world.getBlockState(pos).getBlock() instanceof SignalReceiverBlock)) {
+            SignalDeviceStore.remove(world.getServer(), world, pos);
+        }
+        super.onStateReplaced(state, world, pos, moved);
+    }
+
+    @Override
     protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
         return SHAPE;
     }

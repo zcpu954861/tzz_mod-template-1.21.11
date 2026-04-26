@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.ModBlock;
 
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.PasswordMachineBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SilentSensorPlateBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
@@ -36,6 +37,12 @@ public final class ModBlockEntities {
                         blockEntityTypeRegistry(),
             Identifier.of(Tzz_mod.MOD_ID, "signal_receiver"),
             FabricBlockEntityTypeBuilder.create(SignalReceiverBlockEntity::new, ModBlocks.SIGNAL_RECEIVER).build()
+    );
+
+    public static final BlockEntityType<ActionRelayBlockEntity> ACTION_RELAY = Registry.register(
+                        blockEntityTypeRegistry(),
+            Identifier.of(Tzz_mod.MOD_ID, "action_relay"),
+            FabricBlockEntityTypeBuilder.create(ActionRelayBlockEntity::new, ModBlocks.ACTION_RELAY).build()
     );
 
     private ModBlockEntities() {

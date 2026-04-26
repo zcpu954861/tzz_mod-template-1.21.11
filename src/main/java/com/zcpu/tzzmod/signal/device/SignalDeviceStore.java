@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.signal.device;
 
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
@@ -69,6 +70,31 @@ public final class SignalDeviceStore {
         return upsertReceiver(world, pos, blockEntity);
     }
 
+    public static synchronized SignalDeviceData upsertActionRelay(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, ActionRelayBlockEntity.sourceId(world, pos));
+        SignalDeviceData updated = fromActionRelay(world, pos, blockEntity, existing, false);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateChannel(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
+        return upsertActionRelay(world, pos, blockEntity);
+    }
+
+    public static synchronized SignalDeviceData updateEnabled(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
+        return upsertActionRelay(world, pos, blockEntity);
+    }
+
+    public static synchronized SignalDeviceData updateCooldown(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
+        return upsertActionRelay(world, pos, blockEntity);
+    }
+
+    public static synchronized SignalDeviceData updateActions(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
+        return upsertActionRelay(world, pos, blockEntity);
+    }
+
     public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, String name) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
@@ -87,6 +113,15 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity, String name) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, ActionRelayBlockEntity.sourceId(world, pos));
+        SignalDeviceData updated = withName(fromActionRelay(world, pos, blockEntity, existing, false), cleanUserText(name));
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
     public static synchronized ResolveResult clearName(MinecraftServer server, String deviceRef) {
         ResolveResult resolved = resolveDevice(server, deviceRef);
         if (!resolved.foundUnique()) {
@@ -98,6 +133,55 @@ public final class SignalDeviceStore {
         replaceOrAdd(state, updated);
         state.markDirty();
         return ResolveResult.unique(updated);
+    }
+
+    public static synchronized boolean remove(MinecraftServer server, ServerWorld world, BlockPos pos) {
+        return removeById(server, sourceId(world, pos));
+    }
+
+    public static synchronized boolean removeById(MinecraftServer server, String sourceId) {
+        if (server == null || sourceId == null || sourceId.isBlank()) {
+            return false;
+        }
+
+        State state = getState(server);
+        boolean removed = state.devices.removeIf(device -> sourceId.equals(device.id()));
+        if (removed) {
+            state.markDirty();
+        }
+        return removed;
+    }
+
+    public static synchronized int cleanupInvalidLoadedDevices(MinecraftServer server) {
+        State state = getState(server);
+        int removed = 0;
+        for (SignalDeviceData device : List.copyOf(state.devices)) {
+            ServerWorld world = findWorld(server, device.dimension());
+            if (world == null) {
+                continue;
+            }
+
+            BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+            if (!world.isChunkLoaded(pos)) {
+                continue;
+            }
+
+            if (matchesLoadedDevice(world, pos, device.type())) {
+                SignalDeviceData refreshed = refreshLoadedDevice(server, state, device);
+                if (refreshed != null) {
+                    replaceOrAdd(state, refreshed);
+                }
+                continue;
+            }
+
+            if (state.devices.removeIf(candidate -> candidate.id().equals(device.id()))) {
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            state.markDirty();
+        }
+        return removed;
     }
 
     public static synchronized void recordTrigger(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, ActionExecutionResult result) {
@@ -118,6 +202,8 @@ public final class SignalDeviceStore {
                 base.enabled(),
                 base.pulseTicks(),
                 base.remainingPulseTicks(),
+                base.cooldownTicks(),
+                base.actionCount(),
                 base.createdWallTimeMillis(),
                 now,
                 world.getTime(),
@@ -146,6 +232,38 @@ public final class SignalDeviceStore {
                 base.enabled(),
                 base.pulseTicks(),
                 base.remainingPulseTicks(),
+                base.cooldownTicks(),
+                base.actionCount(),
+                base.createdWallTimeMillis(),
+                now,
+                world.getTime(),
+                now,
+                resultMessage
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordActionRelayRun(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity, ActionExecutionResult result) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, ActionRelayBlockEntity.sourceId(world, pos));
+        SignalDeviceData base = fromActionRelay(world, pos, blockEntity, existing, false);
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        SignalDeviceData updated = new SignalDeviceData(
+                base.id(),
+                base.type(),
+                base.name(),
+                base.dimension(),
+                base.x(),
+                base.y(),
+                base.z(),
+                base.channel(),
+                base.enabled(),
+                base.pulseTicks(),
+                base.remainingPulseTicks(),
+                base.cooldownTicks(),
+                base.actionCount(),
                 base.createdWallTimeMillis(),
                 now,
                 world.getTime(),
@@ -161,6 +279,19 @@ public final class SignalDeviceStore {
         List<SignalDeviceData> result = new ArrayList<>();
         for (SignalDeviceData device : getSnapshot(server)) {
             if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_RECEIVER)
+                    && device.enabled()
+                    && device.channel().equals(normalizedChannel)) {
+                result.add(device);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public static synchronized List<SignalDeviceData> getEnabledActionRelaysForChannel(MinecraftServer server, String channel) {
+        String normalizedChannel = com.zcpu.tzzmod.signal.SignalChannel.normalize(channel);
+        List<SignalDeviceData> result = new ArrayList<>();
+        for (SignalDeviceData device : getSnapshot(server)) {
+            if (device.type().equals(SignalDeviceData.TYPE_ACTION_RELAY)
                     && device.enabled()
                     && device.channel().equals(normalizedChannel)) {
                 result.add(device);
@@ -250,6 +381,24 @@ public final class SignalDeviceStore {
         return world.getBlockEntity(pos) instanceof SignalReceiverBlockEntity blockEntity ? blockEntity : null;
     }
 
+    public static ActionRelayBlockEntity getLoadedActionRelay(MinecraftServer server, SignalDeviceData device) {
+        if (server == null || device == null) {
+            return null;
+        }
+
+        ServerWorld world = findWorld(server, device.dimension());
+        if (world == null) {
+            return null;
+        }
+
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        if (!world.isChunkLoaded(pos)) {
+            return null;
+        }
+
+        return world.getBlockEntity(pos) instanceof ActionRelayBlockEntity blockEntity ? blockEntity : null;
+    }
+
     public static ServerWorld getDeviceWorld(MinecraftServer server, SignalDeviceData device) {
         return device == null ? null : findWorld(server, device.dimension());
     }
@@ -263,6 +412,10 @@ public final class SignalDeviceStore {
 
     public static synchronized void clearCache(MinecraftServer server) {
         CACHE.remove(server);
+    }
+
+    public static String sourceId(ServerWorld world, BlockPos pos) {
+        return world.getRegistryKey().getValue() + "@" + pos.getX() + "," + pos.getY() + "," + pos.getZ();
     }
 
     public static String shortId(String id) {
@@ -320,7 +473,12 @@ public final class SignalDeviceStore {
 
         BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
         SignalDeviceData refreshed = null;
-        if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_RECEIVER)) {
+        if (device.type().equals(SignalDeviceData.TYPE_ACTION_RELAY)) {
+            ActionRelayBlockEntity relay = getLoadedActionRelay(server, device);
+            if (relay != null) {
+                refreshed = fromActionRelay(world, pos, relay, device, true);
+            }
+        } else if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_RECEIVER)) {
             SignalReceiverBlockEntity receiver = getLoadedReceiver(server, device);
             if (receiver != null) {
                 refreshed = fromReceiver(world, pos, receiver, device, true);
@@ -339,6 +497,17 @@ public final class SignalDeviceStore {
             state.markDirty();
         }
         return refreshed;
+    }
+
+    private static boolean matchesLoadedDevice(ServerWorld world, BlockPos pos, String type) {
+        if (SignalDeviceData.TYPE_ACTION_RELAY.equals(type)) {
+            return world.getBlockEntity(pos) instanceof ActionRelayBlockEntity;
+        }
+        if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(type)) {
+            return world.getBlockEntity(pos) instanceof SignalReceiverBlockEntity;
+        }
+        return SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(type)
+                && world.getBlockEntity(pos) instanceof SignalEmitterBlockEntity;
     }
 
     private static SignalDeviceData fromEmitter(
@@ -361,6 +530,8 @@ public final class SignalDeviceStore {
                 pos.getZ(),
                 blockEntity.channel(),
                 blockEntity.enabled(),
+                0,
+                0,
                 0,
                 0,
                 created,
@@ -393,6 +564,40 @@ public final class SignalDeviceStore {
                 blockEntity.enabled(),
                 blockEntity.pulseTicks(),
                 blockEntity.remainingPulseTicks(),
+                0,
+                0,
+                created,
+                updated,
+                existing == null ? 0L : existing.lastTriggerGameTime(),
+                existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
+                existing == null ? "" : existing.lastResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData fromActionRelay(
+            ServerWorld world,
+            BlockPos pos,
+            ActionRelayBlockEntity blockEntity,
+            SignalDeviceData existing,
+            boolean preserveUpdatedTime
+    ) {
+        long now = System.currentTimeMillis();
+        long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
+        long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
+        return new SignalDeviceData(
+                ActionRelayBlockEntity.sourceId(world, pos),
+                SignalDeviceData.TYPE_ACTION_RELAY,
+                existing == null ? "" : existing.name(),
+                world.getRegistryKey().getValue().toString(),
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                blockEntity.channel(),
+                blockEntity.enabled(),
+                0,
+                0,
+                blockEntity.cooldownTicks(),
+                blockEntity.actions().size(),
                 created,
                 updated,
                 existing == null ? 0L : existing.lastTriggerGameTime(),
@@ -414,6 +619,8 @@ public final class SignalDeviceStore {
                 device.enabled(),
                 device.pulseTicks(),
                 device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
                 device.createdWallTimeMillis(),
                 System.currentTimeMillis(),
                 device.lastTriggerGameTime(),

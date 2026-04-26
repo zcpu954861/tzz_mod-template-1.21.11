@@ -20,6 +20,7 @@ public final class ModFunctionItemGroup {
                 entries.add(ModBlocks.SILENT_SENSOR_PLATE);
                 entries.add(ModBlocks.SIGNAL_EMITTER);
                 entries.add(ModBlocks.SIGNAL_RECEIVER);
+                entries.add(ModBlocks.ACTION_RELAY);
                 entries.add(ModItems.BLOCKING_CARD_CONFIGURATOR);
                 entries.add(ModItems.PASSWORD_CONFIG_CARD);
             }))

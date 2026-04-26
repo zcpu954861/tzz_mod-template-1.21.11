@@ -14,6 +14,8 @@ public record SignalDeviceData(
         boolean enabled,
         int pulseTicks,
         int remainingPulseTicks,
+        int cooldownTicks,
+        int actionCount,
         long createdWallTimeMillis,
         long updatedWallTimeMillis,
         long lastTriggerGameTime,
@@ -22,6 +24,7 @@ public record SignalDeviceData(
 ) {
     public static final String TYPE_SIGNAL_EMITTER = "signal_emitter";
     public static final String TYPE_SIGNAL_RECEIVER = "signal_receiver";
+    public static final String TYPE_ACTION_RELAY = "action_relay";
     public static final int DEFAULT_RECEIVER_PULSE_TICKS = 5;
 
     public SignalDeviceData normalized() {
@@ -45,6 +48,8 @@ public record SignalDeviceData(
                 enabled,
                 cleanPulseTicks,
                 Math.max(0, remainingPulseTicks),
+                Math.max(0, cooldownTicks),
+                Math.max(0, actionCount),
                 Math.max(0L, createdWallTimeMillis),
                 Math.max(0L, updatedWallTimeMillis),
                 Math.max(0L, lastTriggerGameTime),
