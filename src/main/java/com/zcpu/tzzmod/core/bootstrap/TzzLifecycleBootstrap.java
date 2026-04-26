@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceDispatcher;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -32,6 +33,7 @@ public final class TzzLifecycleBootstrap {
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             VirtualBlockDeviceDispatcher.tick(server);
+            VirtualBlockDeviceContainerHandler.tick(server);
             MapDataStore.flushDirty(server);
             TaskDataStore.flushDirty(server);
             NoteDataStore.flushDirty(server);

@@ -183,6 +183,10 @@ public final class SignalBridgeServer {
             int depth,
             String resultMessage
     ) {
+        String detail = event == null || event.detail() == null || event.detail().isBlank()
+                ? ""
+                : "（" + event.detail() + "）";
+        String historyMessage = resultMessage == null || resultMessage.isBlank() ? "已处理信号" : resultMessage;
         SignalEventHistory.record(new SignalEventRecord(
                 event == null ? 0L : event.gameTime(),
                 System.currentTimeMillis(),
@@ -196,7 +200,7 @@ public final class SignalBridgeServer {
                 skippedEmptyCount,
                 failedCount,
                 depth,
-                resultMessage == null || resultMessage.isBlank() ? "已处理信号" : resultMessage
+                historyMessage + detail
         ));
     }
 

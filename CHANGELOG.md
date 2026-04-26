@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.10.0-container-events
+
+- 为 `virtual_block_device` 新增容器事件触发能力。
+- 新增 `/tzz signal blockDevice containerOpenChannel <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice clearContainerOpenChannel <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice containerCloseChannel <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice clearContainerCloseChannel <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice containerChangeChannel <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice clearContainerChangeChannel <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice container <x> <y> <z> enable|disable`。
+- 新增 `/tzz signal blockDevice containerCooldown <x> <y> <z> <ticks>`。
+- 新增 `/tzz signal blockDevice containerCheckInterval <x> <y> <z> <ticks>`。
+- 新增 `/tzz signal blockDevice containerInfo <x> <y> <z>`。
+- 支持已绑定容器方块打开、关闭和内容变化时 emit signal。
+- open / close 基于右键候选和实际 screen session 确认，不把普通右键直接当作打开。
+- content changed 使用轻量内容指纹，MVP 仅包含 slot 物品 id、数量和 damage，不做 NBT / 数据组件 / 槽位条件匹配。
+- 容器事件只处理已登记的 `virtual_block_device`，不扫描世界、区块或周围方块，不强制加载区块。
+- `/tzz signal blockDevice info`、`/tzz signal device info` 和 `/tzz signal device debug` 显示 container 摘要和诊断信息。
+- `/tzz signal device history` 可查看 `virtual_block_device` 的容器事件触发记录。
+- 保持 5.5 红石触发、5.6 BlockState condition 和 5.7 interaction 行为兼容。
+
 ## v1.9.0-block-interaction
 
 - 为 `virtual_block_device` 新增右键交互触发能力。
