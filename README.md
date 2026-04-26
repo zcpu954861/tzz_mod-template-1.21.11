@@ -260,7 +260,9 @@ signal -> action_relay -> ActionEngine actions
 
 - `redstone_rising`：未通电 -> 通电时发出 `channel`。
 - `redstone_falling`：通电 -> 未通电时发出 `offChannel`；未设置 `offChannel` 时发出 `channel`。
-- `redstone_both`：通电和断电边沿都触发；断电时优先使用 `offChannel`。
+- `redstone_both`：通电和断电边沿都触发；通电发出 `channel`，断电优先使用 `offChannel`，未设置 `offChannel` 时回退发出 `channel`。
+
+因此执行 `clearOffChannel` 后，如果模式仍是 `redstone_both`，通电和断电都会发出主 `channel`，这是预期行为。
 
 性能边界：
 

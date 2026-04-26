@@ -329,7 +329,9 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 - `redstone_rising`：`lastPowered=false` 且 `currentPowered=true` 时发出 `channel`。
 - `redstone_falling`：`lastPowered=true` 且 `currentPowered=false` 时发出 `offChannel`；未设置 `offChannel` 时发出 `channel`。
-- `redstone_both`：通电边沿发出 `channel`，断电边沿优先发出 `offChannel`。
+- `redstone_both`：通电边沿发出 `channel`，断电边沿优先发出 `offChannel`；未设置 `offChannel` 时回退发出 `channel`。
+
+因此执行 `clearOffChannel` 后，如果模式仍是 `redstone_both`，通电和断电都会发出主 `channel`，这是预期行为。
 
 `test` 命令只手动 emit 主频道，不改变 `lastPowered`，也不模拟红石边沿。
 
