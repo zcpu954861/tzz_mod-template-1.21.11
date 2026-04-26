@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.7.0-virtual-block-device
+
+- 新增 `virtual_block_device` 虚拟方块发射器设备类型。
+- 支持把任意已存在方块坐标手动绑定为 signal 触发源。
+- 同时检测方块自身 `powered` 属性和该坐标接收到的红石强度。
+- 支持 `redstone_rising`、`redstone_falling`、`redstone_both` 三种触发模式。
+- 支持可选 `offChannel`，用于断电边沿发出不同 signal。
+- 新增 `/tzz signal blockDevice bind <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice offChannel <x> <y> <z> <channel>`。
+- 新增 `/tzz signal blockDevice clearOffChannel <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice mode <x> <y> <z> redstone_rising|redstone_falling|redstone_both`。
+- 新增 `/tzz signal blockDevice info <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice test <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice unbind <x> <y> <z>`。
+- 新增 `/tzz signal blockDevice refresh <x> <y> <z>`。
+- `/tzz signal device list/info/debug/test/enable/disable` 现在支持 `virtual_block_device`。
+- `/tzz signal device cleanup` 会清理已加载区块中已变为空气的虚拟方块发射器记录。
+- 虚拟方块发射器只检测已登记坐标，不扫描世界、不扫描区块、不扫描周围方块、不强制加载区块。
+- 状态不变时不 emit，不写 `signal_devices.json`。
+- `signal_devices.json` 写入增加节流，服务端停止时强制保存。
+- 文档记录 5.6 BlockState 条件、5.7 交互触发、5.8 容器事件、5.9 多条件触发的后续计划，本阶段未实现这些功能。
+
 ## v1.6.0-action-relay
 
 - 新增 `action_relay` 动作继电器方块。

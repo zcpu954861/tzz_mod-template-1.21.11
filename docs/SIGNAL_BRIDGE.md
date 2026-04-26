@@ -288,6 +288,102 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 `action_relay` 外观复用 `signal_emitter` / `signal_receiver` 的多元素科技风模型结构，但使用绿色主题。执行动作后会短暂进入 active 高亮状态；active 只表示最近执行过动作，不输出红石。
 
+## Virtual Block Device 虚拟方块发射器
+
+`virtual_block_device` 是虚拟方块发射器。它不会新增方块，也不会自动扫描世界；管理员需要手动把某个已有方块坐标登记为 signal 触发源。
+
+```text
+已有方块红石状态变化
+-> virtual_block_device
+-> emit SignalBridge channel
+```
+
+它适合把普通拉杆、按钮、压力板、红石灯、普通方块或其他模组方块接入 SignalBridge。TZZ 专用设备方块不建议绑定为虚拟方块发射器，因为它们已经有专用命令。
+
+### 绑定与配置
+
+```text
+/tzz signal blockDevice bind <x> <y> <z> <channel>
+/tzz signal blockDevice offChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearOffChannel <x> <y> <z>
+/tzz signal blockDevice mode <x> <y> <z> redstone_rising
+/tzz signal blockDevice mode <x> <y> <z> redstone_falling
+/tzz signal blockDevice mode <x> <y> <z> redstone_both
+/tzz signal blockDevice info <x> <y> <z>
+/tzz signal blockDevice test <x> <y> <z>
+/tzz signal blockDevice unbind <x> <y> <z>
+/tzz signal blockDevice refresh <x> <y> <z>
+```
+
+`bind` 会记录当前位置的方块 ID、当前是否通电和当前红石强度，避免绑定瞬间误触发。`refresh` 用于管理员更换该坐标方块后重新读取当前方块 ID 和红石状态。
+
+### 红石检测
+
+每次检测只读取绑定坐标本身：
+
+- `blockStatePowered`：如果方块状态包含 `powered` 属性且为 true，则为 true。
+- `receivedPowerLevel`：读取该坐标接收到的红石信号强度，范围 0 到 15。
+- `currentPowered = blockStatePowered || receivedPowerLevel > 0`。
+
+触发规则：
+
+- `redstone_rising`：`lastPowered=false` 且 `currentPowered=true` 时发出 `channel`。
+- `redstone_falling`：`lastPowered=true` 且 `currentPowered=false` 时发出 `offChannel`；未设置 `offChannel` 时发出 `channel`。
+- `redstone_both`：通电边沿发出 `channel`，断电边沿优先发出 `offChannel`。
+
+`test` 命令只手动 emit 主频道，不改变 `lastPowered`，也不模拟红石边沿。
+
+### 统一设备命令
+
+统一设备命令也支持虚拟方块发射器：
+
+```text
+/tzz signal device list
+/tzz signal device info <device>
+/tzz signal device debug <device>
+/tzz signal device test <x> <y> <z>
+/tzz signal device enable <x> <y> <z>
+/tzz signal device disable <x> <y> <z>
+/tzz signal device cleanup
+```
+
+`device debug` 会显示当前方块 ID、绑定时方块 ID、两者是否一致、`blockStatePowered`、`receivedPowerLevel`、`currentPowered`、`lastPowered`、触发模式、主频道、断电频道和常见问题提示。
+
+`cleanup` 对虚拟方块发射器采用保守策略：只遍历已登记设备，只检查已加载区块，不强制加载区块。已加载位置变成空气时会删除记录；当前方块 ID 与绑定时不一致但不是空气时不会自动删除，只在 debug 中提示。
+
+### 性能边界
+
+Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_device 数量)`。
+
+- 不扫描世界。
+- 不扫描区块。
+- 不扫描周围方块。
+- 不自动寻找拉杆、按钮、压力板或红石灯。
+- 不递归追踪红石线路。
+- 不强制加载未加载区块。
+- 未加载区块直接跳过。
+- 每个设备每次只检测自己的一个坐标。
+- 状态不变不 emit。
+- 状态不变不写 JSON。
+- `signal_devices.json` 写入已节流，服务端停止时强制保存。
+
+### 职责边界
+
+- `signal_emitter`：专用方块，红石 / 交互 -> signal。
+- `virtual_block_device`：已有方块，红石状态变化 -> signal。
+- `signal_receiver`：signal -> 红石输出。
+- `action_relay`：signal -> ActionEngine actions。
+- `SignalListener`：后台虚拟逻辑接收端。
+
+## 后续计划
+
+以下内容只作为后续阶段计划记录，5.5 MVP 未实现：
+
+- 5.6 BlockState 条件触发：例如 `/tzz signal blockDevice condition <pos> minecraft:lever[powered=true]`，支持 `open=true`、`lit=true`、`powered=true` 等状态条件。
+- 5.7 交互触发：右键已绑定方块发 signal，适合告示牌、任务终端、装饰按钮等。
+- 5.8 容器事件触发：箱子、木桶、潜影盒打开、关闭或内容变化。
+- 5.9 多条件触发：红石状态、BlockState、玩家 tag、区域条件等组合。
+
 ## cooldown
 
 listener 可以设置全局冷却时间，避免高频 signal 重复执行动作。

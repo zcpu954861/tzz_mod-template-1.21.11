@@ -8,6 +8,7 @@ public enum ActionSourceType {
     SIGNAL_BRIDGE("signal_bridge"),
     SIGNAL_DEVICE("signal_device"),
     ACTION_RELAY("action_relay"),
+    VIRTUAL_BLOCK_DEVICE("virtual_block_device"),
     COMMAND("command"),
     UNKNOWN("unknown");
 

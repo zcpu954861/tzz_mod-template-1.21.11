@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceDispatcher;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -30,6 +31,7 @@ public final class TzzLifecycleBootstrap {
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            VirtualBlockDeviceDispatcher.tick(server);
             MapDataStore.flushDirty(server);
             TaskDataStore.flushDirty(server);
             NoteDataStore.flushDirty(server);
@@ -44,11 +46,12 @@ public final class TzzLifecycleBootstrap {
             NoteDataStore.flushDirty(server);
             RegionControllerStore.flushDirty(server);
             SignalListenerStore.flushDirty(server);
-            SignalDeviceStore.flushDirty(server);
+            SignalDeviceStore.forceFlushDirty(server);
             MapServer.clearServerState();
         });
 
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            SignalDeviceStore.forceFlushDirty(server);
             MapDataStore.clearCache(server);
             TaskDataStore.clearCache(server);
             NoteDataStore.clearCache(server);
