@@ -15,6 +15,7 @@ import com.zcpu.tzzmod.command.CommandSuggestionUtil;
 import com.zcpu.tzzmod.signal.device.ActionRelayCommand;
 import com.zcpu.tzzmod.signal.device.SignalDeviceCommand;
 import com.zcpu.tzzmod.signal.device.SignalReceiverCommand;
+import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceCommand;
 import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.item.ItemStack;
@@ -46,6 +47,7 @@ public final class SignalCommand {
                 .then(SignalDeviceCommand.build())
                 .then(ActionRelayCommand.build())
                 .then(SignalReceiverCommand.build())
+                .then(VirtualBlockDeviceCommand.build())
                 .then(CommandManager.literal("channel")
                         .then(CommandManager.literal("info")
                                 .then(channelTailArgument()

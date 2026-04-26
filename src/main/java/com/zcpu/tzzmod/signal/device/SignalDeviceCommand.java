@@ -10,10 +10,13 @@ import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
+import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.command.CommandSuggestionUtil;
+import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalChannelInspector;
+import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
@@ -30,6 +33,7 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 public final class SignalDeviceCommand {
     private static final int LIST_LIMIT = 20;
@@ -141,6 +145,13 @@ public final class SignalDeviceCommand {
             } else if (isActionRelay(device)) {
                 source.sendFeedback(() -> indentField("动作数量", number(device.actionCount())), false);
                 source.sendFeedback(() -> indentField("冷却", gtText(device.cooldownTicks())), false);
+            } else if (isVirtualBlockDevice(device)) {
+                source.sendFeedback(() -> indentField("方块 ID", idText(device.blockId())), false);
+                source.sendFeedback(() -> indentField("断电频道", channelOrEmpty(device.offChannel())), false);
+                source.sendFeedback(() -> indentField("模式", modeText(device.mode())), false);
+                source.sendFeedback(() -> indentField("通电状态", boolText(device.lastPowered())
+                        .append(Text.literal("，强度 ").formatted(Formatting.GRAY))
+                        .append(number(device.lastPowerLevel()))), false);
             }
             source.sendFeedback(() -> indentField(isReceiver(device) ? "最近接收" : isActionRelay(device) ? "最近执行" : "最近触发",
                     elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
@@ -191,15 +202,25 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeName(ServerCommandSource source, BlockPos pos, String rawName) {
-        LoadedDevice loadedDevice = getDeviceAt(source, pos);
-        if (loadedDevice == null) {
-            return 0;
-        }
-
         String name = SignalDeviceStore.cleanUserText(rawName);
         if (name.isBlank()) {
             sendError(source, Text.literal("设备名称不能为空。"));
             return 0;
+        }
+
+        LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
+        if (loadedDevice == null) {
+            SignalDeviceData virtualDevice = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);
+            if (virtualDevice == null) {
+                sendError(source, Text.literal("该位置不是信号设备。"));
+                return 0;
+            }
+
+            SignalDeviceData device = SignalDeviceStore.setVirtualName(source.getWorld(), pos, name);
+            sendHeader(source, Text.literal("已命名信号设备").formatted(Formatting.GREEN));
+            source.sendFeedback(() -> field("位置", positionText(device)), false);
+            source.sendFeedback(() -> field("名称", nameText(device.name())), false);
+            return 1;
         }
 
         SignalDeviceData device = loadedDevice.emitter() != null
@@ -236,13 +257,20 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeInfoPos(ServerCommandSource source, BlockPos pos) {
-        LoadedDevice loadedDevice = getDeviceAt(source, pos);
-        if (loadedDevice == null) {
+        LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
+        if (loadedDevice != null) {
+            SignalDeviceData device = upsertLoaded(source.getWorld(), pos, loadedDevice);
+            sendInfo(source, device, true);
+            return 1;
+        }
+
+        SignalDeviceData device = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);
+        if (device == null) {
+            sendError(source, Text.literal("该位置不是信号设备。"));
             return 0;
         }
 
-        SignalDeviceData device = upsertLoaded(source.getWorld(), pos, loadedDevice);
-        sendInfo(source, device, true);
+        sendInfo(source, device, isLoaded(source, device));
         return 1;
     }
 
@@ -295,6 +323,11 @@ public final class SignalDeviceCommand {
         }
 
         SignalDeviceData device = SignalDeviceStore.refreshLoadedState(source.getServer(), resolved.device());
+        if (isVirtualBlockDevice(device)) {
+            sendVirtualDebug(source, device);
+            return 1;
+        }
+
         SignalEmitterBlockEntity emitter = SignalDeviceStore.getLoadedEmitter(source.getServer(), device);
         SignalReceiverBlockEntity receiver = SignalDeviceStore.getLoadedReceiver(source.getServer(), device);
         ActionRelayBlockEntity relay = SignalDeviceStore.getLoadedActionRelay(source.getServer(), device);
@@ -384,8 +417,13 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeTest(ServerCommandSource source, BlockPos pos) {
-        LoadedDevice loadedDevice = getDeviceAt(source, pos);
+        LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
         if (loadedDevice == null) {
+            SignalDeviceData virtualDevice = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);
+            if (virtualDevice != null) {
+                return executeVirtualTest(source, pos, virtualDevice);
+            }
+            sendError(source, Text.literal("该位置不是信号设备。"));
             return 0;
         }
 
@@ -425,8 +463,19 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeSetEnabled(ServerCommandSource source, BlockPos pos, boolean enabled) {
-        LoadedDevice loadedDevice = getDeviceAt(source, pos);
+        LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
         if (loadedDevice == null) {
+            SignalDeviceData virtualDevice = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);
+            if (virtualDevice != null) {
+                SignalDeviceData device = SignalDeviceStore.updateVirtualEnabled(source.getWorld(), pos, enabled);
+                sendHeader(source, Text.literal(enabled ? "已启用信号设备" : "已禁用信号设备")
+                        .formatted(enabled ? Formatting.GREEN : Formatting.RED));
+                source.sendFeedback(() -> field("类型", typeText(device)), false);
+                source.sendFeedback(() -> field("位置", posText(pos)), false);
+                source.sendFeedback(() -> field("状态", enabledText(enabled)), false);
+                return 1;
+            }
+            sendError(source, Text.literal("该位置不是信号设备。"));
             return 0;
         }
 
@@ -450,7 +499,48 @@ public final class SignalDeviceCommand {
         return 1;
     }
 
+    private static int executeVirtualTest(ServerCommandSource source, BlockPos pos, SignalDeviceData device) {
+        if (device.channel().isBlank() || !SignalChannel.isValid(device.channel())) {
+            sendError(source, Text.literal("虚拟方块发射器频道未绑定或无效。"));
+            return 0;
+        }
+
+        ServerPlayerEntity player = source.getEntity() instanceof ServerPlayerEntity serverPlayer ? serverPlayer : null;
+        ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
+                device.channel(),
+                player,
+                source.getWorld(),
+                Vec3d.ofCenter(pos),
+                ActionSourceType.VIRTUAL_BLOCK_DEVICE,
+                device.id(),
+                SignalBridgeServer.currentDepth(),
+                source.getWorld().getTime()
+        ));
+        SignalDeviceStore.recordVirtualBlockManualTrigger(source.getWorld(), device, result);
+        if (!result.success()) {
+            sendError(source, result.message());
+            return 0;
+        }
+
+        sendHeader(source, Text.literal("已测试虚拟方块发射器").formatted(Formatting.GREEN));
+        source.sendFeedback(() -> field("类型", typeText(device)), false);
+        source.sendFeedback(() -> field("位置", posText(pos)), false);
+        source.sendFeedback(() -> field("频道", channelText(device.channel())), false);
+        source.sendFeedback(() -> field("结果", result.message()), false);
+        return 1;
+    }
+
     private static LoadedDevice getDeviceAt(ServerCommandSource source, BlockPos pos) {
+        LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
+        if (loadedDevice != null) {
+            return loadedDevice;
+        }
+
+        sendError(source, Text.literal("该位置不是信号设备。"));
+        return null;
+    }
+
+    private static LoadedDevice findLoadedDeviceAt(ServerCommandSource source, BlockPos pos) {
         if (source.getWorld().getBlockEntity(pos) instanceof SignalEmitterBlockEntity emitter) {
             return new LoadedDevice(emitter, null, null);
         }
@@ -461,7 +551,6 @@ public final class SignalDeviceCommand {
             return new LoadedDevice(null, null, relay);
         }
 
-        sendError(source, Text.literal("该位置不是信号设备。"));
         return null;
     }
 
@@ -513,6 +602,18 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("冷却", gtText(device.cooldownTicks())), false);
             source.sendFeedback(() -> field("动作数量", number(device.actionCount())), false);
             source.sendFeedback(() -> field("最近执行", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
+        } else if (isVirtualBlockDevice(device)) {
+            VirtualBlockPowerState powerState = virtualPowerState(source, device);
+            source.sendFeedback(() -> field("绑定时方块 ID", idText(device.blockId())), false);
+            source.sendFeedback(() -> field("当前方块 ID", powerState == null ? unknownText() : idText(powerState.blockId())), false);
+            source.sendFeedback(() -> field("BlockState powered", powerState == null ? unknownText() : boolText(powerState.blockStatePowered())), false);
+            source.sendFeedback(() -> field("接收红石强度", powerState == null ? unknownText() : number(powerState.receivedPowerLevel())), false);
+            source.sendFeedback(() -> field("当前通电", powerState == null ? unknownText() : boolText(powerState.currentPowered())), false);
+            source.sendFeedback(() -> field("上次通电", boolText(device.lastPowered())), false);
+            source.sendFeedback(() -> field("上次红石强度", number(device.lastPowerLevel())), false);
+            source.sendFeedback(() -> field("断电频道", channelOrEmpty(device.offChannel())), false);
+            source.sendFeedback(() -> field("模式", modeText(device.mode())), false);
+            source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
@@ -521,6 +622,108 @@ public final class SignalDeviceCommand {
         source.sendFeedback(() -> field("状态来源", loaded
                 ? Text.literal("已加载方块实体").formatted(Formatting.GREEN)
                 : Text.literal("设备注册表，方块未加载或不匹配").formatted(Formatting.YELLOW)), false);
+    }
+
+    private static void sendVirtualDebug(ServerCommandSource source, SignalDeviceData device) {
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(source.getServer(), device);
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        boolean chunkLoaded = world != null && world.isChunkLoaded(pos);
+        VirtualBlockPowerState powerState = chunkLoaded ? VirtualBlockDeviceSupport.powerState(world, pos) : null;
+        List<SignalListenerData> listeners = SignalChannelInspector.getListenersForChannel(source.getServer(), device.channel());
+        int receiverCount = receiverCountForChannel(source, device.channel());
+        int relayCount = actionRelayCountForChannel(source, device.channel());
+
+        sendHeader(source, Text.literal("虚拟方块发射器调试信息").formatted(Formatting.GOLD));
+        source.sendFeedback(() -> field("名称", nameText(SignalDeviceStore.displayName(device))), false);
+        source.sendFeedback(() -> field("ID", idText(device.id())), false);
+        source.sendFeedback(() -> field("短ID", idText(SignalDeviceStore.shortId(device.id()))), false);
+        source.sendFeedback(() -> field("类型", typeText(device)), false);
+        source.sendFeedback(() -> field("位置", positionText(device)), false);
+        source.sendFeedback(() -> field("区块", chunkLoaded
+                ? Text.literal("已加载").formatted(Formatting.GREEN)
+                : Text.literal("未加载，本 tick 跳过检测").formatted(Formatting.YELLOW)), false);
+        source.sendFeedback(() -> field("绑定时方块 ID", idText(device.blockId())), false);
+        source.sendFeedback(() -> field("当前方块 ID", powerState == null ? unknownText() : idText(powerState.blockId())), false);
+        source.sendFeedback(() -> field("方块一致性", powerState == null
+                ? unknownText()
+                : Text.literal(powerState.blockId().equals(device.blockId()) ? "一致" : "不一致")
+                        .formatted(powerState.blockId().equals(device.blockId()) ? Formatting.GREEN : Formatting.YELLOW)), false);
+        source.sendFeedback(() -> field("BlockState powered", powerState == null ? unknownText() : boolText(powerState.blockStatePowered())), false);
+        source.sendFeedback(() -> field("接收红石强度", powerState == null ? unknownText() : number(powerState.receivedPowerLevel())), false);
+        source.sendFeedback(() -> field("当前通电", powerState == null ? unknownText() : boolText(powerState.currentPowered())), false);
+        source.sendFeedback(() -> field("上次通电", boolText(device.lastPowered())), false);
+        source.sendFeedback(() -> field("上次红石强度", number(device.lastPowerLevel())), false);
+        source.sendFeedback(() -> field("频道", channelOrEmpty(device.channel())), false);
+        source.sendFeedback(() -> field("断电频道", channelOrEmpty(device.offChannel())), false);
+        source.sendFeedback(() -> field("模式", modeText(device.mode())), false);
+        source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
+        source.sendFeedback(() -> field("频道监听器", number(listeners.size())), false);
+        source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
+        source.sendFeedback(() -> field("同频道动作继电器", number(relayCount)), false);
+        source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
+        source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
+
+        List<Text> hints = virtualDebugHints(device, powerState, chunkLoaded, listeners, receiverCount, relayCount);
+        if (!hints.isEmpty()) {
+            source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
+            for (Text hint : hints) {
+                source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.YELLOW).append(hint), false);
+            }
+        }
+
+        List<SignalEventRecord> records = recentDeviceEvents(device, DEBUG_HISTORY_LIMIT);
+        if (records.isEmpty()) {
+            source.sendFeedback(() -> warning("该设备暂无最近事件。"), false);
+        } else {
+            source.sendFeedback(() -> Text.literal("最近事件：").formatted(Formatting.GRAY), false);
+            for (SignalEventRecord record : records) {
+                source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                        .append(channelText(record.channel()))
+                        .append(Text.literal("，执行 ").formatted(Formatting.GRAY))
+                        .append(number(record.executedCount()))
+                        .append(Text.literal("，失败 ").formatted(Formatting.GRAY))
+                        .append(number(record.failedCount()))
+                        .append(Text.literal("，距今 ").formatted(Formatting.GRAY))
+                        .append(elapsedText(record.wallTimeMillis())), false);
+            }
+        }
+    }
+
+    private static List<Text> virtualDebugHints(
+            SignalDeviceData device,
+            VirtualBlockPowerState powerState,
+            boolean chunkLoaded,
+            List<SignalListenerData> listeners,
+            int receiverCount,
+            int relayCount
+    ) {
+        List<Text> hints = new ArrayList<>();
+        if (device.channel().isBlank()) {
+            hints.add(Text.literal("未绑定频道。").formatted(Formatting.YELLOW));
+        }
+        if (!device.channel().isBlank() && !SignalChannel.isValid(device.channel())) {
+            hints.add(Text.literal("频道名称无效。").formatted(Formatting.RED));
+        }
+        if (!device.offChannel().isBlank() && !SignalChannel.isValid(device.offChannel())) {
+            hints.add(Text.literal("断电频道名称无效。").formatted(Formatting.RED));
+        }
+        if (!device.enabled()) {
+            hints.add(Text.literal("设备已禁用。").formatted(Formatting.YELLOW));
+        }
+        if (!chunkLoaded) {
+            hints.add(Text.literal("所在区块未加载，本 tick 会跳过检测。").formatted(Formatting.YELLOW));
+        } else if (powerState != null && powerState.air()) {
+            hints.add(Text.literal("当前方块为空气，可用 /tzz signal device cleanup 清理记录。").formatted(Formatting.YELLOW));
+        } else if (powerState != null && !powerState.blockId().equals(device.blockId())) {
+            hints.add(Text.literal("当前方块 ID 与绑定时不一致，MVP 会跳过触发；请 refresh 或重新 bind。").formatted(Formatting.YELLOW));
+        }
+        if (device.offChannel().isBlank() && VirtualBlockDeviceMode.fromId(device.mode()).triggersFalling()) {
+            hints.add(Text.literal("offChannel 未设置，断电触发会使用主频道。").formatted(Formatting.YELLOW));
+        }
+        if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
+            hints.add(Text.literal("频道没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。").formatted(Formatting.YELLOW));
+        }
+        return hints;
     }
 
     private static List<Text> debugHints(
@@ -607,6 +810,10 @@ public final class SignalDeviceCommand {
                         || SignalChannel.normalize(record.channel()).equals(SignalChannel.normalize(device.channel()))) {
                     matches.add(record);
                 }
+            } else if (isVirtualBlockDevice(device)) {
+                if ("virtual_block_device".equals(record.sourceType()) && device.id().equals(record.sourceId())) {
+                    matches.add(record);
+                }
             } else if ("signal_device".equals(record.sourceType()) && device.id().equals(record.sourceId())) {
                 matches.add(record);
             }
@@ -650,6 +857,10 @@ public final class SignalDeviceCommand {
     }
 
     private static boolean isLoaded(ServerCommandSource source, SignalDeviceData device) {
+        if (isVirtualBlockDevice(device)) {
+            ServerWorld world = SignalDeviceStore.getDeviceWorld(source.getServer(), device);
+            return world != null && world.isChunkLoaded(new BlockPos(device.x(), device.y(), device.z()));
+        }
         if (isActionRelay(device)) {
             return SignalDeviceStore.getLoadedActionRelay(source.getServer(), device) != null;
         }
@@ -664,6 +875,10 @@ public final class SignalDeviceCommand {
 
     private static boolean isActionRelay(SignalDeviceData device) {
         return device != null && SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type());
+    }
+
+    private static boolean isVirtualBlockDevice(SignalDeviceData device) {
+        return device != null && SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type());
     }
 
     private static CompletableFuture<Suggestions> suggestDevices(ServerCommandSource source, SuggestionsBuilder builder) {
@@ -721,7 +936,9 @@ public final class SignalDeviceCommand {
     }
 
     private static MutableText typeText(SignalDeviceData device) {
-        return Text.literal(device.type()).formatted(isActionRelay(device) ? Formatting.GREEN : isReceiver(device) ? Formatting.RED : Formatting.WHITE);
+        return Text.literal(device.type()).formatted(isActionRelay(device)
+                ? Formatting.GREEN
+                : isReceiver(device) ? Formatting.RED : isVirtualBlockDevice(device) ? Formatting.LIGHT_PURPLE : Formatting.WHITE);
     }
 
     private static MutableText positionText(SignalDeviceData device) {
@@ -734,6 +951,18 @@ public final class SignalDeviceCommand {
 
     private static MutableText enabledText(boolean enabled) {
         return Text.literal(enabled ? "启用" : "禁用").formatted(enabled ? Formatting.GREEN : Formatting.RED);
+    }
+
+    private static MutableText boolText(boolean value) {
+        return Text.literal(value ? "是" : "否").formatted(value ? Formatting.GREEN : Formatting.GRAY);
+    }
+
+    private static MutableText unknownText() {
+        return Text.literal("未知").formatted(Formatting.YELLOW);
+    }
+
+    private static MutableText modeText(String mode) {
+        return Text.literal(VirtualBlockDeviceMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
     }
 
     private static MutableText gtText(int ticks) {
@@ -760,6 +989,15 @@ public final class SignalDeviceCommand {
         }
         boolean powered = blockEntity.remainingPulseTicks() > 0;
         return Text.literal(powered ? "正在输出" : "未输出").formatted(powered ? Formatting.RED : Formatting.GRAY);
+    }
+
+    private static VirtualBlockPowerState virtualPowerState(ServerCommandSource source, SignalDeviceData device) {
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(source.getServer(), device);
+        if (world == null) {
+            return null;
+        }
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        return world.isChunkLoaded(pos) ? VirtualBlockDeviceSupport.powerState(world, pos) : null;
     }
 
     private static MutableText consistencyText(

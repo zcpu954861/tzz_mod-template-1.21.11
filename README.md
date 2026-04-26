@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.6.0-action-relay`
+- 最新发布版本：`v1.7.0-virtual-block-device`
 - 当前开发版本：以 `gradle.properties` 的 `mod_version` 为准
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
@@ -231,6 +231,71 @@ signal -> action_relay -> ActionEngine actions
 
 `action_relay` 的 `actions[]` 直接使用 ActionEngine 的 `ActionConfig` 格式。后续 ActionEngine 增加新动作类型时，动作继电器可以继续复用同一套动作结构。`signal_devices.json` 继续作为设备管理索引，设备历史仍来自内存中的 SignalEventHistory，不新增永久 history JSON。
 
+### Virtual Block Device 虚拟方块发射器
+
+`virtual_block_device` 是虚拟方块发射器。它不是新方块，而是把管理员手动指定的已有方块坐标登记为 SignalBridge 触发源：
+
+```text
+已有方块的红石状态变化 -> virtual_block_device -> emit signal
+```
+
+它会同时检测该坐标方块自身的 `powered` 状态和该坐标接收到的红石强度。只有已登记坐标从未通电变为通电，或从通电变为未通电时，才会根据触发模式发出 signal。
+
+新增命令：
+
+```text
+/tzz signal blockDevice bind <x> <y> <z> <channel>
+/tzz signal blockDevice offChannel <x> <y> <z> <channel>
+/tzz signal blockDevice clearOffChannel <x> <y> <z>
+/tzz signal blockDevice mode <x> <y> <z> redstone_rising
+/tzz signal blockDevice mode <x> <y> <z> redstone_falling
+/tzz signal blockDevice mode <x> <y> <z> redstone_both
+/tzz signal blockDevice info <x> <y> <z>
+/tzz signal blockDevice test <x> <y> <z>
+/tzz signal blockDevice unbind <x> <y> <z>
+/tzz signal blockDevice refresh <x> <y> <z>
+```
+
+触发模式：
+
+- `redstone_rising`：未通电 -> 通电时发出 `channel`。
+- `redstone_falling`：通电 -> 未通电时发出 `offChannel`；未设置 `offChannel` 时发出 `channel`。
+- `redstone_both`：通电和断电边沿都触发；断电时优先使用 `offChannel`。
+
+性能边界：
+
+- 不扫描世界。
+- 不扫描区块。
+- 不扫描周围方块。
+- 不自动寻找拉杆、按钮、压力板或红石灯。
+- 不强制加载区块。
+- 只检测 `signal_devices.json` 中登记过的 `virtual_block_device`。
+- 每个设备每次只检测自己的一个坐标。
+- 状态不变不 emit，也不写 JSON。
+- `signal_devices.json` 写入已节流，服务端停止时会强制保存。
+
+统一设备命令现在也支持虚拟方块发射器：
+
+```text
+/tzz signal device list
+/tzz signal device info <device>
+/tzz signal device debug <device>
+/tzz signal device test <x> <y> <z>
+/tzz signal device enable <x> <y> <z>
+/tzz signal device disable <x> <y> <z>
+/tzz signal device cleanup
+```
+
+`cleanup` 对虚拟方块发射器采用保守策略：如果已加载位置变成空气，会删除记录；如果当前方块 ID 与绑定时不一致但不是空气，只在 debug 中提示，不自动删除。
+
+职责边界：
+
+- `signal_emitter`：专用方块，红石 / 交互 -> signal。
+- `virtual_block_device`：已有方块，红石状态变化 -> signal。
+- `signal_receiver`：signal -> 红石输出。
+- `action_relay`：signal -> ActionEngine actions。
+- `SignalListener`：后台虚拟逻辑接收端。
+
 ### SignalBridge 可观测性命令
 
 4.5 阶段补充了 SignalBridge 的只读观测与诊断命令，用于排查 signal 是否发出、channel 是否存在 listener、listener 是否处于冷却或存在递归风险。
@@ -348,6 +413,8 @@ world/tzz_mod/region_controllers.json
 - `region_planner`：创建和编辑规划区域。
 - `task_configurator`：创建和编辑任务配置。
 - `signal_emitter`：可绑定 SignalBridge channel，并在红石上升沿发出 signal。
+- `signal_receiver`：接收 SignalBridge channel 并输出红石脉冲。
+- `action_relay`：接收 SignalBridge channel 并执行 ActionEngine actions。
 
 ## 开发与构建
 

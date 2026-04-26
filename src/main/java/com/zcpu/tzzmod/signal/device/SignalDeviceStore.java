@@ -5,12 +5,14 @@ import com.zcpu.tzzmod.ModBlock.entity.SignalEmitterBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.WorldSavePath;
@@ -95,6 +97,103 @@ public final class SignalDeviceStore {
         return upsertActionRelay(world, pos, blockEntity);
     }
 
+    public static synchronized SignalDeviceData upsertVirtualBlock(ServerWorld world, BlockPos pos, String channel) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        VirtualBlockPowerState powerState = VirtualBlockDeviceSupport.powerState(world, pos);
+        SignalDeviceData updated = fromVirtualBlock(
+                world,
+                pos,
+                existing,
+                SignalChannel.normalize(channel),
+                existing == null ? "" : existing.offChannel(),
+                existing == null ? VirtualBlockDeviceMode.REDSTONE_RISING.id() : existing.mode(),
+                existing == null || existing.enabled(),
+                powerState,
+                false,
+                existing == null ? "" : existing.name()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualOffChannel(ServerWorld world, BlockPos pos, String offChannel) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withVirtualSettings(
+                existing,
+                existing.channel(),
+                SignalChannel.normalize(offChannel),
+                existing.mode(),
+                existing.enabled()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualMode(ServerWorld world, BlockPos pos, String mode) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withVirtualSettings(
+                existing,
+                existing.channel(),
+                existing.offChannel(),
+                VirtualBlockDeviceMode.normalize(mode),
+                existing.enabled()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualEnabled(ServerWorld world, BlockPos pos, boolean enabled) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withVirtualSettings(existing, existing.channel(), existing.offChannel(), existing.mode(), enabled);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData refreshVirtualBlock(ServerWorld world, BlockPos pos) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        VirtualBlockPowerState powerState = VirtualBlockDeviceSupport.powerState(world, pos);
+        SignalDeviceData updated = fromVirtualBlock(
+                world,
+                pos,
+                existing,
+                existing.channel(),
+                existing.offChannel(),
+                existing.mode(),
+                existing.enabled(),
+                powerState,
+                false,
+                existing.name()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
     public static synchronized SignalDeviceData setName(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, String name) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
@@ -122,6 +221,19 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData setVirtualName(ServerWorld world, BlockPos pos, String name) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withName(existing, cleanUserText(name));
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
     public static synchronized ResolveResult clearName(MinecraftServer server, String deviceRef) {
         ResolveResult resolved = resolveDevice(server, deviceRef);
         if (!resolved.foundUnique()) {
@@ -137,6 +249,10 @@ public final class SignalDeviceStore {
 
     public static synchronized boolean remove(MinecraftServer server, ServerWorld world, BlockPos pos) {
         return removeById(server, sourceId(world, pos));
+    }
+
+    public static synchronized boolean removeVirtualBlock(MinecraftServer server, ServerWorld world, BlockPos pos) {
+        return removeById(server, VirtualBlockDeviceSupport.id(world, pos));
     }
 
     public static synchronized boolean removeById(MinecraftServer server, String sourceId) {
@@ -166,6 +282,14 @@ public final class SignalDeviceStore {
                 continue;
             }
 
+            if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
+                BlockState blockState = world.getBlockState(pos);
+                if (blockState.isAir() && state.devices.removeIf(candidate -> candidate.id().equals(device.id()))) {
+                    removed++;
+                }
+                continue;
+            }
+
             if (matchesLoadedDevice(world, pos, device.type())) {
                 SignalDeviceData refreshed = refreshLoadedDevice(server, state, device);
                 if (refreshed != null) {
@@ -182,6 +306,25 @@ public final class SignalDeviceStore {
             state.markDirty();
         }
         return removed;
+    }
+
+    public static synchronized List<SignalDeviceData> getVirtualBlockDevicesSnapshot(MinecraftServer server) {
+        State state = getState(server);
+        List<SignalDeviceData> result = new ArrayList<>();
+        for (SignalDeviceData device : state.devices) {
+            if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
+                result.add(device.normalized());
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public static synchronized SignalDeviceData findVirtualBlockDevice(MinecraftServer server, ServerWorld world, BlockPos pos) {
+        if (server == null || world == null || pos == null) {
+            return null;
+        }
+        State state = getState(server);
+        return findById(state, VirtualBlockDeviceSupport.id(world, pos));
     }
 
     public static synchronized void recordTrigger(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity, ActionExecutionResult result) {
@@ -208,7 +351,12 @@ public final class SignalDeviceStore {
                 now,
                 world.getTime(),
                 now,
-                resultMessage
+                resultMessage,
+                base.blockId(),
+                base.offChannel(),
+                base.mode(),
+                base.lastPowered(),
+                base.lastPowerLevel()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -238,7 +386,12 @@ public final class SignalDeviceStore {
                 now,
                 world.getTime(),
                 now,
-                resultMessage
+                resultMessage,
+                base.blockId(),
+                base.offChannel(),
+                base.mode(),
+                base.lastPowered(),
+                base.lastPowerLevel()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -268,7 +421,96 @@ public final class SignalDeviceStore {
                 now,
                 world.getTime(),
                 now,
-                resultMessage
+                resultMessage,
+                base.blockId(),
+                base.offChannel(),
+                base.mode(),
+                base.lastPowered(),
+                base.lastPowerLevel()
+        ).normalized();
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualPowerState(ServerWorld world, SignalDeviceData device, VirtualBlockPowerState powerState) {
+        if (world == null || device == null || powerState == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        SignalDeviceData updated = withVirtualPower(world, existing, powerState, existing.lastResult(), false);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualBlockTrigger(
+            ServerWorld world,
+            SignalDeviceData device,
+            VirtualBlockPowerState powerState,
+            ActionExecutionResult result
+    ) {
+        if (world == null || device == null || powerState == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        SignalDeviceData updated = withVirtualPower(world, existing, powerState, resultMessage, true);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualBlockManualTrigger(
+            ServerWorld world,
+            SignalDeviceData device,
+            ActionExecutionResult result
+    ) {
+        if (world == null || device == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        SignalDeviceData updated = new SignalDeviceData(
+                existing.id(),
+                existing.type(),
+                existing.name(),
+                existing.dimension(),
+                existing.x(),
+                existing.y(),
+                existing.z(),
+                existing.channel(),
+                existing.enabled(),
+                existing.pulseTicks(),
+                existing.remainingPulseTicks(),
+                existing.cooldownTicks(),
+                existing.actionCount(),
+                existing.createdWallTimeMillis(),
+                now,
+                world.getTime(),
+                now,
+                resultMessage,
+                existing.blockId(),
+                existing.offChannel(),
+                existing.mode(),
+                existing.lastPowered(),
+                existing.lastPowerLevel()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -406,7 +648,14 @@ public final class SignalDeviceStore {
     public static synchronized void flushDirty(MinecraftServer server) {
         State state = CACHE.get(server);
         if (state != null) {
-            state.flushDirty();
+            state.flushDirty(false, currentGameTime(server));
+        }
+    }
+
+    public static synchronized void forceFlushDirty(MinecraftServer server) {
+        State state = CACHE.get(server);
+        if (state != null) {
+            state.flushDirty(true, currentGameTime(server));
         }
     }
 
@@ -473,6 +722,9 @@ public final class SignalDeviceStore {
 
         BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
         SignalDeviceData refreshed = null;
+        if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
+            return device;
+        }
         if (device.type().equals(SignalDeviceData.TYPE_ACTION_RELAY)) {
             ActionRelayBlockEntity relay = getLoadedActionRelay(server, device);
             if (relay != null) {
@@ -483,7 +735,7 @@ public final class SignalDeviceStore {
             if (receiver != null) {
                 refreshed = fromReceiver(world, pos, receiver, device, true);
             }
-        } else {
+        } else if (device.type().equals(SignalDeviceData.TYPE_SIGNAL_EMITTER)) {
             SignalEmitterBlockEntity emitter = getLoadedEmitter(server, device);
             if (emitter != null) {
                 refreshed = fromEmitter(world, pos, emitter, device, true);
@@ -538,7 +790,12 @@ public final class SignalDeviceStore {
                 updated,
                 existing == null ? 0L : existing.lastTriggerGameTime(),
                 existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
-                existing == null ? "" : existing.lastResult()
+                existing == null ? "" : existing.lastResult(),
+                existing == null ? "" : existing.blockId(),
+                existing == null ? "" : existing.offChannel(),
+                existing == null ? VirtualBlockDeviceMode.REDSTONE_RISING.id() : existing.mode(),
+                existing != null && existing.lastPowered(),
+                existing == null ? 0 : existing.lastPowerLevel()
         ).normalized();
     }
 
@@ -570,7 +827,12 @@ public final class SignalDeviceStore {
                 updated,
                 existing == null ? 0L : existing.lastTriggerGameTime(),
                 existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
-                existing == null ? "" : existing.lastResult()
+                existing == null ? "" : existing.lastResult(),
+                existing == null ? "" : existing.blockId(),
+                existing == null ? "" : existing.offChannel(),
+                existing == null ? VirtualBlockDeviceMode.REDSTONE_RISING.id() : existing.mode(),
+                existing != null && existing.lastPowered(),
+                existing == null ? 0 : existing.lastPowerLevel()
         ).normalized();
     }
 
@@ -602,7 +864,123 @@ public final class SignalDeviceStore {
                 updated,
                 existing == null ? 0L : existing.lastTriggerGameTime(),
                 existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
-                existing == null ? "" : existing.lastResult()
+                existing == null ? "" : existing.lastResult(),
+                existing == null ? "" : existing.blockId(),
+                existing == null ? "" : existing.offChannel(),
+                existing == null ? VirtualBlockDeviceMode.REDSTONE_RISING.id() : existing.mode(),
+                existing != null && existing.lastPowered(),
+                existing == null ? 0 : existing.lastPowerLevel()
+        ).normalized();
+    }
+
+    private static SignalDeviceData fromVirtualBlock(
+            ServerWorld world,
+            BlockPos pos,
+            SignalDeviceData existing,
+            String channel,
+            String offChannel,
+            String mode,
+            boolean enabled,
+            VirtualBlockPowerState powerState,
+            boolean preserveUpdatedTime,
+            String name
+    ) {
+        long now = System.currentTimeMillis();
+        long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
+        long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
+        return new SignalDeviceData(
+                VirtualBlockDeviceSupport.id(world, pos),
+                SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE,
+                name == null ? "" : name,
+                world.getRegistryKey().getValue().toString(),
+                pos.getX(),
+                pos.getY(),
+                pos.getZ(),
+                channel,
+                enabled,
+                0,
+                0,
+                0,
+                0,
+                created,
+                updated,
+                existing == null ? 0L : existing.lastTriggerGameTime(),
+                existing == null ? 0L : existing.lastTriggerWallTimeMillis(),
+                existing == null ? "" : existing.lastResult(),
+                powerState.blockId(),
+                offChannel,
+                mode,
+                powerState.currentPowered(),
+                powerState.receivedPowerLevel()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withVirtualSettings(
+            SignalDeviceData device,
+            String channel,
+            String offChannel,
+            String mode,
+            boolean enabled
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                channel,
+                enabled,
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                offChannel,
+                mode,
+                device.lastPowered(),
+                device.lastPowerLevel()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withVirtualPower(
+            ServerWorld world,
+            SignalDeviceData device,
+            VirtualBlockPowerState powerState,
+            String resultMessage,
+            boolean triggered
+    ) {
+        long now = System.currentTimeMillis();
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                now,
+                triggered ? world.getTime() : device.lastTriggerGameTime(),
+                triggered ? now : device.lastTriggerWallTimeMillis(),
+                resultMessage,
+                powerState.blockId(),
+                device.offChannel(),
+                device.mode(),
+                powerState.currentPowered(),
+                powerState.receivedPowerLevel()
         ).normalized();
     }
 
@@ -625,7 +1003,12 @@ public final class SignalDeviceStore {
                 System.currentTimeMillis(),
                 device.lastTriggerGameTime(),
                 device.lastTriggerWallTimeMillis(),
-                device.lastResult()
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel()
         ).normalized();
     }
 
@@ -685,6 +1068,10 @@ public final class SignalDeviceStore {
         return null;
     }
 
+    private static long currentGameTime(MinecraftServer server) {
+        return server == null || server.getOverworld() == null ? 0L : server.getOverworld().getTime();
+    }
+
     private static String tailId(String id) {
         if (id == null || id.isBlank()) {
             return "";
@@ -724,9 +1111,12 @@ public final class SignalDeviceStore {
     }
 
     private static final class State {
+        private static final long FLUSH_INTERVAL_TICKS = 100L;
+
         private final Path path;
         private final List<SignalDeviceData> devices = new ArrayList<>();
         private boolean dirty;
+        private long lastFlushGameTime = -FLUSH_INTERVAL_TICKS;
 
         private State(Path path) {
             this.path = path;
@@ -736,8 +1126,11 @@ public final class SignalDeviceStore {
             dirty = true;
         }
 
-        private void flushDirty() {
+        private void flushDirty(boolean force, long currentGameTime) {
             if (!dirty) {
+                return;
+            }
+            if (!force && currentGameTime - lastFlushGameTime < FLUSH_INTERVAL_TICKS) {
                 return;
             }
             DataFile dataFile = new DataFile();
@@ -747,6 +1140,7 @@ public final class SignalDeviceStore {
             }
             if (JsonStoreSupport.write(path, dataFile, "signal devices")) {
                 dirty = false;
+                lastFlushGameTime = currentGameTime;
             }
         }
     }
