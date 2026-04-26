@@ -628,10 +628,17 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 
 5.12 阶段把 `interactionItem` 的物品来源从固定主手扩展为可配置来源。旧配置缺少新字段时默认 `main_hand`，保持 5.10 / 5.11 行为；`off_hand` 和 `inventory_contains` 必须由管理员显式配置。
 
+5.13 阶段继续新增装备 / 盔甲来源：`armor_head`、`armor_chest`、`armor_legs`、`armor_feet`、`armor_any`。这些来源同样必须显式配置；右键事件仍只处理 `MAIN_HAND`，armor 来源只读取触发玩家对应盔甲槽位的 ItemStack，不处理装备事件，也不支持装备 / 盔甲消耗。
+
 ```text
 /tzz signal blockDevice interactionItem source <x> <y> <z> main_hand
 /tzz signal blockDevice interactionItem source <x> <y> <z> off_hand
 /tzz signal blockDevice interactionItem source <x> <y> <z> inventory_contains
+/tzz signal blockDevice interactionItem source <x> <y> <z> armor_head
+/tzz signal blockDevice interactionItem source <x> <y> <z> armor_chest
+/tzz signal blockDevice interactionItem source <x> <y> <z> armor_legs
+/tzz signal blockDevice interactionItem source <x> <y> <z> armor_feet
+/tzz signal blockDevice interactionItem source <x> <y> <z> armor_any
 /tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> allow
 /tzz signal blockDevice interactionItem vanillaInteraction <x> <y> <z> require_item_match
 ```
@@ -641,9 +648,14 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - `main_hand`：读取触发玩家 `MAIN_HAND`，继续支持 5.11 的主手消耗。
 - `off_hand`：只检查触发玩家副手物品；右键事件仍只处理 `MAIN_HAND`，不会处理副手右键事件。
 - `inventory_contains`：只在玩家右键已绑定方块时检查该玩家自己的主背包 / 热键栏；不包含副手、装备栏或盔甲栏，也不在 tick 中扫描。
+- `armor_head`：只检查触发玩家头盔槽。
+- `armor_chest`：只检查触发玩家胸甲槽。
+- `armor_legs`：只检查触发玩家护腿槽。
+- `armor_feet`：只检查触发玩家靴子槽。
+- `armor_any`：只检查头盔、胸甲、护腿、靴子四个盔甲槽，任意槽位匹配即成功，并记录第一个匹配槽位。
 - `inventory_contains` 使用 `ItemStackMatcher` 的非数量条件筛选背包 stack，然后统计总数；`ignore` 表示至少存在一个匹配 stack，`at_least` / `exactly` / `at_most` 作用于总数，其中 `at_most` 要求总数大于 0。
 - `consumeCount` 是成功后消耗数量，和 `countMode=ignore` 无关；启用 consume 时仍必须满足消耗数量。
-- `consume` 只支持 `main_hand`。source 为 `off_hand` 或 `inventory_contains` 时启用 consume 会被拒绝；旧数据中出现不兼容配置时运行时不会消耗，并会进入失败流程或在 debug 中提示。
+- `consume` 只支持 `main_hand`。source 为 `off_hand`、`inventory_contains` 或任意 `armor_*` 时启用 consume 会被拒绝；旧数据中出现不兼容配置时运行时不会消耗，并会进入失败流程或在 debug 中提示。
 - `vanillaInteraction` 默认 `allow`，不阻止原版右键行为。显式设置 `require_item_match` 后，它会作为锁定策略生效：只有 interactionItem 匹配成功才允许原版交互继续；匹配失败、空手不匹配或数量不足以 consume 时会阻止箱子打开、门开关、按钮/拉杆切换等原版 use。`interactionCooldownTicks` 不会让锁失效；冷却中匹配失败仍会阻止原版交互，只是不 emit、不反馈、不消耗、不额外播放触发动效，也不写入结果/历史。设备禁用、interaction 禁用、matcher 未启用、blockId 不一致、空气或未绑定方块仍保持 `PASS`。
 - 对门使用 `require_item_match` 时，绑定上半格或下半格都可以；玩家右键另一半门时会尝试归一化到已绑定设备，避免通过门的另一半绕过锁。该逻辑只检查当前点击坐标和门的另一半坐标，不扫描世界。
 
@@ -653,8 +665,8 @@ Signal 设备被破坏后会自动从 `signal_devices.json` 中移除。`/tzz si
 - 不扫描世界、区块或周围方块，不强制加载区块。
 - 不每 tick 检查玩家背包。
 - 不读取其他玩家背包。
-- 不读取装备栏或盔甲栏。
-- 不做背包消耗、副手消耗、多物品提交、复杂条件组或通用 NBT 查询。
+- `armor_head` / `armor_chest` / `armor_legs` / `armor_feet` 只读取对应盔甲槽；`armor_any` 只读取四个盔甲槽。
+- 不做背包消耗、副手消耗、装备 / 盔甲消耗、多物品提交、复杂条件组或通用 NBT 查询。
 - `interactionItem info` 会显示 source、最近匹配来源、最近匹配槽位和最近匹配数量；`device debug` 会显示 source 与 consume 的兼容性诊断。
 
 ### 统一设备命令
@@ -707,10 +719,11 @@ Virtual Block Device 的 tick 检测复杂度是 `O(已登记 virtual_block_devi
 
 ## 后续计划
 
-以下内容只作为后续阶段计划记录，不在 5.12 MVP 实现：
+以下内容只作为后续阶段计划记录，不在 5.13 MVP 实现：
 
-- 5.13 装备栏 / 盔甲栏匹配。
 - 5.14 消耗策略 / 多物品提交，包括背包消耗、副手消耗和更复杂的提交规则。
+- 复杂 ConditionEngine / ConditionGroup 后续单独设计。
+- 5.15 稳定化 / GUI 前置整理版。
 - GUI / Admin UI：所有 source、matcher、consume 和反馈配置未来都应进入 GUI；可拆分成交互条件配置器、物品 matcher 配置器、容器条件配置器、signal 设备配置器、debug/doctor 工具。
 
 ## cooldown

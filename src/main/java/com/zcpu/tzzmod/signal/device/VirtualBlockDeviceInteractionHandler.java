@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.DoorBlock;
 import net.minecraft.block.enums.DoubleBlockHalf;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
 import net.minecraft.registry.Registries;
@@ -305,6 +306,43 @@ public final class VirtualBlockDeviceInteractionHandler {
                     ItemStack.EMPTY
             );
         }
+        if (InteractionItemSource.ARMOR_HEAD.equals(source)) {
+            return evaluateEquippedStack(player, matcher, EquipmentSlot.HEAD, InteractionItemSource.ARMOR_HEAD);
+        }
+        if (InteractionItemSource.ARMOR_CHEST.equals(source)) {
+            return evaluateEquippedStack(player, matcher, EquipmentSlot.CHEST, InteractionItemSource.ARMOR_CHEST);
+        }
+        if (InteractionItemSource.ARMOR_LEGS.equals(source)) {
+            return evaluateEquippedStack(player, matcher, EquipmentSlot.LEGS, InteractionItemSource.ARMOR_LEGS);
+        }
+        if (InteractionItemSource.ARMOR_FEET.equals(source)) {
+            return evaluateEquippedStack(player, matcher, EquipmentSlot.FEET, InteractionItemSource.ARMOR_FEET);
+        }
+        if (InteractionItemSource.ARMOR_ANY.equals(source)) {
+            InteractionItemMatch head = evaluateEquippedStack(player, matcher, EquipmentSlot.HEAD, InteractionItemSource.ARMOR_HEAD);
+            if (head.matched()) {
+                return head;
+            }
+            InteractionItemMatch chest = evaluateEquippedStack(player, matcher, EquipmentSlot.CHEST, InteractionItemSource.ARMOR_CHEST);
+            if (chest.matched()) {
+                return chest;
+            }
+            InteractionItemMatch legs = evaluateEquippedStack(player, matcher, EquipmentSlot.LEGS, InteractionItemSource.ARMOR_LEGS);
+            if (legs.matched()) {
+                return legs;
+            }
+            InteractionItemMatch feet = evaluateEquippedStack(player, matcher, EquipmentSlot.FEET, InteractionItemSource.ARMOR_FEET);
+            if (feet.matched()) {
+                return feet;
+            }
+            return new InteractionItemMatch(
+                    false,
+                    InteractionItemSource.ARMOR_ANY,
+                    -1,
+                    0,
+                    ItemStack.EMPTY
+            );
+        }
 
         ItemStack stack = player.getMainHandStack();
         boolean matched = ItemStackMatcher.matches(stack, matcher);
@@ -314,6 +352,23 @@ public final class VirtualBlockDeviceInteractionHandler {
                 player.getInventory().getSelectedSlot(),
                 matched && stack != null && !stack.isEmpty() ? stack.getCount() : 0,
                 stack
+        );
+    }
+
+    private static InteractionItemMatch evaluateEquippedStack(
+            ServerPlayerEntity player,
+            ItemStackMatcherData matcher,
+            EquipmentSlot slot,
+            String source
+    ) {
+        ItemStack stack = player.getEquippedStack(slot);
+        boolean matched = ItemStackMatcher.matches(stack, matcher);
+        return new InteractionItemMatch(
+                matched,
+                source,
+                -1,
+                matched && stack != null && !stack.isEmpty() ? stack.getCount() : 0,
+                ItemStack.EMPTY
         );
     }
 

@@ -209,6 +209,36 @@ public final class VirtualBlockInteractionItemCommand {
                                                 context.getSource(),
                                                 BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
                                                 InteractionItemSource.INVENTORY_CONTAINS
+                                        )))
+                                .then(CommandManager.literal(InteractionItemSource.ARMOR_HEAD)
+                                        .executes(context -> executeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemSource.ARMOR_HEAD
+                                        )))
+                                .then(CommandManager.literal(InteractionItemSource.ARMOR_CHEST)
+                                        .executes(context -> executeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemSource.ARMOR_CHEST
+                                        )))
+                                .then(CommandManager.literal(InteractionItemSource.ARMOR_LEGS)
+                                        .executes(context -> executeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemSource.ARMOR_LEGS
+                                        )))
+                                .then(CommandManager.literal(InteractionItemSource.ARMOR_FEET)
+                                        .executes(context -> executeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemSource.ARMOR_FEET
+                                        )))
+                                .then(CommandManager.literal(InteractionItemSource.ARMOR_ANY)
+                                        .executes(context -> executeSource(
+                                                context.getSource(),
+                                                BlockPosArgumentType.getLoadedBlockPos(context, "pos"),
+                                                InteractionItemSource.ARMOR_ANY
                                         )))))
                 .then(CommandManager.literal("vanillaInteraction")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
@@ -568,7 +598,7 @@ public final class VirtualBlockInteractionItemCommand {
         source.sendFeedback(() -> field("成功消耗", boolText(matcher.consumeEnabled())), false);
         source.sendFeedback(() -> field("消耗数量", Text.literal(Integer.toString(matcher.consumeCount())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近匹配", boolText(device.lastInteractionItemMatched())), false);
-        source.sendFeedback(() -> field("最近匹配来源", Text.literal(matcher.lastInteractionItemSource().isBlank() ? "暂无" : matcher.lastInteractionItemSource()).formatted(Formatting.WHITE)), false);
+        source.sendFeedback(() -> field("最近匹配来源", Text.literal(matcher.lastInteractionItemSource().isBlank() ? "暂无" : InteractionItemSource.displayName(matcher.lastInteractionItemSource())).formatted(Formatting.WHITE)), false);
         source.sendFeedback(() -> field("最近匹配槽位", Text.literal(Integer.toString(matcher.lastInteractionItemMatchedSlot())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近匹配数量", Text.literal(Integer.toString(matcher.lastInteractionItemMatchedCount())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近来源结果", Text.literal(matcher.lastInteractionItemSourceResult().isBlank() ? "暂无结果" : matcher.lastInteractionItemSourceResult()).formatted(Formatting.WHITE)), false);

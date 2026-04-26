@@ -1222,7 +1222,7 @@ public final class SignalDeviceCommand {
     private static Text sourceText(String source) {
         return source == null || source.isBlank()
                 ? Text.literal("暂无").formatted(Formatting.YELLOW)
-                : Text.literal(source).formatted(Formatting.AQUA);
+                : Text.literal(InteractionItemSource.displayName(source)).formatted(Formatting.AQUA);
     }
 
     private static Text soundText(String soundId, float volume, float pitch) {
