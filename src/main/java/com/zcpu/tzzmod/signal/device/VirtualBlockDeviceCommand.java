@@ -234,6 +234,7 @@ public final class VirtualBlockDeviceCommand {
                                         context.getSource(),
                                         BlockPosArgumentType.getLoadedBlockPos(context, "pos")
                                 ))))
+                .then(ContainerItemConditionCommand.build())
                 .then(CommandManager.literal("info")
                         .then(CommandManager.argument("pos", BlockPosArgumentType.blockPos())
                                 .executes(context -> executeInfo(
@@ -800,6 +801,9 @@ public final class VirtualBlockDeviceCommand {
                 ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
                 : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
+        source.sendFeedback(() -> field("物品条件", itemConditionCountText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件触发", latestItemConditionTriggerText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件结果", latestItemConditionResultText(device)), false);
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastResult())), false);
@@ -891,6 +895,9 @@ public final class VirtualBlockDeviceCommand {
         source.sendFeedback(() -> field("最近内容变化", elapsedOrNever(device.lastContainerChangeWallTimeMillis())), false);
         source.sendFeedback(() -> field("最近玩家", playerOrNever(device.lastContainerPlayerName())), false);
         source.sendFeedback(() -> field("最近结果", resultText(device.lastContainerResult())), false);
+        source.sendFeedback(() -> field("物品条件", itemConditionCountText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件触发", latestItemConditionTriggerText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件结果", latestItemConditionResultText(device)), false);
     }
 
     private static void sendHeader(ServerCommandSource source, Text title) {
@@ -935,6 +942,38 @@ public final class VirtualBlockDeviceCommand {
 
     private static MutableText conditionModeText(String mode) {
         return Text.literal(BlockStateConditionMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText itemConditionCountText(SignalDeviceData device) {
+        int enabled = 0;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            if (condition.enabled()) {
+                enabled++;
+            }
+        }
+        return Text.literal(device.itemConditions().size() + " 个，启用 " + enabled + " 个")
+                .formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static Text latestItemConditionTriggerText(SignalDeviceData device) {
+        long latest = 0L;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            latest = Math.max(latest, condition.lastTriggerWallTimeMillis());
+        }
+        return elapsedOrNever(latest);
+    }
+
+    private static Text latestItemConditionResultText(SignalDeviceData device) {
+        ContainerItemConditionData latest = null;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            if (latest == null || condition.lastTriggerWallTimeMillis() > latest.lastTriggerWallTimeMillis()) {
+                latest = condition;
+            }
+        }
+        if (latest == null || latest.lastResult().isBlank()) {
+            return Text.literal("尚无结果").formatted(Formatting.YELLOW);
+        }
+        return Text.literal(latest.name() + "：" + latest.lastResult()).formatted(Formatting.WHITE);
     }
 
     private static MutableText enabledText(boolean enabled) {

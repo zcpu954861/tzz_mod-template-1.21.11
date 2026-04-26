@@ -8,10 +8,12 @@ import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.util.NullSafety;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.BlockState;
+import net.minecraft.inventory.Inventory;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -139,10 +141,11 @@ public final class VirtualBlockDeviceContainerHandler {
 
     private static void tickContentChanges(MinecraftServer server) {
         for (SignalDeviceData device : SignalDeviceStore.getVirtualBlockDevicesSnapshot(server)) {
-            if (!device.enabled()
-                    || !device.containerEnabled()
-                    || device.containerChangeChannel().isBlank()
-                    || !SignalChannel.isValid(device.containerChangeChannel())) {
+            boolean hasChangeChannel = device.containerEnabled()
+                    && !device.containerChangeChannel().isBlank()
+                    && SignalChannel.isValid(device.containerChangeChannel());
+            boolean hasItemConditions = hasEnabledItemConditions(device.itemConditions());
+            if (!device.enabled() || (!hasChangeChannel && !hasItemConditions)) {
                 continue;
             }
 
@@ -179,12 +182,12 @@ public final class VirtualBlockDeviceContainerHandler {
             if (fingerprint.equals(device.lastContainerFingerprint())) {
                 continue;
             }
-            if (SignalDeviceStore.getRemainingContainerCooldownTicks(device, gameTime) > 0L) {
-                continue;
-            }
+            boolean changeCooldownReady = SignalDeviceStore.getRemainingContainerCooldownTicks(device, gameTime) <= 0L;
 
             ServerPlayerEntity player = playerForOpenSession(device.id());
-            ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
+            boolean recordedFingerprint = false;
+            if (hasChangeChannel && changeCooldownReady) {
+                ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
                     device.containerChangeChannel(),
                     player,
                     world,
@@ -194,9 +197,93 @@ public final class VirtualBlockDeviceContainerHandler {
                     SignalBridgeServer.currentDepth(),
                     gameTime,
                     "容器内容变化"
-            ));
-            SignalDeviceStore.recordVirtualContainerEvent(world, device, "change", player, result, fingerprint);
+                ));
+                SignalDeviceStore.recordVirtualContainerEvent(world, device, "change", player, result, fingerprint);
+                recordedFingerprint = true;
+            }
+
+            Inventory inventory = ContainerItemConditionSupport.inventory(world, pos);
+            boolean itemConditionChanged = evaluateItemConditions(world, pos, device, inventory, player, gameTime);
+            if (!recordedFingerprint) {
+                SignalDeviceStore.recordVirtualContainerFingerprintState(
+                        world,
+                        device,
+                        fingerprint,
+                        itemConditionChanged ? "已检查容器物品条件" : "容器内容已变化"
+                );
+            }
         }
+    }
+
+    private static boolean evaluateItemConditions(
+            ServerWorld world,
+            BlockPos pos,
+            SignalDeviceData device,
+            Inventory inventory,
+            ServerPlayerEntity player,
+            long gameTime
+    ) {
+        if (inventory == null || !hasEnabledItemConditions(device.itemConditions())) {
+            return false;
+        }
+
+        boolean changed = false;
+        Map<String, Integer> totalCounts = ContainerItemConditionSupport.totalCounts(inventory, device.itemConditions());
+        for (ContainerItemConditionData rawCondition : device.itemConditions()) {
+            if (rawCondition == null || !rawCondition.enabled()) {
+                continue;
+            }
+            ContainerItemConditionData condition = rawCondition.normalized();
+            boolean currentMatched = ContainerItemConditionSupport.matchesWithTotals(inventory, condition, totalCounts);
+            if (currentMatched == condition.lastMatched()) {
+                continue;
+            }
+
+            changed = true;
+            BlockStateConditionMode mode = BlockStateConditionMode.fromId(condition.mode());
+            boolean entering = !condition.lastMatched() && currentMatched;
+            boolean exiting = condition.lastMatched() && !currentMatched;
+            boolean shouldEmit = entering ? mode.triggersEnter() : exiting && mode.triggersExit();
+            String channel = entering
+                    ? condition.channel()
+                    : condition.offChannel().isBlank() ? condition.channel() : condition.offChannel();
+            if (!shouldEmit || channel.isBlank() || !SignalChannel.isValid(channel)) {
+                SignalDeviceStore.recordVirtualItemConditionState(
+                        world,
+                        device,
+                        condition,
+                        currentMatched,
+                        "容器物品条件状态已更新"
+                );
+                continue;
+            }
+
+            ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
+                    channel,
+                    player,
+                    world,
+                    Vec3d.ofCenter(pos),
+                    ActionSourceType.VIRTUAL_BLOCK_DEVICE,
+                    device.id(),
+                    SignalBridgeServer.currentDepth(),
+                    gameTime,
+                    "物品条件 " + condition.name() + " " + condition.type()
+            ));
+            SignalDeviceStore.recordVirtualItemConditionTrigger(world, device, condition, currentMatched, result);
+        }
+        return changed;
+    }
+
+    private static boolean hasEnabledItemConditions(List<ContainerItemConditionData> conditions) {
+        if (conditions == null || conditions.isEmpty()) {
+            return false;
+        }
+        for (ContainerItemConditionData condition : conditions) {
+            if (condition != null && condition.normalized().enabled()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void emitContainerEvent(ServerWorld world, BlockPos pos, String deviceId, String eventType, ServerPlayerEntity player) {

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.block.BlockState;
 import net.minecraft.command.argument.BlockPosArgumentType;
+import net.minecraft.inventory.Inventory;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -168,6 +169,10 @@ public final class SignalDeviceCommand {
                     source.sendFeedback(() -> indentField("关闭频道", channelOrEmpty(device.containerCloseChannel())), false);
                     source.sendFeedback(() -> indentField("内容变化频道", channelOrEmpty(device.containerChangeChannel())), false);
                     source.sendFeedback(() -> indentField("检查间隔", gtText(device.containerChangeCheckIntervalTicks())), false);
+                }
+                if (!device.itemConditions().isEmpty()) {
+                    source.sendFeedback(() -> indentField("物品条件", itemConditionCountText(device)), false);
+                    source.sendFeedback(() -> indentField("最近物品条件", latestItemConditionTriggerText(device)), false);
                 }
                 source.sendFeedback(() -> indentField("通电状态", boolText(device.lastPowered())
                         .append(Text.literal("，强度 ").formatted(Formatting.GRAY))
@@ -653,6 +658,9 @@ public final class SignalDeviceCommand {
                     ? Text.literal("尚无记录").formatted(Formatting.YELLOW)
                     : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
             source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
+            source.sendFeedback(() -> field("物品条件", itemConditionCountText(device)), false);
+            source.sendFeedback(() -> field("最近物品条件触发", latestItemConditionTriggerText(device)), false);
+            source.sendFeedback(() -> field("最近物品条件结果", latestItemConditionResultText(device)), false);
             source.sendFeedback(() -> field("最近触发", elapsedOrNever(device.lastTriggerWallTimeMillis())), false);
         } else {
             source.sendFeedback(() -> field("红石输入", emitterRedstoneText(source, device)), false);
@@ -683,6 +691,7 @@ public final class SignalDeviceCommand {
         boolean containerAvailable = chunkLoaded && currentState != null && !currentState.isAir()
                 && ContainerDeviceSupport.isContainer(world, pos);
         int containerSlotCount = containerAvailable ? ContainerDeviceSupport.slotCount(world, pos) : -1;
+        Inventory containerInventory = containerAvailable ? ContainerItemConditionSupport.inventory(world, pos) : null;
 
         sendHeader(source, Text.literal("虚拟方块发射器调试信息").formatted(Formatting.GOLD));
         source.sendFeedback(() -> field("名称", nameText(SignalDeviceStore.displayName(device))), false);
@@ -745,6 +754,24 @@ public final class SignalDeviceCommand {
                 : Text.literal(device.lastContainerEventType()).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("最近容器玩家", playerOrNever(device.lastContainerPlayerName())), false);
         source.sendFeedback(() -> field("最近容器结果", resultText(device.lastContainerResult())), false);
+        source.sendFeedback(() -> field("物品条件", itemConditionCountText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件触发", latestItemConditionTriggerText(device)), false);
+        source.sendFeedback(() -> field("最近物品条件结果", latestItemConditionResultText(device)), false);
+        if (device.itemConditions().isEmpty()) {
+            source.sendFeedback(() -> field("物品条件列表", Text.literal("未配置").formatted(Formatting.YELLOW)), false);
+        } else {
+            source.sendFeedback(() -> Text.literal("物品条件列表：").formatted(Formatting.GRAY), false);
+            for (ContainerItemConditionData condition : device.itemConditions()) {
+                source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
+                        .append(nameText(condition.name()))
+                        .append(Text.literal("，类型 ").formatted(Formatting.GRAY))
+                        .append(Text.literal(condition.type()).formatted(Formatting.LIGHT_PURPLE))
+                        .append(Text.literal("，状态 ").formatted(Formatting.GRAY))
+                        .append(enabledText(condition.enabled()))
+                        .append(Text.literal("，上次满足 ").formatted(Formatting.GRAY))
+                        .append(boolText(condition.lastMatched())), false);
+            }
+        }
         source.sendFeedback(() -> field("状态", enabledText(device.enabled())), false);
         source.sendFeedback(() -> field("频道监听器", number(listeners.size())), false);
         source.sendFeedback(() -> field("同频道接收器", number(receiverCount)), false);
@@ -765,7 +792,8 @@ public final class SignalDeviceCommand {
                 interactionRelayCount,
                 remainingInteractionCooldown,
                 remainingContainerCooldown,
-                containerAvailable
+                containerAvailable,
+                containerInventory
         );
         if (!hints.isEmpty()) {
             source.sendFeedback(() -> Text.literal("常见问题提示：").formatted(Formatting.YELLOW), false);
@@ -805,7 +833,8 @@ public final class SignalDeviceCommand {
             int interactionRelayCount,
             long remainingInteractionCooldown,
             long remainingContainerCooldown,
-            boolean containerAvailable
+            boolean containerAvailable,
+            Inventory containerInventory
     ) {
         List<Text> hints = new ArrayList<>();
         if (device.channel().isBlank()) {
@@ -883,6 +912,26 @@ public final class SignalDeviceCommand {
         }
         if (remainingContainerCooldown > 0L) {
             hints.add(Text.literal("正处于 container cooldown。").formatted(Formatting.YELLOW));
+        }
+        if (!device.itemConditions().isEmpty() && !containerAvailable) {
+            hints.add(Text.literal("已配置物品条件，但当前方块不是可用容器、方块未加载或 ID 不一致。").formatted(Formatting.YELLOW));
+        }
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            if (!condition.enabled()) {
+                hints.add(Text.literal("物品条件“" + condition.name() + "”已禁用。").formatted(Formatting.YELLOW));
+            }
+            if (condition.channel().isBlank() || !SignalChannel.isValid(condition.channel())) {
+                hints.add(Text.literal("物品条件“" + condition.name() + "”的频道为空或无效。").formatted(Formatting.RED));
+            }
+            if (!condition.offChannel().isBlank() && !SignalChannel.isValid(condition.offChannel())) {
+                hints.add(Text.literal("物品条件“" + condition.name() + "”的退出频道无效。").formatted(Formatting.RED));
+            }
+            if (containerInventory != null) {
+                for (String issue : ContainerItemConditionSupport.validate(containerInventory, condition)) {
+                    hints.add(Text.literal("物品条件“" + condition.name() + "”："
+                            + issue).formatted(Formatting.YELLOW));
+                }
+            }
         }
         if (!device.channel().isBlank() && listeners.isEmpty() && receiverCount <= 0 && relayCount <= 0) {
             hints.add(Text.literal("频道没有 listener、接收器或动作继电器；signal 仍会发出并记录历史。").formatted(Formatting.YELLOW));
@@ -1127,6 +1176,42 @@ public final class SignalDeviceCommand {
 
     private static MutableText modeText(String mode) {
         return Text.literal(VirtualBlockDeviceMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static MutableText itemConditionCountText(SignalDeviceData device) {
+        return Text.literal(device.itemConditions().size() + " 个，启用 " + enabledItemConditionCount(device) + " 个")
+                .formatted(Formatting.LIGHT_PURPLE);
+    }
+
+    private static int enabledItemConditionCount(SignalDeviceData device) {
+        int count = 0;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            if (condition.enabled()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static Text latestItemConditionTriggerText(SignalDeviceData device) {
+        long latest = 0L;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            latest = Math.max(latest, condition.lastTriggerWallTimeMillis());
+        }
+        return elapsedOrNever(latest);
+    }
+
+    private static Text latestItemConditionResultText(SignalDeviceData device) {
+        ContainerItemConditionData latest = null;
+        for (ContainerItemConditionData condition : device.itemConditions()) {
+            if (latest == null || condition.lastTriggerWallTimeMillis() > latest.lastTriggerWallTimeMillis()) {
+                latest = condition;
+            }
+        }
+        if (latest == null || latest.lastResult().isBlank()) {
+            return Text.literal("尚无结果").formatted(Formatting.YELLOW);
+        }
+        return Text.literal(latest.name() + "：" + latest.lastResult()).formatted(Formatting.WHITE);
     }
 
     private static MutableText conditionModeText(String mode) {

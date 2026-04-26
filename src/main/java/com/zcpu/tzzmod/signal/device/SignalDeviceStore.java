@@ -498,6 +498,226 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData addVirtualItemCondition(
+            ServerWorld world,
+            BlockPos pos,
+            ContainerItemConditionData condition
+    ) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null || condition == null) {
+            return null;
+        }
+
+        ContainerItemConditionData normalized = condition.normalized();
+        List<ContainerItemConditionData> conditions = new ArrayList<>(existing.itemConditions());
+        conditions.removeIf(candidate -> candidate.name().equalsIgnoreCase(normalized.name()));
+        conditions.add(normalized);
+        SignalDeviceData updated = withItemConditions(existing, conditions);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData removeVirtualItemCondition(ServerWorld world, BlockPos pos, String name) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        String cleanName = cleanUserText(name);
+        List<ContainerItemConditionData> conditions = new ArrayList<>(existing.itemConditions());
+        boolean removed = conditions.removeIf(condition -> condition.name().equalsIgnoreCase(cleanName));
+        if (!removed) {
+            return existing;
+        }
+
+        SignalDeviceData updated = withItemConditions(existing, conditions);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData clearVirtualItemConditions(ServerWorld world, BlockPos pos) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = withItemConditions(existing, List.of());
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualItemCondition(ServerWorld world, BlockPos pos, ContainerItemConditionData condition) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null || condition == null) {
+            return null;
+        }
+
+        ContainerItemConditionData normalized = condition.normalized();
+        List<ContainerItemConditionData> conditions = new ArrayList<>();
+        boolean replaced = false;
+        for (ContainerItemConditionData candidate : existing.itemConditions()) {
+            if (candidate.name().equalsIgnoreCase(normalized.name())) {
+                conditions.add(normalized);
+                replaced = true;
+            } else {
+                conditions.add(candidate);
+            }
+        }
+        if (!replaced) {
+            return existing;
+        }
+
+        SignalDeviceData updated = withItemConditions(existing, conditions);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        return updated;
+    }
+
+    public static synchronized void recordVirtualItemConditionState(
+            ServerWorld world,
+            SignalDeviceData device,
+            ContainerItemConditionData condition,
+            boolean currentMatched,
+            String resultMessage
+    ) {
+        if (world == null || device == null || condition == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        List<ContainerItemConditionData> conditions = new ArrayList<>();
+        boolean changed = false;
+        for (ContainerItemConditionData candidate : existing.itemConditions()) {
+            if (candidate.name().equalsIgnoreCase(condition.name())) {
+                ContainerItemConditionData updatedCondition = candidate.withMatched(currentMatched, world.getTime(), resultMessage);
+                conditions.add(updatedCondition);
+                changed = true;
+            } else {
+                conditions.add(candidate);
+            }
+        }
+        if (!changed) {
+            return;
+        }
+
+        SignalDeviceData updated = withItemConditions(existing, conditions);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+    }
+
+    public static synchronized void recordVirtualItemConditionTrigger(
+            ServerWorld world,
+            SignalDeviceData device,
+            ContainerItemConditionData condition,
+            boolean currentMatched,
+            ActionExecutionResult result
+    ) {
+        if (world == null || device == null || condition == null) {
+            return;
+        }
+
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, device.id());
+        if (existing == null) {
+            return;
+        }
+
+        String resultMessage = result == null || result.message() == null ? "" : result.message().getString();
+        long now = System.currentTimeMillis();
+        long gameTime = world.getTime();
+        List<ContainerItemConditionData> conditions = new ArrayList<>();
+        boolean changed = false;
+        for (ContainerItemConditionData candidate : existing.itemConditions()) {
+            if (candidate.name().equalsIgnoreCase(condition.name())) {
+                conditions.add(candidate.withTriggered(currentMatched, gameTime, now, resultMessage));
+                changed = true;
+            } else {
+                conditions.add(candidate);
+            }
+        }
+        if (!changed) {
+            return;
+        }
+
+        SignalDeviceData conditioned = withItemConditions(existing, conditions);
+        SignalDeviceData triggered = new SignalDeviceData(
+                conditioned.id(),
+                conditioned.type(),
+                conditioned.name(),
+                conditioned.dimension(),
+                conditioned.x(),
+                conditioned.y(),
+                conditioned.z(),
+                conditioned.channel(),
+                conditioned.enabled(),
+                conditioned.pulseTicks(),
+                conditioned.remainingPulseTicks(),
+                conditioned.cooldownTicks(),
+                conditioned.actionCount(),
+                conditioned.createdWallTimeMillis(),
+                now,
+                gameTime,
+                now,
+                resultMessage,
+                conditioned.blockId(),
+                conditioned.offChannel(),
+                conditioned.mode(),
+                conditioned.lastPowered(),
+                conditioned.lastPowerLevel(),
+                conditioned.conditionEnabled(),
+                conditioned.conditionBlockId(),
+                conditioned.conditionProperties(),
+                conditioned.conditionRaw(),
+                conditioned.conditionMode(),
+                conditioned.lastConditionMatched(),
+                conditioned.lastConditionCheckGameTime(),
+                conditioned.lastConditionResult(),
+                conditioned.interactionEnabled(),
+                conditioned.interactChannel(),
+                conditioned.interactionCooldownTicks(),
+                conditioned.lastInteractionGameTime(),
+                conditioned.lastInteractionWallTimeMillis(),
+                conditioned.lastInteractionPlayerName(),
+                conditioned.lastInteractionPlayerUuid(),
+                conditioned.lastInteractionResult(),
+                conditioned.lastInteractionHand(),
+                conditioned.lastInteractionSide(),
+                conditioned.containerEnabled(),
+                conditioned.containerOpenChannel(),
+                conditioned.containerCloseChannel(),
+                conditioned.containerChangeChannel(),
+                conditioned.containerCooldownTicks(),
+                conditioned.containerChangeCheckIntervalTicks(),
+                conditioned.lastContainerCheckGameTime(),
+                conditioned.lastContainerFingerprint(),
+                conditioned.lastContainerOpenGameTime(),
+                conditioned.lastContainerOpenWallTimeMillis(),
+                conditioned.lastContainerCloseGameTime(),
+                conditioned.lastContainerCloseWallTimeMillis(),
+                conditioned.lastContainerChangeGameTime(),
+                conditioned.lastContainerChangeWallTimeMillis(),
+                conditioned.lastContainerPlayerName(),
+                conditioned.lastContainerPlayerUuid(),
+                resultMessage,
+                "item_condition",
+                conditioned.itemConditions()
+        ).normalized();
+        replaceOrAdd(state, triggered);
+        state.markDirty();
+    }
+
     private static SignalDeviceData updateVirtualContainerChannels(
             ServerWorld world,
             BlockPos pos,
@@ -894,7 +1114,8 @@ public final class SignalDeviceStore {
                 existing.lastContainerPlayerName(),
                 existing.lastContainerPlayerUuid(),
                 existing.lastContainerResult(),
-                existing.lastContainerEventType()
+                existing.lastContainerEventType(),
+                existing.itemConditions()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1019,7 +1240,8 @@ public final class SignalDeviceStore {
                 conditioned.lastContainerPlayerName(),
                 conditioned.lastContainerPlayerUuid(),
                 conditioned.lastContainerResult(),
-                conditioned.lastContainerEventType()
+                conditioned.lastContainerEventType(),
+                conditioned.itemConditions()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1117,7 +1339,8 @@ public final class SignalDeviceStore {
                 interacted.lastContainerPlayerName(),
                 interacted.lastContainerPlayerUuid(),
                 interacted.lastContainerResult(),
-                interacted.lastContainerEventType()
+                interacted.lastContainerEventType(),
+                interacted.itemConditions()
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1235,7 +1458,8 @@ public final class SignalDeviceStore {
                 updated.lastContainerPlayerName(),
                 updated.lastContainerPlayerUuid(),
                 updated.lastContainerResult(),
-                updated.lastContainerEventType()
+                updated.lastContainerEventType(),
+                updated.itemConditions()
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
@@ -1726,7 +1950,8 @@ public final class SignalDeviceStore {
                 existing == null ? "" : existing.lastContainerPlayerName(),
                 existing == null ? "" : existing.lastContainerPlayerUuid(),
                 existing == null ? "" : existing.lastContainerResult(),
-                existing == null ? "" : existing.lastContainerEventType()
+                existing == null ? "" : existing.lastContainerEventType(),
+                existing == null ? List.of() : existing.itemConditions()
         ).normalized();
     }
 
@@ -1796,7 +2021,8 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerName(),
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
-                device.lastContainerEventType()
+                device.lastContainerEventType(),
+                device.itemConditions()
         ).normalized();
     }
 
@@ -1867,7 +2093,8 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerName(),
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
-                device.lastContainerEventType()
+                device.lastContainerEventType(),
+                device.itemConditions()
         ).normalized();
     }
 
@@ -1941,7 +2168,8 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerName(),
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
-                device.lastContainerEventType()
+                device.lastContainerEventType(),
+                device.itemConditions()
         ).normalized();
     }
 
@@ -2017,7 +2245,8 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerName(),
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
-                device.lastContainerEventType()
+                device.lastContainerEventType(),
+                device.itemConditions()
         ).normalized();
     }
 
@@ -2101,7 +2330,76 @@ public final class SignalDeviceStore {
                 lastContainerPlayerName,
                 lastContainerPlayerUuid,
                 lastContainerResult,
-                lastContainerEventType
+                lastContainerEventType,
+                device.itemConditions()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withItemConditions(
+            SignalDeviceData device,
+            List<ContainerItemConditionData> itemConditions
+    ) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                device.pulseTicks(),
+                device.remainingPulseTicks(),
+                device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType(),
+                itemConditions == null ? List.of() : itemConditions
         ).normalized();
     }
 
@@ -2165,7 +2463,8 @@ public final class SignalDeviceStore {
                 device.lastContainerPlayerName(),
                 device.lastContainerPlayerUuid(),
                 device.lastContainerResult(),
-                device.lastContainerEventType()
+                device.lastContainerEventType(),
+                device.itemConditions()
         ).normalized();
     }
 
