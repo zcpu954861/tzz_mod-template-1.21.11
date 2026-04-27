@@ -24,7 +24,9 @@ public final class WebAdminUserStore {
     }
 
     public static Path path(MinecraftServer server) {
-        return server.getRunDirectory().resolve("config").resolve("tzz").resolve("web_admin_users.json");
+        WebAdminStoragePaths paths = WebAdminStoragePaths.resolve(server);
+        paths.ensureDirectory();
+        return paths.usersPath();
     }
 
     public static synchronized UserFile load(MinecraftServer server) {

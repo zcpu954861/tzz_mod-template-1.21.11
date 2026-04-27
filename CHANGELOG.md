@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.19.0-web-admin-readonly-services
+
+- Added 6.1 WebAdmin readonly Service / DTO layer for future dashboard and admin pages.
+- Added authenticated readonly APIs: `GET /api/devices`, `GET /api/devices/{id}`, and `GET /api/devices/{id}/debug`.
+- Added authenticated readonly Signal APIs: `GET /api/signals/channels`, `GET /api/signals/channels/{channel}`, and `GET /api/signals/history`.
+- Added authenticated readonly `GET /api/doctor`.
+- Added authenticated readonly Region APIs: `GET /api/regions` and `GET /api/regions/{id}`.
+- Added authenticated readonly Action APIs: `GET /api/actions` and `GET /api/actions/{id}`.
+- Added DTO and service packages under WebAdmin so future UI code consumes stable structures instead of internal objects or business JSON.
+- All new 6.1 APIs require WebAdmin session authentication; `VIEWER`, `TESTER`, `EDITOR`, and `OWNER` can access the readonly endpoints.
+- List endpoints apply bounded limits; unavailable runtime statistics return `UNKNOWN`, `null`, or empty arrays instead of forcing heavy scans.
+- Changed WebAdmin persistent storage to the world-save scoped directory `<world-save-root>/tzz/webadmin/`, isolating WebAdmin config, users, and audit state per world.
+- Legacy global WebAdmin files under `config/tzz` are detected for warnings but are not loaded, copied, migrated, or deleted automatically.
+- Performance boundary: APIs read existing stores, history, and diagnostics only; they do not scan worlds, force-load chunks, tick-scan devices, or trigger game logic.
+- Compatibility: 6.0 auth/session/status and `/tzz webadmin` commands remain unchanged.
+- Compatibility: 5.x SignalBridge, SignalDevice, `virtual_block_device`, ItemStackMatcher, RegionController, ActionEngine, Doctor, History, command semantics, and JSON schema remain unchanged.
+- Added `docs/web_admin_readonly_services.md`.
+- Not included yet: dashboard pages, device pages, channel logic-chain pages, full Doctor/History pages, WebSocket, Web editing, Region/Action pages, ConditionEngine, or high-level game scheduling.
+
 ## v1.18.0-web-admin-foundation
 
 - Added WebAdmin Foundation minimal backend loop.

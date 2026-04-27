@@ -9,7 +9,9 @@ public final class WebAdminConfigStore {
     }
 
     public static Path path(MinecraftServer server) {
-        return server.getRunDirectory().resolve("config").resolve("tzz").resolve("web_admin_config.json");
+        WebAdminStoragePaths paths = WebAdminStoragePaths.resolve(server);
+        paths.ensureDirectory();
+        return paths.configPath();
     }
 
     public static WebAdminConfig load(MinecraftServer server) {

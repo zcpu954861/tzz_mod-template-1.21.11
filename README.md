@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.18.0-web-admin-foundation`
-- 当前开发版本：`v1.18.0-web-admin-foundation`（6.0 WebAdmin Foundation；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.19.0-web-admin-readonly-services`
+- 当前开发版本：`v1.19.0-web-admin-readonly-services`（6.1 WebAdmin 只读 Service / DTO 数据层；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -39,17 +39,43 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 
 ## WebAdmin Foundation
 
+### 6.1 WebAdmin Readonly Services（开发中）
+
+6.1 建立 WebAdmin 的只读 Service / DTO / API 数据层，面向后续 Dashboard、设备页、Signal 频道页、Doctor / History 页提供稳定后端结构。本阶段不做完整 Web 页面、不做配置编辑、不做 WebSocket，也不改变 5.x 已封版功能语义。
+
+新增只读 API：
+
+```text
+GET /api/devices
+GET /api/devices/{id}
+GET /api/devices/{id}/debug
+GET /api/signals/channels
+GET /api/signals/channels/{channel}
+GET /api/signals/history
+GET /api/doctor
+GET /api/regions
+GET /api/regions/{id}
+GET /api/actions
+GET /api/actions/{id}
+```
+
+所有 6.1 API 都要求 WebAdmin 登录，`VIEWER`、`TESTER`、`EDITOR`、`OWNER` 均可访问这些只读接口。接口只通过 service / DTO 层读取现有系统状态，不直接读写业务 JSON，不扫描世界，不强制加载区块，不触发游戏逻辑，也不修改设备、频道、区域或动作配置。
+
+从 6.1 开始，WebAdmin 持久化文件按当前世界 / 当前存档隔离，目录为 `<world-save-root>/tzz/webadmin/`。该目录包含 `web_admin_config.json`、`web_admin_users.json` 和 `web_admin_audit.log`。WebAdmin 不再读取全局 `config/tzz` 下的旧文件；如需迁移，管理员需要手动复制到对应世界的 `tzz/webadmin/` 目录。
+
+更多说明见 `docs/web_admin_readonly_services.md`。
+
 ### 6.0 WebAdmin Foundation
 
 6.0 WebAdmin Foundation 是 WebAdmin 后端地基与登录闭环，不是完整 WebAdmin Dashboard。本阶段默认关闭，不会自动公网开放，不改变 5.x SignalBridge / SignalDevice / `virtual_block_device` / ItemStackMatcher / itemSubmit / Doctor / debug 等既有逻辑。
 
 当前能力：
 
-- 新增配置文件：`config/tzz/web_admin_config.json`。
+- WebAdmin 配置文件：`<world-save-root>/tzz/webadmin/web_admin_config.json`（6.1 起按世界 / 存档隔离）。
 - 默认 `enabled=false`、`host=127.0.0.1`、`port=18080`、`accessMode=LOCAL_ONLY`。
 - 支持访问模式：`LOCAL_ONLY`、`LAN_DEV`、`MULTIPLAYER_DEV`。
 - `LAN_DEV` / `MULTIPLAYER_DEV` 必须显式配置，启动日志和 `/tzz webadmin status` 会显示安全提示。
-- 新增用户文件：`config/tzz/web_admin_users.json`。
+- WebAdmin 用户文件：`<world-save-root>/tzz/webadmin/web_admin_users.json`（6.1 起每个世界独立）。
 - 用户密码使用 JDK 原生 `PBKDF2WithHmacSHA256` 保存，不保存明文。
 - 初始密码由服务端随机生成，只在 `/tzz webadmin user create` 或 `resetPassword` 时显示一次。
 - 登录成功后写入短期 `TZZ_WEBADMIN_SESSION` HttpOnly cookie。

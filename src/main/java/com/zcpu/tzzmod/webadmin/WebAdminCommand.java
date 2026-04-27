@@ -2,6 +2,10 @@ package com.zcpu.tzzmod.webadmin;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import net.minecraft.command.permission.LeveledPermissionPredicate;
 import net.minecraft.command.permission.PermissionLevel;
@@ -27,6 +31,7 @@ public final class WebAdminCommand {
                         .then(CommandManager.literal("create")
                                 .then(CommandManager.argument("username", StringArgumentType.word())
                                         .then(CommandManager.argument("role", StringArgumentType.word())
+                                                .suggests((context, builder) -> suggestRoles(builder))
                                                 .executes(context -> executeUserCreate(
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "username"),
@@ -34,6 +39,11 @@ public final class WebAdminCommand {
                                                 )))))
                         .then(CommandManager.literal("disable")
                                 .then(CommandManager.argument("username", StringArgumentType.word())
+                                        .suggests((context, builder) -> suggestUsers(
+                                                context.getSource(),
+                                                builder,
+                                                UserSuggestionFilter.ENABLED
+                                        ))
                                         .executes(context -> executeUserEnabled(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "username"),
@@ -41,6 +51,11 @@ public final class WebAdminCommand {
                                         ))))
                         .then(CommandManager.literal("enable")
                                 .then(CommandManager.argument("username", StringArgumentType.word())
+                                        .suggests((context, builder) -> suggestUsers(
+                                                context.getSource(),
+                                                builder,
+                                                UserSuggestionFilter.DISABLED
+                                        ))
                                         .executes(context -> executeUserEnabled(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "username"),
@@ -48,6 +63,11 @@ public final class WebAdminCommand {
                                         ))))
                         .then(CommandManager.literal("resetPassword")
                                 .then(CommandManager.argument("username", StringArgumentType.word())
+                                        .suggests((context, builder) -> suggestUsers(
+                                                context.getSource(),
+                                                builder,
+                                                UserSuggestionFilter.ALL
+                                        ))
                                         .executes(context -> executeResetPassword(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "username")
@@ -67,13 +87,20 @@ public final class WebAdminCommand {
         source.sendFeedback(() -> field("端口", number(config.port)), false);
         source.sendFeedback(() -> field("访问模式", Text.literal(config.accessModeEnum().displayName()).formatted(Formatting.AQUA)), false);
         source.sendFeedback(() -> field("访问 URL", Text.literal("http://" + config.host + ":" + config.port).formatted(Formatting.GREEN)), false);
+        source.sendFeedback(() -> field("存储作用域", Text.literal(WebAdminStoragePaths.STORAGE_SCOPE).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("存储目录", Text.literal(status.storagePaths().directory().toString()).formatted(Formatting.AQUA)), false);
+        source.sendFeedback(() -> field("配置文件", Text.literal(status.storagePaths().configPath().toString()).formatted(Formatting.GRAY)), false);
+        source.sendFeedback(() -> field("用户文件", Text.literal(status.storagePaths().usersPath().toString()).formatted(Formatting.GRAY)), false);
         source.sendFeedback(() -> field("当前 session", number(status.sessionCount()).append(Text.literal(" 个").formatted(Formatting.GRAY))), false);
         source.sendFeedback(() -> field("用户总数", number(status.userCount()).append(Text.literal(" 个").formatted(Formatting.GRAY))), false);
         if (config.accessModeEnum().needsSecurityWarning()) {
             source.sendFeedback(() -> warning("警告：当前 WebAdmin 允许通过 IP:端口访问。请只向可信协作者提供账号，并避免在不受信网络中暴露端口。"), false);
         }
         if (!config.enabled) {
-            source.sendFeedback(() -> warning("WebAdmin 默认关闭。请编辑 config/tzz/web_admin_config.json 并重启服务器后启用。"), false);
+            source.sendFeedback(() -> warning("WebAdmin 默认关闭。请编辑当前世界存档目录下的 tzz/webadmin/web_admin_config.json 并重启服务器后启用。"), false);
+        }
+        if (status.legacyGlobalFilesDetected()) {
+            source.sendFeedback(() -> warning("检测到旧版全局 WebAdmin 文件，但当前版本只读取当前世界存档目录下的 WebAdmin 文件；旧文件不会自动加载或删除。"), false);
         }
         return 1;
     }
@@ -160,6 +187,53 @@ public final class WebAdminCommand {
         }
         return source.getPermissions() instanceof LeveledPermissionPredicate leveled
                 && leveled.getLevel().isAtLeast(PermissionLevel.OWNERS);
+    }
+
+    private enum UserSuggestionFilter {
+        ALL,
+        ENABLED,
+        DISABLED
+    }
+
+    private static CompletableFuture<Suggestions> suggestUsers(
+            ServerCommandSource source,
+            SuggestionsBuilder builder,
+            UserSuggestionFilter filter
+    ) {
+        if (source == null || source.getServer() == null || !canManage(source)) {
+            return builder.buildFuture();
+        }
+        try {
+            for (WebAdminUser user : WebAdminLifecycle.userService(source.getServer()).listUsers()) {
+                if (user == null || user.username == null || user.username.isBlank()) {
+                    continue;
+                }
+                if (filter == UserSuggestionFilter.ENABLED && !user.enabled) {
+                    continue;
+                }
+                if (filter == UserSuggestionFilter.DISABLED && user.enabled) {
+                    continue;
+                }
+                suggestIfMatching(builder, user.username);
+            }
+        } catch (RuntimeException ignored) {
+            return builder.buildFuture();
+        }
+        return builder.buildFuture();
+    }
+
+    private static CompletableFuture<Suggestions> suggestRoles(SuggestionsBuilder builder) {
+        for (WebAdminRole role : WebAdminRole.values()) {
+            suggestIfMatching(builder, role.id());
+        }
+        return builder.buildFuture();
+    }
+
+    private static void suggestIfMatching(SuggestionsBuilder builder, String value) {
+        String remaining = builder.getRemainingLowerCase();
+        if (value.toLowerCase(Locale.ROOT).startsWith(remaining)) {
+            builder.suggest(value);
+        }
     }
 
     private static String actorName(ServerCommandSource source) {

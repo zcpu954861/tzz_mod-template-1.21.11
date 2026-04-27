@@ -13,7 +13,14 @@ public final class WebAdminLifecycle {
     }
 
     public static synchronized void start(MinecraftServer minecraftServer) {
+        WebAdminStoragePaths paths = WebAdminStoragePaths.resolve(minecraftServer);
+        paths.ensureDirectory();
         config = WebAdminConfigStore.load(minecraftServer);
+        WebAdminAuditLogger.configure(paths, config);
+        if (paths.hasLegacyGlobalFiles()) {
+            Tzz_mod.LOGGER.warn("Detected legacy global WebAdmin files under {}. Current versions use world-scoped storage at {} and will not load the legacy files.",
+                    paths.legacyGlobalDirectory(), paths.directory());
+        }
         userService = new WebAdminUserService(minecraftServer);
         sessionService = new WebAdminSessionService();
         if (!config.enabled) {
@@ -41,9 +48,12 @@ public final class WebAdminLifecycle {
 
     public static synchronized WebAdminRuntimeStatus status(MinecraftServer minecraftServer) {
         ensureLoaded(minecraftServer);
+        WebAdminStoragePaths paths = WebAdminStoragePaths.resolve(minecraftServer);
         return new WebAdminRuntimeStatus(config, server != null && server.running(),
                 sessionService == null ? 0 : sessionService.sessionCount(),
-                userService == null ? 0 : userService.userCount());
+                userService == null ? 0 : userService.userCount(),
+                paths,
+                paths.hasLegacyGlobalFiles());
     }
 
     public static synchronized WebAdminUserService userService(MinecraftServer minecraftServer) {
@@ -52,7 +62,10 @@ public final class WebAdminLifecycle {
     }
 
     public static synchronized void reloadStores(MinecraftServer minecraftServer) {
+        WebAdminStoragePaths paths = WebAdminStoragePaths.resolve(minecraftServer);
+        paths.ensureDirectory();
         config = WebAdminConfigStore.load(minecraftServer);
+        WebAdminAuditLogger.configure(paths, config);
         userService = new WebAdminUserService(minecraftServer);
         if (sessionService == null) {
             sessionService = new WebAdminSessionService();
@@ -65,6 +78,13 @@ public final class WebAdminLifecycle {
         }
     }
 
-    public record WebAdminRuntimeStatus(WebAdminConfig config, boolean running, int sessionCount, int userCount) {
+    public record WebAdminRuntimeStatus(
+            WebAdminConfig config,
+            boolean running,
+            int sessionCount,
+            int userCount,
+            WebAdminStoragePaths storagePaths,
+            boolean legacyGlobalFilesDetected
+    ) {
     }
 }
