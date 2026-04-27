@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.23.0-web-admin-users-settings
+
+- Added 6.5 WebAdmin user management readonly page at `/app#/users`.
+- Added 6.5 WebAdmin system settings readonly page at `/app#/settings`.
+- Added readonly WebAdmin user summary API with username, display name, role, enabled status, online/session summary, created time, createdBy, and last login time.
+- Added readonly WebAdmin settings API with service status, access mode, host, port, storage summary, auth summary, audit status, session TTL, mod version, Minecraft version, server type, and world/save summary.
+- User management is OWNER-only and never returns password hash, password salt, session token, cookie value, or plaintext password.
+- Settings page hides sensitive storage path details from non-OWNER users while keeping basic readonly runtime status visible.
+- Added sidebar navigation for 用户管理 and 系统设置.
+- Kept the 6.5 boundary readonly: no user creation, delete, enable/disable, password reset, role change, session kick, host/port/accessMode edit, WebSocket, config write, or write API.
+- Not included: Region / Action pages, user-management Web CRUD, system settings editing, permission editing, WebSocket, or configuration writes.
+
 ## v1.22.0-web-admin-doctor-history
 
 - Added 6.4 WebAdmin Doctor global diagnostics readonly page at `/app#/doctor`.

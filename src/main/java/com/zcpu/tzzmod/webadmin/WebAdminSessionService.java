@@ -53,6 +53,15 @@ public final class WebAdminSessionService {
         return sessionsByHash.size();
     }
 
+    public synchronized Map<String, Integer> sessionCountsByUsername() {
+        cleanupExpired();
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (WebAdminSession session : sessionsByHash.values()) {
+            result.merge(session.username, 1, Integer::sum);
+        }
+        return result;
+    }
+
     public synchronized void clear() {
         sessionsByHash.clear();
     }

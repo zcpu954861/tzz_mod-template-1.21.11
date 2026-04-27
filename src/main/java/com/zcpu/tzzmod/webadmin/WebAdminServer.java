@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
+import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ public final class WebAdminServer {
     private final WebAdminUserService userService;
     private final WebAdminSessionService sessionService;
     private final WebAdminReadonlyRoutes readonlyRoutes = new WebAdminReadonlyRoutes();
+    private final WebAdminUserSettingsService userSettingsService = new WebAdminUserSettingsService();
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -115,6 +117,22 @@ public final class WebAdminServer {
                 handleStatus(exchange, auth);
                 return;
             }
+            if (path.equals("/api/webadmin/users")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                handleWebAdminUsers(exchange, auth);
+                return;
+            }
+            if (path.equals("/api/webadmin/settings")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                handleWebAdminSettings(exchange, auth);
+                return;
+            }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
                 return;
             }
@@ -200,6 +218,18 @@ public final class WebAdminServer {
         data.put("server", server);
         data.put("auth", authData);
         WebAdminJsonResponse.ok(exchange, data);
+    }
+
+    private void handleWebAdminUsers(HttpExchange exchange, AuthContext auth) throws IOException {
+        if (auth.user.roleEnum() != WebAdminRole.OWNER) {
+            WebAdminJsonResponse.error(exchange, 403, "FORBIDDEN", "权限不足：只有所有者可以查看用户管理。");
+            return;
+        }
+        WebAdminJsonResponse.ok(exchange, userSettingsService.users(userService, sessionService));
+    }
+
+    private void handleWebAdminSettings(HttpExchange exchange, AuthContext auth) throws IOException {
+        WebAdminJsonResponse.ok(exchange, userSettingsService.settings(minecraftServer, config, sessionService, auth.user));
     }
 
     private AuthContext requireAuth(HttpExchange exchange) throws IOException {
@@ -362,8 +392,8 @@ public final class WebAdminServer {
                         <button class="nav-item" data-pending="动作系统将在后续版本接入"><span class="nav-icon" data-icon="action"></span>动作系统</button>
                         <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>Doctor 诊断</button>
                         <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>历史记录</button>
-                        <button class="nav-item" data-pending="用户管理 Web 页面将在后续版本接入"><span class="nav-icon" data-icon="user"></span>用户管理</button>
-                        <button class="nav-item" data-pending="系统设置页面将在后续版本接入"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
+                        <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户管理</button>
+                        <button class="nav-item" data-route="#/settings"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
                       </nav>
                     </aside>
                     <section class="workspace">
@@ -406,11 +436,11 @@ public final class WebAdminServer {
     }
 
     private static String appJs() {
-        return """
+        return new StringBuilder().append("""
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'}};
+                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
                 function svg(paths){return `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`}
@@ -434,6 +464,7 @@ public final class WebAdminServer {
                 function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});}
                 function statusClass(value){const v=String(value||'').toUpperCase();if(v==='ERROR'||v==='FAILED')return'error';if(v==='WARNING')return'warning';if(v==='INFO'||v==='UNKNOWN')return'info';return'ok';}
                 function pill(value){return `<span class="pill ${statusClass(value)}">${esc(labelStatus(value))}</span>`}
+                function textPill(text, kind='info'){return `<span class="pill ${esc(kind)}">${esc(text)}</span>`}
                 function labelStatus(value){const v=String(value||'UNKNOWN').toUpperCase();return {OK:'正常',INFO:'信息',WARNING:'警告',ERROR:'错误',UNKNOWN:'未知',SUCCESS:'成功',FAILED:'失败',SKIPPED:'跳过'}[v]||value;}
                 function labelBool(value){return value?'已启用':'已禁用';}
                 function labelType(value){const v=String(value||'UNKNOWN').toUpperCase();return {SIGNAL_EMITTER:'信号发射器',SIGNAL_RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',VIRTUAL_BLOCK_DEVICE:'虚拟方块设备',REGION_CONTROLLER:'区域控制器',UNKNOWN:'未知设备'}[v]||value||'未知设备';}
@@ -443,7 +474,10 @@ public final class WebAdminServer {
                 function labelSubType(value){const v=String(value||'').toLowerCase();return {signal_listener:'监听器',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备'}[v]||labelType(value);}
                 function labelServerStatus(value){return {RUNNING:'运行中',STOPPED:'已停止',STARTING:'启动中',UNKNOWN:'未知'}[String(value||'').toUpperCase()]||value||'-';}
                 function labelAccessMode(value){return {LOCAL_ONLY:'本机模式',LAN_DEV:'局域网开发模式',MULTIPLAYER_DEV:'多人开发模式'}[String(value||'').toUpperCase()]||value||'-';}
-                function labelRole(value){return {OWNER:'所有者',EDITOR:'编辑者',TESTER:'测试者',VIEWER:'只读查看者'}[String(value||'').toUpperCase()]||value||'-';}
+                function labelRole(value){return {OWNER:'所有者',EDITOR:'编辑者',TESTER:'测试者',VIEWER:'查看者'}[String(value||'').toUpperCase()]||value||'-';}
+                function labelRoleFull(value){const id=String(value||'').toUpperCase();return `${labelRole(id)}${id&&id!=='-'?`（${id}）`:''}`;}
+                function labelEnabledState(value){return value?'启用':'禁用';}
+                function labelOnline(value){return value?'在线':'离线';}
                 function labelChannel(value){return isBlank(value)?'未设置':value;}
                 function labelChannelType(value){return {DEVICE:'设备频道',REGION:'区域频道',SYSTEM:'系统频道',GAME:'游戏流程频道'}[String(value||'').toUpperCase()]||'频道';}
                 function labelConsumerFilter(value){return {ALL:'全部',HAS_CONSUMER:'有消费者',NO_CONSUMER:'无消费者',HAS_LISTENER:'有监听器',HAS_RECEIVER:'有接收器',HAS_RELAY:'有动作继电器'}[value]||value;}
@@ -531,6 +565,8 @@ public final class WebAdminServer {
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length));
                   if(hash==='#/doctor') return renderDoctorPage();
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length));
+                  if(hash==='#/users') return renderUsersPage();
+                  if(hash==='#/settings') return renderSettingsPage();
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
@@ -556,7 +592,7 @@ public final class WebAdminServer {
                       <article class="panel-card"><h2>最近信号触发</h2>${history.ok?historyList(hist):errorBlock(history.error.message)}<p class="muted"><button class="link-button" onclick="location.hash='#/history'">查看全部历史</button></p></article>
                       <article class="panel-card"><h2>诊断摘要</h2>${doctor.ok?doctorList(doc.issues||[],5):errorBlock(doctor.error.message)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor 诊断</button></p></article>
                       <article class="panel-card"><h2>设备概览</h2>${devices.ok?deviceOverview(deviceList):errorBlock(devices.error.message)}</article>
-                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理、Signal 频道、Doctor 诊断和 History 历史只读页面已接入。编辑、配置写入、WebSocket 和完整管理页面将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button> / <button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor</button> / <button class="link-button" onclick="location.hash='#/history'">查看 History</button></p></article>
+                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理和系统设置只读页面已接入。编辑、配置写入、WebSocket 和完整写操作将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button> / <button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor</button> / <button class="link-button" onclick="location.hash='#/history'">查看 History</button></p></article>
                     </section>`);
                 }
                 function metric(label,value,kind='',iconName=''){return `<article class="metric-card ${kind}"><div class="metric-head"><div class="label">${esc(label)}</div>${iconName?`<span class="metric-icon">${icon(iconName)}</span>`:''}</div><div class="value">${esc(value)}</div></article>`}
@@ -758,6 +794,76 @@ public final class WebAdminServer {
                 function historyCutoff(range){const now=Date.now();if(range==='M10')return now-10*60*1000;if(range==='H1')return now-60*60*1000;if(range==='H24')return now-24*60*60*1000;return 0;}
                 function historyTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>事件类型</th><th>频道</th><th>来源对象</th><th>来源类型</th><th>玩家 / 用户</th><th>结果</th><th>详情</th><th>操作</th></tr></thead><tbody>${items.map(h=>`<tr><td>${fmtTime(h.time)}</td><td>Signal 事件</td><td>${channelButton(h.channel)}</td><td>${esc(h.sourceName||h.sourceId||'暂无')}</td><td>${esc(labelSourceType(h.sourceType))}</td><td>${esc(h.playerName||'无玩家上下文')}</td><td>${pill(h.result||'UNKNOWN')}</td><td>${esc(h.description||'暂无详情')}</td><td>${historyAction(h)}</td></tr>`).join('')}</tbody></table></div>`;}
                 function historySummaryPanel(filtered,allItems){if(!allItems||allItems.length===0)return empty('暂无历史事件。');const byResult=countBy(filtered,h=>String(h.result||'UNKNOWN').toUpperCase()), bySource=countBy(filtered,h=>String(h.sourceType||'UNKNOWN').toUpperCase());const recent=filtered.slice(0,5).map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} · ${esc(labelStatus(h.result))}</span><span>${esc(h.description||'暂无详情')}</span></div>`).join('');return `<div class="summary-grid">${metric('当前筛选',filtered.length)}${metric('全部记录',allItems.length)}${metric('成功',byResult.SUCCESS||0)}${metric('失败',byResult.FAILED||0)}</div><h3>来源类型</h3><div class="list-stack">${Object.entries(bySource).slice(0,6).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(labelSourceType(k))}</span><strong>${v}</strong></div>`).join('')||empty('暂无来源统计。')}</div><h3>最近事件</h3><div class="list-stack">${recent||empty('当前筛选下暂无事件。')}</div><p class="muted">History 页面只读展示已有内存历史，不删除、不导出、不重放事件。</p>`;}
+                """).append("""
+                async function renderUsersPage(){
+                  setView(loading('正在加载用户管理...'));
+                  let data;try{data=await api('/api/webadmin/users')}catch(err){setView(`<div class="page-head"><div><h1>用户管理</h1><p>查看 WebAdmin 用户、角色、状态与登录情况</p></div><span class="pill info">只读模式</span></div>${err.status===403?errorBlock('权限不足：只有所有者可以查看用户管理。'):errorBlock(err.message)}`);return;}
+                  appState.usersData=data||{summary:{},users:[],roles:[]};
+                  renderUserList('');
+                }
+                function renderUserList(focusId){
+                  const data=appState.usersData||{summary:{},users:[],roles:[]}, users=data.users||[], summary=data.summary||{}, filtered=filterUsers(users);
+                  setView(`
+                    <div class="page-head"><div><h1>用户管理</h1><p>查看 WebAdmin 用户、角色、状态与登录情况</p></div><span class="pill info">只读模式</span></div>
+                    <section class="card-grid">
+                      ${metric('用户总数',summary.totalCount ?? users.length,'','user')}
+                      ${metric('在线用户',summary.onlineCount ?? users.filter(u=>u.online).length,'','ok')}
+                      ${metric('所有者',summary.ownerCount ?? users.filter(u=>u.role==='OWNER').length,'','user')}
+                      ${metric('编辑者',summary.editorCount ?? users.filter(u=>u.role==='EDITOR').length,'','settings')}
+                      ${metric('测试者',summary.testerCount ?? users.filter(u=>u.role==='TESTER').length,'','action')}
+                      ${metric('查看者',summary.viewerCount ?? users.filter(u=>u.role==='VIEWER').length,'','device')}
+                      ${metric('禁用用户',summary.disabledCount ?? users.filter(u=>!u.enabled).length,(summary.disabledCount||0)>0?'warning':'','warning')}
+                    </section>
+                    <div class="toolbar">
+                      <input class="input" id="user-search" placeholder="搜索用户名" value="${esc(appState.userFilters.search)}">
+                      ${userFilterSelect('角色','user-role',['ALL','OWNER','EDITOR','TESTER','VIEWER'],appState.userFilters.role)}
+                      ${userFilterSelect('状态','user-enabled',['ALL','ENABLED','DISABLED'],appState.userFilters.enabled)}
+                      ${userFilterSelect('在线状态','user-online',['ALL','ONLINE','OFFLINE'],appState.userFilters.online)}
+                    </div>
+                    <section class="content-grid">
+                      <article class="panel-card">${filtered.length?userTable(filtered):empty(users.length?'没有匹配当前筛选条件的用户。':'暂无 WebAdmin 用户。')}</article>
+                      <aside class="panel-card"><h2>角色与安全说明</h2>${roleSummary(data.roles||[])}${securityTips()}</aside>
+                    </section>`);
+                  bindUserFilters(focusId);
+                }
+                function userFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(userOptionLabel(o))}</option>`).join('')}</select></label>`}
+                function userOptionLabel(v){return {ALL:'全部',OWNER:'所有者',EDITOR:'编辑者',TESTER:'测试者',VIEWER:'查看者',ENABLED:'启用',DISABLED:'禁用',ONLINE:'在线',OFFLINE:'离线'}[v]||v;}
+                function bindUserFilters(focusId){
+                  const update=(event)=>{appState.userFilters.search=document.getElementById('user-search').value;appState.userFilters.role=document.getElementById('user-role').value;appState.userFilters.enabled=document.getElementById('user-enabled').value;appState.userFilters.online=document.getElementById('user-online').value;renderUserList(event.target.id);};
+                  ['user-search','user-role','user-enabled','user-online'].forEach(id=>document.getElementById(id).addEventListener(id==='user-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
+                }
+                function filterUsers(users){const f=appState.userFilters;return (users||[]).filter(u=>{const hay=[u.username,u.displayName,u.role,u.createdBy].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.role!=='ALL'&&String(u.role||'').toUpperCase()!==f.role)return false;if(f.enabled==='ENABLED'&&!u.enabled)return false;if(f.enabled==='DISABLED'&&u.enabled)return false;if(f.online==='ONLINE'&&!u.online)return false;if(f.online==='OFFLINE'&&u.online)return false;return true;});}
+                function userTable(users){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>在线状态</th><th>Session</th><th>最后登录</th><th>创建时间</th><th>创建者</th><th>说明</th></tr></thead><tbody>${users.map(u=>`<tr><td><span class="device-name"><span class="device-icon">${icon('user')}</span><span><strong>${esc(u.displayName||u.username)}</strong><span class="device-subtitle">用户名：${esc(u.username)}</span></span></span></td><td>${esc(labelRoleFull(u.role))}</td><td>${textPill(labelEnabledState(u.enabled),u.enabled?'ok':'warning')}</td><td>${textPill(labelOnline(u.online),u.online?'ok':'info')}</td><td>${esc(Number(u.sessionCount||0))}</td><td>${fmtTime(u.lastLoginAt)}</td><td>${fmtTime(u.createdAt)}</td><td>${esc(u.createdBy||'暂无')}</td><td>${u.forcePasswordChange?'<span class="pill warning">需首次改密</span>':'<span class="muted">暂无备注</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
+                function roleSummary(roles){const items=(roles&&roles.length?roles:[{role:'OWNER',displayName:'所有者（OWNER）',count:0},{role:'EDITOR',displayName:'编辑者（EDITOR）',count:0},{role:'TESTER',displayName:'测试者（TESTER）',count:0},{role:'VIEWER',displayName:'查看者（VIEWER）',count:0}]);return `<div class="list-stack">${items.map(r=>`<div class="kv-row"><span class="muted">${esc(r.displayName||labelRoleFull(r.role))}</span><strong>${esc(r.count ?? 0)}</strong></div>`).join('')}</div><h3>角色说明</h3><div class="list-stack"><div class="event-row"><strong>所有者</strong><span>完整管理权限。</span></div><div class="event-row"><strong>编辑者</strong><span>未来用于编辑配置。</span></div><div class="event-row"><strong>测试者</strong><span>未来用于测试触发。</span></div><div class="event-row"><strong>查看者</strong><span>只读查看。</span></div></div>`}
+                function securityTips(){return `<h3>安全提示</h3><div class="list-stack"><div class="event-row"><span>密码不会明文保存，服务端使用 PBKDF2 哈希。</span></div><div class="event-row"><span>WebAdmin 用户按当前世界 / 存档目录隔离存储。</span></div><div class="event-row"><span>请只给可信协作者创建账号，多人访问建议配合可信网络、防火墙或反向代理。</span></div><div class="event-row"><span>6.5 页面只读展示，不提供重置密码、禁用、删除或踢出 session。</span></div></div>`}
+                async function renderSettingsPage(){
+                  setView(loading('正在加载系统设置...'));
+                  let data;try{data=await api('/api/webadmin/settings')}catch(err){setView(errorBlock(err.message));return;}
+                  const service=data.service||{}, storage=data.storage||{}, security=data.security||{}, audit=data.audit||{}, system=data.system||{}, visibility=data.visibility||{};
+                  setView(`
+                    <div class="page-head"><div><h1>系统设置</h1><p>查看 WebAdmin 服务、安全、存储与运行信息</p></div><span class="pill info">只读模式</span></div>
+                    <section class="card-grid">
+                      ${metric('服务状态',service.running?'运行中':'未运行',service.running?'':'warning','settings')}
+                      ${metric('访问模式',labelAccessMode(service.accessMode),'','settings')}
+                      ${metric('当前 Session',system.sessionCount ?? '暂无','','user')}
+                      ${metric('审计日志',audit.enabled?'已启用':'已关闭',audit.enabled?'':'warning','history')}
+                      ${metric('服务器类型',labelServerType(system.serverType),'','dashboard')}
+                      ${metric('Mod 版本',system.modVersion||'暂无','','device')}
+                    </section>
+                    <section class="detail-grid" style="margin-top:16px">
+                      <article class="panel-card"><h2>服务状态</h2><div class="identity-grid">${row('WebAdmin 服务',esc(service.running?'运行中':'未运行'))}${row('监听地址',esc(service.host||'暂无'))}${row('端口',esc(service.port ?? '暂无'))}${row('访问模式',esc(labelAccessMode(service.accessMode)))}${row('当前访问 URL',esc(service.url||'暂无'))}${row('当前登录用户',esc(service.currentUser||'暂无'))}${row('当前角色',esc(labelRoleFull(service.currentRole)))}</div></article>
+                      <article class="panel-card"><h2>存储目录</h2>${storagePanel(storage,visibility)}</article>
+                      <article class="panel-card"><h2>安全配置</h2><div class="identity-grid">${row('认证方式',esc(labelAuthMode(security.authMode)))}${row('密码哈希算法',esc(security.passwordHashAlgorithm||'暂无'))}${row('Session Cookie',esc(security.sessionCookieName||'暂无'))}${row('Session 有效期',esc(formatMinutes(security.sessionTtlMinutes)))}${row('记住我有效期',esc(formatMinutes(security.rememberMeTtlMinutes)))}${row('审计日志',esc(security.auditEnabled?'已启用':'已关闭'))}${row('远程访问',esc(security.remoteAccessAllowed?'允许当前访问模式远程协作':'本机访问'))}</div></article>
+                      <article class="panel-card"><h2>审计 / History</h2><div class="identity-grid">${row('审计日志状态',esc(audit.enabled?'已启用':'已关闭'))}${row('审计文件',esc(audit.auditLogExists?'已存在':'暂无文件'))}${row('最近登录记录',esc(audit.recentLoginRecords||'暂无数据'))}${row('API 访问统计',esc(audit.apiAccessStats||'暂无数据'))}</div></article>
+                      <article class="panel-card"><h2>系统信息</h2><div class="identity-grid">${row('TZZ Mod 版本',esc(system.modVersion||'暂无数据'))}${row('Minecraft 版本',esc(system.minecraftVersion||'暂无数据'))}${row('服务器类型',esc(labelServerType(system.serverType)))}${row('当前世界 / 存档',esc(system.worldName||'暂无数据'))}</div></article>
+                      <article class="panel-card"><h2>危险操作说明</h2><p class="muted">6.5 系统设置页面只读展示。修改端口、访问模式、用户、密码等操作当前请使用 /tzz webadmin 命令或服务端配置文件；Web UI 写操作将在后续阶段谨慎开放。</p></article>
+                    </section>`);
+                }
+                function storagePanel(storage,visibility){const restricted=storage.restricted||visibility.sensitiveStorageHidden;const hidden='受限信息已隐藏';return `<div class="identity-grid">${row('存储作用域',esc(storage.scope||'WORLD_SAVE'))}${row('按世界隔离',esc(storage.worldScoped?'是':'否'))}${row('WebAdmin 存储目录',esc(restricted?hidden:(storage.directory||'暂无')))}${row('配置文件',esc(restricted?hidden:(storage.configPath||'暂无')))}${row('用户文件',esc(restricted?hidden:(storage.usersPath||'暂无')))}${row('审计日志',esc(restricted?hidden:(storage.auditLogPath||'暂无')))}${row('配置文件存在',esc(storage.configExists?'是':'否'))}${row('用户文件存在',esc(storage.usersExists?'是':'否'))}${row('审计日志存在',esc(storage.auditLogExists?'是':'否'))}${row('旧全局文件提示',esc(storage.legacyGlobalFilesDetected?'检测到旧 config/tzz WebAdmin 文件，但不会自动加载':'未检测到旧全局文件'))}</div><p class="muted">WebAdmin 持久化文件统一放在当前世界 / 存档目录下的 tzz/webadmin/，不再使用全局 config/tzz。</p>`}
+                function labelAuthMode(value){return {USERNAME_PASSWORD:'用户名 / 密码'}[String(value||'').toUpperCase()]||value||'暂无';}
+                function labelServerType(value){return {DEDICATED:'专用服务器（DEDICATED）',INTEGRATED:'集成服务器（INTEGRATED）'}[String(value||'').toUpperCase()]||value||'暂无';}
+                function formatMinutes(value){const n=Number(value||0);return n>0?`${n} 分钟`:'暂无';}
                 function uniqueValues(items){return [...new Set(items)].sort((a,b)=>String(a).localeCompare(String(b)));}
                 async function renderSignals(){
                   setView(loading('正在加载 Signal 频道...'));
@@ -872,7 +978,7 @@ public final class WebAdminServer {
                 }
                 function renderPlaceholder(title,message){setView(`<div class="page-head"><div><h1>${esc(title)}</h1><p>${esc(message)}</p></div></div>${empty('该模块将在后续版本接入。')}`)}
                 initLogin();initApp();
-                """;
+                """).toString();
     }
 
     private static final class LoginRequest {
