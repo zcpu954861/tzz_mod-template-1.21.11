@@ -965,6 +965,28 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.5 用户管理 + 系统设置只读页面
+
+6.5 在 WebAdmin 中新增用户管理和系统设置只读页面：
+
+```text
+/app#/users
+/app#/settings
+```
+
+用户管理页用于查看当前世界 WebAdmin 用户、角色、启用状态、在线 / session 摘要、创建时间、创建者和最近登录时间。该页面只对 `OWNER` 开放；API 不返回 password hash、salt、session token、cookie value、明文密码或敏感密钥。
+
+系统设置页用于查看 WebAdmin 服务运行状态、监听地址、端口、accessMode、当前访问 URL、当前登录用户、世界级存储目录摘要、安全配置摘要、审计日志状态和系统信息。非 `OWNER` 用户可以查看基础运行状态，但敏感存储路径会显示为受限信息。
+
+6.5 仍是只读阶段，不包含：
+
+- 创建、删除、禁用 / 启用 WebAdmin 用户。
+- 重置密码、修改角色或踢出 session。
+- 修改 host、port、accessMode、session 有效期或安全设置。
+- 保存配置、WebSocket 或新增写 API。
+
+写操作继续由 `/tzz webadmin` 命令和未来专门阶段管理。后续 6.6 计划进入 Region / Action 只读页面。
+
 ## WebAdmin 6.4 Doctor + History 观测页面
 
 6.4 在 WebAdmin 中新增全局 Doctor 诊断页和 History 历史页：
@@ -986,7 +1008,7 @@ History 页面用于查看已有 Signal history 时间线。页面展示时间�
 - 编辑设备、channel、listener、receiver、action_relay、action 或 region。
 - 配置写入、WebSocket 或新增写 API。
 
-后续 6.5 计划进入用户管理 + 系统设置页面；WebAdmin 实时同步 / WebSocket / Event Stream 会在未来专门阶段单独规划，配置编辑能力也会继续独立分阶段接入。
+后续 6.6 计划进入 Region / Action 只读页面；WebAdmin 实时同步 / WebSocket / Event Stream 会在未来专门阶段单独规划，配置编辑能力也会继续独立分阶段接入。
 
 ## WebAdmin 6.3 Signal 频道只读页面
 

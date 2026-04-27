@@ -220,4 +220,50 @@ public final class WebAdminDtos {
             String navigationTarget
     ) {
     }
+
+    public record WebAdminUserSummaryDto(
+            int totalCount,
+            int onlineCount,
+            int ownerCount,
+            int editorCount,
+            int testerCount,
+            int viewerCount,
+            int disabledCount
+    ) {
+    }
+
+    public record WebAdminRoleSummaryDto(String role, String displayName, int count) {
+    }
+
+    public record WebAdminUserListEntryDto(
+            String username,
+            String displayName,
+            String role,
+            String roleDisplayName,
+            boolean enabled,
+            boolean online,
+            int sessionCount,
+            String createdAt,
+            String createdBy,
+            String lastLoginAt,
+            boolean forcePasswordChange
+    ) {
+    }
+
+    public record WebAdminUsersDto(
+            WebAdminUserSummaryDto summary,
+            List<WebAdminUserListEntryDto> users,
+            List<WebAdminRoleSummaryDto> roles
+    ) {
+    }
+
+    public record WebAdminSettingsDto(
+            Map<String, Object> service,
+            Map<String, Object> storage,
+            Map<String, Object> security,
+            Map<String, Object> audit,
+            Map<String, Object> system,
+            Map<String, Object> visibility
+    ) {
+    }
 }
