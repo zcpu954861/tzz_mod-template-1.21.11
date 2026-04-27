@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.22.0-web-admin-doctor-history
+
+- Added 6.4 WebAdmin Doctor global diagnostics readonly page at `/app#/doctor`.
+- Added 6.4 WebAdmin History readonly timeline page at `/app#/history`.
+- Added Doctor issue search, severity filter, object type filter, jump-target filter, summary cards, and readonly navigation to related devices, channels, and history.
+- Added History event search, channel filter, source type filter, result filter, time range filter, sorting, timeline table, and readonly navigation to related channels/devices.
+- Added Dashboard navigation to Doctor and History pages.
+- Added device and Signal channel detail links to related History and global Doctor views.
+- Kept timestamps formatted as `YYYY-MM-DD HH:mm:ss` in all new pages.
+- Kept the 6.4 boundary readonly: no fix button, issue clear, history delete/export, signal emit, replay, WebSocket, config write, or edit API.
+- Not included: WebSocket, automatic realtime sync, configuration editing, Region / Action full pages, user management page, or system settings page.
+
 ## v1.21.0-web-admin-signal-channels
 
 - Added 6.3 WebAdmin Signal channel management readonly page at `/app#/signals`.

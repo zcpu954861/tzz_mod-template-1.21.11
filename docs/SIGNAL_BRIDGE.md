@@ -965,6 +965,29 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.4 Doctor + History 观测页面
+
+6.4 在 WebAdmin 中新增全局 Doctor 诊断页和 History 历史页：
+
+```text
+/app#/doctor
+/app#/history
+```
+
+Doctor 页面用于查看当前 SignalBridge、SignalDevice、WebAdmin 只读诊断问题。页面展示错误 / 警告 / 信息数量、受影响设备 / 频道、问题标题、关联对象、影响说明、建议操作和诊断代码，并支持关键词、严重级别、对象类型和跳转目标筛选。问题可跳转到相关设备、频道或历史视图；无法静态定位的项目会显示“暂无跳转目标”。
+
+History 页面用于查看已有 Signal history 时间线。页面展示时间、事件类型、channel、来源对象、来源类型、玩家上下文、结果和详情，并支持关键词、channel、sourceType、result、时间范围和排序筛选。时间统一格式化为 `YYYY-MM-DD HH:mm:ss`，不会直接显示 ISO 原始字符串。
+
+6.4 仍是只读观测阶段，不包含：
+
+- 修复按钮或清除问题。
+- 删除、导出或重放历史。
+- 手动 signal emit 或测试触发按钮。
+- 编辑设备、channel、listener、receiver、action_relay、action 或 region。
+- 配置写入、WebSocket 或新增写 API。
+
+后续 6.5 计划进入用户管理 + 系统设置页面；WebAdmin 实时同步 / WebSocket / Event Stream 会在未来专门阶段单独规划，配置编辑能力也会继续独立分阶段接入。
+
 ## WebAdmin 6.3 Signal 频道只读页面
 
 6.3 在 WebAdmin 中新增 Signal 频道管理和频道详情逻辑链只读页面：
