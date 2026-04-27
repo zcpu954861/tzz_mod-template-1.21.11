@@ -17,7 +17,7 @@ git grep -n "6\\.0\\.1\\|6\\.0\\.2" -- README.md CHANGELOG.md docs src
 - `clean build` 通过。
 - `stabilizationGuardTest` 输出 `Stabilization guard checks passed.`
 - WebAdmin frontend assets guard 覆盖 app shell、CSS、JS、核心路由、时间格式化、返回导航和只读页面入口。
-- 不出现 6.0.1 / 6.0.2 阶段编号残留。
+- 不出现旧 hotfix 阶段编号残留。
 
 ## 2. 登录 / Session
 
