@@ -964,3 +964,31 @@ world/tzz_mod/signal_listeners.json
 - `doctor`：全局诊断 SignalBridge 配置问题，包括空动作 listener、最近触发但没有 listener 的 channel、全部禁用的 channel、直接 signal 自递归、过长 cooldown、非法 channel 脏数据和异常 action 配置。
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
+
+## WebAdmin 6.2 只读页面
+
+6.2 将 WebAdmin 6.1 的只读 Service / DTO / API 接入浏览器端，提供第一批正式只读页面：
+
+```text
+/app#/dashboard
+/app#/devices
+/app#/devices/<deviceId>
+```
+
+Dashboard 展示服务器状态、设备数量、Signal channel 数量、最近 Signal history、Doctor 摘要、Region / Action 数量。设备管理列表展示设备名称、类型、世界、坐标、主频道、启用状态、最近触发和 Doctor 状态，并提供只读搜索与筛选。设备详情基础页展示设备状态、关联 channel、debug checks、Doctor 问题、最近事件和收敛后的配置摘要。
+
+6.2 仍然是只读页面阶段，不包含：
+
+- 新增、编辑、删除设备。
+- 修改 channel。
+- enable / disable 操作。
+- 导出列表。
+- Signal 频道详情 / 横向逻辑链页面。
+- Doctor 完整页。
+- History 完整页。
+- WebSocket。
+- 配置编辑或写 API。
+
+设备详情中的“关联频道 / 逻辑链”入口仅显示后续阶段提示。Signal 频道管理和频道详情逻辑链计划放到 6.3；Doctor 完整页、History 完整页和实时同步会在后续阶段接入。
+
+6.2 页面只调用 6.1 只读 API，不直接读写业务 JSON，不扫描世界，不强制加载区块，不触发 signal / action / region 行为，也不改变 5.x 已封版的 SignalBridge、SignalDevice、VirtualBlockDevice、ItemStackMatcher、itemSubmit、Doctor 或 debug 运行语义。

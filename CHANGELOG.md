@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.20.0-web-admin-dashboard-devices
+
+- Added 6.2 WebAdmin Dashboard app shell using hash routes: `/app#/dashboard`, `/app#/devices`, and `/app#/devices/<deviceId>`.
+- Added frontend API client for the 6.1 readonly APIs with unified JSON envelope handling, session-expired redirect, and Chinese loading / empty / error states.
+- Added Dashboard overview cards for server status, device count, Signal channel count, Region / Action count, and Doctor warning / error totals.
+- Added Dashboard sections for recent Signal history, device overview, and Doctor issue summary.
+- Added readonly device management list page with search, type filter, enabled filter, Doctor status filter, and dynamic world filter.
+- Added readonly device detail page with identity summary, channel card, debug checks, recent channel history, Doctor issues, and compact config summary.
+- Added navigation shell with sidebar and top status bar while keeping 6.0 login/session and 6.1 APIs compatible.
+- Added unified dark WebAdmin console styling with a shared 2D inline SVG icon system.
+- Improved device list filters with clear Chinese labels for type, enabled state, Doctor status, and world / dimension.
+- Improved device list subtitles so raw `minecraft` / namespace prefixes are not shown as truncated primary metadata.
+- Improved device detail hierarchy, localized Debug checks, aligned Doctor status with Debug / list state, and collapsed raw config fields by default.
+- Fixed WebAdmin sidebar layout so the sidebar stays fixed while the main content scrolls independently.
+- Fixed client resource regressions covering lang JSON validity, item group translation keys, and key missing block/item model resources.
+- Not included: device create/edit/delete, channel editing, enable/disable buttons, Signal channel detail page, full Doctor/History pages, WebSocket, config editing, Web user CRUD, Region/Action pages, ConditionEngine, or game scheduling.
+
 ## v1.19.0-web-admin-readonly-services
 
 - Added 6.1 WebAdmin readonly Service / DTO layer for future dashboard and admin pages.

@@ -1,5 +1,7 @@
 # 6.1 WebAdmin 只读 Service / DTO 数据层
 
+> 6.2 已开始把本页定义的只读 API 接入 Dashboard 和设备管理只读页面。页面层说明见 `docs/web_admin_dashboard_devices.md`。
+
 ## WebAdmin 存储作用域
 
 从 6.1 开始，WebAdmin 所有持久化文件都存放在当前世界 / 当前存档根目录下：

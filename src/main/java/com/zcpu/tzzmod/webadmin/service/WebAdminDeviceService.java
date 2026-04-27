@@ -83,11 +83,14 @@ public final class WebAdminDeviceService {
         SignalDeviceData device = rawDevice.normalized();
         List<DiagnosticIssue> issues = diagnosticIssues(server, device);
         List<WebAdminDtos.DebugCheckDto> checks = new ArrayList<>();
-        checks.add(new WebAdminDtos.DebugCheckDto("enabled", device.enabled() ? "OK" : "WARNING",
-                device.enabled() ? "Device is enabled." : "Device is disabled."));
-        checks.add(new WebAdminDtos.DebugCheckDto("channel", device.channel().isBlank() ? "WARNING" : "OK",
-                device.channel().isBlank() ? "Primary channel is empty." : device.channel()));
+        checks.add(new WebAdminDtos.DebugCheckDto("设备状态", device.enabled() ? "OK" : "WARNING",
+                device.enabled() ? "当前设备处于启用状态。" : "当前设备处于禁用状态。"));
+        checks.add(new WebAdminDtos.DebugCheckDto("主频道", device.channel().isBlank() ? "WARNING" : "OK",
+                device.channel().isBlank() ? "当前设备没有设置主频道。" : "主频道：" + device.channel()));
         for (DiagnosticIssue issue : issues) {
+            if ("device_disabled".equals(issue.code()) || "channel_empty".equals(issue.code())) {
+                continue;
+            }
             checks.add(new WebAdminDtos.DebugCheckDto(
                     issue.code(),
                     severity(issue.severity()),
@@ -106,12 +109,49 @@ public final class WebAdminDeviceService {
     }
 
     private List<DiagnosticIssue> diagnosticIssues(MinecraftServer server, SignalDeviceData device) {
+        List<DiagnosticIssue> issues = new ArrayList<>(baseDiagnosticIssues(device));
         if (!SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
-            return List.of();
+            return List.copyOf(issues);
         }
         long time = server == null || server.getOverworld() == null ? 0L : server.getOverworld().getTime();
         DeviceDiagnostic diagnostic = VirtualBlockDeviceDiagnosticService.diagnose(server, device, time);
-        return diagnostic.issues();
+        issues.addAll(diagnostic.issues());
+        return List.copyOf(issues);
+    }
+
+    private List<DiagnosticIssue> baseDiagnosticIssues(SignalDeviceData device) {
+        List<DiagnosticIssue> issues = new ArrayList<>();
+        String pos = device.dimension() + " " + device.x() + " " + device.y() + " " + device.z();
+        String name = WebAdminReadonlySupport.deviceDisplayName(device);
+        if (!device.enabled()) {
+            issues.add(new DiagnosticIssue(
+                    DiagnosticSeverity.WARNING,
+                    "device_disabled",
+                    "设备已禁用",
+                    "当前设备处于禁用状态，不会响应触发。",
+                    "如需使用该设备，请在游戏内确认启用状态。",
+                    "",
+                    device.id(),
+                    name,
+                    pos,
+                    device.channel()
+            ));
+        }
+        if (device.channel().isBlank()) {
+            issues.add(new DiagnosticIssue(
+                    DiagnosticSeverity.WARNING,
+                    "channel_empty",
+                    "主频道未设置",
+                    "当前设备没有设置主频道，触发后不会发出主信号。",
+                    "请按需要在游戏内配置主频道。",
+                    "",
+                    device.id(),
+                    name,
+                    pos,
+                    ""
+            ));
+        }
+        return issues;
     }
 
     private List<WebAdminDtos.DoctorIssueDto> doctorIssueDtos(List<DiagnosticIssue> issues) {
@@ -153,6 +193,8 @@ public final class WebAdminDeviceService {
         ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
         Map<String, Object> interactionItem = new LinkedHashMap<>();
         interactionItem.put("enabled", device.interactionItemMatcherEnabled());
+        interactionItem.put("successChannel", matcher.successChannel());
+        interactionItem.put("failChannel", matcher.failChannel());
         interactionItem.put("source", matcher.interactionItemSource());
         interactionItem.put("sourceDisplayName", InteractionItemSource.displayName(matcher.interactionItemSource()));
         interactionItem.put("vanillaPolicy", matcher.interactionItemVanillaPolicy());

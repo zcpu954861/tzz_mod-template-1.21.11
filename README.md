@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.19.0-web-admin-readonly-services`
-- 当前开发版本：`v1.19.0-web-admin-readonly-services`（6.1 WebAdmin 只读 Service / DTO 数据层；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.20.0-web-admin-dashboard-devices`
+- 当前开发版本：`v1.20.0-web-admin-dashboard-devices`（6.2 Dashboard + 设备管理只读页面；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -19,7 +19,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin Foundation：提供默认关闭的轻量 Web 管理入口，支持登录、session、基础状态 API 和基础状态页。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理列表和设备详情基础页。
 
 ## 命令入口
 
@@ -39,7 +39,23 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 
 ## WebAdmin Foundation
 
-### 6.1 WebAdmin Readonly Services（开发中）
+### 6.2 WebAdmin Dashboard + Devices
+
+6.2 将 6.1 的只读 Service / DTO / API 接入 WebAdmin 前端，提供第一批正式只读页面：
+
+```text
+/app#/dashboard
+/app#/devices
+/app#/devices/<deviceId>
+```
+
+登录后默认进入 Dashboard，总览服务器状态、设备数量、Signal channel 数量、最近 Signal 历史、Doctor 摘要、Region / Action 数量。设备管理页提供只读列表、搜索和筛选；设备详情页展示设备身份、关联 channel、debug checks、最近事件、Doctor 问题和配置摘要。
+
+6.2 同时完成 WebAdmin 视觉与可读性整理：统一深色控制台风格、2D inline SVG 图标系统、固定 sidebar、中文筛选器标签、设备类型 / 状态 / Doctor badge 中文化、Debug 中文化、Doctor / Debug 状态一致性、配置摘要收敛和原始字段默认折叠。资源侧修复了 lang JSON、翻译 key 和关键模型 / 贴图加载问题。
+
+本阶段仍然只读：不提供新增设备、编辑设备、删除设备、修改 channel、enable / disable 操作、配置写入或 WebSocket。前端只调用 6.1 只读 API，不扫描世界、不强制加载区块、不触发游戏逻辑。更多说明见 `docs/web_admin_dashboard_devices.md`。
+
+### 6.1 WebAdmin Readonly Services
 
 6.1 建立 WebAdmin 的只读 Service / DTO / API 数据层，面向后续 Dashboard、设备页、Signal 频道页、Doctor / History 页提供稳定后端结构。本阶段不做完整 Web 页面、不做配置编辑、不做 WebSocket，也不改变 5.x 已封版功能语义。
 
