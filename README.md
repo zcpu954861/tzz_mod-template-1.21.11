@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.20.0-web-admin-dashboard-devices`
-- 当前开发版本：`v1.20.0-web-admin-dashboard-devices`（6.2 Dashboard + 设备管理只读页面；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.21.0-web-admin-signal-channels`
+- 当前开发版本：`v1.21.0-web-admin-signal-channels`（6.3 Signal 频道管理 + 频道详情逻辑链只读页面；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,19 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.3 WebAdmin Signal Channels
+
+6.3 在 6.2 Dashboard / 设备管理只读页面基础上接入 Signal 频道管理和频道详情逻辑链只读视图：
+
+```text
+/app#/signals
+/app#/signals/<channel>
+```
+
+Signal 管理页展示频道总数、消费者数量、最近触发、Doctor 状态，并提供频道名搜索、消费者筛选、状态筛选和排序。频道详情页展示频道基础信息、最近事件、诊断摘要，以及“触发源 → Channel → 消费者 → Actions / 下游影响”的横向逻辑链雏形。
+
+6.3 继续保持只读边界：不新增 channel，不编辑 / 删除 channel，不修改 listener、receiver、action_relay、device 或 action，不执行 signal emit，不提供配置写入，不接入 WebSocket。设备详情中的关联 channel 可以跳转到频道详情页；Dashboard 也提供进入 Signal 管理的入口。
 
 ### 6.2 WebAdmin Dashboard + Devices
 

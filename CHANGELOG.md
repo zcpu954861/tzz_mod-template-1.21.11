@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.21.0-web-admin-signal-channels
+
+- Added 6.3 WebAdmin Signal channel management readonly page at `/app#/signals`.
+- Added Signal channel detail readonly page at `/app#/signals/<channel>` with safe hash-route channel encoding.
+- Added a readonly horizontal logic-chain preview: trigger sources → channel → consumers → actions / downstream signals.
+- Added Signal channel search, consumer filters, status filters, and sorting controls with explicit Chinese labels.
+- Added channel consumer summaries for listeners, signal receivers, and action relays.
+- Added recent Signal event display and channel-level Doctor summary in the channel detail page.
+- Added navigation from Dashboard to Signal management and from device detail channel links to channel detail.
+- Formatted WebAdmin visible timestamps as `YYYY-MM-DD HH:mm:ss` instead of raw ISO strings.
+- Localized Signal page labels, consumer types, action types, empty states, and readonly hints.
+- Improved channel type fallback so normal channels do not show a misleading “unknown channel” label.
+- Kept the 6.3 boundary readonly: no channel creation, editing, deletion, listener/action mutation, signal emit test button, config write, WebSocket, export, or write API.
+
 ## v1.20.0-web-admin-dashboard-devices
 
 - Added 6.2 WebAdmin Dashboard app shell using hash routes: `/app#/dashboard`, `/app#/devices`, and `/app#/devices/<deviceId>`.

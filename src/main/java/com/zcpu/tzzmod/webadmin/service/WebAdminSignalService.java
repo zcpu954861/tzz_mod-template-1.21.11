@@ -83,14 +83,14 @@ public final class WebAdminSignalService {
             issues.add(new WebAdminDtos.DoctorIssueDto(
                     "channel_no_consumers",
                     "WARNING",
-                    "Channel has no consumers",
-                    "The signal can still be emitted and recorded, but no listener, receiver, or action relay currently consumes it.",
+                    "频道暂无消费者",
+                    "该信号仍会发出并写入历史，但当前不会触发监听器、接收器或动作继电器。",
                     "CHANNEL",
                     channel,
                     channel,
                     channel,
-                    "No configured consumer.",
-                    "Add a listener, signal_receiver, or action_relay if this channel should do work.",
+                    "没有已配置的消费者。",
+                    "如该频道需要产生下游效果，请添加监听器 listener、接收器 signal_receiver 或动作继电器 action_relay。",
                     java.time.Instant.now().toString(),
                     "channel:" + channel
             ));
@@ -215,6 +215,9 @@ public final class WebAdminSignalService {
         List<WebAdminDtos.SignalChannelEndpointDto> endpoints = new ArrayList<>();
         for (SignalDeviceData raw : devices) {
             SignalDeviceData device = raw.normalized();
+            if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(device.type()) || SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
+                continue;
+            }
             if (deviceReferencesChannel(device, channel)) {
                 endpoints.add(deviceEndpoint(device, "DEVICE", WebAdminReadonlySupport.deviceType(device)));
             }
