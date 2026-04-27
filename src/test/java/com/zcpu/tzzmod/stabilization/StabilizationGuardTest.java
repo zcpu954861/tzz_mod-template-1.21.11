@@ -31,6 +31,7 @@ import com.zcpu.tzzmod.signal.device.item.ItemSubmitEvaluator;
 import com.zcpu.tzzmod.signal.device.item.ItemSubmitInventoryAdapter;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -62,6 +63,7 @@ public final class StabilizationGuardTest {
         testDiagnosticIssueModel();
         testDiagnosticIssueRendering();
         testVirtualDeviceDiagnostics();
+        testWebAdminReadonlyFrontendAssets();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -679,6 +681,54 @@ public final class StabilizationGuardTest {
         );
         DeviceDiagnostic consumeDiagnostic = VirtualBlockDeviceDiagnosticService.diagnoseStatic(unsupportedConsume);
         requireTrue(hasDiagnosticCode(consumeDiagnostic, "consume_source_unsupported"), "armor source consume incompatibility is diagnosed");
+    }
+
+    private static void testWebAdminReadonlyFrontendAssets() {
+        String loginHtml = WebAdminFrontendAssets.loginHtml();
+        String appHtml = WebAdminFrontendAssets.appHtml();
+        String css = WebAdminFrontendAssets.appCss();
+        String js = WebAdminFrontendAssets.appJs();
+
+        requireNotBlank(loginHtml, "WebAdmin login HTML asset");
+        requireNotBlank(appHtml, "WebAdmin app HTML asset");
+        requireNotBlank(css, "WebAdmin CSS asset");
+        requireNotBlank(js, "WebAdmin JS asset");
+
+        for (String route : List.of(
+                "#/dashboard",
+                "#/devices",
+                "#/signals",
+                "#/doctor",
+                "#/history",
+                "#/users",
+                "#/settings",
+                "#/regions",
+                "#/actions"
+        )) {
+            requireContains(appHtml + js, route, "WebAdmin readonly route present: " + route);
+        }
+
+        for (String helper : List.of(
+                "formatDateTime",
+                "formatRelativeTime",
+                "withReturnContext",
+                "goBackOrFallback",
+                "backButton",
+                "navigationButton"
+        )) {
+            requireContains(js, helper, "WebAdmin frontend helper present: " + helper);
+        }
+
+        requireContains(appHtml, "区域管理", "sidebar contains Region navigation");
+        requireContains(appHtml, "动作系统", "sidebar contains Action navigation");
+        requireContains(js, "text.slice(11,19)", "time formatter strips ISO separator and milliseconds");
+        requireContains(js, "暂无", "Chinese empty state fallback present");
+        requireContains(js, "只读", "readonly UI hint present");
+        requireFalse(js.contains("'code=") || js.contains("\"code=") || js.contains(">code="),
+                "diagnostic code is not rendered as a visible code= prefix");
+        requireFalse(js.contains(">undefined<"), "frontend does not render raw undefined marker");
+        requireFalse(js.contains(">null<"), "frontend does not render raw null marker");
+        requireFalse(js.contains("location.hash='http"), "frontend does not route to external URL");
     }
 
     private static SignalDeviceData fullDevice() {

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.25.0-web-admin-readonly-stabilization
+
+- Added 6.7 WebAdmin readonly layer stabilization and frontend foundation cleanup.
+- Split WebAdmin HTML / CSS / JS static assets from `WebAdminServer` into `WebAdminFrontendAssets`, keeping server responsibilities focused on request dispatch, auth/session, and API routing.
+- Added WebAdmin readonly frontend guard coverage to `stabilizationGuardTest` for static assets, readonly routes, navigation helpers, time formatting helpers, Chinese empty states, and readonly UI hints.
+- Kept Dashboard, Devices, Signals, Doctor, History, Users, Settings, Regions, and Actions pages compatible.
+- Kept detail-page context return navigation, visible time formatting, Chinese display, fixed sidebar layout, and readonly API usage intact.
+- Added WebAdmin readonly stabilization and regression documentation.
+- No new write API, config write, WebSocket, automatic realtime sync, editing feature, ConditionEngine, or high-level game orchestration is included.
+
 ## v1.24.0-web-admin-region-action
 
 - Added 6.6 WebAdmin Region management readonly page at `/app#/regions`.

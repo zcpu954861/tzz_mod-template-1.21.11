@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.24.0-web-admin-region-action`
-- 当前开发版本：`v1.24.0-web-admin-region-action`（6.6 Region / Action 只读页面；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.25.0-web-admin-readonly-stabilization`
+- 当前开发版本：`v1.25.0-web-admin-readonly-stabilization`（6.7 WebAdmin 只读层稳定化 / 前端架构整理；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,16 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.7 WebAdmin Readonly Stabilization
+
+6.7 是 WebAdmin 只读层稳定化 / 前端架构整理版，不新增业务页面、不新增写 API、不接入 WebSocket。
+
+本阶段整理 WebAdmin 前端资源边界：`WebAdminServer` 继续负责 HTTP request dispatch、auth/session 和 API route dispatch，HTML / CSS / JS 静态资源集中到 `WebAdminFrontendAssets`。页面路径、登录、session、只读 API 和 world-save scoped WebAdmin 存储目录均保持兼容。
+
+6.7 同时增加 WebAdmin readonly guard，纳入 `stabilizationGuardTest` / `clean build`，覆盖 app shell / CSS / JS assets 非空、Dashboard / Devices / Signals / Doctor / History / Users / Settings / Regions / Actions 路由存在、时间格式化 helper、详情页上下文返回 helper、中文空状态和只读提示等基础护栏。
+
+更多说明见 `docs/WEBADMIN_READONLY_STABILIZATION_6_7.md`，完整人工回归清单见 `docs/REGRESSION_TEST_6_7.md`。
 
 ### 6.6 WebAdmin Region + Action
 
