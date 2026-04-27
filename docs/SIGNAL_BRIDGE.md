@@ -965,6 +965,39 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.7 只读层稳定化 / 前端架构整理
+
+6.7 是 WebAdmin 只读观察层稳定化阶段，不新增业务页面、不新增写 API、不接入 WebSocket。当前 WebAdmin 只读覆盖范围包括：
+
+```text
+/app#/dashboard
+/app#/devices
+/app#/devices/<deviceId>
+/app#/signals
+/app#/signals/<channel>
+/app#/doctor
+/app#/history
+/app#/users
+/app#/settings
+/app#/regions
+/app#/regions/<regionId>
+/app#/actions
+/app#/actions/<actionId>
+```
+
+本阶段把前端 HTML / CSS / JS 静态资源从 `WebAdminServer` 拆到 `WebAdminFrontendAssets`。`WebAdminServer` 继续只负责 HTTP request dispatch、auth/session、静态资源返回和 API route dispatch；页面脚本中的 formatter、icon、route、navigation 和 UI helper 仍作为浏览器端 helper 复用，不引入 npm、前端构建链、外部 CDN 或大型前端框架。
+
+6.7 增加 WebAdmin readonly guard 到 `stabilizationGuardTest`：检查 app shell / CSS / JS assets 非空、所有只读页面 route 存在、时间格式化 helper、详情页上下文返回 helper、中文空状态、只读提示和基础危险字符串。该护栏用于避免后续 WebSocket、配置编辑、权限细化和多人协作阶段破坏 6.2～6.6 的只读观察层。
+
+6.7 不包含：
+
+- 实时同步 / WebSocket / Event Stream。
+- 设备、Signal、Region、Action、用户或系统设置编辑。
+- 配置写入、草稿 / 发布 / 回滚。
+- ConditionEngine 或高层 GameController / MissionSystem。
+
+后续阶段可以在当前只读 service / DTO / frontend helper 基础上继续推进 WebAdmin 实时同步，或先进入配置编辑服务层、权限审计和草稿发布模型。
+
 ## WebAdmin 6.6 Region / Action 只读页面
 
 6.6 在 WebAdmin 中新增 Region 管理和 Action 系统只读页面：
