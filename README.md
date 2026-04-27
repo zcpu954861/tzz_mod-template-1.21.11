@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.23.0-web-admin-users-settings`
-- 当前开发版本：`v1.23.0-web-admin-users-settings`（6.5 用户管理 + 系统设置只读页面；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.24.0-web-admin-region-action`
+- 当前开发版本：`v1.24.0-web-admin-region-action`（6.6 Region / Action 只读页面；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -19,7 +19,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理和系统设置只读页面。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region 管理和 Action 系统只读页面。
 
 ## 命令入口
 
@@ -38,6 +38,25 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.6 WebAdmin Region + Action
+
+6.6 在 6.5 用户管理 / 系统设置只读页面基础上接入 Region 管理和 Action 系统只读页面：
+
+```text
+/app#/regions
+/app#/regions/<regionId>
+/app#/actions
+/app#/actions/<actionId>
+```
+
+Region 管理页用于查看 RegionController 区域、世界、坐标边界、目标过滤、进入 / 离开 / 停留动作数量、绑定频道、当前玩家数量和 Doctor 状态。Region 详情页展示 bounds、目标过滤、事件动作摘要、绑定频道、当前玩家 / 最近事件和诊断摘要。
+
+Action 系统页用于查看 ActionEngine 动作、动作类型、归属对象、关联 channel、引用次数、执行摘要和 Doctor 状态。Action 详情页展示动作基础信息、配置摘要、引用来源、最近执行记录和诊断摘要。
+
+Region / Action 页面与 Signal、Doctor、History、设备详情之间支持只读跨页面跳转。详情页返回按钮会优先回到进入前的上下文页面；直接打开详情 URL 时会回退到对应模块列表页。
+
+6.6 仍然只读：不提供新增、编辑、删除、执行 action、测试 action、修改 region bounds、修改 target filter、修改 enter / exit / stay actions、配置写入、WebSocket 或任何写 API。
 
 ### 6.5 WebAdmin Users + Settings
 

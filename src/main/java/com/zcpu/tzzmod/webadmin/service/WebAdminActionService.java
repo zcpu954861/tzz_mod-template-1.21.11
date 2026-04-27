@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
@@ -75,7 +76,7 @@ public final class WebAdminActionService {
                         "ACTION_RELAY",
                         device.id(),
                         WebAdminReadonlySupport.deviceDisplayName(device),
-                        device.channel(),
+                    device.channel(),
                         device.actionCount(),
                         0,
                         "UNKNOWN",
@@ -106,7 +107,7 @@ public final class WebAdminActionService {
                     ownerType,
                     ownerId,
                     ownerName,
-                    channel,
+                    channelFor(action, channel),
                     1,
                     0,
                     "UNKNOWN",
@@ -118,5 +119,12 @@ public final class WebAdminActionService {
 
     private static String display(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static String channelFor(ActionConfig action, String ownerChannel) {
+        if (action != null && action.type() == com.zcpu.tzzmod.action.ActionType.SIGNAL) {
+            return SignalChannel.normalize(action.value());
+        }
+        return ownerChannel == null ? "" : ownerChannel;
     }
 }

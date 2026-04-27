@@ -965,6 +965,33 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.6 Region / Action 只读页面
+
+6.6 在 WebAdmin 中新增 Region 管理和 Action 系统只读页面：
+
+```text
+/app#/regions
+/app#/regions/<regionId>
+/app#/actions
+/app#/actions/<actionId>
+```
+
+Region 管理页用于查看 RegionController 区域、世界、坐标边界、目标过滤、进入 / 离开 / 停留动作数量、绑定频道、当前玩家数量和 Doctor 状态。Region 详情页展示 bounds、中心点、尺寸 / 体积、目标过滤、事件动作摘要、绑定频道、当前玩家 / 最近事件和诊断摘要。
+
+Action 系统页用于查看 ActionEngine 动作、动作类型、归属对象、关联 channel、引用次数、执行次数、最近结果和 Doctor 状态。Action 详情页展示动作基础信息、按类型整理的配置摘要、引用来源、最近执行记录和诊断摘要。
+
+Region / Action 页面会与设备详情、Signal 频道详情、Doctor 问题和 History 历史记录形成只读跳转。详情页返回按钮使用上下文返回规则：从列表进入则返回对应列表，从 Signal / Region / Doctor / History 等交叉页面进入则返回进入前页面；直接打开详情 URL 或来源无效时，回退到对应模块列表页。
+
+6.6 仍是只读阶段，不包含：
+
+- 新增、编辑或删除 region。
+- 修改 region bounds、target filter、enter / exit / stay actions。
+- 新增、编辑、删除、执行或测试 action。
+- 修改 action_relay、listener、channel 或其他设备配置。
+- 保存配置、WebSocket 或新增写 API。
+
+Region 与 Action 页面用于补齐 WebAdmin 对 RegionController 和 ActionEngine 的观测能力，并把区域、动作、Signal channel、设备和历史记录之间的只读跳转逐步连通。后续阶段将继续规划 WebAdmin 实时同步、编辑能力、ConditionEngine 和高层游戏调度系统。
+
 ## WebAdmin 6.5 用户管理 + 系统设置只读页面
 
 6.5 在 WebAdmin 中新增用户管理和系统设置只读页面：
@@ -985,7 +1012,7 @@ world/tzz_mod/signal_listeners.json
 - 修改 host、port、accessMode、session 有效期或安全设置。
 - 保存配置、WebSocket 或新增写 API。
 
-写操作继续由 `/tzz webadmin` 命令和未来专门阶段管理。后续 6.6 计划进入 Region / Action 只读页面。
+写操作继续由 `/tzz webadmin` 命令和未来专门阶段管理。后续阶段会继续推进 WebAdmin 实时同步、编辑能力、ConditionEngine 和高层游戏调度系统。
 
 ## WebAdmin 6.4 Doctor + History 观测页面
 
@@ -1008,7 +1035,7 @@ History 页面用于查看已有 Signal history 时间线。页面展示时间�
 - 编辑设备、channel、listener、receiver、action_relay、action 或 region。
 - 配置写入、WebSocket 或新增写 API。
 
-后续 6.6 计划进入 Region / Action 只读页面；WebAdmin 实时同步 / WebSocket / Event Stream 会在未来专门阶段单独规划，配置编辑能力也会继续独立分阶段接入。
+后续 WebAdmin 实时同步 / WebSocket / Event Stream 会在未来专门阶段单独规划，配置编辑能力也会继续独立分阶段接入。
 
 ## WebAdmin 6.3 Signal 频道只读页面
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.24.0-web-admin-region-action
+
+- Added 6.6 WebAdmin Region management readonly page at `/app#/regions`.
+- Added 6.6 WebAdmin Region detail readonly page at `/app#/regions/<regionId>`.
+- Added 6.6 WebAdmin Action system readonly page at `/app#/actions`.
+- Added 6.6 WebAdmin Action detail readonly page at `/app#/actions/<actionId>`.
+- Added readonly Region search, world filter, enabled-state filter, Doctor-state filter, player-presence filter, and sorting controls.
+- Added readonly Action search, action-type filter, owner-type filter, execution-result filter, Doctor-state filter, and sorting controls.
+- Region pages display bounds, target filter, enter/exit/stay action summaries, bound channels, player state summary, recent events, and Doctor summary when available.
+- Action pages display action type, owner, references, recent result, config summary, recent executions, downstream signal link, and Doctor summary when available.
+- Added readonly Region / Action / Signal / Doctor / History cross-page navigation where route targets are available.
+- Added context-aware detail-page back navigation so device, Signal, Region, and Action detail pages return to the page that opened them, with module-list fallback for direct URL entry.
+- Kept the 6.6 boundary readonly: no Region or Action creation, editing, deletion, execution, testing, WebSocket, config write, or write API.
+
 ## v1.23.0-web-admin-users-settings
 
 - Added 6.5 WebAdmin user management readonly page at `/app#/users`.
