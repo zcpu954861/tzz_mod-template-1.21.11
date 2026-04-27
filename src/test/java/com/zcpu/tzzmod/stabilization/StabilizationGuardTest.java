@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.stabilization;
 
 import com.google.gson.Gson;
+import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.device.BlockStateConditionMode;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionType;
@@ -61,6 +62,7 @@ public final class StabilizationGuardTest {
         testDiagnosticIssueModel();
         testDiagnosticIssueRendering();
         testVirtualDeviceDiagnostics();
+        ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
 
