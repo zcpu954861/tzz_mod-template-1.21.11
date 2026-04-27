@@ -965,6 +965,33 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.3 Signal 频道只读页面
+
+6.3 在 WebAdmin 中新增 Signal 频道管理和频道详情逻辑链只读页面：
+
+```text
+/app#/signals
+/app#/signals/<channel>
+```
+
+Signal 管理页读取 6.1 的只读 Signal API，展示频道列表、消费者统计、最近触发、最近来源和 Doctor 状态。页面支持按频道名搜索，并按消费者状态、最近事件 / 警告状态排序和筛选。所有筛选仅在前端只读数据上执行，不写入配置。
+
+频道详情页展示频道基础信息、最近 Signal 事件、频道诊断摘要，以及“触发源 → 频道 → 消费者 → 动作 / 下游影响”的横向逻辑链雏形。消费者会区分 listener、signal_receiver 和 action_relay；如果消费者关联设备，页面可以跳转到设备详情。设备详情中的关联 channel 也可以跳转回频道详情。
+
+WebAdmin 页面会把后端返回的 ISO 时间格式化为 `YYYY-MM-DD HH:mm:ss`，避免在表格、详情页和历史列表中直接显示原始 `T`、毫秒或 `Z` 字段。频道类型无法静态推断时，页面使用普通“频道”作为类型说明，避免在真实频道名下方显示误导性的“未知频道”。
+
+6.3 仍然只读，不包含：
+
+- 新增、编辑或删除 channel。
+- 修改 listener、receiver、action_relay、device 或 action。
+- enable / disable 操作。
+- 手动 signal emit 或测试触发按钮。
+- 图标编辑或上传。
+- 配置写入、导出、WebSocket。
+- 完整 Doctor 页面或完整 History 页面。
+
+后续阶段可以在同一 DTO / service 基础上接入更完整的 Signal 频道逻辑链、Doctor 页面、History 页面和实时同步。
+
 ## WebAdmin 6.2 只读页面
 
 6.2 将 WebAdmin 6.1 的只读 Service / DTO / API 接入浏览器端，提供第一批正式只读页面：

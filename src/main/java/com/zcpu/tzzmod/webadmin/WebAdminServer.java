@@ -357,7 +357,7 @@ public final class WebAdminServer {
                       <nav class="nav-list" aria-label="主导航">
                         <button class="nav-item" data-route="#/dashboard"><span class="nav-icon" data-icon="dashboard"></span>总览</button>
                         <button class="nav-item" data-route="#/devices"><span class="nav-icon" data-icon="device"></span>设备管理</button>
-                        <button class="nav-item" data-pending="信号管理将在后续版本接入"><span class="nav-icon" data-icon="signal"></span>信号管理</button>
+                        <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signal"></span>Signal 管理</button>
                         <button class="nav-item" data-pending="区域管理将在后续版本接入"><span class="nav-icon" data-icon="region"></span>区域管理</button>
                         <button class="nav-item" data-pending="动作系统将在后续版本接入"><span class="nav-icon" data-icon="action"></span>动作系统</button>
                         <button class="nav-item" data-pending="诊断完整页将在后续版本接入"><span class="nav-icon" data-icon="doctor"></span>诊断中心</button>
@@ -399,8 +399,8 @@ public final class WebAdminServer {
                 .hero-copy{max-width:760px}.hero-copy h1{font-size:64px;line-height:1.05;margin:0 0 22px}.hero-copy p{font-size:20px;color:var(--muted);margin:12px 0}.hero-copy .lead{font-size:28px;color:#fff}.tags{color:#9bf3ff!important}
                 .login-card,.status-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.login-card{padding:32px;max-width:440px;width:100%;justify-self:end}.server-pill{display:inline-flex;padding:7px 12px;border:1px solid #1f6d86;border-radius:999px;color:#9bf3ff;background:#092638;font-size:13px}.login-card h2,.status-card h2{margin:20px 0 22px;font-size:26px}
                 label{display:block;margin:16px 0 8px;color:#cfe6f4;font-size:14px}input{width:100%;height:44px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 12px;font-size:15px}input:focus{outline:2px solid #1fbce2;border-color:transparent}.password-row{display:flex;gap:8px}.password-row input{flex:1}.password-row button{min-width:64px;border-radius:10px;border:1px solid #28516d;background:#112a42;color:#bfeeff}.check-row{display:flex;gap:10px;align-items:center}.check-row input{width:auto;height:auto}.primary,.secondary{height:44px;border:0;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}.primary{width:100%;background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#04111d}.secondary{background:#12263e;color:#dff8ff;border:1px solid #284963}.secondary:disabled{opacity:.45;cursor:not-allowed}.message{min-height:20px;color:var(--danger)}.help{color:var(--muted);font-size:13px}.divider{display:flex;align-items:center;margin:20px 0;color:#6d8799}.divider:before,.divider:after{content:"";height:1px;background:#213d54;flex:1}.divider span{padding:0 10px}
-                .admin-shell{height:100vh;overflow:hidden;background:var(--bg)}.sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:#081625;padding:22px 18px;display:flex;flex-direction:column;gap:24px;z-index:10}.sidebar-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:#dffbff}.nav-list{display:grid;gap:8px}.nav-item{height:42px;border:1px solid transparent;border-radius:10px;background:transparent;color:#b9cfde;text-align:left;padding:0 12px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px}.nav-item:hover{background:#0f243b;color:#fff}.nav-item.active{background:#12334d;border-color:#1c6d88;color:#9bf3ff}.nav-icon{display:inline-grid;place-items:center;width:22px;height:22px;color:#72eaff}.icon-svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.workspace{min-width:0;margin-left:260px;height:100vh;overflow:hidden;display:grid;grid-template-rows:64px minmax(0,1fr)}.topbar{border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 24px;background:#091827}.topbar-status,.topbar-user{display:flex;align-items:center;gap:14px;color:#c7d9e6;font-size:14px}.view-panel{padding:26px;overflow:auto;height:calc(100vh - 64px)}.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:22px}.page-head h1{margin:0;font-size:30px}.page-head p{margin:8px 0 0;color:var(--muted)}.toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:18px 0}.filter-field{display:grid;gap:6px;margin:0}.filter-field span{font-size:12px;color:var(--muted);font-weight:700}.input,.select{height:38px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 10px}.input{min-width:280px}.select{min-width:150px}.card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.panel-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:18px}.metric-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.metric-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#0b2738;border:1px solid #27677e;color:#8ff5ff}.metric-card .label{color:var(--muted);font-size:13px}.metric-card .value{font-size:28px;font-weight:800;margin-top:8px}.content-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:16px;margin-top:16px}.panel-card h2{font-size:18px;margin:0 0 14px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#081725}.data-table{width:100%;border-collapse:collapse;min-width:760px}.data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid #142b42;text-align:left;font-size:13px}.data-table th{color:#9fb4c4;font-weight:700;background:#0a1b2c}.data-table tr:hover td{background:#0d2136}.link-button,.text-button{border:0;background:transparent;color:#7cecff;cursor:pointer;padding:0;font:inherit}.pill{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;border:1px solid #2a4c64;color:#d7edf7;background:#102237;font-size:12px}.pill.ok{border-color:#26775c;color:#a7f3d0}.pill.warning{border-color:#826d1b;color:#fde68a}.pill.error{border-color:#91414d;color:#fecdd3}.pill.info{border-color:#246e85;color:#a5f3fc}.muted{color:var(--muted)}.empty-state,.error-state,.loading-state{border:1px dashed #28516d;border-radius:14px;padding:24px;color:#b8cbd9;background:#081725}.error-state{border-color:#7f3542;color:#fecdd3}.list-stack{display:grid;gap:10px}.event-row,.issue-row,.check-row-card,.kv-row,.chain-row{display:grid;gap:5px;padding:12px;border:1px solid #17324b;border-radius:10px;background:#091b2d}.event-row .meta,.issue-row .meta{color:#91a7b8;font-size:12px}.device-name{display:flex;align-items:center;gap:10px}.device-subtitle{display:block;margin-top:3px;color:var(--muted);font-size:12px}.device-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;border:1px solid #27677e;color:#8ff5ff;background:#0b2738}.device-icon .icon-svg{width:19px;height:19px}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.6fr);gap:16px}.overview-card{grid-column:1/-1}.overview-inline{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.identity-grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 14px}.identity-grid .k{color:var(--muted)}.identity-grid .v{word-break:break-word}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.config-section{display:grid;gap:8px;margin-bottom:14px}.config-section h3{margin:0;color:#dffbff;font-size:14px}.raw-config{margin-top:12px;color:var(--muted)}.raw-config summary{cursor:pointer;color:#7cecff}.toast{position:fixed;right:24px;bottom:24px;max-width:360px;background:#102b42;border:1px solid #2a7993;color:#dffbff;border-radius:12px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.35);z-index:20}.back-row{margin-bottom:16px}
-                @media(max-width:1100px){.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content-grid,.detail-grid{grid-template-columns:1fr}.sidebar{width:220px}.workspace{margin-left:220px}}
+                .admin-shell{height:100vh;overflow:hidden;background:var(--bg)}.sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:#081625;padding:22px 18px;display:flex;flex-direction:column;gap:24px;z-index:10}.sidebar-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:#dffbff}.nav-list{display:grid;gap:8px}.nav-item{height:42px;border:1px solid transparent;border-radius:10px;background:transparent;color:#b9cfde;text-align:left;padding:0 12px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px}.nav-item:hover{background:#0f243b;color:#fff}.nav-item.active{background:#12334d;border-color:#1c6d88;color:#9bf3ff}.nav-icon{display:inline-grid;place-items:center;width:22px;height:22px;color:#72eaff}.icon-svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.workspace{min-width:0;margin-left:260px;height:100vh;overflow:hidden;display:grid;grid-template-rows:64px minmax(0,1fr)}.topbar{border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 24px;background:#091827}.topbar-status,.topbar-user{display:flex;align-items:center;gap:14px;color:#c7d9e6;font-size:14px}.view-panel{padding:26px;overflow:auto;height:calc(100vh - 64px)}.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:22px}.page-head h1{margin:0;font-size:30px}.page-head p{margin:8px 0 0;color:var(--muted)}.toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:18px 0}.filter-field{display:grid;gap:6px;margin:0}.filter-field span{font-size:12px;color:var(--muted);font-weight:700}.input,.select{height:38px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 10px}.input{min-width:280px}.select{min-width:150px}.card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.panel-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:18px}.metric-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.metric-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#0b2738;border:1px solid #27677e;color:#8ff5ff}.metric-card .label{color:var(--muted);font-size:13px}.metric-card .value{font-size:28px;font-weight:800;margin-top:8px}.content-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:16px;margin-top:16px}.panel-card h2{font-size:18px;margin:0 0 14px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#081725}.data-table{width:100%;border-collapse:collapse;min-width:760px}.data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid #142b42;text-align:left;font-size:13px}.data-table th{color:#9fb4c4;font-weight:700;background:#0a1b2c}.data-table tr:hover td{background:#0d2136}.link-button,.text-button{border:0;background:transparent;color:#7cecff;cursor:pointer;padding:0;font:inherit}.pill{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;border:1px solid #2a4c64;color:#d7edf7;background:#102237;font-size:12px}.pill.ok{border-color:#26775c;color:#a7f3d0}.pill.warning{border-color:#826d1b;color:#fde68a}.pill.error{border-color:#91414d;color:#fecdd3}.pill.info{border-color:#246e85;color:#a5f3fc}.muted{color:var(--muted)}.empty-state,.error-state,.loading-state{border:1px dashed #28516d;border-radius:14px;padding:24px;color:#b8cbd9;background:#081725}.error-state{border-color:#7f3542;color:#fecdd3}.list-stack{display:grid;gap:10px}.event-row,.issue-row,.check-row-card,.kv-row,.chain-row,.chain-node,.endpoint-row{display:grid;gap:5px;padding:12px;border:1px solid #17324b;border-radius:10px;background:#091b2d}.event-row .meta,.issue-row .meta,.endpoint-row .meta{color:#91a7b8;font-size:12px}.device-name{display:flex;align-items:center;gap:10px}.device-subtitle{display:block;margin-top:3px;color:var(--muted);font-size:12px}.device-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;border:1px solid #27677e;color:#8ff5ff;background:#0b2738}.device-icon .icon-svg{width:19px;height:19px}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.6fr);gap:16px}.overview-card{grid-column:1/-1}.overview-inline{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.identity-grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 14px}.identity-grid .k{color:var(--muted)}.identity-grid .v{word-break:break-word}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.config-section{display:grid;gap:8px;margin-bottom:14px}.config-section h3{margin:0;color:#dffbff;font-size:14px}.raw-config{margin-top:12px;color:var(--muted)}.raw-config summary{cursor:pointer;color:#7cecff}.logic-chain{display:grid;grid-template-columns:minmax(180px,1fr) 38px minmax(190px,1fr) 38px minmax(220px,1.2fr) 38px minmax(220px,1.2fr);gap:10px;align-items:stretch}.chain-arrow{display:grid;place-items:center;color:#6ee7f9;font-weight:800}.chain-node h3{margin:0 0 8px;font-size:14px;color:#dffbff}.endpoint-grid{display:grid;gap:8px}.inline-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.toast{position:fixed;right:24px;bottom:24px;max-width:360px;background:#102b42;border:1px solid #2a7993;color:#dffbff;border-radius:12px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.35);z-index:20}.back-row{margin-bottom:16px}
+                @media(max-width:1100px){.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content-grid,.detail-grid,.logic-chain{grid-template-columns:1fr}.chain-arrow{transform:rotate(90deg);min-height:24px}.sidebar{width:220px}.workspace{margin-left:220px}}
                 @media(max-width:760px){.login-shell{grid-template-columns:1fr;max-width:720px;gap:34px;align-items:start;padding:32px 20px}.brand-panel{min-height:auto;justify-content:flex-start;gap:32px}.hero-copy h1{font-size:42px}.hero-copy .lead{font-size:22px}.login-card{max-width:none;justify-self:stretch}.admin-shell{height:auto;min-height:100vh;overflow:visible}.sidebar{position:static;width:auto;height:auto;max-height:42vh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--line)}.workspace{margin-left:0;height:auto;min-height:100vh;overflow:visible}.nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.topbar{height:auto;min-height:76px;align-items:flex-start;gap:10px;flex-direction:column;padding:14px 18px}.topbar-status,.topbar-user{flex-wrap:wrap}.view-panel{padding:18px;height:auto;overflow:visible}.page-head{align-items:flex-start;flex-direction:column}.card-grid,.summary-grid{grid-template-columns:1fr}.input{min-width:100%}.identity-grid{grid-template-columns:1fr}}
                 """;
     }
@@ -410,7 +410,7 @@ public final class WebAdminServer {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'}};
+                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
                 function svg(paths){return `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`}
@@ -438,17 +438,32 @@ public final class WebAdminServer {
                 function labelBool(value){return value?'已启用':'已禁用';}
                 function labelType(value){const v=String(value||'UNKNOWN').toUpperCase();return {SIGNAL_EMITTER:'信号发射器',SIGNAL_RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',VIRTUAL_BLOCK_DEVICE:'虚拟方块设备',REGION_CONTROLLER:'区域控制器',UNKNOWN:'未知设备'}[v]||value||'未知设备';}
                 function labelSourceType(value){return {DEVICE:'设备',LISTENER:'监听器',RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',REGION:'区域',COMMAND:'命令',SYSTEM:'系统',UNKNOWN:'未知来源'}[value]||value||'-';}
+                function labelEndpointType(value){return {DEVICE:'触发设备',LISTENER:'监听器',RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',REGION:'区域',COMMAND:'命令',SYSTEM:'系统',UNKNOWN:'未知节点'}[String(value||'UNKNOWN').toUpperCase()]||value||'未知节点';}
+                function labelActionType(value){return {COMMAND:'命令动作',MESSAGE:'消息动作',SOUND:'音效动作',SIGNAL:'下游信号',UNKNOWN:'未知动作'}[String(value||'UNKNOWN').toUpperCase()]||value||'未知动作';}
+                function labelSubType(value){const v=String(value||'').toLowerCase();return {signal_listener:'监听器',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备'}[v]||labelType(value);}
                 function labelServerStatus(value){return {RUNNING:'运行中',STOPPED:'已停止',STARTING:'启动中',UNKNOWN:'未知'}[String(value||'').toUpperCase()]||value||'-';}
                 function labelAccessMode(value){return {LOCAL_ONLY:'本机模式',LAN_DEV:'局域网开发模式',MULTIPLAYER_DEV:'多人开发模式'}[String(value||'').toUpperCase()]||value||'-';}
                 function labelRole(value){return {OWNER:'所有者',EDITOR:'编辑者',TESTER:'测试者',VIEWER:'只读查看者'}[String(value||'').toUpperCase()]||value||'-';}
                 function labelChannel(value){return isBlank(value)?'未设置':value;}
+                function labelChannelType(value){return {DEVICE:'设备频道',REGION:'区域频道',SYSTEM:'系统频道',GAME:'游戏流程频道'}[String(value||'').toUpperCase()]||'频道';}
+                function labelConsumerFilter(value){return {ALL:'全部',HAS_CONSUMER:'有消费者',NO_CONSUMER:'无消费者',HAS_LISTENER:'有监听器',HAS_RECEIVER:'有接收器',HAS_RELAY:'有动作继电器'}[value]||value;}
+                function labelSignalStatusFilter(value){return {ALL:'全部',RECENT:'最近有事件',NO_RECENT:'暂无事件',WARNING:'有警告'}[value]||value;}
+                function labelSignalSort(value){return {RECENT:'最近触发时间',CHANNEL:'频道名',CONSUMERS:'消费者数量'}[value]||value;}
+                function consumerCount(c){return Number(c?.listenerCount||0)+Number(c?.receiverCount||0)+Number(c?.actionRelayCount||0);}
+                function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
+                function channelButton(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" onclick="event.stopPropagation();location.hash='${signalHash(channel)}'">${esc(channel)}</button>`}
+                function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" onclick="event.stopPropagation();location.hash='#/devices/${encodeURIComponent(String(target).substring(7))}'">${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" onclick="event.stopPropagation();location.hash='${signalHash(String(target).substring(8))}'">${esc(label)}</button>`;return esc(label||target);}
                 function labelInteractionSource(value){return {main_hand:'主手',off_hand:'副手',inventory_contains:'背包/热键栏',armor_head:'头盔槽',armor_chest:'胸甲槽',armor_legs:'护腿槽',armor_feet:'靴子槽',armor_any:'任意盔甲槽'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeSource(value){return {matched_source:'匹配来源',main_hand:'主手',off_hand:'副手',inventory:'背包/热键栏'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeOrder(value){return {hotbar_first:'优先热键栏',main_inventory_first:'优先主背包'}[String(value||'').toLowerCase()]||value;}
                 function labelVanillaPolicy(value){return {allow:'允许原版交互',require_item_match:'需要物品匹配才允许原版交互'}[String(value||'').toLowerCase()]||value;}
                 function posText(pos){return pos?`${pos.x} ${pos.y} ${pos.z}`:'-';}
                 function deviceIcon(type){const v=String(type||'UNKNOWN').toUpperCase();return icon({SIGNAL_EMITTER:'signal',SIGNAL_RECEIVER:'receiver',ACTION_RELAY:'relay',VIRTUAL_BLOCK_DEVICE:'virtual',REGION_CONTROLLER:'region',UNKNOWN:'device'}[v]||'device');}
-                function fmtTime(value){if(isBlank(value))return '暂无';return esc(value);}
+                function parseTime(value){if(isBlank(value))return null;const d=new Date(String(value));return Number.isNaN(d.getTime())?null:d;}
+                function pad2(value){return String(value).padStart(2,'0');}
+                function formatDateTime(value){if(isBlank(value))return '暂无';const text=String(value).trim();if(text.length>=19&&text.charAt(4)==='-'&&text.charAt(7)==='-'&&(text.charAt(10)==='T'||text.charAt(10)===' '))return `${text.slice(0,10)} ${text.slice(11,19)}`;const d=parseTime(text);if(!d)return '暂无';return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
+                function formatRelativeTime(value){const d=parseTime(value);if(!d)return '暂无';const seconds=Math.max(0,Math.floor((Date.now()-d.getTime())/1000));if(seconds<60)return `${seconds} 秒前`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes} 分钟前`;const hours=Math.floor(minutes/60);if(hours<24)return `${hours} 小时前`;return `${Math.floor(hours/24)} 天前`;}
+                function fmtTime(value){return esc(formatDateTime(value));}
                 function setView(html){document.getElementById('app-view').innerHTML=html;}
                 function loading(text='正在加载...'){return `<div class="loading-state">${esc(text)}</div>`}
                 function empty(text){return `<div class="empty-state">${esc(text)}</div>`}
@@ -508,6 +523,8 @@ public final class WebAdminServer {
                   if(hash==='#/dashboard') return renderDashboard();
                   if(hash==='#/devices') return renderDevices();
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length));
+                  if(hash==='#/signals') return renderSignals();
+                  if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length));
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
@@ -533,7 +550,7 @@ public final class WebAdminServer {
                       <article class="panel-card"><h2>最近信号触发</h2>${history.ok?historyList(hist):errorBlock(history.error.message)}</article>
                       <article class="panel-card"><h2>诊断摘要</h2>${doctor.ok?doctorList(doc.issues||[],5):errorBlock(doctor.error.message)}<p class="muted"><button class="link-button" onclick="toast('诊断完整页将在后续版本接入')">查看详情</button></p></article>
                       <article class="panel-card"><h2>设备概览</h2>${devices.ok?deviceOverview(deviceList):errorBlock(devices.error.message)}</article>
-                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard 与设备管理只读页面已接入。设备编辑、Signal 频道详情、Doctor 完整页和 History 完整页将在后续阶段接入。</p></article>
+                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理和 Signal 频道只读页面已接入。编辑、配置写入、Doctor 完整页和 History 完整页将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button></p></article>
                     </section>`);
                 }
                 function metric(label,value,kind='',iconName=''){return `<article class="metric-card ${kind}"><div class="metric-head"><div class="label">${esc(label)}</div>${iconName?`<span class="metric-icon">${icon(iconName)}</span>`:''}</div><div class="value">${esc(value)}</div></article>`}
@@ -575,7 +592,7 @@ public final class WebAdminServer {
                 function filterDevices(items){const f=appState.deviceFilters;return items.filter(d=>{const hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),d.type].join(' ').toLowerCase();if(f.search&& !hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&d.type!==f.type)return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.world!=='ALL'&&d.world!==f.world)return false;return true;});}
                 function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>`<tr onclick="location.hash='#/devices/${encodeURIComponent(d.id)}'"><td><span class="device-name"><span class="device-icon">${deviceIcon(d.type)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" onclick="event.stopPropagation();location.hash='#/devices/${encodeURIComponent(d.id)}'">查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
                 function deviceSubtitle(d){const id=shortId(d.id);if(!isBlank(id)&&!String(id).toLowerCase().startsWith('minecraf'))return `<span class="device-subtitle">ID：${esc(id)}</span>`;if(!isBlank(d.world))return `<span class="device-subtitle">维度：${esc(d.world)}</span>`;return '';}
-                function channelCell(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" onclick="event.stopPropagation();toast('频道详情 / 逻辑链将在后续 6.3 接入')">${esc(channel)}</button>`}
+                function channelCell(channel){return channelButton(channel);}
                 async function renderDeviceDetail(id){
                   setView(loading('正在加载设备详情...'));
                   const encoded=encodeURIComponent(id);
@@ -589,14 +606,14 @@ public final class WebAdminServer {
                     <section class="detail-grid">
                       <article class="panel-card overview-card"><h2>设备概览</h2><div class="overview-inline"><span class="device-icon">${deviceIcon(detail.type)}</span><strong>${esc(labelType(detail.type))}</strong>${pill(detail.enabled?'OK':'WARNING')} ${pill(detail.doctorStatus||detail.debugSummary?.status||'UNKNOWN')}<span class="muted">坐标：${esc(posText(detail.pos))}</span><span class="muted">主频道：${esc(labelChannel(detail.channel))}</span></div></article>
                       <article class="panel-card"><h2>设备基础信息</h2><div class="identity-grid">${row('名称',esc(detail.displayName))}${row('类型',esc(labelType(detail.type)))}${row('设备 ID',esc(detail.id))}${row('短 ID',esc(shortId(detail.id)))}${row('世界/维度',esc(detail.world||'-'))}${row('坐标',esc(posText(detail.pos)))}${row('启用状态',esc(labelBool(detail.enabled)))}${row('最近触发',fmtTime(detail.lastTriggeredAt))}</div></article>
-                      <article class="panel-card"><h2>关联频道</h2><div class="identity-grid">${row('主频道',channelCell(detail.channel))}${row('成功频道',channelCell(detail.configSummary?.interactionItem?.successChannel))}${row('失败频道',channelCell(detail.configSummary?.interactionItem?.failChannel))}${row('链路预览',chainPreview(detail))}</div><p class="muted"><button class="link-button" onclick="toast('频道详情 / 逻辑链将在后续 6.3 接入')">频道详情 / 逻辑链将在后续 6.3 接入</button></p></article>
+                      <article class="panel-card"><h2>关联频道</h2><div class="identity-grid">${row('主频道',channelCell(detail.channel))}${row('成功频道',channelCell(detail.configSummary?.interactionItem?.successChannel))}${row('失败频道',channelCell(detail.configSummary?.interactionItem?.failChannel))}${row('链路预览',chainPreview(detail))}</div><p class="muted">${isBlank(detail.channel)?'当前设备暂无可跳转频道。':`<button class="link-button" onclick="location.hash='${signalHash(detail.channel)}'">查看频道详情 / 逻辑链</button>`}</p></article>
                       <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
                       <article class="panel-card"><h2>Doctor 问题</h2>${doctorList(uniqueIssues(relatedDoctor),8)}</article>
                       <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}</article>
                       <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
                     </section>`);
                 }
-                function chainPreview(detail){if(isBlank(detail.channel))return '<span class="muted">当前设备没有主频道。</span>';return `<div class="chain-row"><strong>${esc(detail.displayName)}</strong><span class="muted">→ 主频道：${esc(detail.channel)}</span><span class="muted">→ 消费者数量将在频道详情页接入</span></div>`}
+                function chainPreview(detail){if(isBlank(detail.channel))return '<span class="muted">当前设备没有主频道。</span>';return `<div class="chain-row"><strong>${esc(detail.displayName)}</strong><span class="muted">→ 主频道：${esc(detail.channel)}</span><span class="muted">→ 可在频道详情页查看消费者与最近事件</span></div>`}
                 function debugChecks(data){const checks=data?.checks||[];if(checks.length===0)return empty('当前设备暂无 debug 数据。');return `<div class="list-stack">${checks.map(c=>`<div class="check-row-card"><strong>${pill(c.status)} ${esc(debugTitle(c))}</strong><span class="muted">${esc(debugMessage(c))}</span></div>`).join('')}</div>`}
                 function debugTitle(c){const name=String(c?.name||'');if(name.includes('_')&&!isBlank(c?.message))return localizeCheckMessage(c);return localizeCheckName(name);}
                 function debugMessage(c){const name=String(c?.name||'');if(name.includes('_')&&!isBlank(c?.message))return '';return localizeCheckMessage(c);}
@@ -643,6 +660,117 @@ public final class WebAdminServer {
                 function flatten(obj,prefix=''){const out=[];for(const [k,v] of Object.entries(obj||{})){const key=prefix?`${prefix}.${k}`:k;if(v&&typeof v==='object'&&!Array.isArray(v)){out.push(...flatten(v,key));}else{out.push([key,Array.isArray(v)?`${v.length} 项`:(v ?? '')]);}}return out;}
                 function uniqueIssues(items){const seen=new Set();return (items||[]).filter(i=>{const key=i.id||`${i.title}:${i.relatedObjectId}`;if(seen.has(key))return false;seen.add(key);return true;});}
                 function shortId(id){return String(id||'').length>12?String(id).slice(0,8):String(id||'');}
+                async function renderSignals(){
+                  setView(loading('正在加载 Signal 频道...'));
+                  let channels;try{channels=await api('/api/signals/channels')}catch(err){setView(errorBlock(err.message));return;}
+                  appState.signals=channels||[];
+                  renderSignalList('');
+                }
+                function renderSignalList(focusId){
+                  const channels=appState.signals||[], filtered=filterSignalChannels(channels);
+                  const hasConsumers=channels.filter(c=>consumerCount(c)>0).length;
+                  const recent=channels.filter(c=>!isBlank(c.lastTriggeredAt)).length;
+                  const warning=channels.filter(c=>['WARNING','ERROR'].includes(String(c.doctorStatus||'').toUpperCase())).length;
+                  setView(`
+                    <div class="page-head"><div><h1>Signal 管理</h1><p>查看频道、消费者、最近触发与逻辑链入口</p></div><span class="pill info">只读模式</span></div>
+                    <section class="card-grid">
+                      ${metric('频道总数',channels.length,'','signal')}
+                      ${metric('有消费者频道',hasConsumers,'','receiver')}
+                      ${metric('无消费者频道',channels.length-hasConsumers,(channels.length-hasConsumers)>0?'warning':'','warning')}
+                      ${metric('最近触发频道',recent,'','history')}
+                      ${metric('最近 Signal 事件',channels.reduce((sum,c)=>sum+Number(c.triggerCountToday||0),0),'','history')}
+                      ${metric('Doctor 警告',warning,warning>0?'warning':'','doctor')}
+                    </section>
+                    <div class="toolbar">
+                      <input class="input" id="signal-search" placeholder="搜索频道名" value="${esc(appState.signalFilters.search)}">
+                      ${signalFilterSelect('消费者','signal-consumer',['ALL','HAS_CONSUMER','NO_CONSUMER','HAS_LISTENER','HAS_RECEIVER','HAS_RELAY'],appState.signalFilters.consumer)}
+                      ${signalFilterSelect('状态','signal-status',['ALL','RECENT','NO_RECENT','WARNING'],appState.signalFilters.status)}
+                      ${signalFilterSelect('排序','signal-sort',['RECENT','CHANNEL','CONSUMERS'],appState.signalFilters.sort)}
+                    </div>
+                    ${filtered.length===0?(channels.length===0?empty('当前暂无 Signal 频道数据。请在游戏内触发 signal 或配置 listener / receiver / action_relay 后刷新。'):empty('没有匹配当前筛选条件的频道。')):signalTable(filtered)}
+                    <article class="panel-card" style="margin-top:16px"><h2>预设频道图标说明</h2><p class="muted">6.3 只读阶段按频道状态和类型显示预设 2D 图标，不提供图标编辑或上传。</p></article>
+                  `);
+                  bindSignalFilters(focusId);
+                }
+                function signalFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(signalOptionLabel(o))}</option>`).join('')}</select></label>`}
+                function signalOptionLabel(v){return {ALL:'全部',HAS_CONSUMER:'有消费者',NO_CONSUMER:'无消费者',HAS_LISTENER:'有监听器',HAS_RECEIVER:'有接收器',HAS_RELAY:'有动作继电器',RECENT:'最近有事件',NO_RECENT:'暂无事件',WARNING:'有警告',CHANNEL:'频道名',CONSUMERS:'消费者数量'}[v]||labelSignalSort(v)||v;}
+                function bindSignalFilters(focusId){
+                  const update=(event)=>{appState.signalFilters.search=document.getElementById('signal-search').value;appState.signalFilters.consumer=document.getElementById('signal-consumer').value;appState.signalFilters.status=document.getElementById('signal-status').value;appState.signalFilters.sort=document.getElementById('signal-sort').value;renderSignalList(event.target.id);};
+                  ['signal-search','signal-consumer','signal-status','signal-sort'].forEach(id=>document.getElementById(id).addEventListener(id==='signal-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
+                }
+                function filterSignalChannels(items){
+                  const f=appState.signalFilters;
+                  const filtered=items.filter(c=>{
+                    if(f.search && !String(c.channel||'').toLowerCase().includes(f.search.toLowerCase()))return false;
+                    if(f.consumer==='HAS_CONSUMER'&&consumerCount(c)===0)return false;
+                    if(f.consumer==='NO_CONSUMER'&&consumerCount(c)>0)return false;
+                    if(f.consumer==='HAS_LISTENER'&&Number(c.listenerCount||0)===0)return false;
+                    if(f.consumer==='HAS_RECEIVER'&&Number(c.receiverCount||0)===0)return false;
+                    if(f.consumer==='HAS_RELAY'&&Number(c.actionRelayCount||0)===0)return false;
+                    if(f.status==='RECENT'&&isBlank(c.lastTriggeredAt))return false;
+                    if(f.status==='NO_RECENT'&&!isBlank(c.lastTriggeredAt))return false;
+                    if(f.status==='WARNING'&&!['WARNING','ERROR'].includes(String(c.doctorStatus||'').toUpperCase()))return false;
+                    return true;
+                  });
+                  return filtered.sort((a,b)=>{
+                    if(f.sort==='CHANNEL')return String(a.channel||'').localeCompare(String(b.channel||''));
+                    if(f.sort==='CONSUMERS')return consumerCount(b)-consumerCount(a);
+                    return String(b.lastTriggeredAt||'').localeCompare(String(a.lastTriggeredAt||'')) || String(a.channel||'').localeCompare(String(b.channel||''));
+                  });
+                }
+                function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>`<tr onclick="location.hash='${signalHash(c.channel)}'"><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(labelChannelType(c.type))}</span></span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" onclick="event.stopPropagation();location.hash='${signalHash(c.channel)}'">查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function consumerSummary(c){const count=consumerCount(c);if(count===0)return '<span class="muted">暂无消费者</span>';return `<span class="pill info">${count} 个消费者</span>`}
+                async function renderSignalDetail(channel){
+                  const decoded=channel||'';
+                  setView(loading('正在加载频道详情...'));
+                  let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){setView(`<div class="back-row"><button class="secondary" onclick="location.hash='#/signals'">返回 Signal 管理</button></div>${err.status===404?errorBlock('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}`);return;}
+                  const stats=detail.stats||{}, totalConsumers=Number(stats.listenerCount||0)+Number(stats.receiverCount||0)+Number(stats.actionRelayCount||0);
+                  setView(`
+                    <div class="back-row"><button class="secondary" onclick="location.hash='#/signals'">返回 Signal 管理</button></div>
+                    <div class="page-head"><div><h1>${esc(detail.channel)}</h1><p>频道详情 / 横向逻辑链 · 只读</p></div><div class="inline-actions">${pill((detail.doctorIssues||[]).some(i=>i.severity==='ERROR')?'ERROR':((detail.doctorIssues||[]).length?'WARNING':'OK'))}<span class="pill info">只读模式</span></div></div>
+                    <section class="card-grid">
+                      ${metric('消费者数量',totalConsumers,'','receiver')}
+                      ${metric('监听器',Number(stats.listenerCount||0),'','signal')}
+                      ${metric('接收器',Number(stats.receiverCount||0),'','receiver')}
+                      ${metric('动作继电器',Number(stats.actionRelayCount||0),'','relay')}
+                      ${metric('关联来源',Number(stats.sourceCount||0),'','device')}
+                      ${metric('下游 Signal',Number(stats.downstreamSignalCount||0),'','signal')}
+                      ${metric('最近事件数',Number(stats.triggerCountToday||0),'','history')}
+                      ${metric('最近触发',formatDateTime(stats.lastTriggeredAt),'','history')}
+                    </section>
+                    <section class="detail-grid" style="margin-top:16px">
+                      <article class="panel-card overview-card"><h2>频道基础信息</h2><div class="identity-grid">${row('频道名',esc(detail.channel))}${row('频道类型',esc(labelChannelType(detail.type)))}${row('最近触发',fmtTime(stats.lastTriggeredAt))}${row('消费者',esc(`${totalConsumers} 个`))}${row('监听器',esc(Number(stats.listenerCount||0)))}${row('接收器',esc(Number(stats.receiverCount||0)))}${row('动作继电器',esc(Number(stats.actionRelayCount||0)))}</div></article>
+                      <article class="panel-card overview-card"><h2>横向逻辑链</h2>${logicChain(detail)}</article>
+                      <article class="panel-card"><h2>消费者</h2>${endpointGroups(detail)}</article>
+                      <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
+                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}</article>
+                      <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}</article>
+                    </section>`);
+                }
+                function logicChain(detail){
+                  const sources=detail.sources||[], listeners=detail.listeners||[], receivers=detail.receivers||[], relays=detail.actionRelays||[], actions=detail.actions||[], downstream=detail.downstreamSignals||[];
+                  return `<div class="logic-chain">
+                    <div class="chain-node"><h3>触发源</h3>${endpointCompact(sources,'暂无可推断触发源')}</div>
+                    <div class="chain-arrow">→</div>
+                    <div class="chain-node"><h3>频道</h3><strong>${esc(detail.channel)}</strong><span class="muted">${esc(labelChannelType(detail.type))}</span>${pill((detail.doctorIssues||[]).length?'WARNING':'OK')}</div>
+                    <div class="chain-arrow">→</div>
+                    <div class="chain-node"><h3>消费者</h3>${endpointCompact([...listeners,...receivers,...relays],'暂无消费者')}</div>
+                    <div class="chain-arrow">→</div>
+                    <div class="chain-node"><h3>动作 / 下游影响</h3>${actions.length?actions.slice(0,4).map(a=>`<span>${esc(labelActionType(a.type))}：${esc(a.summary||a.name||'-')}</span>`).join(''):(downstream.length?downstream.map(c=>`<span>下游频道：${esc(c)}</span>`).join(''):'<span class="muted">暂无可用动作详情</span>')}</div>
+                  </div>`;
+                }
+                function endpointCompact(items,emptyText){if(!items||items.length===0)return `<span class="muted">${esc(emptyText)}</span>`;return items.slice(0,4).map(e=>`<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="muted">(${esc(labelEndpointType(e.type))})</span></span>`).join('');}
+                function endpointGroups(detail){
+                  const groups=[['监听器',detail.listeners||[]],['接收器',detail.receivers||[]],['动作继电器',detail.actionRelays||[]]];
+                  return `<div class="list-stack">${groups.map(([name,items])=>`<div class="endpoint-row"><strong>${esc(name)}：${items.length}</strong>${items.length?items.map(endpointRow).join(''): '<span class="muted">暂无</span>'}</div>`).join('')}</div>`;
+                }
+                function endpointRow(e){return `<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="meta">${esc(labelEndpointType(e.type))} / ${esc(labelSubType(e.subType))} / ${e.enabled?'启用':'禁用'}${e.pos?` / ${esc(posText(e.pos))}`:''}</span></span>`}
+                function actionsPanel(detail){
+                  const actions=detail.actions||[], downstream=detail.downstreamSignals||[];
+                  if(actions.length===0&&downstream.length===0)return empty('暂无可用动作详情。');
+                  return `<div class="list-stack">${actions.map(a=>`<div class="event-row"><strong>${esc(labelActionType(a.type))}</strong><span class="meta">${esc(a.ownerName||a.ownerId||'-')} · ${esc(labelEndpointType(a.ownerType))}</span><span>${esc(a.summary||'')}</span></div>`).join('')}${downstream.map(c=>`<div class="event-row"><strong>下游频道</strong><span>${channelButton(c)}</span></div>`).join('')}</div>`;
+                }
                 function renderPlaceholder(title,message){setView(`<div class="page-head"><div><h1>${esc(title)}</h1><p>${esc(message)}</p></div></div>${empty('该模块暂未在 6.2 接入。')}`)}
                 initLogin();initApp();
                 """;
