@@ -62,9 +62,9 @@ public final class WebAdminRegionService {
         RegionControllerData region = rawRegion.normalized();
         MapDataStore.PlannerRegionData planner = MapDataStore.getPlannerRegion(server, region.regionId());
         Map<String, List<WebAdminDtos.RegionActionSummaryDto>> actions = new LinkedHashMap<>();
-        actions.put("enter", actionSummaries(region.enterActions(), "enter"));
-        actions.put("exit", actionSummaries(region.exitActions(), "exit"));
-        actions.put("stay", actionSummaries(region.stayActions(), "stay"));
+        actions.put("enter", actionSummaries(region.enterActions(), "REGION_ENTER", region.id()));
+        actions.put("exit", actionSummaries(region.exitActions(), "REGION_EXIT", region.id()));
+        actions.put("stay", actionSummaries(region.stayActions(), "REGION_STAY", region.id()));
         return new WebAdminDtos.RegionDetailDto(
                 region.id(),
                 displayName(region),
@@ -121,13 +121,13 @@ public final class WebAdminRegionService {
         }
     }
 
-    private static List<WebAdminDtos.RegionActionSummaryDto> actionSummaries(List<ActionConfig> actions, String prefix) {
+    private static List<WebAdminDtos.RegionActionSummaryDto> actionSummaries(List<ActionConfig> actions, String ownerType, String ownerId) {
         List<WebAdminDtos.RegionActionSummaryDto> result = new ArrayList<>();
         List<ActionConfig> source = actions == null ? List.of() : actions;
         for (int i = 0; i < source.size(); i++) {
             ActionConfig action = source.get(i);
             result.add(new WebAdminDtos.RegionActionSummaryDto(
-                    prefix + ":" + i,
+                    ownerType + ":" + ownerId + ":" + i,
                     WebAdminReadonlySupport.actionType(action),
                     WebAdminReadonlySupport.actionSummary(action),
                     action != null && action.enabled()
