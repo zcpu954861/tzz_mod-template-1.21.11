@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.17.0-stabilization-foundation`
-- 当前开发版本：`v1.17.0-stabilization-foundation`（5.15 底层工具链稳定化 / GUI 前置整理版；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.18.0-web-admin-foundation`
+- 当前开发版本：`v1.18.0-web-admin-foundation`（6.0 WebAdmin Foundation；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -19,6 +19,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
+- WebAdmin Foundation：提供默认关闭的轻量 Web 管理入口，支持登录、session、基础状态 API 和基础状态页。
 
 ## 命令入口
 
@@ -31,9 +32,65 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 /tzz sendmsg ...
 /tzz regionctl ...
 /tzz signal ...
+/tzz webadmin ...
 ```
 
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
+
+## WebAdmin Foundation
+
+### 6.0 WebAdmin Foundation
+
+6.0 WebAdmin Foundation 是 WebAdmin 后端地基与登录闭环，不是完整 WebAdmin Dashboard。本阶段默认关闭，不会自动公网开放，不改变 5.x SignalBridge / SignalDevice / `virtual_block_device` / ItemStackMatcher / itemSubmit / Doctor / debug 等既有逻辑。
+
+当前能力：
+
+- 新增配置文件：`config/tzz/web_admin_config.json`。
+- 默认 `enabled=false`、`host=127.0.0.1`、`port=18080`、`accessMode=LOCAL_ONLY`。
+- 支持访问模式：`LOCAL_ONLY`、`LAN_DEV`、`MULTIPLAYER_DEV`。
+- `LAN_DEV` / `MULTIPLAYER_DEV` 必须显式配置，启动日志和 `/tzz webadmin status` 会显示安全提示。
+- 新增用户文件：`config/tzz/web_admin_users.json`。
+- 用户密码使用 JDK 原生 `PBKDF2WithHmacSHA256` 保存，不保存明文。
+- 初始密码由服务端随机生成，只在 `/tzz webadmin user create` 或 `resetPassword` 时显示一次。
+- 登录成功后写入短期 `TZZ_WEBADMIN_SESSION` HttpOnly cookie。
+- 浏览器访问 `http://host:port` 会打开登录页，登录后进入基础状态页。
+- 已实现 API：`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me`、`GET /api/status`。
+- `/api/status` 返回 WebAdmin、Minecraft server、当前用户和基础版本状态。
+- 服务器停止时释放 WebAdmin HTTP 端口。
+
+WebAdmin 命令：
+
+```text
+/tzz webadmin status
+/tzz webadmin user list
+/tzz webadmin user create <username> <role>
+/tzz webadmin user disable <username>
+/tzz webadmin user enable <username>
+/tzz webadmin user resetPassword <username>
+```
+
+权限边界：
+
+- 控制台允许执行 `/tzz webadmin`。
+- OP / 创造级管理员允许执行。
+- 普通玩家禁止管理 WebAdmin 用户。
+- 普通玩家不能通过游戏内命令创建 WebAdmin 账号。
+
+本阶段暂不包含：
+
+- 设备列表、Signal 频道页、逻辑链视图。
+- Doctor 完整页、History 完整页。
+- WebSocket、实时同步、配置编辑。
+- 用户管理 Web 页面完整 CRUD。
+- 区域、动作系统、节点编辑或多人协作锁。
+
+后续 Web UI 原则保持 5.15 稳定化结论：
+
+- Web UI 不直接读写 JSON。
+- 命令、游戏内工具、Web UI 应共用服务层。
+- 未来需要 DTO、权限、审计和 WebSocket 实时同步。
+- 游戏内工具负责轻量绑定、选择和定位。
+- Web Admin UI 负责全局逻辑视图、模块化卡片、实时调试和配置编辑。
 
 ## SignalBridge
 

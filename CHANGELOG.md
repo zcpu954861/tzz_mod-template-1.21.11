@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.18.0-web-admin-foundation
+
+- Added WebAdmin Foundation minimal backend loop.
+- Added default-disabled `config/tzz/web_admin_config.json` with `enabled`, `host`, `port`, `accessMode`, session TTL, login code TTL, and audit settings.
+- Added access modes `LOCAL_ONLY`, `LAN_DEV`, and `MULTIPLAYER_DEV`; non-local modes require explicit configuration and show safety warnings.
+- Added `config/tzz/web_admin_users.json` for WebAdmin users.
+- Passwords are stored with JDK `PBKDF2WithHmacSHA256`; plaintext passwords are never persisted.
+- Added server-side random initial password generation for user create/reset flows.
+- Added in-memory session service and `TZZ_WEBADMIN_SESSION` HttpOnly cookie.
+- Added lightweight JDK HTTP server lifecycle: start when enabled, stop on Minecraft server shutdown.
+- Added static login page and basic status page using a dark admin-console style.
+- Added APIs: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, and `GET /api/status`.
+- Added `/tzz webadmin status`.
+- Added `/tzz webadmin user list|create|disable|enable|resetPassword`.
+- WebAdmin commands are limited to console and OP / creative-level administrators.
+- Added lightweight WebAdmin audit logging for server start/stop, login success/failure, logout, user creation, enable/disable, and password reset.
+- Added `docs/web_admin_foundation.md`.
+- Compatibility: 5.x SignalBridge, SignalDevice, `virtual_block_device`, ItemStackMatcher, itemSubmit, Doctor, debug, existing commands, and old JSON schema remain unchanged.
+- Not included yet: device pages, signal channel pages, logic-chain view, full Doctor/History pages, WebSocket, Web config editing, Web user CRUD, OAuth, 2FA, HTTPS, public exposure automation, GUI, or ConditionEngine.
+
 ## v1.17.0-stabilization-foundation
 
 - Added 5.15 Stabilization Foundation / GUI preparation pass for the 5.x SignalBridge toolchain.
