@@ -4,6 +4,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ public final class WebAdminServer {
     private final WebAdminConfig config;
     private final WebAdminUserService userService;
     private final WebAdminSessionService sessionService;
+    private final WebAdminReadonlyRoutes readonlyRoutes = new WebAdminReadonlyRoutes();
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -113,6 +115,9 @@ public final class WebAdminServer {
                 handleStatus(exchange, auth);
                 return;
             }
+            if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
+                return;
+            }
             WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "接口不存在。");
         } catch (Exception exception) {
             Tzz_mod.LOGGER.warn("WebAdmin request failed: {}", exception.getMessage());
@@ -169,6 +174,15 @@ public final class WebAdminServer {
         webAdmin.put("port", config.port);
         webAdmin.put("accessMode", config.accessMode);
         webAdmin.put("sessionCount", sessionService.sessionCount());
+        WebAdminStoragePaths storagePaths = WebAdminStoragePaths.resolve(minecraftServer);
+        Map<String, Object> storage = new LinkedHashMap<>();
+        storage.put("scope", WebAdminStoragePaths.STORAGE_SCOPE);
+        storage.put("directory", storagePaths.directory().toString());
+        storage.put("configPath", storagePaths.configPath().toString());
+        storage.put("usersPath", storagePaths.usersPath().toString());
+        storage.put("auditLogPath", storagePaths.auditLogPath().toString());
+        storage.put("legacyGlobalFilesDetected", storagePaths.hasLegacyGlobalFiles());
+        webAdmin.put("storage", storage);
 
         Map<String, Object> server = new LinkedHashMap<>();
         server.put("type", minecraftServer.isDedicated() ? "DEDICATED" : "INTEGRATED");

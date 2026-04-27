@@ -40,10 +40,10 @@ WebAdmin Foundation 是 TZZ Mod 6.x 管理界面的后端地基和登录最小�
 
 ## 2. 配置文件
 
-配置文件位置：
+配置文件位置（6.1 起按当前世界 / 当前存档隔离）：
 
 ```text
-config/tzz/web_admin_config.json
+<world-save-root>/tzz/webadmin/web_admin_config.json
 ```
 
 默认内容：
@@ -62,6 +62,16 @@ config/tzz/web_admin_config.json
 ```
 
 默认 `enabled=false`。启用 WebAdmin 需要手动修改配置并重启服务器。
+
+WebAdmin 的所有持久化文件都属于当前世界 / 当前地图项目：
+
+```text
+<world-save-root>/tzz/webadmin/web_admin_config.json
+<world-save-root>/tzz/webadmin/web_admin_users.json
+<world-save-root>/tzz/webadmin/web_admin_audit.log
+```
+
+单人世界 A 与单人世界 B 不共享 WebAdmin 用户、密码、访问模式、端口、安全设置或审计日志。Dedicated Server 的 WebAdmin 设置也跟随当前 server world。旧版 `config/tzz` 下的 WebAdmin 文件不会自动加载，也不会自动删除；如需迁移，需要管理员手动复制到对应世界的 `tzz/webadmin/` 目录。
 
 ## 3. 访问模式
 
@@ -91,7 +101,7 @@ config/tzz/web_admin_config.json
 用户文件位置：
 
 ```text
-config/tzz/web_admin_users.json
+<world-save-root>/tzz/webadmin/web_admin_users.json
 ```
 
 用户字段包含：
