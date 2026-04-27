@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.21.0-web-admin-signal-channels`
-- 当前开发版本：`v1.21.0-web-admin-signal-channels`（6.3 Signal 频道管理 + 频道详情逻辑链只读页面；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.22.0-web-admin-doctor-history`
+- 当前开发版本：`v1.22.0-web-admin-doctor-history`（6.4 Doctor + History 观测页面；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -19,7 +19,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理列表和设备详情基础页。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断和 History 历史只读页面。
 
 ## 命令入口
 
@@ -39,6 +39,21 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 
 ## WebAdmin Foundation
 
+### 6.4 WebAdmin Doctor + History
+
+6.4 在 6.3 Signal 频道只读页面基础上接入全局 Doctor 诊断页和 History 历史时间线：
+
+```text
+/app#/doctor
+/app#/history
+```
+
+Doctor 页面读取 6.1 的只读诊断 API，展示错误 / 警告 / 信息数量、受影响设备 / 频道、问题搜索、严重级别筛选、对象类型筛选和跳转目标筛选。问题列表以中文显示标题、影响、建议和诊断代码，并可跳转到相关设备、频道或历史视图。
+
+History 页面读取已有 Signal history 只读 API，展示 Signal 事件时间线，支持按关键词、channel、sourceType、result、时间范围和排序筛选。时间显示统一为 `YYYY-MM-DD HH:mm:ss`，不显示 ISO 原始字符串。
+
+6.4 仍然只读：不提供修复按钮、清除问题、删除历史、导出历史、signal emit、重放事件、配置写入、WebSocket 或任何设备 / channel / listener / action / region 编辑能力。
+
 ### 6.3 WebAdmin Signal Channels
 
 6.3 在 6.2 Dashboard / 设备管理只读页面基础上接入 Signal 频道管理和频道详情逻辑链只读视图：
@@ -48,7 +63,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 /app#/signals/<channel>
 ```
 
-Signal 管理页展示频道总数、消费者数量、最近触发、Doctor 状态，并提供频道名搜索、消费者筛选、状态筛选和排序。频道详情页展示频道基础信息、最近事件、诊断摘要，以及“触发源 → Channel → 消费者 → Actions / 下游影响”的横向逻辑链雏形。
+Signal 管理页展示频道总数、消费者数量、最近触发、Doctor 状态，并提供频道名搜索、消费者筛选、状态筛选和排序。频道详情页展示频道基础信息、最近事件、诊断摘要，以及“触发源 → 频道 → 消费者 → 动作 / 下游影响”的横向逻辑链雏形。
 
 6.3 继续保持只读边界：不新增 channel，不编辑 / 删除 channel，不修改 listener、receiver、action_relay、device 或 action，不执行 signal emit，不提供配置写入，不接入 WebSocket。设备详情中的关联 channel 可以跳转到频道详情页；Dashboard 也提供进入 Signal 管理的入口。
 

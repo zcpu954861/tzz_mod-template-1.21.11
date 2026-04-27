@@ -360,8 +360,8 @@ public final class WebAdminServer {
                         <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signal"></span>Signal 管理</button>
                         <button class="nav-item" data-pending="区域管理将在后续版本接入"><span class="nav-icon" data-icon="region"></span>区域管理</button>
                         <button class="nav-item" data-pending="动作系统将在后续版本接入"><span class="nav-icon" data-icon="action"></span>动作系统</button>
-                        <button class="nav-item" data-pending="诊断完整页将在后续版本接入"><span class="nav-icon" data-icon="doctor"></span>诊断中心</button>
-                        <button class="nav-item" data-pending="历史记录完整页将在后续版本接入"><span class="nav-icon" data-icon="history"></span>历史记录</button>
+                        <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>Doctor 诊断</button>
+                        <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>历史记录</button>
                         <button class="nav-item" data-pending="用户管理 Web 页面将在后续版本接入"><span class="nav-icon" data-icon="user"></span>用户管理</button>
                         <button class="nav-item" data-pending="系统设置页面将在后续版本接入"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
                       </nav>
@@ -410,7 +410,7 @@ public final class WebAdminServer {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'}};
+                const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
                 function svg(paths){return `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`}
@@ -437,7 +437,7 @@ public final class WebAdminServer {
                 function labelStatus(value){const v=String(value||'UNKNOWN').toUpperCase();return {OK:'正常',INFO:'信息',WARNING:'警告',ERROR:'错误',UNKNOWN:'未知',SUCCESS:'成功',FAILED:'失败',SKIPPED:'跳过'}[v]||value;}
                 function labelBool(value){return value?'已启用':'已禁用';}
                 function labelType(value){const v=String(value||'UNKNOWN').toUpperCase();return {SIGNAL_EMITTER:'信号发射器',SIGNAL_RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',VIRTUAL_BLOCK_DEVICE:'虚拟方块设备',REGION_CONTROLLER:'区域控制器',UNKNOWN:'未知设备'}[v]||value||'未知设备';}
-                function labelSourceType(value){return {DEVICE:'设备',LISTENER:'监听器',RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',REGION:'区域',COMMAND:'命令',SYSTEM:'系统',UNKNOWN:'未知来源'}[value]||value||'-';}
+                function labelSourceType(value){return {DEVICE:'设备',LISTENER:'监听器',RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',REGION:'区域',COMMAND:'命令',MANUAL:'手动',SYSTEM:'系统',UNKNOWN:'未知来源'}[String(value||'UNKNOWN').toUpperCase()]||value||'-';}
                 function labelEndpointType(value){return {DEVICE:'触发设备',LISTENER:'监听器',RECEIVER:'信号接收器',ACTION_RELAY:'动作继电器',REGION:'区域',COMMAND:'命令',SYSTEM:'系统',UNKNOWN:'未知节点'}[String(value||'UNKNOWN').toUpperCase()]||value||'未知节点';}
                 function labelActionType(value){return {COMMAND:'命令动作',MESSAGE:'消息动作',SOUND:'音效动作',SIGNAL:'下游信号',UNKNOWN:'未知动作'}[String(value||'UNKNOWN').toUpperCase()]||value||'未知动作';}
                 function labelSubType(value){const v=String(value||'').toLowerCase();return {signal_listener:'监听器',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备'}[v]||labelType(value);}
@@ -449,8 +449,12 @@ public final class WebAdminServer {
                 function labelConsumerFilter(value){return {ALL:'全部',HAS_CONSUMER:'有消费者',NO_CONSUMER:'无消费者',HAS_LISTENER:'有监听器',HAS_RECEIVER:'有接收器',HAS_RELAY:'有动作继电器'}[value]||value;}
                 function labelSignalStatusFilter(value){return {ALL:'全部',RECENT:'最近有事件',NO_RECENT:'暂无事件',WARNING:'有警告'}[value]||value;}
                 function labelSignalSort(value){return {RECENT:'最近触发时间',CHANNEL:'频道名',CONSUMERS:'消费者数量'}[value]||value;}
+                function labelObjectType(value){return {DEVICE:'设备',CHANNEL:'频道',LISTENER:'监听器',RECEIVER:'接收器',ACTION_RELAY:'动作继电器',ACTION:'动作',REGION:'区域',SYSTEM:'系统',UNKNOWN:'未知'}[String(value||'UNKNOWN').toUpperCase()]||value||'未知';}
+                function labelHistoryRange(value){return {ALL:'全部',M10:'最近 10 分钟',H1:'最近 1 小时',H24:'最近 24 小时'}[value]||value;}
+                function labelHistorySort(value){return {NEWEST:'最新优先',OLDEST:'最旧优先'}[value]||value;}
                 function consumerCount(c){return Number(c?.listenerCount||0)+Number(c?.receiverCount||0)+Number(c?.actionRelayCount||0);}
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
+                function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function channelButton(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" onclick="event.stopPropagation();location.hash='${signalHash(channel)}'">${esc(channel)}</button>`}
                 function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" onclick="event.stopPropagation();location.hash='#/devices/${encodeURIComponent(String(target).substring(7))}'">${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" onclick="event.stopPropagation();location.hash='${signalHash(String(target).substring(8))}'">${esc(label)}</button>`;return esc(label||target);}
                 function labelInteractionSource(value){return {main_hand:'主手',off_hand:'副手',inventory_contains:'背包/热键栏',armor_head:'头盔槽',armor_chest:'胸甲槽',armor_legs:'护腿槽',armor_feet:'靴子槽',armor_any:'任意盔甲槽'}[String(value||'').toLowerCase()]||value;}
@@ -525,6 +529,8 @@ public final class WebAdminServer {
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length));
                   if(hash==='#/signals') return renderSignals();
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length));
+                  if(hash==='#/doctor') return renderDoctorPage();
+                  if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length));
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
@@ -547,16 +553,21 @@ public final class WebAdminServer {
                       ${metric('访问模式',labelAccessMode(appState.status?.webAdmin?.accessMode),'','settings')}
                     </section>
                     <section class="content-grid">
-                      <article class="panel-card"><h2>最近信号触发</h2>${history.ok?historyList(hist):errorBlock(history.error.message)}</article>
-                      <article class="panel-card"><h2>诊断摘要</h2>${doctor.ok?doctorList(doc.issues||[],5):errorBlock(doctor.error.message)}<p class="muted"><button class="link-button" onclick="toast('诊断完整页将在后续版本接入')">查看详情</button></p></article>
+                      <article class="panel-card"><h2>最近信号触发</h2>${history.ok?historyList(hist):errorBlock(history.error.message)}<p class="muted"><button class="link-button" onclick="location.hash='#/history'">查看全部历史</button></p></article>
+                      <article class="panel-card"><h2>诊断摘要</h2>${doctor.ok?doctorList(doc.issues||[],5):errorBlock(doctor.error.message)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor 诊断</button></p></article>
                       <article class="panel-card"><h2>设备概览</h2>${devices.ok?deviceOverview(deviceList):errorBlock(devices.error.message)}</article>
-                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理和 Signal 频道只读页面已接入。编辑、配置写入、Doctor 完整页和 History 完整页将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button></p></article>
+                      <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理、Signal 频道、Doctor 诊断和 History 历史只读页面已接入。编辑、配置写入、WebSocket 和完整管理页面将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button> / <button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor</button> / <button class="link-button" onclick="location.hash='#/history'">查看 History</button></p></article>
                     </section>`);
                 }
                 function metric(label,value,kind='',iconName=''){return `<article class="metric-card ${kind}"><div class="metric-head"><div class="label">${esc(label)}</div>${iconName?`<span class="metric-icon">${icon(iconName)}</span>`:''}</div><div class="value">${esc(value)}</div></article>`}
                 function historyList(items){if(!items||items.length===0)return empty('暂无 Signal 历史记录。');return `<div class="list-stack">${items.map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} / ${esc(h.sourceName||'-')} · ${labelStatus(h.result)}</span><span>${esc(h.description||'')}</span></div>`).join('')}</div>`}
                 function doctorList(items,limit){if(!items||items.length===0)return empty('当前没有诊断问题。');return `<div class="list-stack">${items.slice(0,limit).map(i=>`<div class="issue-row"><strong>${pill(i.severity)} ${esc(i.title||'诊断问题')}</strong><span class="meta">${esc(issueContext(i))}</span><span>${esc(i.suggestion||i.message||'')}</span></div>`).join('')}</div>`}
                 function issueContext(i){if(!i)return '';if(!isBlank(i.relatedObjectName))return i.relatedObjectType==='DEVICE'?`设备：${i.relatedObjectName}`:i.relatedObjectName;if(!isBlank(i.channel))return `频道：${i.channel}`;if(!isBlank(i.relatedObjectId))return `${labelSourceType(i.relatedObjectType)}：${i.relatedObjectId}`;return '';}
+                function issueNavigation(i){if(!i)return '<span class="muted">暂无跳转目标</span>';const target=i.navigationTarget||(!isBlank(i.relatedObjectId)&&String(i.relatedObjectType).toUpperCase()==='DEVICE'?`device:${i.relatedObjectId}`:(!isBlank(i.channel)?`channel:${i.channel}`:''));const buttons=[];if(target)buttons.push(navigationButton(target,'查看对象'));if(!isBlank(i.channel))buttons.push(`<button class="link-button" onclick="event.stopPropagation();location.hash='${historyHash(i.channel)}'">查看历史</button>`);return buttons.length?buttons.join(' / '):'<span class="muted">暂无跳转目标</span>';}
+                function issueTitle(i){return esc(i?.title||'诊断问题');}
+                function issueMessage(i){return esc(i?.message||i?.impact||'暂无说明');}
+                function issueSuggestion(i){return esc(i?.suggestion||'暂无建议');}
+                function historyAction(h){const buttons=[];if(!isBlank(h?.channel))buttons.push(channelButton(h.channel));if(String(h?.sourceType||'').toUpperCase()==='DEVICE'&&!isBlank(h?.sourceId))buttons.push(navigationButton(`device:${h.sourceId}`,'查看设备'));return buttons.length?buttons.join(' / '):'<span class="muted">暂无关联对象</span>';}
                 function deviceOverview(items){if(!items||items.length===0)return empty('当前暂无设备数据。');const enabled=items.filter(d=>d.enabled).length;const warn=items.filter(d=>['WARNING','ERROR'].includes(String(d.doctorStatus||'').toUpperCase())).length;return `<div class="summary-grid">${metric('启用设备',enabled)}${metric('禁用设备',items.length-enabled)}${metric('诊断警告/错误',warn)}${metric('虚拟方块设备',items.filter(d=>d.type==='VIRTUAL_BLOCK_DEVICE').length)}</div>`}
                 async function renderDevices(){
                   setView(loading('正在加载设备列表...'));
@@ -608,8 +619,8 @@ public final class WebAdminServer {
                       <article class="panel-card"><h2>设备基础信息</h2><div class="identity-grid">${row('名称',esc(detail.displayName))}${row('类型',esc(labelType(detail.type)))}${row('设备 ID',esc(detail.id))}${row('短 ID',esc(shortId(detail.id)))}${row('世界/维度',esc(detail.world||'-'))}${row('坐标',esc(posText(detail.pos)))}${row('启用状态',esc(labelBool(detail.enabled)))}${row('最近触发',fmtTime(detail.lastTriggeredAt))}</div></article>
                       <article class="panel-card"><h2>关联频道</h2><div class="identity-grid">${row('主频道',channelCell(detail.channel))}${row('成功频道',channelCell(detail.configSummary?.interactionItem?.successChannel))}${row('失败频道',channelCell(detail.configSummary?.interactionItem?.failChannel))}${row('链路预览',chainPreview(detail))}</div><p class="muted">${isBlank(detail.channel)?'当前设备暂无可跳转频道。':`<button class="link-button" onclick="location.hash='${signalHash(detail.channel)}'">查看频道详情 / 逻辑链</button>`}</p></article>
                       <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
-                      <article class="panel-card"><h2>Doctor 问题</h2>${doctorList(uniqueIssues(relatedDoctor),8)}</article>
-                      <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}</article>
+                      <article class="panel-card"><h2>Doctor 问题</h2>${doctorList(uniqueIssues(relatedDoctor),8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
+                      <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关历史</button>`}</p></article>
                       <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
                     </section>`);
                 }
@@ -660,6 +671,94 @@ public final class WebAdminServer {
                 function flatten(obj,prefix=''){const out=[];for(const [k,v] of Object.entries(obj||{})){const key=prefix?`${prefix}.${k}`:k;if(v&&typeof v==='object'&&!Array.isArray(v)){out.push(...flatten(v,key));}else{out.push([key,Array.isArray(v)?`${v.length} 项`:(v ?? '')]);}}return out;}
                 function uniqueIssues(items){const seen=new Set();return (items||[]).filter(i=>{const key=i.id||`${i.title}:${i.relatedObjectId}`;if(seen.has(key))return false;seen.add(key);return true;});}
                 function shortId(id){return String(id||'').length>12?String(id).slice(0,8):String(id||'');}
+                async function renderDoctorPage(){
+                  setView(loading('正在加载 Doctor 诊断...'));
+                  let report;try{report=await api('/api/doctor')}catch(err){setView(errorBlock(err.message));return;}
+                  appState.doctorReport=report||{summary:{},issues:[]};
+                  renderDoctorList('');
+                }
+                function renderDoctorList(focusId){
+                  const report=appState.doctorReport||{summary:{},issues:[]}, issues=report.issues||[], filtered=filterDoctorIssues(issues), summary=report.summary||{};
+                  const jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;
+                  setView(`
+                    <div class="page-head"><div><h1>Doctor 诊断</h1><p>查看设备、频道、Signal 与配置风险</p></div><span class="pill info">只读模式</span></div>
+                    <section class="card-grid">
+                      ${metric('错误数量',summary.errorCount||0,(summary.errorCount||0)>0?'error':'','doctor')}
+                      ${metric('警告数量',summary.warningCount||0,(summary.warningCount||0)>0?'warning':'','warning')}
+                      ${metric('信息数量',summary.infoCount||0,'','doctor')}
+                      ${metric('受影响设备',summary.affectedDeviceCount ?? '暂无','','device')}
+                      ${metric('受影响频道',summary.affectedChannelCount ?? '暂无','','signal')}
+                      ${metric('最近诊断',issues.length?formatDateTime(issues[0].detectedAt):'暂无','','history')}
+                    </section>
+                    <div class="toolbar">
+                      <input class="input" id="doctor-search" placeholder="搜索标题 / 对象 / 频道 / 建议" value="${esc(appState.doctorFilters.search)}">
+                      ${doctorFilterSelect('严重级别','doctor-severity',['ALL','ERROR','WARNING','INFO'],appState.doctorFilters.severity)}
+                      ${doctorFilterSelect('对象类型','doctor-object',['ALL','DEVICE','CHANNEL','LISTENER','RECEIVER','ACTION_RELAY','ACTION','REGION','SYSTEM','UNKNOWN'],appState.doctorFilters.objectType)}
+                      ${doctorFilterSelect('跳转目标','doctor-jump',['ALL','HAS_TARGET','NO_TARGET'],appState.doctorFilters.jump)}
+                    </div>
+                    <section class="content-grid">
+                      <article class="panel-card">${filtered.length?doctorTable(filtered):empty(issues.length?'没有匹配当前筛选条件的诊断问题。':'当前没有诊断问题。')}</article>
+                      <aside class="panel-card"><h2>诊断摘要</h2>${doctorSummaryPanel(issues,jumpTargets)}</aside>
+                    </section>`);
+                  bindDoctorFilters(focusId);
+                }
+                function doctorFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(doctorOptionLabel(o))}</option>`).join('')}</select></label>`}
+                function doctorOptionLabel(v){return {ALL:'全部',ERROR:'错误',WARNING:'警告',INFO:'信息',DEVICE:'设备',CHANNEL:'频道',LISTENER:'监听器',RECEIVER:'接收器',ACTION_RELAY:'动作继电器',ACTION:'动作',REGION:'区域',SYSTEM:'系统',UNKNOWN:'未知',HAS_TARGET:'有跳转目标',NO_TARGET:'无跳转目标'}[v]||v;}
+                function bindDoctorFilters(focusId){
+                  const update=(event)=>{appState.doctorFilters.search=document.getElementById('doctor-search').value;appState.doctorFilters.severity=document.getElementById('doctor-severity').value;appState.doctorFilters.objectType=document.getElementById('doctor-object').value;appState.doctorFilters.jump=document.getElementById('doctor-jump').value;renderDoctorList(event.target.id);};
+                  ['doctor-search','doctor-severity','doctor-object','doctor-jump'].forEach(id=>document.getElementById(id).addEventListener(id==='doctor-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
+                }
+                function filterDoctorIssues(items){const f=appState.doctorFilters;return (items||[]).filter(i=>{const hay=[i.title,i.message,i.relatedObjectName,i.relatedObjectId,i.channel,i.suggestion,i.code,i.id].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.severity!=='ALL'&&String(i.severity||'').toUpperCase()!==f.severity)return false;if(f.objectType!=='ALL'&&String(i.relatedObjectType||'UNKNOWN').toUpperCase()!==f.objectType)return false;const hasTarget=!isBlank(i.navigationTarget)||!isBlank(i.channel);if(f.jump==='HAS_TARGET'&&!hasTarget)return false;if(f.jump==='NO_TARGET'&&hasTarget)return false;return true;});}
+                function doctorTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>严重级别</th><th>问题标题</th><th>关联对象</th><th>对象类型</th><th>频道</th><th>影响说明</th><th>建议操作</th><th>诊断代码</th><th>操作</th></tr></thead><tbody>${items.map(i=>`<tr><td>${pill(i.severity)}</td><td><strong>${issueTitle(i)}</strong></td><td>${esc(i.relatedObjectName||i.relatedObjectId||'暂无')}</td><td>${esc(labelObjectType(i.relatedObjectType))}</td><td>${isBlank(i.channel)?'<span class="muted">暂无</span>':channelButton(i.channel)}</td><td>${issueMessage(i)}</td><td>${issueSuggestion(i)}</td><td><span class="muted">代码：${esc(i.id||'unknown')}</span></td><td>${issueNavigation(i)}</td></tr>`).join('')}</tbody></table></div>`}
+                function doctorSummaryPanel(issues,jumpTargets){if(!issues||issues.length===0)return empty('当前没有诊断问题。');const bySeverity=countBy(issues,i=>String(i.severity||'UNKNOWN').toUpperCase()), byObject=countBy(issues,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase());const top=issues.slice(0,5).map(i=>`<div class="issue-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('');return `<div class="summary-grid">${metric('可跳转问题',jumpTargets)}${metric('无跳转目标',issues.length-jumpTargets)}${metric('频道问题',byObject.CHANNEL||0)}${metric('设备问题',byObject.DEVICE||0)}</div><h3>严重级别分布</h3><div class="list-stack"><div class="kv-row"><span class="muted">错误</span><strong>${bySeverity.ERROR||0}</strong></div><div class="kv-row"><span class="muted">警告</span><strong>${bySeverity.WARNING||0}</strong></div><div class="kv-row"><span class="muted">信息</span><strong>${bySeverity.INFO||0}</strong></div></div><h3>最近问题</h3><div class="list-stack">${top}</div><p class="muted">Doctor 页面只读展示当前可低成本诊断结果，不扫描世界、不强制加载区块。</p>`;}
+                function countBy(items,mapper){return (items||[]).reduce((acc,item)=>{const key=mapper(item)||'UNKNOWN';acc[key]=(acc[key]||0)+1;return acc;},{});}
+                async function renderHistoryPage(queryTail=''){
+                  const params=parseHashParams(queryTail);appState.historyFilters.channel=params.channel||'ALL';
+                  setView(loading('正在加载历史记录...'));
+                  let history;try{history=await api('/api/signals/history?limit=500')}catch(err){setView(errorBlock(err.message));return;}
+                  appState.historyItems=history||[];
+                  renderHistoryListPage('');
+                }
+                function parseHashParams(tail){const raw=String(tail||'');const query=raw.startsWith('?')?raw.substring(1):(raw.includes('?')?raw.substring(raw.indexOf('?')+1):'');const params=new URLSearchParams(query);return {channel:params.get('channel')||''};}
+                function renderHistoryListPage(focusId){
+                  const items=appState.historyItems||[], filtered=filterHistoryItems(items), channels=uniqueValues(items.map(h=>h.channel).filter(v=>!isBlank(v))), sourceTypes=uniqueValues(items.map(h=>h.sourceType).filter(v=>!isBlank(v)));
+                  const success=items.filter(h=>String(h.result||'').toUpperCase()==='SUCCESS').length, failed=items.filter(h=>String(h.result||'').toUpperCase()==='FAILED').length, latest=items[0]?.time||'';
+                  setView(`
+                    <div class="page-head"><div><h1>历史记录</h1><p>查看 Signal 事件、设备事件与系统观测记录</p></div><span class="pill info">只读模式</span></div>
+                    <section class="card-grid">
+                      ${metric('最近记录数',items.length,'','history')}
+                      ${metric('成功事件',success,'','ok')}
+                      ${metric('失败事件',failed,failed>0?'warning':'','warning')}
+                      ${metric('涉及频道',channels.length,'','signal')}
+                      ${metric('最近事件时间',fmtTime(latest),'','history')}
+                    </section>
+                    <div class="toolbar">
+                      <input class="input" id="history-search" placeholder="搜索频道 / 来源 / 玩家 / 详情 / 结果" value="${esc(appState.historyFilters.search)}">
+                      ${historyFilterSelect('频道','history-channel',['ALL',...channels],appState.historyFilters.channel)}
+                      ${historyFilterSelect('来源类型','history-source',['ALL',...sourceTypes],appState.historyFilters.sourceType)}
+                      ${historyFilterSelect('结果','history-result',['ALL','SUCCESS','FAILED','UNKNOWN'],appState.historyFilters.result)}
+                      ${historyFilterSelect('时间范围','history-range',['ALL','M10','H1','H24'],appState.historyFilters.range)}
+                      ${historyFilterSelect('排序','history-sort',['NEWEST','OLDEST'],appState.historyFilters.sort)}
+                    </div>
+                    <section class="content-grid">
+                      <article class="panel-card">${filtered.length?historyTable(filtered):empty(items.length?'没有匹配当前筛选条件的历史事件。':'暂无历史事件。')}</article>
+                      <aside class="panel-card"><h2>时间线摘要</h2>${historySummaryPanel(filtered,items)}</aside>
+                    </section>`);
+                  bindHistoryFilters(focusId);
+                }
+                function historyFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(historyOptionLabel(id,o))}</option>`).join('')}</select></label>`}
+                function historyOptionLabel(id,v){if(v==='ALL')return'全部';if(id==='history-source')return labelSourceType(v);if(id==='history-result')return labelStatus(v);if(id==='history-range')return labelHistoryRange(v);if(id==='history-sort')return labelHistorySort(v);return v;}
+                function bindHistoryFilters(focusId){
+                  const update=(event)=>{appState.historyFilters.search=document.getElementById('history-search').value;appState.historyFilters.channel=document.getElementById('history-channel').value;appState.historyFilters.sourceType=document.getElementById('history-source').value;appState.historyFilters.result=document.getElementById('history-result').value;appState.historyFilters.range=document.getElementById('history-range').value;appState.historyFilters.sort=document.getElementById('history-sort').value;renderHistoryListPage(event.target.id);};
+                  ['history-search','history-channel','history-source','history-result','history-range','history-sort'].forEach(id=>document.getElementById(id).addEventListener(id==='history-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
+                }
+                function filterHistoryItems(items){const f=appState.historyFilters;const cutoff=historyCutoff(f.range);const filtered=(items||[]).filter(h=>{const hay=[h.channel,h.sourceName,h.sourceId,h.playerName,h.result,h.description,h.sourceType].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.channel!=='ALL'&&h.channel!==f.channel)return false;if(f.sourceType!=='ALL'&&h.sourceType!==f.sourceType)return false;if(f.result!=='ALL'&&String(h.result||'UNKNOWN').toUpperCase()!==f.result)return false;if(cutoff){const d=parseTime(h.time);if(!d||d.getTime()<cutoff)return false;}return true;});return filtered.sort((a,b)=>f.sort==='OLDEST'?String(a.time||'').localeCompare(String(b.time||'')):String(b.time||'').localeCompare(String(a.time||'')));}
+                function historyCutoff(range){const now=Date.now();if(range==='M10')return now-10*60*1000;if(range==='H1')return now-60*60*1000;if(range==='H24')return now-24*60*60*1000;return 0;}
+                function historyTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>事件类型</th><th>频道</th><th>来源对象</th><th>来源类型</th><th>玩家 / 用户</th><th>结果</th><th>详情</th><th>操作</th></tr></thead><tbody>${items.map(h=>`<tr><td>${fmtTime(h.time)}</td><td>Signal 事件</td><td>${channelButton(h.channel)}</td><td>${esc(h.sourceName||h.sourceId||'暂无')}</td><td>${esc(labelSourceType(h.sourceType))}</td><td>${esc(h.playerName||'无玩家上下文')}</td><td>${pill(h.result||'UNKNOWN')}</td><td>${esc(h.description||'暂无详情')}</td><td>${historyAction(h)}</td></tr>`).join('')}</tbody></table></div>`;}
+                function historySummaryPanel(filtered,allItems){if(!allItems||allItems.length===0)return empty('暂无历史事件。');const byResult=countBy(filtered,h=>String(h.result||'UNKNOWN').toUpperCase()), bySource=countBy(filtered,h=>String(h.sourceType||'UNKNOWN').toUpperCase());const recent=filtered.slice(0,5).map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} · ${esc(labelStatus(h.result))}</span><span>${esc(h.description||'暂无详情')}</span></div>`).join('');return `<div class="summary-grid">${metric('当前筛选',filtered.length)}${metric('全部记录',allItems.length)}${metric('成功',byResult.SUCCESS||0)}${metric('失败',byResult.FAILED||0)}</div><h3>来源类型</h3><div class="list-stack">${Object.entries(bySource).slice(0,6).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(labelSourceType(k))}</span><strong>${v}</strong></div>`).join('')||empty('暂无来源统计。')}</div><h3>最近事件</h3><div class="list-stack">${recent||empty('当前筛选下暂无事件。')}</div><p class="muted">History 页面只读展示已有内存历史，不删除、不导出、不重放事件。</p>`;}
+                function uniqueValues(items){return [...new Set(items)].sort((a,b)=>String(a).localeCompare(String(b)));}
                 async function renderSignals(){
                   setView(loading('正在加载 Signal 频道...'));
                   let channels;try{channels=await api('/api/signals/channels')}catch(err){setView(errorBlock(err.message));return;}
@@ -744,8 +843,8 @@ public final class WebAdminServer {
                       <article class="panel-card overview-card"><h2>横向逻辑链</h2>${logicChain(detail)}</article>
                       <article class="panel-card"><h2>消费者</h2>${endpointGroups(detail)}</article>
                       <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
-                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}</article>
-                      <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}</article>
+                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}<p class="muted"><button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看该频道历史</button></p></article>
+                      <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
                     </section>`);
                 }
                 function logicChain(detail){
@@ -771,7 +870,7 @@ public final class WebAdminServer {
                   if(actions.length===0&&downstream.length===0)return empty('暂无可用动作详情。');
                   return `<div class="list-stack">${actions.map(a=>`<div class="event-row"><strong>${esc(labelActionType(a.type))}</strong><span class="meta">${esc(a.ownerName||a.ownerId||'-')} · ${esc(labelEndpointType(a.ownerType))}</span><span>${esc(a.summary||'')}</span></div>`).join('')}${downstream.map(c=>`<div class="event-row"><strong>下游频道</strong><span>${channelButton(c)}</span></div>`).join('')}</div>`;
                 }
-                function renderPlaceholder(title,message){setView(`<div class="page-head"><div><h1>${esc(title)}</h1><p>${esc(message)}</p></div></div>${empty('该模块暂未在 6.2 接入。')}`)}
+                function renderPlaceholder(title,message){setView(`<div class="page-head"><div><h1>${esc(title)}</h1><p>${esc(message)}</p></div></div>${empty('该模块将在后续版本接入。')}`)}
                 initLogin();initApp();
                 """;
     }
