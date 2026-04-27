@@ -13,6 +13,55 @@ RegionController 触发 signal
 
 SignalBridge 不新增方块、GUI 或网络 payload。它只负责服务端事件联动，适合让 RegionController、封锁卡、密码机、感应板以及未来工具共享同一套事件通道。
 
+## 5.15 稳定化 / GUI 前置整理版
+
+5.15 标记为 `v1.17.0-stabilization-foundation`。这是 5.x 底层工具链稳定化版本，不是新玩法功能版本。
+
+### 5.x 底层能力封版含义
+
+到 5.15 为止，SignalBridge、SignalDevice、`virtual_block_device`、ItemStackMatcher、interactionItem、container、itemCondition、consume 和 itemSubmit 等底层工具链进入稳定化状态。后续不应继续在 5.x 内堆叠大量新触发类型，而应优先推进：
+
+- 服务层 / DTO / 权限与审计。
+- debug / doctor 结构化输出。
+- Web Admin UI 与实时同步。
+- 更高层的 ConditionEngine / ConditionGroup。
+- 游戏主线调度、任务和 GUI 管理。
+
+### 稳定化护栏
+
+`stabilizationGuardTest` 已挂到 Gradle `check` / `build`。执行：
+
+```text
+./gradlew.bat clean build
+```
+
+会自动运行稳定化护栏。当前覆盖：
+
+- `SignalDeviceData` 字段保留。
+- 旧 `signal_devices.json` 缺字段样本兼容。
+- `ConsumePlan` / `ConsumePlanner` 两阶段消耗计划。
+- `ItemSubmitEvaluator` 与生产 itemSubmit 路径。
+- `InteractionDecisionEvaluator` 的 allow / require lock / cooldown 决策。
+- displayName 和 diagnostic DTO 渲染。
+
+### debug / doctor
+
+- `/tzz signal device debug <device>` 用于单设备诊断。
+- `/tzz signal doctor` 用于全局诊断。
+- doctor 不扫描世界、不强制加载区块、不扫描玩家背包。
+- doctor 只检查已登记设备、已加载方块和已有内存状态。
+- 对需要玩家上下文或真实交互才能判断的内容，doctor 应输出诊断提示，而不是做昂贵扫描。
+
+### Web Admin UI 方向
+
+未来管理界面建议分工：
+
+- Minecraft 游戏内工具：绑定、选择、定位、简单初始化。
+- 本地 / 服务器 Web Admin UI：完整全局配置、缩放逻辑图、模块化卡片、实时状态、多人协作基础。
+- Web UI 必须与服务器实时同步，不能直接改 JSON。
+- 命令、游戏内工具、Web UI 必须共用服务层。
+- 所有写操作应走服务端统一服务，并预留权限与审计。
+
 ## channel
 
 channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：

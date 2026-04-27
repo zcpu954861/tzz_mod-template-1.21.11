@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.17.0-stabilization-foundation
+
+- Added 5.15 Stabilization Foundation / GUI preparation pass for the 5.x SignalBridge toolchain.
+- This version does not add new gameplay features, trigger types, GUI, Web UI, ConditionEngine, or JSON schema changes.
+- Added stabilization audit reports for Round1 through Round5 and the final 5.15 summary.
+- Added `stabilizationGuardTest` and wired it into Gradle `check` / `build`.
+- Guard tests cover `SignalDeviceData` field preservation, legacy JSON sample compatibility, consume planning, itemSubmit evaluation, cooldown / vanilla policy decisions, display names, and diagnostic DTO rendering.
+- Added `ConsumePlan` / `ConsumePlanner` guard logic for staged consume planning and atomic apply.
+- Added `ItemSubmitEvaluator` / `ItemSubmitEvaluationResult` / `ItemSubmitInventoryAdapter`; production itemSubmit evaluation now uses the shared evaluator path.
+- Added `InteractionDecisionEvaluator` / `InteractionDecision` to keep vanilla interaction locking separate from cooldown-controlled side effects.
+- Strengthened guarantees that cooldown does not unlock `require_item_match` and does not skip enabled successful consume.
+- Strengthened itemSubmit atomic consume behavior: all requirements and consume plans are checked before any real stack mutation.
+- Enhanced `/tzz signal device debug` with structured device diagnostics.
+- Enhanced `/tzz signal doctor` with device-level diagnostic summaries.
+- Added diagnostic DTOs and Chinese display rendering for `DiagnosticSeverity`, `DiagnosticIssue`, `DeviceDiagnostic`, `InteractionItemDiagnostic`, `ItemSubmitDiagnostic`, and virtual block device diagnostics.
+- Improved displayName / user-facing Chinese rendering for internal modes and diagnostic output.
+- Added Web Admin UI preparation notes: future command, game tool, and Web UI writes should share service-layer APIs; Web UI should use DTOs and real-time sync rather than direct JSON edits.
+- Compatibility: 5.5 through 5.14 behavior remains compatible.
+- Compatibility: `signal_emitter`, `signal_receiver`, `action_relay`, and `virtual_block_device` behavior remains compatible.
+- Compatibility: old `signal_devices.json` data remains readable; missing new fields normalize to safe defaults.
+- Compatibility: existing command semantics and JSON field names are unchanged.
+- Follow-up plan only: 5.15 final regression, then 6.x service layer / API / Web Admin UI preparation or GUI foundation work.
+
 ## v1.16.0-consume-submit
 
 - Added 5.14 Consume Strategies / Multi-Item Submission MVP for `virtual_block_device`.

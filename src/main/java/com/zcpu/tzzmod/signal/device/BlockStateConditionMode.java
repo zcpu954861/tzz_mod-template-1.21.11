@@ -42,4 +42,12 @@ public enum BlockStateConditionMode {
         }
         return CONDITION_ENTER.id;
     }
+
+    public static String displayName(String raw) {
+        return switch (fromId(raw)) {
+            case CONDITION_EXIT -> "退出条件时触发（condition_exit）";
+            case CONDITION_BOTH -> "进入和退出都触发（condition_both）";
+            default -> "进入条件时触发（condition_enter）";
+        };
+    }
 }

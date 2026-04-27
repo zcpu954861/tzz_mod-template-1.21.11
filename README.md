@@ -3,7 +3,7 @@
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
 - 最新发布版本：`v1.16.0-consume-submit`
-- 当前开发版本：`v1.16.0-consume-submit`（5.14 Consume Strategies / Multi-Item Submission MVP；以 `gradle.properties` 的 `mod_version` 为准）
+- 当前开发版本：`v1.17.0-stabilization-foundation`（5.15 底层工具链稳定化 / GUI 前置整理版；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -36,6 +36,53 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## SignalBridge
+
+### 5.15 Stabilization Foundation / GUI 前置整理版
+
+Version marker: `v1.17.0-stabilization-foundation`.
+
+5.15 是底层工具链稳定化 / GUI 前置整理版，不是新玩法功能版本。本阶段围绕 5.1 到 5.14 已完成的 SignalBridge、SignalDevice、`virtual_block_device`、ItemStackMatcher、consume 和 itemSubmit 链路做审查、测试护栏、诊断输出和 Web Admin UI 前置设计整理。
+
+稳定化审查报告：
+
+- `docs/STABILIZATION_AUDIT_5_15.md`
+- `docs/STABILIZATION_AUDIT_5_15_ROUND2.md`
+- `docs/STABILIZATION_AUDIT_5_15_ROUND3.md`
+- `docs/STABILIZATION_AUDIT_5_15_ROUND4.md`
+- `docs/STABILIZATION_AUDIT_5_15_ROUND5.md`
+- `docs/STABILIZATION_AUDIT_5_15_FINAL.md`
+
+自动化护栏：
+
+- 新增 `stabilizationGuardTest`，已挂到 Gradle `check` / `build`。
+- 执行 `./gradlew.bat clean build` 会自动运行稳定化护栏测试。
+- 覆盖 `SignalDeviceData` 字段保留、旧 JSON 样本兼容、`ConsumePlan` / `ConsumePlanner`、`ItemSubmitEvaluator`、`InteractionDecisionEvaluator`、displayName 和 diagnostic DTO。
+- 防止 interactionItem / itemSubmit / consume / cooldown / `require_item_match` 组合路径再次出现字段丢失、部分消耗、冷却绕锁等回归。
+
+逻辑稳定化：
+
+- 新增并接入 `ConsumePlan` / `ConsumePlanner`，消耗采用两阶段 plan / apply。
+- 新增并接入 `ItemSubmitEvaluator` / `ItemSubmitEvaluationResult` / `ItemSubmitInventoryAdapter`，生产 itemSubmit 路径使用统一 evaluator。
+- 新增并接入 `InteractionDecisionEvaluator` / `InteractionDecision`，明确区分原版交互放行、消耗执行和 signal / message / sound / history 等副作用。
+- `cooldown` 不解除 `require_item_match` 锁，不跳过成功消耗，只抑制 signal / message / sound / 额外动画 / 高频 history 等副作用。
+- `itemSubmit` 原子消耗保持两阶段：先完整模拟 consume plan，再统一 apply；任一 requirement 不足时不消耗任何物品。
+- `interactionItem` 与 `itemSubmit` 保持互斥匹配模式：多物品提交启用时不再执行单物品 matcher / consume。
+
+debug / doctor 结构化诊断：
+
+- 新增 `DiagnosticSeverity`、`DiagnosticIssue`、`DeviceDiagnostic`、`InteractionItemDiagnostic`、`ItemSubmitDiagnostic`、`VirtualBlockDeviceDiagnosticService`。
+- `/tzz signal device debug <device>` 会输出结构化诊断。
+- `/tzz signal doctor` 增加设备层诊断摘要。
+- 诊断输出已中文化、分组化，并保留机器可读诊断代码用于未来 Web UI / 高级排查。
+
+GUI / Web Admin UI 前置原则：
+
+- 未来 Web UI 不应直接读写 JSON。
+- 命令、游戏内工具和 Web UI 应共用服务层，所有写操作走服务端统一服务。
+- 后续需要 service / DTO / internal event bus / WebSocket 实时同步。
+- 游戏内工具负责轻量初始化、绑定、选择和定位。
+- Web Admin UI 负责全局逻辑视图、模块化卡片、实时调试、配置编辑、history 和 doctor。
+- Web UI 最终必须覆盖所有可配置功能，不是命令系统的缩水版。
 
 ### 5.14 Consume Strategies / Multi-Item Submission MVP
 

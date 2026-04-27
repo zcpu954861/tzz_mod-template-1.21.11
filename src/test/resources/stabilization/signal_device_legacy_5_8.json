@@ -1,0 +1,23 @@
+{
+  "id": "virtual_block_device:minecraft:overworld@3,64,3",
+  "type": "virtual_block_device",
+  "name": "legacy 5.8",
+  "dimension": "minecraft:overworld",
+  "x": 3,
+  "y": 64,
+  "z": 3,
+  "channel": "legacy.redstone",
+  "enabled": true,
+  "createdWallTimeMillis": 1,
+  "updatedWallTimeMillis": 2,
+  "blockId": "minecraft:chest",
+  "offChannel": "",
+  "mode": "redstone_rising",
+  "conditionEnabled": false,
+  "interactionEnabled": false,
+  "containerEnabled": true,
+  "containerOpenChannel": "container.open",
+  "containerCloseChannel": "container.close",
+  "containerChangeChannel": "container.change",
+  "containerChangeCheckIntervalTicks": 10
+}

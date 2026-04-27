@@ -45,14 +45,14 @@ public final class InteractionItemSource {
 
     public static String displayName(String source) {
         return switch (normalize(source)) {
-            case OFF_HAND -> "off_hand（副手）";
-            case INVENTORY_CONTAINS -> "inventory_contains（主背包 / 热键栏）";
-            case ARMOR_HEAD -> "armor_head（头盔槽）";
-            case ARMOR_CHEST -> "armor_chest（胸甲槽）";
-            case ARMOR_LEGS -> "armor_legs（护腿槽）";
-            case ARMOR_FEET -> "armor_feet（靴子槽）";
-            case ARMOR_ANY -> "armor_any（任意盔甲槽）";
-            default -> "main_hand（主手）";
+            case OFF_HAND -> "副手（off_hand）";
+            case INVENTORY_CONTAINS -> "背包/热键栏（inventory_contains）";
+            case ARMOR_HEAD -> "头盔槽（armor_head）";
+            case ARMOR_CHEST -> "胸甲槽（armor_chest）";
+            case ARMOR_LEGS -> "护腿槽（armor_legs）";
+            case ARMOR_FEET -> "靴子槽（armor_feet）";
+            case ARMOR_ANY -> "任意盔甲槽（armor_any）";
+            default -> "主手（main_hand）";
         };
     }
 }

@@ -20,6 +20,11 @@ import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
+import com.zcpu.tzzmod.signal.device.debug.DeviceDiagnostic;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssue;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssueText;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticSeverity;
+import com.zcpu.tzzmod.signal.device.debug.VirtualBlockDeviceDiagnosticService;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
 import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
@@ -427,6 +432,13 @@ public final class SignalDeviceCommand {
             }
         }
 
+        DeviceDiagnostic diagnostic = VirtualBlockDeviceDiagnosticService.diagnose(
+                source.getServer(),
+                device,
+                source.getWorld().getTime()
+        );
+        sendStructuredDiagnostics(source, diagnostic);
+
         List<SignalEventRecord> records = recentDeviceEvents(device, DEBUG_HISTORY_LIMIT);
         if (records.isEmpty()) {
             source.sendFeedback(() -> warning("该设备暂无最近事件。"), false);
@@ -660,7 +672,7 @@ public final class SignalDeviceCommand {
                 source.sendFeedback(() -> field("单物品 matcher", Text.literal("已被 itemSubmit 模式忽略/禁用").formatted(Formatting.YELLOW)), false);
             }
             source.sendFeedback(() -> field("物品来源", Text.literal(InteractionItemSource.displayName(interactionMatcher.interactionItemSource())).formatted(Formatting.AQUA)), false);
-            source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
+            source.sendFeedback(() -> field("数量模式", Text.literal(ContainerItemCountMode.displayName(interactionMatcher.countMode())).formatted(Formatting.LIGHT_PURPLE)), false);
             source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
             source.sendFeedback(() -> field("原版交互策略", Text.literal(InteractionItemVanillaPolicy.displayName(interactionMatcher.interactionItemVanillaPolicy())).formatted(Formatting.AQUA)), false);
             source.sendFeedback(() -> field("来源支持消耗", boolText(InteractionItemSource.supportsConsume(interactionMatcher.interactionItemSource()))), false);
@@ -773,7 +785,7 @@ public final class SignalDeviceCommand {
             source.sendFeedback(() -> field("单物品 matcher", Text.literal("已被 itemSubmit 模式忽略/禁用").formatted(Formatting.YELLOW)), false);
         }
         source.sendFeedback(() -> field("物品匹配模板", Text.literal(ItemStackMatcherSupport.summary(interactionMatcher)).formatted(Formatting.WHITE)), false);
-        source.sendFeedback(() -> field("数量模式", Text.literal(interactionMatcher.countMode()).formatted(Formatting.LIGHT_PURPLE)), false);
+        source.sendFeedback(() -> field("数量模式", Text.literal(ContainerItemCountMode.displayName(interactionMatcher.countMode())).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("数量要求", Text.literal(ItemStackMatcherSupport.countRequirementText(interactionMatcher)).formatted(Formatting.LIGHT_PURPLE)), false);
         source.sendFeedback(() -> field("物品来源", Text.literal(InteractionItemSource.displayName(interactionMatcher.interactionItemSource())).formatted(Formatting.AQUA)), false);
         source.sendFeedback(() -> field("原版交互策略", Text.literal(InteractionItemVanillaPolicy.displayName(interactionMatcher.interactionItemVanillaPolicy())).formatted(Formatting.AQUA)), false);
@@ -1147,6 +1159,44 @@ public final class SignalDeviceCommand {
         return List.copyOf(matches.subList(start, matches.size()));
     }
 
+    private static void sendStructuredDiagnostics(ServerCommandSource source, DeviceDiagnostic diagnostic) {
+        if (diagnostic == null || diagnostic.issues().isEmpty()) {
+            return;
+        }
+        source.sendFeedback(() -> Text.literal("结构化诊断：").formatted(Formatting.YELLOW), false);
+        for (DiagnosticIssue issue : diagnostic.issues()) {
+            source.sendFeedback(() -> Text.literal(DiagnosticIssueText.headline(issue)).formatted(severityFormatting(issue.severity())), false);
+            for (String line : DiagnosticIssueText.detailLines(issue)) {
+                source.sendFeedback(() -> Text.literal("  " + line).formatted(diagnosticLineFormatting(line)), false);
+            }
+            source.sendFeedback(() -> Text.literal("  --------").formatted(Formatting.DARK_GRAY), false);
+        }
+    }
+
+    private static Formatting diagnosticLineFormatting(String line) {
+        if (line == null) {
+            return Formatting.GRAY;
+        }
+        if (line.startsWith("代码：")) {
+            return Formatting.DARK_GRAY;
+        }
+        if (line.startsWith("建议：")) {
+            return Formatting.AQUA;
+        }
+        if (line.startsWith("命令：")) {
+            return Formatting.LIGHT_PURPLE;
+        }
+        return Formatting.WHITE;
+    }
+
+    private static Formatting severityFormatting(DiagnosticSeverity severity) {
+        return switch (severity == null ? DiagnosticSeverity.INFO : severity) {
+            case ERROR -> Formatting.RED;
+            case WARNING -> Formatting.YELLOW;
+            case INFO -> Formatting.GRAY;
+        };
+    }
+
     private static int receiverCountForChannel(ServerCommandSource source, String channel) {
         String normalizedChannel = SignalChannel.normalize(channel);
         int count = 0;
@@ -1305,7 +1355,7 @@ public final class SignalDeviceCommand {
     }
 
     private static MutableText modeText(String mode) {
-        return Text.literal(VirtualBlockDeviceMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+        return Text.literal(VirtualBlockDeviceMode.displayName(mode)).formatted(Formatting.LIGHT_PURPLE);
     }
 
     private static MutableText matchingModeText(SignalDeviceData device) {
@@ -1365,7 +1415,7 @@ public final class SignalDeviceCommand {
     }
 
     private static MutableText conditionModeText(String mode) {
-        return Text.literal(BlockStateConditionMode.normalize(mode)).formatted(Formatting.LIGHT_PURPLE);
+        return Text.literal(BlockStateConditionMode.displayName(mode)).formatted(Formatting.LIGHT_PURPLE);
     }
 
     private static Text conditionSummary(SignalDeviceData device) {

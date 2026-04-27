@@ -236,6 +236,7 @@ public final class SignalCommand {
         }
 
         sendDoctorOverview(source, report);
+        source.sendFeedback(() -> title("问题："), false);
         sendDoctorIssues(source, report, SignalDoctorIssue.Severity.ERROR);
         sendDoctorIssues(source, report, SignalDoctorIssue.Severity.WARNING);
         sendDoctorIssues(source, report, SignalDoctorIssue.Severity.INFO);
@@ -722,15 +723,35 @@ public final class SignalCommand {
             return;
         }
 
-        source.sendFeedback(() -> doctorSectionTitle(severity), false);
         Formatting itemFormatting = doctorItemFormatting(severity);
         for (SignalDoctorIssue issue : issues) {
-            source.sendFeedback(() -> Text.literal("- ").formatted(Formatting.GRAY)
-                    .append(Text.literal(issue.title()).formatted(itemFormatting)), false);
+            source.sendFeedback(() -> Text.literal(issue.title()).formatted(itemFormatting), false);
             if (issue.detail() != null && !issue.detail().isBlank()) {
-                source.sendFeedback(() -> Text.literal("  " + issue.detail()).formatted(Formatting.GRAY), false);
+                for (String detailLine : issue.detail().split("\\R")) {
+                    String line = detailLine.trim();
+                    if (!line.isBlank()) {
+                        source.sendFeedback(() -> Text.literal("  " + line).formatted(doctorDetailFormatting(line)), false);
+                    }
+                }
             }
+            source.sendFeedback(() -> Text.literal("  --------").formatted(Formatting.DARK_GRAY), false);
         }
+    }
+
+    private static Formatting doctorDetailFormatting(String line) {
+        if (line == null) {
+            return Formatting.GRAY;
+        }
+        if (line.startsWith("代码：")) {
+            return Formatting.DARK_GRAY;
+        }
+        if (line.startsWith("建议：")) {
+            return Formatting.AQUA;
+        }
+        if (line.startsWith("命令：")) {
+            return Formatting.LIGHT_PURPLE;
+        }
+        return Formatting.GRAY;
     }
 
     private static void sendDirectRecursionWarning(ServerCommandSource source, SignalListenerData listener) {
@@ -810,14 +831,6 @@ public final class SignalCommand {
 
     private static MutableText warning(String text) {
         return Text.literal(text).formatted(Formatting.YELLOW);
-    }
-
-    private static MutableText doctorSectionTitle(SignalDoctorIssue.Severity severity) {
-        return switch (severity) {
-            case ERROR -> Text.literal("错误：").formatted(Formatting.RED);
-            case WARNING -> Text.literal("警告：").formatted(Formatting.YELLOW);
-            case INFO -> Text.literal("提示：").formatted(Formatting.GRAY);
-        };
     }
 
     private static Formatting doctorItemFormatting(SignalDoctorIssue.Severity severity) {

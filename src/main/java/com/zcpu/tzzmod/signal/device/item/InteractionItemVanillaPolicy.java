@@ -20,8 +20,8 @@ public final class InteractionItemVanillaPolicy {
 
     public static String displayName(String raw) {
         return switch (normalize(raw)) {
-            case REQUIRE_ITEM_MATCH -> "require_item_match（失败时阻止原版交互）";
-            default -> "allow（不阻止原版交互）";
+            case REQUIRE_ITEM_MATCH -> "需要物品匹配才允许原版交互（require_item_match）";
+            default -> "允许原版交互（allow）";
         };
     }
 }
