@@ -44,4 +44,13 @@ public enum ContainerItemCountMode {
         }
         return AT_LEAST.id;
     }
+
+    public static String displayName(String raw) {
+        return switch (fromId(raw)) {
+            case EXACTLY -> "等于（exactly）";
+            case AT_MOST -> "至多（at_most）";
+            case IGNORE -> "不检查数量（ignore）";
+            default -> "至少（at_least）";
+        };
+    }
 }

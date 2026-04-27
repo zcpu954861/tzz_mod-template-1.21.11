@@ -5,10 +5,16 @@ import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
+import com.zcpu.tzzmod.signal.device.item.ConsumePlan;
+import com.zcpu.tzzmod.signal.device.item.ConsumePlanner;
+import com.zcpu.tzzmod.signal.device.item.InteractionDecision;
+import com.zcpu.tzzmod.signal.device.item.InteractionDecisionEvaluator;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemConsumeSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemSource;
 import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
-import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
+import com.zcpu.tzzmod.signal.device.item.ItemSubmitEvaluationResult;
+import com.zcpu.tzzmod.signal.device.item.ItemSubmitInventoryAdapter;
+import com.zcpu.tzzmod.signal.device.item.ItemSubmitEvaluator;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcher;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.util.NullSafety;
@@ -169,34 +175,39 @@ public final class VirtualBlockDeviceInteractionHandler {
             return fail(world, player, hand, sideName, device, matcher, inCooldown, match.source(), match.matchedSlot(), match.matchedCount(), "item_not_matched");
         }
 
+        ConsumePlan consumePlan = new ConsumePlan();
         if (itemSubmitMode) {
-            ItemSubmitEvaluation submitEvaluation = evaluateItemSubmit(player, device, !inCooldown);
-            if (!submitEvaluation.ok()) {
+            ItemSubmitEvaluationResult submitEvaluation = evaluateItemSubmit(player, device, !inCooldown, consumePlan);
+            if (!submitEvaluation.finalSuccess()) {
                 return fail(world, player, hand, sideName, device, matcher, inCooldown, "item_submit", -1, 0, submitEvaluation.failureReason());
+            }
+            if (device.itemSubmitConsumeEnabled()) {
+                consumePlan.replaceWith(submitEvaluation.stagedConsumePlan());
             }
         }
 
-        ConsumePlan consumePlan = new ConsumePlan();
         if (!itemSubmitMode && hasItemMatcher && matcher.consumeEnabled()) {
             String failure = stageInteractionConsumePlan(player, matcher, match, consumePlan);
             if (!failure.isBlank()) {
                 return fail(world, player, hand, sideName, device, matcher, inCooldown, match.source(), match.matchedSlot(), match.matchedCount(), failure);
             }
         }
-        if (itemSubmitMode && device.itemSubmitConsumeEnabled()) {
-            String failure = stageItemSubmitConsumePlan(player, device, consumePlan);
-            if (!failure.isBlank()) {
-                return fail(world, player, hand, sideName, device, matcher, inCooldown, "item_submit", -1, 0, failure);
-            }
-        }
 
         String consumedSlots = "";
         if (!consumePlan.isEmpty()) {
             consumedSlots = consumePlan.summary();
-            consumePlan.apply(player);
+            consumePlan.apply();
         }
 
-        if (inCooldown) {
+        InteractionDecision decision = InteractionDecisionEvaluator.evaluate(
+                matcher.interactionItemVanillaPolicy(),
+                true,
+                inCooldown,
+                !consumePlan.isEmpty(),
+                true,
+                ""
+        );
+        if (!decision.executeSignal()) {
             return ActionResult.PASS;
         }
 
@@ -266,20 +277,6 @@ public final class VirtualBlockDeviceInteractionHandler {
         return "";
     }
 
-    private static String stageItemSubmitConsumePlan(
-            ServerPlayerEntity player,
-            SignalDeviceData device,
-            ConsumePlan plan
-    ) {
-        ConsumePlan staged = plan.copy();
-        String failure = addItemSubmitConsumePlan(player, device, staged);
-        if (!failure.isBlank()) {
-            return "item_submit_consume_plan_failed:" + failure;
-        }
-        plan.replaceWith(staged);
-        return "";
-    }
-
     private static ActionResult fail(
             ServerWorld world,
             ServerPlayerEntity player,
@@ -293,8 +290,16 @@ public final class VirtualBlockDeviceInteractionHandler {
             int matchedCount,
             String failureReason
     ) {
-        if (inCooldown) {
-            return vanillaFailureResult(matcher);
+        InteractionDecision decision = InteractionDecisionEvaluator.evaluate(
+                matcher.interactionItemVanillaPolicy(),
+                false,
+                inCooldown,
+                false,
+                true,
+                failureReason
+        );
+        if (!decision.executeSignal()) {
+            return decision.allowVanillaInteraction() ? ActionResult.PASS : ActionResult.FAIL;
         }
         if (device.itemSubmitEnabled()) {
             SignalDeviceStore.recordVirtualItemSubmitResult(world, device, false, failureReason, "", "itemSubmit failed");
@@ -406,12 +411,19 @@ public final class VirtualBlockDeviceInteractionHandler {
         if (!ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
             return "consume_source_not_matched";
         }
-        int available = stack.getCount() - plan.reserved(key);
-        if (available < count) {
-            return "not_enough_items_to_consume";
-        }
-        plan.add(new ConsumeEntry(key, consumeHand, -1, stack, count, key));
-        return "";
+        return ConsumePlanner.stageSingle(
+                plan,
+                key,
+                stack.getCount(),
+                count,
+                key,
+                amount -> {
+                    stack.decrement(amount);
+                    if (stack.isEmpty()) {
+                        player.setStackInHand(consumeHand, ItemStack.EMPTY);
+                    }
+                }
+        );
     }
 
     private static String addInventoryConsumePlan(
@@ -422,84 +434,69 @@ public final class VirtualBlockDeviceInteractionHandler {
             ConsumePlan plan,
             String label
     ) {
-        int remaining = count;
         List<ItemStack> stacks = player.getInventory().getMainStacks();
+        List<ConsumePlanner.ConsumableStack> matchingStacks = new ArrayList<>();
         for (int slot : inventorySlotOrder(stacks.size(), order)) {
             ItemStack stack = stacks.get(slot);
             if (!ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
                 continue;
             }
             String key = inventoryKey(slot);
-            int available = stack.getCount() - plan.reserved(key);
-            if (available <= 0) {
-                continue;
-            }
-            int take = Math.min(available, remaining);
-            plan.add(new ConsumeEntry(key, null, slot, stack, take, label + ":slot" + slot));
-            remaining -= take;
-            if (remaining <= 0) {
-                return "";
-            }
+            matchingStacks.add(new ConsumePlanner.ConsumableStack(
+                    key,
+                    stack.getCount(),
+                    label + ":slot" + slot,
+                    stack::decrement
+            ));
         }
-        return "not_enough_items_to_consume";
+        return ConsumePlanner.stageAcrossStacks(plan, matchingStacks, count);
     }
 
-    private static String addItemSubmitConsumePlan(ServerPlayerEntity player, SignalDeviceData device, ConsumePlan plan) {
-        String order = device.itemSubmitConsumeOrder();
-        for (ItemSubmitRequirementData rawRequirement : device.itemSubmitRequirements()) {
-            ItemSubmitRequirementData requirement = rawRequirement.normalized();
-            if (!requirement.enabled()) {
-                continue;
-            }
-            String failure = addInventoryConsumePlan(
-                    player,
-                    requirement.matcher(),
-                    requirement.consumeCount(),
-                    order,
-                    plan,
-                    "submit:" + requirement.name()
-            );
-            if (!failure.isBlank()) {
-                return failure + ":" + requirement.name();
-            }
-        }
-        return "";
-    }
-
-    private static ItemSubmitEvaluation evaluateItemSubmit(ServerPlayerEntity player, SignalDeviceData device, boolean recordResults) {
+    private static ItemSubmitEvaluationResult evaluateItemSubmit(
+            ServerPlayerEntity player,
+            SignalDeviceData device,
+            boolean recordResults,
+            ConsumePlan existingPlan
+    ) {
         if (!device.itemSubmitEnabled()) {
-            return ItemSubmitEvaluation.passed();
+            return new ItemSubmitEvaluationResult(true, true, true, "", List.of(), new ConsumePlan(), "");
         }
-        int enabledCount = 0;
+
+        ItemSubmitInventoryAdapter.View view = ItemSubmitInventoryAdapter.fromMainStacks(
+                player.getInventory().getMainStacks(),
+                device.itemSubmitConsumeOrder()
+        );
+        ItemSubmitEvaluationResult evaluation = ItemSubmitEvaluator.evaluate(
+                device.itemSubmitRequirements(),
+                view.sourceStacks(),
+                device.itemSubmitConsumeEnabled(),
+                existingPlan,
+                view.matcher()
+        );
+
         long gameTime = player.getCommandSource().getWorld().getTime();
         List<ItemSubmitRequirementData> updated = new ArrayList<>();
+        Map<String, ItemSubmitEvaluationResult.RequirementResult> resultsByName = new HashMap<>();
+        for (ItemSubmitEvaluationResult.RequirementResult result : evaluation.requirementResults()) {
+            resultsByName.put(result.name(), result);
+        }
         for (ItemSubmitRequirementData rawRequirement : device.itemSubmitRequirements()) {
             ItemSubmitRequirementData requirement = rawRequirement.normalized();
             if (!requirement.enabled()) {
                 updated.add(requirement);
                 continue;
             }
-            enabledCount++;
-            int matchedCount = inventoryMatchedCount(player, requirement.matcher());
-            boolean matched = matchesInventoryCount(matchedCount, requirement.matcher());
-            updated.add(requirement.withResult(matched, matchedCount, gameTime, matched ? "matched" : "not_matched"));
-            if (!matched) {
-                if (recordResults) {
-                    SignalDeviceStore.updateVirtualItemSubmit(
-                            player.getCommandSource().getWorld(),
-                            new BlockPos(device.x(), device.y(), device.z()),
-                            device.itemSubmitEnabled(),
-                            device.itemSubmitConsumeEnabled(),
-                            device.itemSubmitConsumeOrder(),
-                            updated,
-                            "itemSubmit requirement failed: " + requirement.name()
-                    );
-                }
-                return ItemSubmitEvaluation.failed("submit_requirement_not_matched:" + requirement.name());
+            ItemSubmitEvaluationResult.RequirementResult result = resultsByName.get(requirement.name());
+            if (result == null) {
+                updated.add(requirement);
+            } else {
+                updated.add(requirement.withResult(
+                        result.matched(),
+                        result.matchedCount(),
+                        gameTime,
+                        result.matched() ? "matched" : "not_matched"
+                ));
             }
-        }
-        if (enabledCount == 0) {
-            return ItemSubmitEvaluation.failed("item_submit_no_enabled_requirements");
         }
         if (recordResults) {
             SignalDeviceStore.updateVirtualItemSubmit(
@@ -509,20 +506,10 @@ public final class VirtualBlockDeviceInteractionHandler {
                     device.itemSubmitConsumeEnabled(),
                     device.itemSubmitConsumeOrder(),
                     updated,
-                    "itemSubmit matched"
+                    evaluation.finalSuccess() ? "itemSubmit matched" : "itemSubmit requirement failed: " + evaluation.failureReason()
             );
         }
-        return ItemSubmitEvaluation.passed();
-    }
-
-    private static int inventoryMatchedCount(ServerPlayerEntity player, ItemStackMatcherData matcher) {
-        int total = 0;
-        for (ItemStack stack : player.getInventory().getMainStacks()) {
-            if (ItemStackMatcher.matchesIgnoringCount(stack, matcher)) {
-                total += stack.getCount();
-            }
-        }
-        return total;
+        return evaluation;
     }
 
     private static InteractionItemMatch evaluateInteractionItemMatch(ServerPlayerEntity player, ItemStackMatcherData matcher) {
@@ -603,24 +590,7 @@ public final class VirtualBlockDeviceInteractionHandler {
     }
 
     private static List<Integer> inventorySlotOrder(int size, String rawOrder) {
-        List<Integer> slots = new ArrayList<>(size);
-        String order = InventoryConsumeOrder.normalize(rawOrder);
-        if (InventoryConsumeOrder.MAIN_INVENTORY_FIRST.equals(order)) {
-            for (int i = 9; i < size; i++) {
-                slots.add(i);
-            }
-            for (int i = 0; i < Math.min(9, size); i++) {
-                slots.add(i);
-            }
-            return slots;
-        }
-        for (int i = 0; i < Math.min(9, size); i++) {
-            slots.add(i);
-        }
-        for (int i = 9; i < size; i++) {
-            slots.add(i);
-        }
-        return slots;
+        return ConsumePlanner.inventorySlotOrder(size, rawOrder);
     }
 
     private static String inventoryKey(int slot) {
@@ -677,88 +647,7 @@ public final class VirtualBlockDeviceInteractionHandler {
         }
     }
 
-    private record ItemSubmitEvaluation(boolean ok, String failureReason) {
-        private static ItemSubmitEvaluation passed() {
-            return new ItemSubmitEvaluation(true, "");
-        }
-
-        private static ItemSubmitEvaluation failed(String failureReason) {
-            return new ItemSubmitEvaluation(false, failureReason == null ? "item_submit_failed" : failureReason);
-        }
-    }
-
     private record InteractionTarget(SignalDeviceData device, BlockPos devicePos, BlockState clickedState) {
     }
 
-    private record ConsumeEntry(String key, Hand hand, int inventorySlot, ItemStack stack, int count, String label) {
-    }
-
-    private static final class ConsumePlan {
-        private final List<ConsumeEntry> entries = new ArrayList<>();
-        private final Map<String, Integer> reserved = new HashMap<>();
-
-        ConsumePlan copy() {
-            ConsumePlan copy = new ConsumePlan();
-            copy.entries.addAll(entries);
-            copy.reserved.putAll(reserved);
-            return copy;
-        }
-
-        void replaceWith(ConsumePlan other) {
-            entries.clear();
-            reserved.clear();
-            if (other != null) {
-                entries.addAll(other.entries);
-                reserved.putAll(other.reserved);
-            }
-        }
-
-        void add(ConsumeEntry entry) {
-            entries.add(entry);
-            reserved.put(entry.key(), reserved(entry.key()) + entry.count());
-        }
-
-        int reserved(String key) {
-            return reserved.getOrDefault(key, 0);
-        }
-
-        boolean isEmpty() {
-            return entries.isEmpty();
-        }
-
-        int totalCount() {
-            int total = 0;
-            for (ConsumeEntry entry : entries) {
-                total += entry.count();
-            }
-            return total;
-        }
-
-        String primarySource() {
-            return entries.isEmpty() ? "" : entries.get(0).key();
-        }
-
-        String summary() {
-            if (entries.isEmpty()) {
-                return "";
-            }
-            StringBuilder builder = new StringBuilder();
-            for (ConsumeEntry entry : entries) {
-                if (!builder.isEmpty()) {
-                    builder.append(", ");
-                }
-                builder.append(entry.label()).append(" x").append(entry.count());
-            }
-            return builder.toString();
-        }
-
-        void apply(ServerPlayerEntity player) {
-            for (ConsumeEntry entry : entries) {
-                entry.stack().decrement(entry.count());
-                if (entry.stack().isEmpty() && entry.hand() != null) {
-                    player.setStackInHand(entry.hand(), ItemStack.EMPTY);
-                }
-            }
-        }
-    }
 }

@@ -3,6 +3,13 @@ package com.zcpu.tzzmod.signal;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.signal.device.SignalDeviceData;
+import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.signal.device.debug.DeviceDiagnostic;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssue;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssueText;
+import com.zcpu.tzzmod.signal.device.debug.DiagnosticSeverity;
+import com.zcpu.tzzmod.signal.device.debug.VirtualBlockDeviceDiagnosticService;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,6 +38,7 @@ public final class SignalDoctor {
         inspectHistoryWithoutListeners(history, listeners, issues);
         inspectDisabledChannels(summaries, issues);
         inspectRawListenerData(server, issues);
+        inspectDevices(server, issues);
 
         int enabledCount = 0;
         for (SignalListenerData listener : listeners) {
@@ -166,6 +174,44 @@ public final class SignalDoctor {
                 issues.add(error("监听器" + quotedName(listener) + "的频道名称无效：" + safeText(listener.channel())));
             }
         }
+    }
+
+    private static void inspectDevices(MinecraftServer server, List<SignalDoctorIssue> issues) {
+        List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
+        int disabledCount = 0;
+        for (SignalDeviceData device : devices) {
+            if (!device.enabled()) {
+                disabledCount++;
+            }
+            if (device.channel().isBlank()) {
+                issues.add(warning("设备“" + SignalDeviceStore.displayName(device) + "”未设置主频道。"));
+            }
+            if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
+                DeviceDiagnostic diagnostic = VirtualBlockDeviceDiagnosticService.diagnose(
+                        server,
+                        device,
+                        server.getOverworld() == null ? 0L : server.getOverworld().getTime()
+                );
+                for (DiagnosticIssue issue : diagnostic.issues()) {
+                    if (issue.severity() == DiagnosticSeverity.INFO) {
+                        continue;
+                    }
+                    issues.add(toDoctorIssue(issue));
+                }
+            }
+        }
+        if (disabledCount > 0) {
+            issues.add(info("当前登记表中有 " + disabledCount + " 个 disabled signal device。"));
+        }
+    }
+
+    private static SignalDoctorIssue toDoctorIssue(DiagnosticIssue issue) {
+        SignalDoctorIssue.Severity severity = switch (issue.severity()) {
+            case ERROR -> SignalDoctorIssue.Severity.ERROR;
+            case WARNING -> SignalDoctorIssue.Severity.WARNING;
+            case INFO -> SignalDoctorIssue.Severity.INFO;
+        };
+        return new SignalDoctorIssue(severity, DiagnosticIssueText.headline(issue), DiagnosticIssueText.doctorDetail(issue));
     }
 
     private static SignalDoctorIssue error(String title) {

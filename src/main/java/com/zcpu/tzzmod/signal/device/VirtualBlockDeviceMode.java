@@ -42,4 +42,12 @@ public enum VirtualBlockDeviceMode {
         }
         return REDSTONE_RISING.id;
     }
+
+    public static String displayName(String raw) {
+        return switch (fromId(raw)) {
+            case REDSTONE_FALLING -> "断电时触发（redstone_falling）";
+            case REDSTONE_BOTH -> "通电和断电都触发（redstone_both）";
+            default -> "通电时触发（redstone_rising）";
+        };
+    }
 }

@@ -1,0 +1,26 @@
+{
+  "id": "virtual_block_device:minecraft:overworld@5,64,5",
+  "type": "virtual_block_device",
+  "name": "legacy 5.12",
+  "dimension": "minecraft:overworld",
+  "x": 5,
+  "y": 64,
+  "z": 5,
+  "channel": "legacy.redstone",
+  "enabled": true,
+  "createdWallTimeMillis": 1,
+  "updatedWallTimeMillis": 2,
+  "blockId": "minecraft:chest",
+  "mode": "redstone_rising",
+  "interactionEnabled": true,
+  "interactChannel": "legacy.interact",
+  "interactionItemMatcherEnabled": true,
+  "interactionItemMatcher": {
+    "enabled": true,
+    "templateItemId": "minecraft:diamond",
+    "templateCount": 1,
+    "countMode": "at_least",
+    "requiredCount": 1,
+    "matchItemId": true
+  }
+}

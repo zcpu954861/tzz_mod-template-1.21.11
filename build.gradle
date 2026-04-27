@@ -35,6 +35,22 @@ dependencies {
 	
 }
 
+tasks.register("stabilizationGuardTest", JavaExec) {
+	group = "verification"
+	description = "Runs dependency-free stabilization guard regression checks."
+	dependsOn tasks.named("testClasses")
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = "com.zcpu.tzzmod.stabilization.StabilizationGuardTest"
+}
+
+tasks.named("check") {
+	dependsOn tasks.named("stabilizationGuardTest")
+}
+
+tasks.withType(Test).configureEach {
+	failOnNoDiscoveredTests = false
+}
+
 processResources {
 	inputs.property "version", project.version
 

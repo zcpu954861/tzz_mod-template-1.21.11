@@ -1,0 +1,20 @@
+{
+  "id": "legacy-5-4",
+  "type": "signal_emitter",
+  "name": "legacy 5.4",
+  "dimension": "minecraft:overworld",
+  "x": 1,
+  "y": 64,
+  "z": 1,
+  "channel": "legacy.channel",
+  "enabled": true,
+  "pulseTicks": 0,
+  "remainingPulseTicks": 0,
+  "cooldownTicks": 0,
+  "actionCount": 0,
+  "createdWallTimeMillis": 1,
+  "updatedWallTimeMillis": 2,
+  "lastTriggerGameTime": 0,
+  "lastTriggerWallTimeMillis": 0,
+  "lastResult": ""
+}
