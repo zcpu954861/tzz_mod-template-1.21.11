@@ -13,6 +13,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionDecision;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
@@ -54,13 +55,23 @@ public final class WebAdminDeviceMetadataService {
 
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
+    private final WebAdminEditLockService editLockService;
 
     public WebAdminDeviceMetadataService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService
     ) {
+        this(permissionService, securityService, null);
+    }
+
+    public WebAdminDeviceMetadataService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
+        this.editLockService = editLockService;
     }
 
     public WebAdminDtos.DeviceMetadataDto metadataFor(MinecraftServer server, SignalDeviceData rawDevice) {
@@ -134,12 +145,19 @@ public final class WebAdminDeviceMetadataService {
             return result;
         }
 
-        NormalizedRequest normalized = normalize(request);
-        List<WebAdminValidationError> errors = validateRequest(request);
-        if (!errors.isEmpty()) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
-            audit(writeContext, result, Map.of(), normalized.summary());
-            return result;
+        if (editLockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_DEVICE_METADATA,
+                    device.id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session
+            );
+            if (!lockValidation.success()) {
+                WebAdminWriteResult result = lockValidation.result();
+                audit(writeContext, result, Map.of(), Map.of("attempt", "edit_lock_failed"));
+                return result;
+            }
         }
 
         WebAdminDeviceMetadataStore.MetadataFile file = WebAdminDeviceMetadataStore.load(server);
@@ -147,9 +165,34 @@ public final class WebAdminDeviceMetadataService {
                 device.id(),
                 file.devices.get(device.id())
         );
+
+        if (request == null || request.expectedVersion == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "expectedVersion",
+                    "required",
+                    "保存需要 expectedVersion，用于防止覆盖其他用户修改。",
+                    ""
+            )));
+            audit(writeContext, result, beforeSummary(before), Map.of("attempt", "expected_version_missing"));
+            return result;
+        }
+        if (!versionMatches(before.version, request.expectedVersion)) {
+            WebAdminWriteResult result = conflictDetected(target, device, before, request.expectedVersion);
+            audit(writeContext, result, beforeSummary(before), Map.of("attempt", "version_conflict", "expectedVersion", request.expectedVersion));
+            return result;
+        }
+
+        NormalizedRequest normalized = normalize(request);
+        List<WebAdminValidationError> errors = validateRequest(request);
+        if (!errors.isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
+            audit(writeContext, result, Map.of(), normalized.summary());
+            return result;
+        }
         if (metadataEquals(before, normalized)) {
             WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的变化。");
             audit(writeContext, result, beforeSummary(before), beforeSummary(before));
+            releaseLockAfterWrite(request, user, session, remoteAddress);
             return result;
         }
 
@@ -192,7 +235,12 @@ public final class WebAdminDeviceMetadataService {
         );
         WebAdminAuditEvent auditEvent = audit(writeContext, result, beforeSummary(before), beforeSummary(after));
         publishRealtime(device, after, auditEvent, changedFields(before, after), user);
+        releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
+    }
+
+    public static boolean versionMatches(long currentVersion, Long expectedVersion) {
+        return expectedVersion != null && currentVersion == expectedVersion.longValue();
     }
 
     public static List<WebAdminValidationError> validateRequest(WebAdminDeviceMetadataUpdateRequest request) {
@@ -278,6 +326,51 @@ public final class WebAdminDeviceMetadataService {
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("deviceEventId", deviceEvent == null ? "" : deviceEvent.id()));
+    }
+
+    private void releaseLockAfterWrite(
+            WebAdminDeviceMetadataUpdateRequest request,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress
+    ) {
+        if (editLockService == null || request == null || request.lockId == null || request.lockId.isBlank()) {
+            return;
+        }
+        editLockService.releaseAfterWrite(
+                WebAdminEditLockService.TARGET_DEVICE_METADATA,
+                request.deviceId,
+                request.lockId,
+                user,
+                session,
+                remoteAddress
+        );
+    }
+
+    private static WebAdminWriteResult conflictDetected(
+            WebAdminWriteTarget target,
+            SignalDeviceData device,
+            WebAdminDeviceMetadataStore.MetadataEntry current,
+            Long expectedVersion
+    ) {
+        Map<String, Object> conflict = new LinkedHashMap<>();
+        conflict.put("expectedVersion", expectedVersion);
+        conflict.put("currentVersion", current.version);
+        conflict.put("currentMetadata", dto(device, current));
+        return new WebAdminWriteResult(
+                false,
+                WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
+                "该设备显示信息已被其他用户修改，请刷新后再编辑。",
+                target.targetType(),
+                target.targetId(),
+                false,
+                List.of(),
+                "",
+                "",
+                false,
+                conflict,
+                Map.of("currentMetadata", dto(device, current))
+        );
     }
 
     private static WebAdminDtos.DeviceMetadataDto dto(

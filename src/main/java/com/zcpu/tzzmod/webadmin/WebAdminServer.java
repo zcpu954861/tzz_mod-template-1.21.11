@@ -4,11 +4,13 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
@@ -34,8 +36,10 @@ public final class WebAdminServer {
     private final WebAdminUserSettingsService userSettingsService = new WebAdminUserSettingsService();
     private final WebAdminRealtimeService realtimeService = new WebAdminRealtimeService();
     private final WebAdminWriteSecurityService writeSecurityService = new WebAdminWriteSecurityService();
+    private final WebAdminPermissionService permissionService = new WebAdminPermissionService();
     private final WebAdminWriteFoundationService writeFoundationService = new WebAdminWriteFoundationService(writeSecurityService);
-    private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(new WebAdminPermissionService(), writeSecurityService);
+    private final WebAdminEditLockService editLockService = new WebAdminEditLockService(permissionService, writeSecurityService);
+    private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -81,6 +85,7 @@ public final class WebAdminServer {
             executor = null;
         }
         realtimeService.closeAll();
+        editLockService.clear();
         writeSecurityService.clear();
         sessionService.clear();
         WebAdminAuditLogger.server("stop", config);
@@ -161,6 +166,10 @@ public final class WebAdminServer {
                     return;
                 }
                 handleWebAdminWriteCapabilities(exchange, auth);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/edit-locks/")) {
+                handleEditLocks(exchange, auth, path, method);
                 return;
             }
             if (path.startsWith("/api/webadmin/device-metadata/")) {
@@ -269,6 +278,46 @@ public final class WebAdminServer {
 
     private void handleWebAdminWriteCapabilities(HttpExchange exchange, AuthContext auth) throws IOException {
         WebAdminJsonResponse.ok(exchange, writeFoundationService.capabilities(auth.user, auth.session));
+    }
+
+    private void handleEditLocks(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        if (path.equals("/api/webadmin/edit-locks/status")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, editLockService.status(
+                    query.getOrDefault("targetType", ""),
+                    query.getOrDefault("targetId", ""),
+                    auth.user,
+                    auth.session
+            ));
+            return;
+        }
+
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        WebAdminEditLockRequest request = readJson(exchange, WebAdminEditLockRequest.class);
+        if (request == null) {
+            request = new WebAdminEditLockRequest();
+        }
+        String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
+        boolean sameOrigin = isWriteSameOrigin(exchange);
+        WebAdminWriteResult result;
+        if (path.equals("/api/webadmin/edit-locks/acquire")) {
+            result = editLockService.acquire(auth.user, auth.session, sourceIp(exchange), request, csrfToken, sameOrigin);
+        } else if (path.equals("/api/webadmin/edit-locks/heartbeat")) {
+            result = editLockService.heartbeat(auth.user, auth.session, sourceIp(exchange), request, csrfToken, sameOrigin);
+        } else if (path.equals("/api/webadmin/edit-locks/release")) {
+            result = editLockService.release(auth.user, auth.session, sourceIp(exchange), request, csrfToken, sameOrigin);
+        } else {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "编辑锁接口不存在。");
+            return;
+        }
+        WebAdminJsonResponse.ok(exchange, result);
     }
 
     private void handleDeviceMetadata(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
@@ -413,6 +462,24 @@ public final class WebAdminServer {
 
     private static String decodePathSegment(String value) {
         return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private static Map<String, String> queryParams(HttpExchange exchange) {
+        Map<String, String> params = new LinkedHashMap<>();
+        String query = exchange.getRequestURI().getRawQuery();
+        if (query == null || query.isBlank()) {
+            return params;
+        }
+        for (String part : query.split("&")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            String[] pieces = part.split("=", 2);
+            String key = URLDecoder.decode(pieces[0], StandardCharsets.UTF_8);
+            String value = pieces.length > 1 ? URLDecoder.decode(pieces[1], StandardCharsets.UTF_8) : "";
+            params.put(key, value);
+        }
+        return params;
     }
 
     private static String sourceIp(HttpExchange exchange) {
