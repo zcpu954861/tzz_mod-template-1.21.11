@@ -7,6 +7,8 @@ import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +28,8 @@ public final class WebAdminServer {
     private final WebAdminReadonlyRoutes readonlyRoutes = new WebAdminReadonlyRoutes();
     private final WebAdminUserSettingsService userSettingsService = new WebAdminUserSettingsService();
     private final WebAdminRealtimeService realtimeService = new WebAdminRealtimeService();
+    private final WebAdminWriteSecurityService writeSecurityService = new WebAdminWriteSecurityService();
+    private final WebAdminWriteFoundationService writeFoundationService = new WebAdminWriteFoundationService(writeSecurityService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -71,6 +75,7 @@ public final class WebAdminServer {
             executor = null;
         }
         realtimeService.closeAll();
+        writeSecurityService.clear();
         sessionService.clear();
         WebAdminAuditLogger.server("stop", config);
     }
@@ -142,6 +147,14 @@ public final class WebAdminServer {
                     return;
                 }
                 handleWebAdminSettings(exchange, auth);
+                return;
+            }
+            if (path.equals("/api/webadmin/write/capabilities")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                handleWebAdminWriteCapabilities(exchange, auth);
                 return;
             }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
@@ -242,6 +255,10 @@ public final class WebAdminServer {
 
     private void handleWebAdminSettings(HttpExchange exchange, AuthContext auth) throws IOException {
         WebAdminJsonResponse.ok(exchange, userSettingsService.settings(minecraftServer, config, sessionService, auth.user));
+    }
+
+    private void handleWebAdminWriteCapabilities(HttpExchange exchange, AuthContext auth) throws IOException {
+        WebAdminJsonResponse.ok(exchange, writeFoundationService.capabilities(auth.user, auth.session));
     }
 
     private AuthContext requireAuth(HttpExchange exchange) throws IOException {

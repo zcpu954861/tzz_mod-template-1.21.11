@@ -33,10 +33,23 @@ import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
+import com.zcpu.tzzmod.webadmin.WebAdminRole;
+import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
+import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
+import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
+import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
+import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteAuditContext;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteContext;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResultCode;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -71,6 +84,7 @@ public final class StabilizationGuardTest {
         testVirtualDeviceDiagnostics();
         testWebAdminReadonlyFrontendAssets();
         testWebAdminRealtimeFoundation();
+        testWebAdminWriteFoundation();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -787,6 +801,101 @@ public final class StabilizationGuardTest {
         WebAdminRealtimeEventBus.unsubscribe(client);
         requireEquals(0, WebAdminRealtimeEventBus.clientCount(), "realtime client unsubscribed");
         WebAdminRealtimeEventBus.closeAll();
+    }
+
+    private static void testWebAdminWriteFoundation() {
+        WebAdminPermissionService permissions = new WebAdminPermissionService();
+        requireFalse(permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE).allowed(), "viewer cannot edit devices");
+        requireFalse(permissions.decide(WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE).allowed(), "tester cannot edit devices");
+        requireTrue(permissions.decide(WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE).allowed(), "editor can edit devices");
+        requireFalse(permissions.decide(WebAdminRole.EDITOR, WebAdminOperationType.EDIT_USER).allowed(), "editor cannot manage users");
+        requireTrue(permissions.decide(WebAdminRole.OWNER, WebAdminOperationType.EDIT_USER).allowed(), "owner can manage users");
+        requireTrue(permissions.decide(WebAdminRole.OWNER, WebAdminOperationType.DANGEROUS_OPERATION).allowed(), "owner can perform dangerous operations");
+
+        WebAdminWriteTarget target = new WebAdminWriteTarget("DEVICE", "device-1", "测试设备");
+        WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE).asWriteResult(target);
+        requireFalse(denied.success(), "permission denied write result fails");
+        requireEquals(WebAdminWriteResultCode.PERMISSION_DENIED.id(), denied.code(), "permission denied code");
+        requireNotBlank(denied.message(), "permission denied message is readable");
+
+        WebAdminValidationError validationError = new WebAdminValidationError(
+                "channel",
+                "required",
+                "频道不能为空。",
+                "passwordHash=secret"
+        );
+        WebAdminWriteResult validation = WebAdminWriteResult.validationFailed(target, List.of(validationError));
+        requireFalse(validation.success(), "validation failed result fails");
+        requireEquals(1, validation.validationErrors().size(), "validation error list is present");
+        requireEquals("已隐藏", validation.validationErrors().get(0).rejectedValueSummary(), "rejected sensitive value is hidden");
+
+        WebAdminWriteResult ok = WebAdminWriteResult.ok(target, true, "配置预览通过。");
+        requireTrue(ok.success(), "ok write result succeeds");
+        requireTrue(ok.changed(), "ok write result carries changed flag");
+        String resultJson = WebAdminJsonResponse.GSON.toJson(Map.of(
+                "denied", denied,
+                "validation", validation,
+                "ok", ok
+        ));
+        requireFalse(resultJson.contains("passwordHash"), "write result omits sensitive rejected key");
+        requireFalse(resultJson.contains("secret"), "write result omits sensitive rejected value");
+
+        WebAdminWriteSecurityService security = new WebAdminWriteSecurityService();
+        WebAdminSession session = new WebAdminSession("session-hash-for-guard", "guard", WebAdminRole.OWNER.id(), 1L, 10_000L, "127.0.0.1", "guard");
+        String csrfToken = security.csrfTokenFor(session);
+        requireNotBlank(csrfToken, "csrf token generated");
+        requireFalse(security.requireValidCsrf(session, "").success(), "missing csrf token fails");
+        requireFalse(security.requireValidCsrf(session, "wrong").success(), "wrong csrf token fails");
+        requireTrue(security.requireValidCsrf(session, csrfToken).success(), "correct csrf token passes");
+
+        WebAdminWriteContext writeContext = new WebAdminWriteContext(
+                "owner",
+                WebAdminRole.OWNER,
+                "abcdefghijklmnopqrstuvwxyz",
+                "127.0.0.1",
+                WebAdminOperationType.EDIT_DEVICE,
+                target
+        );
+        WebAdminAuditEvent auditEvent = WebAdminAuditWriter.eventForResult(
+                WebAdminWriteAuditContext.from(writeContext),
+                denied,
+                Map.of("passwordHash", "secret", "safeField", "before"),
+                Map.of("sessionToken", "token", "safeField", "after")
+        );
+        requireNotBlank(auditEvent.auditId(), "audit id present");
+        requireNotBlank(auditEvent.actorUsername(), "audit actor present");
+        requireNotBlank(auditEvent.operationType(), "audit operation present");
+        String auditJson = WebAdminJsonResponse.GSON.toJson(auditEvent);
+        requireFalse(auditJson.contains("passwordHash"), "audit event omits password hash key");
+        requireFalse(auditJson.contains("sessionToken"), "audit event omits session token key");
+        requireFalse(auditJson.contains("secret"), "audit event omits sensitive value");
+        requireFalse(auditJson.contains("token"), "audit event omits token value");
+
+        for (WebAdminRealtimeEventType type : List.of(
+                WebAdminRealtimeEventType.CONFIG_CHANGED,
+                WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED,
+                WebAdminRealtimeEventType.PERMISSION_DENIED,
+                WebAdminRealtimeEventType.VALIDATION_FAILED,
+                WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED,
+                WebAdminRealtimeEventType.SIGNAL_CONFIG_CHANGED,
+                WebAdminRealtimeEventType.REGION_CONFIG_CHANGED,
+                WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED
+        )) {
+            requireNotBlank(type.id(), "write realtime event type id present");
+            requireNotBlank(type.displayName(), "write realtime event display present");
+        }
+
+        WebAdminRealtimeEvent event = WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
+                .summary("配置变更预留事件")
+                .payload("passwordSalt", null)
+                .build("write-guard");
+        String eventJson = WebAdminJsonResponse.GSON.toJson(event);
+        requireFalse(eventJson.contains("passwordSalt"), "write realtime event omits sensitive payload");
+
+        String js = WebAdminFrontendAssets.appJs();
+        requireFalse(js.contains("fetch('/api/devices', {method:'POST'"), "frontend does not expose device write POST");
+        requireFalse(js.contains("method:'DELETE'"), "frontend does not expose DELETE writes");
+        requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
     }
 
     private static SignalDeviceData fullDevice() {

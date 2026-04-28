@@ -11,6 +11,15 @@ public enum WebAdminRealtimeEventType {
     RECEIVER_PULSE("receiver_pulse", "接收器脉冲"),
     REGION_EVENT("region_event", "区域事件"),
     CONFIG_CHANGED("config_changed", "配置已变化"),
+    WRITE_AUDIT_APPENDED("write_audit_appended", "写入审计已追加"),
+    PERMISSION_DENIED("permission_denied", "权限被拒绝"),
+    VALIDATION_FAILED("validation_failed", "校验失败"),
+    USER_CHANGED("user_changed", "用户配置已变化"),
+    SYSTEM_SETTINGS_CHANGED("system_settings_changed", "系统设置已变化"),
+    DEVICE_CONFIG_CHANGED("device_config_changed", "设备配置已变化"),
+    SIGNAL_CONFIG_CHANGED("signal_config_changed", "Signal 配置已变化"),
+    REGION_CONFIG_CHANGED("region_config_changed", "区域配置已变化"),
+    ACTION_CONFIG_CHANGED("action_config_changed", "动作配置已变化"),
     WEBADMIN_USER_CONNECTED("webadmin_user_connected", "WebAdmin 用户已连接"),
     WEBADMIN_USER_DISCONNECTED("webadmin_user_disconnected", "WebAdmin 用户已断开");
 

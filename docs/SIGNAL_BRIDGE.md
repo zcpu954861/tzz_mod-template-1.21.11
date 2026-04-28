@@ -965,6 +965,115 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.9 写入前置 / 权限审计 / Service API 基础
+
+6.9 是 WebAdmin 进入配置编辑前的安全前置阶段。该阶段不开放真实配置编辑，不新增公开可调用的写 API，不写 JSON，也不改变 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 或 ActionEngine 的既有运行语义。
+
+### 权限矩阵
+
+WebAdmin 写入前置定义统一角色权限：
+
+| 角色 | 当前能力 | 未来预留能力 |
+| --- | --- | --- |
+| VIEWER | 只读查看 | 无配置写入 |
+| TESTER | 只读查看 | 测试触发 / dry-run / validate |
+| EDITOR | 只读查看 | 普通配置编辑：device、Signal、Region、Action、item matcher |
+| OWNER | 只读查看 | 用户管理、系统设置、危险操作和完整写入权限 |
+
+权限判断由服务端 `WebAdminPermissionService` / `WebAdminRolePolicy` 负责，前端不能作为核心权限来源。
+
+### 写操作结果格式
+
+未来写 API 必须返回统一 `WebAdminWriteResult`：
+
+- `success`
+- `code`
+- `message`
+- `targetType`
+- `targetId`
+- `changed`
+- `validationErrors`
+- `auditId`
+- `realtimeEventId`
+- `requiresConfirmation`
+- `conflict`
+- `data`
+
+常见 code 包括：`ok`、`permission_denied`、`unauthenticated`、`csrf_required`、`csrf_invalid`、`validation_failed`、`target_not_found`、`conflict_detected`、`dangerous_operation_requires_confirmation`、`no_change`、`internal_error`。所有 message 必须中文可读，不返回 Java stack trace、password hash、salt、session token、cookie 或大型内部对象。
+
+### CSRF / 写请求安全
+
+6.9 新增写请求安全 helper。未来所有写操作必须同时满足：
+
+- 有效 WebAdmin session。
+- 服务端权限检查通过。
+- CSRF token 校验通过，或使用等价同源保护。
+- JSON 请求类型符合未来写 API 约束。
+- 危险操作具备二次确认机制。
+
+当前新增 `GET /api/webadmin/write/capabilities` 只读接口，用于返回当前角色的未来写入能力摘要、CSRF 策略和 token。该接口不执行写操作。
+
+### 审计日志模型
+
+6.9 定义结构化写操作审计事件：
+
+- `auditId`
+- `occurredAt`
+- `actorUsername`
+- `actorRole`
+- `sessionIdHashSummary`
+- `remoteAddress`
+- `operationType`
+- `targetType`
+- `targetId`
+- `beforeSummary`
+- `afterSummary`
+- `result`
+- `errorCode`
+- `message`
+
+审计 summary 会脱敏敏感字段，不记录明文密码、password hash、salt、session token 或 cookie。未来写失败、权限拒绝和校验失败都应产生审计事件。
+
+### Service 层原则
+
+未来写 service 应使用统一模式：
+
+```text
+request
+→ WebAdminMutationContext
+→ permission check
+→ CSRF / write security
+→ validate
+→ preview
+→ apply through existing domain service / store
+→ audit
+→ realtime config_changed
+→ WebAdminWriteResult
+```
+
+Web UI 不能直接改 JSON，不能绕过现有 store / domain service。写入成功后必须发布轻量 realtime 事件，例如 `config_changed` 和对象专用事件。
+
+### Realtime 变更事件
+
+6.9 补充未来写操作相关事件类型：
+
+- `config_changed`
+- `write_audit_appended`
+- `permission_denied`
+- `validation_failed`
+- `user_changed`
+- `system_settings_changed`
+- `device_config_changed`
+- `signal_config_changed`
+- `region_config_changed`
+- `action_config_changed`
+
+这些事件当前主要作为协议和测试护栏存在；没有真实写操作时不会伪造事件。事件 payload 必须轻量且不包含敏感内容。
+
+6.9 后仍不开放编辑。6.10 建议作为 7.0 配置编辑前总审查阶段，确认权限、审计、CSRF、DTO、realtime 和回滚策略后再进入真实编辑能力。
+
+更多说明见 `docs/WEBADMIN_WRITE_FOUNDATION_6_9.md`，回归测试见 `docs/REGRESSION_TEST_6_9.md`。
+
 ## WebAdmin 6.8 实时同步基础
 
 6.8 建立 WebAdmin 只读实时同步基础。当前阶段采用认证后的 Server-Sent Events / Event Stream：

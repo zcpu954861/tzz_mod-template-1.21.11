@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.27.0-web-admin-write-foundation
+
+- Added 6.9 WebAdmin write foundation primitives without enabling real config editing.
+- Added unified write result, write error, validation error, write target, and write operation models for future write APIs.
+- Added WebAdmin role permission matrix for READ / TEST / EDIT_DEVICE / EDIT_SIGNAL / EDIT_REGION / EDIT_ACTION / EDIT_ITEM_MATCHER / EDIT_USER / EDIT_SYSTEM_SETTINGS / DANGEROUS_OPERATION.
+- Added CSRF and same-origin write request security helper and authenticated readonly write capabilities endpoint at `GET /api/webadmin/write/capabilities`.
+- Added structured write audit event model and redaction helper for future mutation services.
+- Added future mutation service interfaces for preview / validate / apply patterns.
+- Added realtime event type contracts for future config changes, validation failures, permission denials, audit append events, and object-specific config changes.
+- Extended `stabilizationGuardTest` for permissions, write result shape, CSRF validation, audit redaction, realtime write event types, and frontend readonly safety.
+- No real config edit UI, public write API, config write, user write, device / Signal / Region / Action mutation, WebSocket change, ConditionEngine, or high-level game orchestration is included.
+
 ## v1.26.0-web-admin-realtime-sync
 
 - Added 6.8 WebAdmin realtime sync foundation using authenticated Server-Sent Events at `GET /api/realtime/events`.

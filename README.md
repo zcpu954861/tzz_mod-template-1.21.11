@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.26.0-web-admin-realtime-sync`
-- 当前开发版本：`v1.26.0-web-admin-realtime-sync`（6.8 WebAdmin 实时同步基础；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.27.0-web-admin-write-foundation`
+- 当前开发版本：`v1.27.0-web-admin-write-foundation`（6.9 WebAdmin 写入前置 / 权限审计 / Service API 基础；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,22 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.9 WebAdmin Write Permission / Audit / Service API Foundation
+
+6.9 是 WebAdmin 配置编辑前的安全地基阶段，不开放真实配置编辑、不新增公开写 API、不写 JSON，也不改变 5.x 已封版底层工具链语义。
+
+本阶段新增写操作统一结果模型、校验错误模型、权限矩阵、CSRF / 同源写请求安全 helper、结构化写操作审计模型、未来 mutation service 接口规范，以及写入相关 realtime 事件类型规范。新增的能力用于后续 7.0 WebAdmin 配置编辑复用，当前只作为基础设施和测试护栏存在。
+
+新增只读能力接口：
+
+```text
+GET /api/webadmin/write/capabilities
+```
+
+该接口要求有效 WebAdmin session，只返回当前角色的未来写入能力摘要、CSRF 要求和 token，不执行任何写操作。`VIEWER` 仅只读，`TESTER` 预留测试 / dry-run，`EDITOR` 预留普通配置编辑，`OWNER` 预留用户、系统设置和危险操作。
+
+更多说明见 `docs/WEBADMIN_WRITE_FOUNDATION_6_9.md`，回归清单见 `docs/REGRESSION_TEST_6_9.md`。
 
 ### 6.8 WebAdmin Realtime Sync Foundation
 
