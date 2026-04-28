@@ -167,6 +167,35 @@ PATCH /api/webadmin/device-basic-config/{deviceId}
 
 后续阶段可基于 7.3 的 supported-field、fingerprint、lock、audit 和 realtime 模式，继续设计 Signal / Listener / Receiver / ActionRelay 更系统化的编辑能力。
 
+## 7.4 WebAdmin Channel Metadata + Signal Listener 基础配置编辑
+
+7.4 开始在 Signal 管理页面开放两类低风险编辑：WebAdmin-only channel 显示元数据，以及已存在 Signal Listener 的基础配置。该阶段继续使用 7.0 到 7.3 已建立的权限、CSRF、编辑锁、expectedFingerprint、WebAdminWriteResult、audit 和 realtime 安全链路。
+
+Channel metadata 存放在 `<world-save-root>/tzz/webadmin/web_admin_channel_metadata.json`，只影响 WebAdmin 显示：
+
+- `displayName`
+- `note`
+- `iconKey`
+
+metadata 不创建真实 channel，不创建 listener / receiver / action_relay，不改变 SignalBridge 的 channel 字符串，也不改变逻辑链运行语义。raw channel 仍是稳定技术 ID。
+
+Signal Listener 基础配置只允许编辑已存在 listener 的：
+
+- `enabled`
+- `channel`
+- `cooldownTicks`
+
+Listener 使用当前 `SignalListenerStore` 的稳定 `id` 作为 WebAdmin listenerRef。PATCH 只更新上述三个字段，必须保留 listener 名称、id、actions 列表和其它运行统计信息。修改 channel 不会自动创建 channel metadata，也不会自动创建 listener、receiver 或 action_relay。
+
+7.4 不开放：
+
+- 创建 / 删除 / 重命名 listener。
+- 新增 / 删除 / 编辑 / 排序 / 执行 action。
+- command action、signal action、matcher、itemSubmit、interactionItem、consume、container condition、Region、用户、系统设置或 raw JSON 编辑。
+- Scratch-like 编辑器、图谱拖拽编辑、ConditionEngine 或 GameController / MissionSystem。
+
+保存成功会发布轻量 `channel_metadata_changed`、`signal_listener_config_changed`、`config_changed` 和 `write_audit_appended` realtime 事件。前端按当前 route 过滤并静默局部刷新，不整页刷新、不闪屏、不跳顶部、不清空筛选、排序或正在输入的其它表单。
+
 ## channel
 
 channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：

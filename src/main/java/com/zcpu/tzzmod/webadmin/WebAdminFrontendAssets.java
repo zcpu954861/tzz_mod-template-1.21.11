@@ -120,7 +120,7 @@ public final class WebAdminFrontendAssets {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -411,6 +411,8 @@ public final class WebAdminFrontendAssets {
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
+                  maybeReleaseChannelMetadataEditForRoute(hash);
+                  maybeReleaseSignalListenerBasicConfigEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
@@ -450,7 +452,7 @@ public final class WebAdminFrontendAssets {
                   appState.realtime.source=source;
                   source.onopen=()=>{appState.realtime.reconnectAttempt=0;setRealtimeStatus('CONNECTED');};
                   source.onerror=()=>{if(appState.realtime.source===source){source.close();appState.realtime.source=null;scheduleRealtimeReconnect();}};
-                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','device_config_changed','edit_lock_changed','write_audit_appended','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
+                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','device_config_changed','channel_metadata_changed','signal_listener_config_changed','edit_lock_changed','write_audit_appended','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
                     source.addEventListener(type,event=>handleRealtimeEvent(type,event));
                   });
                 }
@@ -483,10 +485,10 @@ public final class WebAdminFrontendAssets {
                 }
                 function shouldHandleRealtimeEvent(hash,event){
                   const type=String(event.type||''), h=String(hash||'#/dashboard');
-                  if(h==='#/dashboard')return ['signal_emitted','history_appended','doctor_changed','device_updated','device_config_changed','config_changed','webadmin_user_connected','webadmin_user_disconnected'].includes(type);
+                  if(h==='#/dashboard')return ['signal_emitted','history_appended','doctor_changed','device_updated','device_config_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','webadmin_user_connected','webadmin_user_disconnected'].includes(type);
                   if(h.startsWith('#/history'))return ['signal_emitted','history_appended'].includes(type);
-                  if(h==='#/signals')return ['signal_emitted','history_appended','doctor_changed'].includes(type);
-                  if(h.startsWith('#/signals/'))return ['signal_emitted','history_appended','doctor_changed'].includes(type)&&event.channel===routeDetailId(h,'#/signals/');
+                  if(h==='#/signals')return ['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','edit_lock_changed'].includes(type);
+                  if(h.startsWith('#/signals/'))return (['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed'].includes(type)&&event.channel===routeDetailId(h,'#/signals/'))||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
                   if(h==='#/devices')return ['device_updated','device_config_changed','config_changed','history_appended'].includes(type);
                   if(h.startsWith('#/devices/'))return event.deviceId&&event.deviceId===routeDetailId(h,'#/devices/');
                   if(h==='#/doctor')return ['doctor_changed','device_updated','signal_emitted','history_appended'].includes(type);
@@ -553,6 +555,8 @@ public final class WebAdminFrontendAssets {
                   if(basic&&!(target&&target.closest&&target.closest('#basic-channel-combo'))){basic.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(basic.deviceId);}
                   const extended=appState.deviceExtendedConfigEdit;
                   if(extended&&!(target&&target.closest&&target.closest('.extended-channel-combo'))){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
+                  const listener=appState.signalListenerBasicConfigEdit;
+                  if(listener&&!(target&&target.closest&&target.closest('.listener-channel-combo'))){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
                 });
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
@@ -661,6 +665,8 @@ public final class WebAdminFrontendAssets {
                 function canEditDeviceMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditDeviceBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditDeviceExtendedConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function canEditChannelMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function canEditSignalListenerBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function csrfToken(){return appState.capabilities?.csrf?.token || '';}
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
@@ -841,6 +847,52 @@ public final class WebAdminFrontendAssets {
                   }catch(err){
                     draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   }
+                }
+                """).append("""
+                function channelMetadataCard(detail){
+                  const meta=detail.metadata||{}, draft=appState.channelMetadataEdit;
+                  if(draft&&draft.channel===detail.channel)return channelMetadataForm(detail,draft);
+                  const canEdit=canEditChannelMetadata(), lock=meta.lockStatus||{};
+                  const lockedByOther=!!lock.locked&&!lock.heldByCurrentUser;
+                  const lockHint=lockedByOther?`<p class="readonly-note">${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</p>`:'';
+                  const action=canEdit&&!lockedByOther?`<button class="secondary" onclick='startChannelMetadataEdit(${jsString(detail.channel)})'>编辑频道显示信息</button>`:(canEdit?lockHint:'<p class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑。</p>');
+                  return `<div class="identity-grid">${row('显示名',esc(meta.displayName||'未设置'))}${row('原始频道',esc(detail.channel))}${row('备注',esc(meta.note||'暂无'))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('最后修改',fmtTime(meta.updatedAt))}${row('修改人',esc(meta.updatedBy||'暂无'))}</div><p class="muted">此信息仅用于 WebAdmin 展示，不会创建频道，也不会改变 SignalBridge 运行语义。</p>${action}`;
+                }
+                function channelMetadataForm(detail,draft){
+                  const errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.field?`${e.field}：`: '')}${esc(e.message||'保存失败')}</li>`).join('')}</ul>`:'';
+                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'频道显示信息已发生冲突，请刷新后再编辑。')} <button class="link-button" onclick='reloadChannelMetadataAfterConflict(${jsString(detail.channel)})'>刷新当前信息</button></div>`:'';
+                  return `<form class="edit-form" onsubmit='event.preventDefault();saveChannelMetadata(${jsString(detail.channel)})'><label>显示名<input id="channel-metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="例如：大厅任务提交成功"></label><label>备注<textarea id="channel-metadata-note" maxlength="512" placeholder="仅用于 WebAdmin 展示">${esc(draft.note||'')}</textarea></label><label>图标<select id="channel-metadata-icon" class="select">${metadataIconOptions().map(key=>`<option value="${esc(key)}" ${key===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(key))}</option>`).join('')}</select></label><p class="readonly-note">正在编辑频道显示信息。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" onclick='cancelChannelMetadataEdit(${jsString(detail.channel)})'>取消</button></div></form>`;
+                }
+                function maybeReleaseChannelMetadataEditForRoute(hash){const draft=appState.channelMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/signals/')){const info=detailRoute(String(hash).substring('#/signals/'.length),'#/signals');if(info.id===draft.channel)return;}releaseChannelMetadataLock(draft,true);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}
+                async function startChannelMetadataEdit(channel){
+                  if(!canEditChannelMetadata())return;
+                  try{
+                    const meta=await api(`/api/webadmin/channel-metadata?channel=${encodeURIComponent(channel)}`);
+                    const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'channel_metadata',targetId:meta.channel||channel})});
+                    if(!result.success){toast(result.message||'无法获取编辑锁');await renderSignalDetail(encodeURIComponent(channel),{silent:true});return;}
+                    const lock=result.data?.lock||{};
+                    appState.channelMetadataEdit={channel:meta.channel||channel,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedFingerprint:meta.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    scheduleChannelMetadataLockHeartbeat();
+                    await renderSignalDetail(encodeURIComponent(channel),{silent:true});
+                  }catch(err){toast(err.message||'无法获取编辑锁');}
+                }
+                async function cancelChannelMetadataEdit(channel){const draft=appState.channelMetadataEdit;if(draft&&draft.channel===channel){await releaseChannelMetadataLock(draft,false);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
+                async function reloadChannelMetadataAfterConflict(channel){const draft=appState.channelMetadataEdit;if(draft&&draft.channel===channel)await releaseChannelMetadataLock(draft,true);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
+                function scheduleChannelMetadataLockHeartbeat(){stopChannelMetadataLockHeartbeat();appState.channelMetadataLockTimer=setTimeout(async()=>{await heartbeatChannelMetadataLock();if(appState.channelMetadataEdit)scheduleChannelMetadataLockHeartbeat();},30000);}
+                function stopChannelMetadataLockHeartbeat(){if(appState.channelMetadataLockTimer){clearTimeout(appState.channelMetadataLockTimer);appState.channelMetadataLockTimer=null;}}
+                async function heartbeatChannelMetadataLock(){const draft=appState.channelMetadataEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'channel_metadata',targetId:draft.channel,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];stopChannelMetadataLockHeartbeat();await renderSignalDetail(encodeURIComponent(draft.channel),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];stopChannelMetadataLockHeartbeat();}}
+                async function releaseChannelMetadataLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'channel_metadata',targetId:draft.channel,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
+                async function saveChannelMetadata(channel){
+                  const draft=appState.channelMetadataEdit||{channel};
+                  draft.displayName=document.getElementById('channel-metadata-display-name')?.value||'';
+                  draft.note=document.getElementById('channel-metadata-note')?.value||'';
+                  draft.iconKey=document.getElementById('channel-metadata-icon')?.value||'auto';
+                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.channelMetadataEdit=draft;renderSignalDetail(encodeURIComponent(channel),{silent:true});
+                  try{
+                    const result=await api(`/api/webadmin/channel-metadata?channel=${encodeURIComponent(channel)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey,expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
+                    if(result.success){appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();toast(result.changed?(result.message||'频道显示信息已保存。'):'没有变更。');await renderSignalDetail(encodeURIComponent(channel),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.channelMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopChannelMetadataLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.channelMetadataEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
                 }
                 function maybeReleaseDeviceBasicConfigEditForRoute(hash){const draft=appState.deviceBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
                 async function startDeviceBasicConfigEdit(deviceId,enabled,channel,expectedFingerprint){
@@ -1250,7 +1302,7 @@ public final class WebAdminFrontendAssets {
                 function filterSignalChannels(items){
                   const f=appState.signalFilters;
                   const filtered=items.filter(c=>{
-                    if(f.search && !String(c.channel||'').toLowerCase().includes(f.search.toLowerCase()))return false;
+                    if(f.search && ![c.channel,c.displayName,c.note].join(' ').toLowerCase().includes(f.search.toLowerCase()))return false;
                     if(f.consumer==='HAS_CONSUMER'&&consumerCount(c)===0)return false;
                     if(f.consumer==='NO_CONSUMER'&&consumerCount(c)>0)return false;
                     if(f.consumer==='HAS_LISTENER'&&Number(c.listenerCount||0)===0)return false;
@@ -1267,16 +1319,21 @@ public final class WebAdminFrontendAssets {
                     return String(b.lastTriggeredAt||'').localeCompare(String(a.lastTriggeredAt||'')) || String(a.channel||'').localeCompare(String(b.channel||''));
                   });
                 }
-                function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>`<tr onclick='navigateTo(${jsString(signalHash(c.channel))})'><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(labelChannelType(c.type))}</span></span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(c.channel))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>`<tr onclick='navigateTo(${jsString(signalHash(c.channel))})'><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(c.channel||'未命名频道')}</span>${!isBlank(c.note)?`<span class="device-subtitle">${esc(c.note)}</span>`:''}</span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(c.channel))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
                 function consumerSummary(c){const count=consumerCount(c);if(count===0)return '<span class="muted">暂无消费者</span>';return `<span class="pill info">${count} 个消费者</span>`}
                 async function renderSignalDetail(channel,options={}){
                   const routeInfo=detailRoute(channel,'#/signals'), decoded=routeInfo.id||'';
                   if(!options.silent)setView(loading('正在加载频道详情...'));
                   let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){if(options.silent){toast('频道详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>${err.status===404?errorBlock('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}`);return;}
+                  const metadataRes=await settle(`/api/webadmin/channel-metadata?channel=${encodeURIComponent(decoded)}`);
+                  if(metadataRes.ok)detail.metadata=metadataRes.data;
+                  const listenerConfigResults=await Promise.all((detail.listeners||[]).map(l=>{const ref=l.id||l.name||'';return ref?settle(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`):Promise.resolve({ok:false});}));
+                  (detail.listeners||[]).forEach((listener,index)=>{const result=listenerConfigResults[index];if(result&&result.ok)listener.basicConfig=result.data;});
+                  const channelMeta=detail.metadata||{}, channelTitle=channelMeta.effectiveDisplayName||detail.channel;
                   const stats=detail.stats||{}, totalConsumers=Number(stats.listenerCount||0)+Number(stats.receiverCount||0)+Number(stats.actionRelayCount||0);
                   setView(`
                     <div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>
-                    <div class="page-head"><div><h1>${esc(detail.channel)}</h1><p>频道详情 / 横向逻辑链 · 只读</p></div><div class="inline-actions">${pill((detail.doctorIssues||[]).some(i=>i.severity==='ERROR')?'ERROR':((detail.doctorIssues||[]).length?'WARNING':'OK'))}<span class="pill info">只读模式</span></div></div>
+                    <div class="page-head"><div><h1>${esc(channelTitle)}</h1><p>${esc(detail.channel)} · 频道详情 / 横向逻辑链</p></div><div class="inline-actions">${pill((detail.doctorIssues||[]).some(i=>i.severity==='ERROR')?'ERROR':((detail.doctorIssues||[]).length?'WARNING':'OK'))}<span class="pill info">基础编辑</span></div></div>
                     <section class="card-grid">
                       ${metric('消费者数量',totalConsumers,'','receiver')}
                       ${metric('监听器',Number(stats.listenerCount||0),'','signal')}
@@ -1288,7 +1345,8 @@ public final class WebAdminFrontendAssets {
                       ${metric('最近触发',formatDateTime(stats.lastTriggeredAt),'','history')}
                     </section>
                     <section class="detail-grid" style="margin-top:16px">
-                      <article class="panel-card overview-card"><h2>频道基础信息</h2><div class="identity-grid">${row('频道名',esc(detail.channel))}${row('频道类型',esc(labelChannelType(detail.type)))}${row('最近触发',fmtTime(stats.lastTriggeredAt))}${row('消费者',esc(`${totalConsumers} 个`))}${row('监听器',esc(Number(stats.listenerCount||0)))}${row('接收器',esc(Number(stats.receiverCount||0)))}${row('动作继电器',esc(Number(stats.actionRelayCount||0)))}</div></article>
+                      <article class="panel-card overview-card"><h2>WebAdmin 频道显示信息</h2>${channelMetadataCard(detail)}</article>
+                      <article class="panel-card overview-card"><h2>频道基础信息</h2><div class="identity-grid">${row('频道名',esc(detail.channel))}${row('显示名',esc(channelTitle))}${row('备注',esc(channelMeta.note||'暂无'))}${row('频道类型',esc(labelChannelType(detail.type)))}${row('最近触发',fmtTime(stats.lastTriggeredAt))}${row('消费者',esc(`${totalConsumers} 个`))}${row('监听器',esc(Number(stats.listenerCount||0)))}${row('接收器',esc(Number(stats.receiverCount||0)))}${row('动作继电器',esc(Number(stats.actionRelayCount||0)))}</div></article>
                       <article class="panel-card overview-card"><h2>横向逻辑链</h2>${logicChain(detail)}</article>
                       <article class="panel-card"><h2>消费者</h2>${endpointGroups(detail)}</article>
                       <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
@@ -1301,7 +1359,7 @@ public final class WebAdminFrontendAssets {
                   return `<div class="logic-chain">
                     <div class="chain-node"><h3>触发源</h3>${endpointCompact(sources,'暂无可推断触发源')}</div>
                     <div class="chain-arrow">→</div>
-                    <div class="chain-node"><h3>频道</h3><strong>${esc(detail.channel)}</strong><span class="muted">${esc(labelChannelType(detail.type))}</span>${pill((detail.doctorIssues||[]).length?'WARNING':'OK')}</div>
+                    <div class="chain-node"><h3>频道</h3><strong>${esc((detail.metadata&&detail.metadata.effectiveDisplayName)||detail.channel)}</strong><span class="muted">${esc(detail.channel)}</span><span class="muted">${esc(labelChannelType(detail.type))}</span>${pill((detail.doctorIssues||[]).length?'WARNING':'OK')}</div>
                     <div class="chain-arrow">→</div>
                     <div class="chain-node"><h3>消费者</h3>${endpointCompact([...listeners,...receivers,...relays],'暂无消费者')}</div>
                     <div class="chain-arrow">→</div>
@@ -1309,11 +1367,95 @@ public final class WebAdminFrontendAssets {
                   </div>`;
                 }
                 function endpointCompact(items,emptyText){if(!items||items.length===0)return `<span class="muted">${esc(emptyText)}</span>`;return items.slice(0,4).map(e=>`<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="muted">(${esc(labelEndpointType(e.type))})</span></span>`).join('');}
+                """).append("""
+                function signalListenerFieldId(ref){return String(ref||'').replace(/[^a-zA-Z0-9_-]/g,'_');}
+                function signalListenerBasicConfigCard(e,detail){
+                  const ref=e.id||e.name||'', draft=appState.signalListenerBasicConfigEdit, isEditing=draft&&draft.listenerRef===ref;
+                  if(isEditing)return signalListenerBasicConfigForm(e,detail,draft);
+                  const cfg=e.basicConfig||{}, lock=cfg.lockStatus||{}, canEdit=canEditSignalListenerBasicConfig(), lockedByOther=!!lock.locked&&!lock.heldByCurrentUser;
+                  const enabled=cfg.listenerRef?cfg.enabled:e.enabled, channel=cfg.listenerRef?cfg.channel:e.channel, cooldown=cfg.listenerRef?cfg.cooldownTicks:e.cooldownTicks, actionCount=cfg.listenerRef?cfg.actionCount:e.actionCount;
+                  const lockHint=lockedByOther?`<div class="readonly-note">${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
+                  const action=canEdit&&!lockedByOther?`<button class="secondary" type="button" onclick='startSignalListenerBasicConfigEdit(${jsString(ref)},${jsString(detail.channel)})'>编辑基础配置</button>`:(canEdit?lockHint:'<span class="muted">需要 EDITOR 或 OWNER 权限才能编辑。</span>');
+                  return `<div class="readonly-note"><div class="kv-row"><span class="muted">基础配置</span><strong>${enabled?'启用':'禁用'} / ${esc(channel||detail.channel||'未设置')} / 冷却 ${esc(cooldown ?? 0)} tick</strong></div><div class="kv-row"><span class="muted">Action</span><strong>${esc(actionCount ?? 0)} 个（只读）</strong></div>${action}</div>`;
+                }
+                function listenerChannelComboOptionsHtml(ref,draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectSignalListenerBasicConfigChannel(${jsString(ref)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function renderSignalListenerConfigChannelCombo(ref,draft){
+                  const id=signalListenerFieldId(ref), open=draft.channelComboOpen?' open':'';
+                  return `<div id="listener-channel-combo-${id}" class="channel-combo listener-channel-combo${open}"><div class="channel-combo-control"><input id="listener-channel-${id}" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="listener-channel-menu-${id}" onfocus='openSignalListenerBasicConfigChannelMenu(${jsString(ref)})' oninput='updateSignalListenerBasicConfigDraftFromForm(${jsString(ref)},true)' onkeydown='handleSignalListenerBasicConfigChannelKey(event,${jsString(ref)})'><button class="channel-combo-toggle" type="button" onclick='toggleSignalListenerBasicConfigChannelMenu(${jsString(ref)})' aria-label="显示已有频道">⌄</button></div><div id="listener-channel-menu-${id}" class="channel-combo-menu" role="listbox">${listenerChannelComboOptionsHtml(ref,draft)}</div></div>`;
+                }
+                function signalListenerBasicConfigForm(e,detail,draft){
+                  const id=signalListenerFieldId(draft.listenerRef), errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(err=>`<li>${esc(err.field?`${err.field}：`: '')}${esc(err.message||'保存失败')}</li>`).join('')}</ul>`:'';
+                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'Listener 基础配置已发生冲突，请刷新后再编辑。')} <button class="link-button" onclick='reloadSignalListenerBasicConfigAfterConflict(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'>刷新当前信息</button></div>`:'';
+                  return `<form class="edit-form" onsubmit='event.preventDefault();saveSignalListenerBasicConfig(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'><label>启用状态<select id="listener-enabled-${id}" class="select"><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label><label>频道${renderSignalListenerConfigChannelCombo(draft.listenerRef,draft)}<span id="listener-channel-hint-${id}" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label>冷却时间（ticks）<input id="listener-cooldown-${id}" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">正在编辑 Signal Listener 基础配置。Action 列表保持只读，不会被修改。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" onclick='cancelSignalListenerBasicConfigEdit(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'>取消</button></div></form>`;
+                }
+                function updateSignalListenerBasicConfigDraftFromForm(ref,openMenu=false){
+                  const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
+                  const id=signalListenerFieldId(ref);
+                  draft.enabled=(document.getElementById(`listener-enabled-${id}`)?.value||'false')==='true';
+                  draft.channel=document.getElementById(`listener-channel-${id}`)?.value||'';
+                  draft.cooldownTicks=document.getElementById(`listener-cooldown-${id}`)?.value||'0';
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  const hint=document.getElementById(`listener-channel-hint-${id}`);
+                  if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
+                  syncSignalListenerBasicConfigChannelCombo(ref);
+                }
+                function syncSignalListenerBasicConfigChannelCombo(ref){
+                  const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
+                  const id=signalListenerFieldId(ref), combo=document.getElementById(`listener-channel-combo-${id}`), menu=document.getElementById(`listener-channel-menu-${id}`), input=document.getElementById(`listener-channel-${id}`);
+                  if(combo)combo.classList.toggle('open',!!draft.channelComboOpen);
+                  if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
+                  if(menu)menu.innerHTML=listenerChannelComboOptionsHtml(ref,draft);
+                }
+                function openSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=true;syncSignalListenerBasicConfigChannelCombo(ref);}
+                function toggleSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=!draft.channelComboOpen;syncSignalListenerBasicConfigChannelCombo(ref);document.getElementById(`listener-channel-${signalListenerFieldId(ref)}`)?.focus();}
+                function selectSignalListenerBasicConfigChannel(ref,channel){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const id=signalListenerFieldId(ref), input=document.getElementById(`listener-channel-${id}`), hint=document.getElementById(`listener-channel-hint-${id}`);if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerBasicConfigChannelCombo(ref);}
+                function handleSignalListenerBasicConfigChannelKey(event,ref){
+                  const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById(`listener-channel-${signalListenerFieldId(ref)}`)?.value||draft.channel);
+                  if(event.key==='Escape'){draft.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(ref);return;}
+                  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSignalListenerBasicConfigChannelCombo(ref);return;}
+                  if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSignalListenerBasicConfigChannel(ref,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
+                }
+                function maybeReleaseSignalListenerBasicConfigEditForRoute(hash){const draft=appState.signalListenerBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/signals/')){const info=detailRoute(String(hash).substring('#/signals/'.length),'#/signals');if(info.id===(draft.routeChannel||draft.channel))return;}releaseSignalListenerBasicConfigLock(draft,true);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}
+                async function startSignalListenerBasicConfigEdit(ref,routeChannel){
+                  if(!canEditSignalListenerBasicConfig())return;
+                  try{
+                    const cfg=await api(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`);
+                    const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'signal_listener_basic_config',targetId:cfg.listenerId||cfg.listenerRef||ref})});
+                    if(!result.success){toast(result.message||'无法获取编辑锁');await renderSignalDetail(encodeURIComponent(routeChannel||cfg.channel||''),{silent:true});return;}
+                    const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();
+                    appState.signalListenerBasicConfigEdit={listenerRef:cfg.listenerRef||ref,listenerId:cfg.listenerId||ref,displayName:cfg.displayName||ref,enabled:!!cfg.enabled,channel:cfg.channel||'',cooldownTicks:cfg.cooldownTicks ?? 0,actionCount:cfg.actionCount||0,actionSummaries:cfg.actionSummaries||[],expectedFingerprint:cfg.expectedFingerprint||'',routeChannel:routeChannel||cfg.channel||'',lockId:lock.lockId||'',lock,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,errors:[],saving:false,conflict:null};
+                    scheduleSignalListenerBasicConfigLockHeartbeat();
+                    await renderSignalDetail(encodeURIComponent(routeChannel||cfg.channel||''),{silent:true});
+                  }catch(err){toast(err.message||'无法获取编辑锁');}
+                }
+                async function cancelSignalListenerBasicConfigEdit(ref,routeChannel){const draft=appState.signalListenerBasicConfigEdit;if(draft&&draft.listenerRef===ref){await releaseSignalListenerBasicConfigLock(draft,false);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}await renderSignalDetail(encodeURIComponent(routeChannel||''),{silent:true});}
+                async function reloadSignalListenerBasicConfigAfterConflict(ref,routeChannel){const draft=appState.signalListenerBasicConfigEdit;if(draft&&draft.listenerRef===ref)await releaseSignalListenerBasicConfigLock(draft,true);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();await renderSignalDetail(encodeURIComponent(routeChannel||''),{silent:true});}
+                function scheduleSignalListenerBasicConfigLockHeartbeat(){stopSignalListenerBasicConfigLockHeartbeat();appState.signalListenerBasicConfigLockTimer=setTimeout(async()=>{await heartbeatSignalListenerBasicConfigLock();if(appState.signalListenerBasicConfigEdit)scheduleSignalListenerBasicConfigLockHeartbeat();},30000);}
+                function stopSignalListenerBasicConfigLockHeartbeat(){if(appState.signalListenerBasicConfigLockTimer){clearTimeout(appState.signalListenerBasicConfigLockTimer);appState.signalListenerBasicConfigLockTimer=null;}}
+                async function heartbeatSignalListenerBasicConfigLock(){const draft=appState.signalListenerBasicConfigEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'signal_listener_basic_config',targetId:draft.listenerId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];stopSignalListenerBasicConfigLockHeartbeat();await renderSignalDetail(encodeURIComponent(draft.routeChannel||draft.channel||''),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];stopSignalListenerBasicConfigLockHeartbeat();}}
+                async function releaseSignalListenerBasicConfigLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'signal_listener_basic_config',targetId:draft.listenerId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
+                async function saveSignalListenerBasicConfig(ref,routeChannel){
+                  const draft=appState.signalListenerBasicConfigEdit||{listenerRef:ref,routeChannel};
+                  updateSignalListenerBasicConfigDraftFromForm(ref,false);
+                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.signalListenerBasicConfigEdit=draft;renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});
+                  try{
+                    const result=await api(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,cooldownTicks:Number(draft.cooldownTicks),expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
+                    if(result.success){appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();toast(result.changed?(result.message||'Signal Listener 基础配置已保存。'):'没有变更。');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.signalListenerBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopSignalListenerBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.signalListenerBasicConfigEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});}
+                }
+                """).append("""
                 function endpointGroups(detail){
                   const groups=[['监听器',detail.listeners||[]],['接收器',detail.receivers||[]],['动作继电器',detail.actionRelays||[]]];
-                  return `<div class="list-stack">${groups.map(([name,items])=>`<div class="endpoint-row"><strong>${esc(name)}：${items.length}</strong>${items.length?items.map(endpointRow).join(''): '<span class="muted">暂无</span>'}</div>`).join('')}</div>`;
+                  return `<div class="list-stack">${groups.map(([name,items])=>`<div class="endpoint-row"><strong>${esc(name)}：${items.length}</strong>${items.length?items.map(e=>endpointRow(e,detail)).join(''): '<span class="muted">暂无</span>'}</div>`).join('')}</div>`;
                 }
-                function endpointRow(e){return `<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="meta">${esc(labelEndpointType(e.type))} / ${esc(labelSubType(e.subType))} / ${e.enabled?'启用':'禁用'}${e.pos?` / ${esc(posText(e.pos))}`:''}</span></span>`}
+                function endpointRow(e,detail){const base=`<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="meta">${esc(labelEndpointType(e.type))} / ${esc(labelSubType(e.subType))} / ${e.enabled?'启用':'禁用'}${e.pos?` / ${esc(posText(e.pos))}`:''}</span></span>`;return String(e.type||'').toUpperCase()==='LISTENER'?`${base}${signalListenerBasicConfigCard(e,detail)}`:base;}
                 function actionsPanel(detail){
                   const actions=detail.actions||[], downstream=detail.downstreamSignals||[];
                   if(actions.length===0&&downstream.length===0)return empty('暂无可用动作详情。');

@@ -14,6 +14,7 @@ import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
+        WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
         LinkedHashSet<String> channels = knownChannels(devices, listeners, regions);
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<WebAdminDtos.SignalChannelListEntryDto> result = new ArrayList<>();
@@ -38,10 +40,18 @@ public final class WebAdminSignalService {
             }
             ChannelCounts counts = counts(channel, devices, listeners, regions);
             SignalEventRecord latest = latest(channel);
+            String fallbackIcon = counts.doctorStatus().equals("OK") ? "signal" : "warning";
+            WebAdminChannelMetadataStore.MetadataEntry metadata = metadataFile.channels.get(channel);
+            WebAdminDtos.ChannelMetadataDto metadataDto = WebAdminChannelMetadataService.dto(
+                    metadata == null ? emptyMetadata(channel) : metadata,
+                    fallbackIcon,
+                    null
+            );
             result.add(new WebAdminDtos.SignalChannelListEntryDto(
                     channel,
-                    channel,
-                    counts.doctorStatus().equals("OK") ? "signal" : "warning",
+                    metadataDto.effectiveDisplayName(),
+                    metadataDto.note(),
+                    metadataDto.effectiveIconKey(),
                     channelType(channel, counts),
                     latest == null ? "" : WebAdminReadonlySupport.isoTime(latest.wallTimeMillis()),
                     historyForChannel(channel).size(),
@@ -61,6 +71,7 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
+        WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
         ChannelCounts counts = counts(channel, devices, listeners, regions);
         SignalEventRecord latest = latest(channel);
         WebAdminDtos.SignalChannelStatsDto stats = new WebAdminDtos.SignalChannelStatsDto(
@@ -95,9 +106,16 @@ public final class WebAdminSignalService {
                     "channel:" + channel
             ));
         }
+        String fallbackIcon = counts.doctorStatus().equals("OK") ? "signal" : "warning";
+        WebAdminDtos.ChannelMetadataDto metadata = WebAdminChannelMetadataService.dto(
+                metadataFile.channels.get(channel) == null ? emptyMetadata(channel) : metadataFile.channels.get(channel),
+                fallbackIcon,
+                null
+        );
         return new WebAdminDtos.SignalChannelDetailDto(
                 channel,
-                counts.doctorStatus().equals("OK") ? "signal" : "warning",
+                metadata,
+                metadata.effectiveIconKey(),
                 channelType(channel, counts),
                 stats,
                 sources,
@@ -237,6 +255,9 @@ public final class WebAdminSignalService {
                         "",
                         null,
                         listener.enabled(),
+                        listener.channel(),
+                        listener.cooldownTicks(),
+                        listener.actions().size(),
                         "listener:" + listener.id()
                 ));
             }
@@ -268,8 +289,15 @@ public final class WebAdminSignalService {
                 device.dimension(),
                 WebAdminReadonlySupport.pos(device),
                 device.enabled(),
+                device.channel(),
+                0,
+                0,
                 "device:" + device.id()
         );
+    }
+
+    private static WebAdminChannelMetadataStore.MetadataEntry emptyMetadata(String channel) {
+        return WebAdminChannelMetadataStore.MetadataEntry.normalized(channel, null);
     }
 
     private List<WebAdminDtos.ActionListEntryDto> actionsForChannel(
