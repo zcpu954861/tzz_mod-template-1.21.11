@@ -4,7 +4,7 @@
 
 - 运行 `./gradlew.bat clean build`，必须通过。
 - 运行 `./gradlew.bat stabilizationGuardTest --rerun-tasks`，必须输出 `Stabilization guard checks passed.`。
-- 确认没有 `6.0.1` / `6.0.2` 阶段编号残留。
+- 确认没有错误 hotfix 阶段编号残留。
 
 ## 2. 权限矩阵
 
