@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.33.0-web-admin-signal-listener-basic-editing
+
+- Added 7.4 WebAdmin Signal channel metadata and Signal Listener basic config editing.
+- Added world-save scoped channel metadata storage at `<world-save-root>/tzz/webadmin/web_admin_channel_metadata.json`.
+- Added safe channel metadata APIs: `GET /api/webadmin/channel-metadata?channel=<channel>` and `PATCH /api/webadmin/channel-metadata?channel=<channel>`.
+- Allowed editing only WebAdmin-only channel `displayName`, `note`, and preset `iconKey`; raw channel IDs and SignalBridge runtime semantics are unchanged.
+- Added safe Signal Listener basic config APIs: `GET /api/webadmin/signal-listener-basic-config/{listenerRef}` and `PATCH /api/webadmin/signal-listener-basic-config/{listenerRef}`.
+- Allowed editing only existing listener `enabled`, `channel`, and `cooldownTicks`.
+- Required `EDITOR` / `OWNER` permission, CSRF / same-origin checks, dedicated edit locks, expected fingerprints, validation, audit, and realtime events for PATCH.
+- Added channel metadata and listener basic config UI in Signal pages, reusing the dark channel combobox for listener channel selection and manual new-channel input.
+- Published lightweight `channel_metadata_changed`, `signal_listener_config_changed`, `config_changed`, and `write_audit_appended` realtime events.
+- Kept 7.4 scope limited: no listener create/delete/rename, no action editing, no action execution, no matcher/itemSubmit/interactionItem/consume/container/region/user/settings/raw JSON editing.
+
 ## v1.32.0-web-admin-device-extended-config
 
 - Added 7.3 WebAdmin device extended basic config editing for simple per-device fields.

@@ -18,6 +18,8 @@ public enum WebAdminRealtimeEventType {
     SYSTEM_SETTINGS_CHANGED("system_settings_changed", "系统设置已变化"),
     DEVICE_CONFIG_CHANGED("device_config_changed", "设备配置已变化"),
     SIGNAL_CONFIG_CHANGED("signal_config_changed", "Signal 配置已变化"),
+    CHANNEL_METADATA_CHANGED("channel_metadata_changed", "频道显示信息已变化"),
+    SIGNAL_LISTENER_CONFIG_CHANGED("signal_listener_config_changed", "Signal Listener 配置已变化"),
     REGION_CONFIG_CHANGED("region_config_changed", "区域配置已变化"),
     ACTION_CONFIG_CHANGED("action_config_changed", "动作配置已变化"),
     EDIT_LOCK_CHANGED("edit_lock_changed", "编辑锁状态已变化"),

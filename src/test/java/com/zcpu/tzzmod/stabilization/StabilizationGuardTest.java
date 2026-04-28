@@ -1,7 +1,10 @@
 package com.zcpu.tzzmod.stabilization;
 
 import com.google.gson.Gson;
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
+import com.zcpu.tzzmod.signal.SignalListenerData;
+import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.BlockStateConditionMode;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionType;
@@ -32,6 +35,7 @@ import com.zcpu.tzzmod.signal.device.item.ItemSubmitInventoryAdapter;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
+import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
@@ -41,6 +45,8 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
@@ -48,6 +54,8 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -825,6 +833,8 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
@@ -833,6 +843,8 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
@@ -842,6 +854,8 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_CHANNEL_METADATA, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_REGION, true);
@@ -877,6 +891,35 @@ public final class StabilizationGuardTest {
         requireTrue(WebAdminDeviceMetadataService.isAllowedIconKey("signal_emitter"), "known metadata icon key is allowed");
         requireFalse(WebAdminDeviceMetadataService.isAllowedIconKey("http_icon"), "unknown metadata icon key is rejected");
 
+        WebAdminChannelMetadataUpdateRequest validChannelMetadata = new WebAdminChannelMetadataUpdateRequest();
+        validChannelMetadata.displayName = "";
+        validChannelMetadata.note = "";
+        validChannelMetadata.iconKey = "auto";
+        requireTrue(WebAdminChannelMetadataService.validateChannel("guard.channel", "guard.channel").isEmpty(), "valid channel metadata target is accepted");
+        requireTrue(WebAdminChannelMetadataService.validateRequest(validChannelMetadata).isEmpty(), "empty channel metadata values are allowed");
+        requireFalse(WebAdminChannelMetadataService.validateChannel("", "").isEmpty(), "empty channel metadata target is rejected");
+        requireFalse(WebAdminChannelMetadataService.validateChannel("bad\u0001channel", "bad\u0001channel").isEmpty(), "control characters in metadata channel are rejected");
+        WebAdminChannelMetadataUpdateRequest longChannelDisplayName = new WebAdminChannelMetadataUpdateRequest();
+        longChannelDisplayName.displayName = "x".repeat(WebAdminChannelMetadataService.MAX_DISPLAY_NAME_LENGTH + 1);
+        longChannelDisplayName.iconKey = "auto";
+        requireFalse(WebAdminChannelMetadataService.validateRequest(longChannelDisplayName).isEmpty(), "long channel display name is rejected");
+        WebAdminChannelMetadataUpdateRequest longChannelNote = new WebAdminChannelMetadataUpdateRequest();
+        longChannelNote.note = "x".repeat(WebAdminChannelMetadataService.MAX_NOTE_LENGTH + 1);
+        longChannelNote.iconKey = "auto";
+        requireFalse(WebAdminChannelMetadataService.validateRequest(longChannelNote).isEmpty(), "long channel note is rejected");
+        WebAdminChannelMetadataUpdateRequest invalidChannelIcon = new WebAdminChannelMetadataUpdateRequest();
+        invalidChannelIcon.iconKey = "https://example.invalid/icon.png";
+        requireFalse(WebAdminChannelMetadataService.validateRequest(invalidChannelIcon).isEmpty(), "external channel icon key is rejected");
+        WebAdminChannelMetadataStore.MetadataEntry channelMetadata = new WebAdminChannelMetadataStore.MetadataEntry();
+        channelMetadata.channel = "guard.channel";
+        channelMetadata.displayName = "Guard Channel";
+        channelMetadata.iconKey = "signal";
+        channelMetadata.version = 1L;
+        String channelMetadataFingerprint = WebAdminChannelMetadataService.fingerprintFor(channelMetadata);
+        WebAdminChannelMetadataStore.MetadataEntry changedChannelMetadata = WebAdminChannelMetadataStore.MetadataEntry.normalized("guard.channel", channelMetadata);
+        changedChannelMetadata.displayName = "Changed Guard Channel";
+        requireFalse(channelMetadataFingerprint.equals(WebAdminChannelMetadataService.fingerprintFor(changedChannelMetadata)), "channel metadata fingerprint detects stale edits");
+
         WebAdminDeviceBasicConfigUpdateRequest validBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
         validBasicConfig.enabled = Boolean.TRUE;
         validBasicConfig.channel = "guard.channel";
@@ -897,6 +940,62 @@ public final class StabilizationGuardTest {
         controlChannelBasicConfig.enabled = Boolean.TRUE;
         controlChannelBasicConfig.channel = "bad\u0001channel";
         requireFalse(WebAdminDeviceBasicConfigService.validateRequest(controlChannelBasicConfig).isEmpty(), "control characters in primary channel are rejected");
+
+        WebAdminSignalListenerBasicConfigUpdateRequest validListenerConfig = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        validListenerConfig.enabled = Boolean.TRUE;
+        validListenerConfig.channel = "guard.listener";
+        validListenerConfig.cooldownTicks = 20;
+        requireTrue(WebAdminSignalListenerBasicConfigService.validateRequest(validListenerConfig).isEmpty(), "valid listener basic config is accepted");
+        WebAdminSignalListenerBasicConfigUpdateRequest invalidListenerEnabled = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        invalidListenerEnabled.enabled = "true";
+        invalidListenerEnabled.channel = "guard.listener";
+        invalidListenerEnabled.cooldownTicks = 20;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(invalidListenerEnabled).isEmpty(), "non-boolean listener enabled is rejected");
+        WebAdminSignalListenerBasicConfigUpdateRequest emptyListenerChannel = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        emptyListenerChannel.enabled = Boolean.TRUE;
+        emptyListenerChannel.channel = "";
+        emptyListenerChannel.cooldownTicks = 20;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(emptyListenerChannel).isEmpty(), "empty listener channel is rejected");
+        WebAdminSignalListenerBasicConfigUpdateRequest longListenerChannel = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        longListenerChannel.enabled = Boolean.TRUE;
+        longListenerChannel.channel = "a".repeat(WebAdminSignalListenerBasicConfigService.MAX_CHANNEL_LENGTH + 1);
+        longListenerChannel.cooldownTicks = 20;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(longListenerChannel).isEmpty(), "long listener channel is rejected");
+        WebAdminSignalListenerBasicConfigUpdateRequest negativeListenerCooldown = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        negativeListenerCooldown.enabled = Boolean.TRUE;
+        negativeListenerCooldown.channel = "guard.listener";
+        negativeListenerCooldown.cooldownTicks = -1;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(negativeListenerCooldown).isEmpty(), "negative listener cooldown is rejected");
+        WebAdminSignalListenerBasicConfigUpdateRequest hugeListenerCooldown = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        hugeListenerCooldown.enabled = Boolean.TRUE;
+        hugeListenerCooldown.channel = "guard.listener";
+        hugeListenerCooldown.cooldownTicks = WebAdminSignalListenerBasicConfigService.MAX_COOLDOWN_TICKS + 1;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(hugeListenerCooldown).isEmpty(), "huge listener cooldown is rejected");
+        WebAdminSignalListenerBasicConfigUpdateRequest fractionalListenerCooldown = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        fractionalListenerCooldown.enabled = Boolean.TRUE;
+        fractionalListenerCooldown.channel = "guard.listener";
+        fractionalListenerCooldown.cooldownTicks = 1.5d;
+        requireFalse(WebAdminSignalListenerBasicConfigService.validateRequest(fractionalListenerCooldown).isEmpty(), "fractional listener cooldown is rejected");
+
+        SignalListenerData listener = new SignalListenerData(
+                "listener-1",
+                "Guard Listener",
+                "guard.listener",
+                true,
+                20,
+                List.of(ActionConfig.command("say hello", false), ActionConfig.signal("guard.downstream", false))
+        ).normalized();
+        String listenerFingerprint = WebAdminSignalListenerBasicConfigService.fingerprintFor(listener);
+        SignalListenerData changedListener = SignalListenerStore.withBasicConfigForWebAdmin(listener, false, "changed.listener", 40);
+        requireFalse(listenerFingerprint.equals(WebAdminSignalListenerBasicConfigService.fingerprintFor(changedListener)), "listener fingerprint detects stale edits");
+        requireEquals(false, changedListener.enabled(), "listener enabled updated");
+        requireEquals("changed.listener", changedListener.channel(), "listener channel updated");
+        requireEquals(40, changedListener.cooldownTicks(), "listener cooldown updated");
+        requireEquals(listener.id(), changedListener.id(), "listener id preserved");
+        requireEquals(listener.name(), changedListener.name(), "listener name preserved");
+        requireEquals(listener.actions().size(), changedListener.actions().size(), "listener actions list preserved");
+        requireEquals(listener.actions().get(0), changedListener.actions().get(0), "listener first action preserved");
+        requireEquals(listener.actions().get(1), changedListener.actions().get(1), "listener second action preserved");
 
         SignalDeviceData baseConfigDevice = fullDevice();
         String baseFingerprint = WebAdminDeviceBasicConfigService.fingerprintFor(baseConfigDevice);
@@ -1177,6 +1276,64 @@ public final class StabilizationGuardTest {
                 basicEditorCsrf,
                 true
         ).success(), "editor can release extended config edit lock");
+        WebAdminEditLockService signalEditLocks = new WebAdminEditLockService(permissions, security, 1_000L);
+        WebAdminEditLockRequest channelMetadataLockRequest = new WebAdminEditLockRequest();
+        channelMetadataLockRequest.targetType = WebAdminEditLockService.TARGET_CHANNEL_METADATA;
+        channelMetadataLockRequest.targetId = "guard.channel";
+        requireFalse(signalEditLocks.acquire(
+                webAdminUser("viewer", WebAdminRole.VIEWER),
+                session,
+                "127.0.0.1",
+                channelMetadataLockRequest,
+                csrfToken,
+                true
+        ).success(), "viewer cannot acquire channel metadata edit lock");
+        WebAdminWriteResult channelMetadataLock = signalEditLocks.acquire(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                channelMetadataLockRequest,
+                basicEditorCsrf,
+                true
+        );
+        requireTrue(channelMetadataLock.success(), "editor can acquire channel metadata edit lock");
+        WebAdminEditLockStatusDto channelMetadataLockStatus = (WebAdminEditLockStatusDto) channelMetadataLock.data().get("lock");
+        requireTrue(signalEditLocks.validateLock(
+                WebAdminEditLockService.TARGET_CHANNEL_METADATA,
+                "guard.channel",
+                channelMetadataLockStatus.lockId(),
+                basicEditor,
+                basicEditorSession
+        ).success(), "channel metadata valid lock accepted");
+        channelMetadataLockRequest.lockId = channelMetadataLockStatus.lockId();
+        requireTrue(signalEditLocks.release(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                channelMetadataLockRequest,
+                basicEditorCsrf,
+                true
+        ).success(), "editor can release channel metadata edit lock");
+        WebAdminEditLockRequest listenerLockRequest = new WebAdminEditLockRequest();
+        listenerLockRequest.targetType = WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG;
+        listenerLockRequest.targetId = "listener-1";
+        WebAdminWriteResult listenerLock = signalEditLocks.acquire(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                listenerLockRequest,
+                basicEditorCsrf,
+                true
+        );
+        requireTrue(listenerLock.success(), "editor can acquire signal listener basic config edit lock");
+        WebAdminEditLockStatusDto listenerLockStatus = (WebAdminEditLockStatusDto) listenerLock.data().get("lock");
+        requireTrue(signalEditLocks.validateLock(
+                WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG,
+                "listener-1",
+                listenerLockStatus.lockId(),
+                basicEditor,
+                basicEditorSession
+        ).success(), "signal listener valid lock accepted");
         requireTrue(security.isSameOriginOrReferer("", "http://127.0.0.1:18080/app#/settings", "127.0.0.1", 18080),
                 "same referer accepted");
         requireFalse(security.isSameOriginOrReferer("", "http://evil.example/app", "127.0.0.1", 18080),
@@ -1253,6 +1410,8 @@ public final class StabilizationGuardTest {
                 WebAdminRealtimeEventType.SYSTEM_SETTINGS_CHANGED,
                 WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.SIGNAL_CONFIG_CHANGED,
+                WebAdminRealtimeEventType.CHANNEL_METADATA_CHANGED,
+                WebAdminRealtimeEventType.SIGNAL_LISTENER_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.REGION_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.EDIT_LOCK_CHANGED
@@ -1279,6 +1438,8 @@ public final class StabilizationGuardTest {
         String capabilitiesJson = WebAdminJsonResponse.GSON.toJson(capabilities);
         requireContains(capabilitiesJson, "metadataWriteEnabled", "capabilities describe metadata write stage");
         requireContains(capabilitiesJson, "deviceExtendedConfigWriteEnabled", "capabilities describe extended config write stage");
+        requireContains(capabilitiesJson, "channelMetadataWriteEnabled", "capabilities describe channel metadata write stage");
+        requireContains(capabilitiesJson, "signalListenerBasicConfigWriteEnabled", "capabilities describe signal listener write stage");
         requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
         requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
         requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
@@ -1291,12 +1452,16 @@ public final class StabilizationGuardTest {
         requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes scoped device metadata write endpoint");
         requireContains(js, "/api/webadmin/device-basic-config/", "frontend exposes scoped device basic config write endpoint");
         requireContains(js, "/api/webadmin/device-extended-config/", "frontend exposes scoped device extended config write endpoint");
+        requireContains(js, "/api/webadmin/channel-metadata?channel=", "frontend exposes scoped channel metadata write endpoint");
+        requireContains(js, "/api/webadmin/signal-listener-basic-config/", "frontend exposes scoped signal listener basic config endpoint");
         requireContains(js, "/api/signals/channels", "basic config channel picker reuses readonly signal channel API");
         requireContains(js, "channel-combo", "basic config channel field uses custom dark combobox");
         requireContains(js, "role=\"combobox\"", "basic config channel field keeps typed input semantics");
         requireContains(js, "handleDeviceBasicConfigChannelKey", "basic config channel combobox supports keyboard handling");
         requireContains(js, "handleDeviceExtendedConfigChannelKey", "extended config channel combobox supports keyboard handling");
+        requireContains(js, "handleSignalListenerBasicConfigChannelKey", "signal listener channel combobox supports keyboard handling");
         requireContains(js, "renderDeviceExtendedConfigChannelCombo", "extended config channel fields reuse dark combobox helper");
+        requireContains(js, "renderSignalListenerConfigChannelCombo", "signal listener channel field reuses dark combobox helper");
         requireContains(js, "channelOptionLabel", "basic config channel candidates include display helper");
         requireFalse(js.contains("<datalist"), "basic config channel picker does not use native datalist menu");
         requireContains(js, "该频道当前未在系统中发现", "basic config channel input warns about unseen channels");
@@ -1306,6 +1471,8 @@ public final class StabilizationGuardTest {
         requireContains(js, "/api/webadmin/edit-locks/release", "frontend releases edit lock after edit");
         requireContains(js, "device_basic_config", "frontend uses distinct basic config edit lock target");
         requireContains(js, "device_extended_config", "frontend uses distinct extended config edit lock target");
+        requireContains(js, "channel_metadata", "frontend uses distinct channel metadata edit lock target");
+        requireContains(js, "signal_listener_basic_config", "frontend uses distinct signal listener edit lock target");
         requireContains(js, "expectedVersion", "frontend sends expectedVersion for metadata writes");
         requireContains(js, "expectedFingerprint", "frontend sends expectedFingerprint for basic config writes");
         requireContains(js, "saveDeviceExtendedConfig", "frontend contains scoped extended config save handler");
@@ -1318,6 +1485,16 @@ public final class StabilizationGuardTest {
         requireContains(js, "lockId", "frontend sends lock id for metadata writes");
         requireContains(js, "edit_lock_changed", "frontend listens for edit lock realtime events");
         requireContains(js, "saveDeviceBasicConfig", "frontend contains scoped basic config save handler");
+        requireContains(js, "saveChannelMetadata", "frontend contains scoped channel metadata save handler");
+        requireContains(js, "onsubmit='event.preventDefault();saveChannelMetadata(", "channel metadata save form uses safe single-quoted submit handler");
+        requireFalse(js.contains("onsubmit=\"event.preventDefault();saveChannelMetadata("), "channel metadata save handler is not truncated by nested double quotes");
+        requireFalse(js.contains("lockedByOther?'disabled':''"), "channel metadata and listener locks hide edit buttons instead of showing disabled ambiguous buttons");
+        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" onclick='startChannelMetadataEdit", "channel metadata hides edit action while another user holds lock");
+        requireContains(js, "saveSignalListenerBasicConfig", "frontend contains scoped signal listener save handler");
+        requireContains(js, "listener.basicConfig=result.data", "signal detail loads listener lock status for readonly lock hint");
+        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" type=\"button\" onclick='startSignalListenerBasicConfigEdit", "signal listener basic config hides edit action while another user holds lock");
+        requireContains(js, "channel_metadata_changed", "frontend listens for channel metadata realtime events");
+        requireContains(js, "signal_listener_config_changed", "frontend listens for signal listener realtime events");
         requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
         requireContains(js, "此信息仅用于 WebAdmin 展示", "metadata edit warning describes display-only scope");
         requireFalse(js.contains("fetch('/api/actions', {method:'PATCH'"), "frontend does not expose action write PATCH");

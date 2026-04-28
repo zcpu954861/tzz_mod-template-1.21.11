@@ -21,6 +21,8 @@ public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_METADATA = "device_metadata";
     public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
     public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
+    public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
+    public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
     private final Map<String, WebAdminEditLock> locks = new ConcurrentHashMap<>();
@@ -439,9 +441,10 @@ public final class WebAdminEditLockService {
         }
         WebAdminRealtimeEvent event = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.EDIT_LOCK_CHANGED)
                 .deviceId(isDeviceLockTarget(lock.targetType()) ? lock.targetId() : "")
+                .channel(TARGET_CHANNEL_METADATA.equals(lock.targetType()) ? lock.targetId() : "")
                 .severity(locked ? "INFO" : "OK")
                 .summary(locked ? "设备显示信息编辑锁已获取。" : "设备显示信息编辑锁已释放。")
-                .routeTarget(isDeviceLockTarget(lock.targetType()) ? "#/devices/" + encode(lock.targetId()) : "")
+                .routeTarget(routeTarget(lock))
                 .payload("targetType", lock.targetType())
                 .payload("targetId", lock.targetId())
                 .payload("locked", locked)
@@ -506,7 +509,26 @@ public final class WebAdminEditLockService {
         if (TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG;
         }
+        if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_CHANNEL_METADATA;
+        }
+        if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG;
+        }
         return null;
+    }
+
+    private static String routeTarget(WebAdminEditLock lock) {
+        if (isDeviceLockTarget(lock.targetType())) {
+            return "#/devices/" + encode(lock.targetId());
+        }
+        if (TARGET_CHANNEL_METADATA.equals(lock.targetType())) {
+            return "#/signals/" + encode(lock.targetId());
+        }
+        if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(lock.targetType())) {
+            return "#/signals";
+        }
+        return "";
     }
 
     private static String iso(long epochMillis) {

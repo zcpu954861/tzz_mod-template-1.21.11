@@ -7,12 +7,16 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
@@ -46,6 +50,8 @@ public final class WebAdminServer {
     private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -188,6 +194,14 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/device-extended-config/")) {
                 handleDeviceExtendedConfig(exchange, auth, path, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/channel-metadata")) {
+                handleChannelMetadata(exchange, auth, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/signal-listener-basic-config/")) {
+                handleSignalListenerBasicConfig(exchange, auth, path, method);
                 return;
             }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
@@ -447,6 +461,81 @@ public final class WebAdminServer {
                 request,
                 csrfToken,
                 sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleChannelMetadata(HttpExchange exchange, AuthContext auth, String method) throws IOException {
+        Map<String, String> query = queryParams(exchange);
+        String channel = query.getOrDefault("channel", "");
+        if (channel.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "频道不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            WebAdminJsonResponse.ok(exchange, channelMetadataService.metadataFor(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    channel,
+                    "signal"
+            ));
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH。");
+            return;
+        }
+        WebAdminChannelMetadataUpdateRequest request = readJson(exchange, WebAdminChannelMetadataUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminChannelMetadataUpdateRequest();
+        }
+        request.channel = channel;
+        WebAdminWriteResult result = channelMetadataService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleSignalListenerBasicConfig(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/signal-listener-basic-config/";
+        String listenerRef = decodePathSegment(path.substring(prefix.length()));
+        if (listenerRef.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Listener 引用不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            var config = signalListenerBasicConfigService.configFor(minecraftServer, auth.user, auth.session, listenerRef);
+            if (config == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 不存在或引用不唯一。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, config);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH。");
+            return;
+        }
+        WebAdminSignalListenerBasicConfigUpdateRequest request = readJson(exchange, WebAdminSignalListenerBasicConfigUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        }
+        request.listenerRef = listenerRef;
+        WebAdminWriteResult result = signalListenerBasicConfigService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
         );
         WebAdminJsonResponse.ok(exchange, result);
     }

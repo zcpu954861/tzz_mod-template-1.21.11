@@ -100,6 +100,7 @@ public final class WebAdminDtos {
     public record SignalChannelListEntryDto(
             String channel,
             String displayName,
+            String note,
             String iconKey,
             String type,
             String lastTriggeredAt,
@@ -110,6 +111,21 @@ public final class WebAdminDtos {
             int actionRelayCount,
             int downstreamSignalCount,
             String doctorStatus
+    ) {
+    }
+
+    public record ChannelMetadataDto(
+            String channel,
+            String displayName,
+            String note,
+            String iconKey,
+            String effectiveDisplayName,
+            String effectiveIconKey,
+            String updatedAt,
+            String updatedBy,
+            long version,
+            String expectedFingerprint,
+            WebAdminEditLockStatusDto lockStatus
     ) {
     }
 
@@ -132,12 +148,30 @@ public final class WebAdminDtos {
             String world,
             PositionDto pos,
             boolean enabled,
+            String channel,
+            int cooldownTicks,
+            int actionCount,
             String navigationTarget
+    ) {
+    }
+
+    public record SignalListenerBasicConfigDto(
+            String listenerRef,
+            String listenerId,
+            String displayName,
+            boolean enabled,
+            String channel,
+            int cooldownTicks,
+            int actionCount,
+            List<String> actionSummaries,
+            String expectedFingerprint,
+            WebAdminEditLockStatusDto lockStatus
     ) {
     }
 
     public record SignalChannelDetailDto(
             String channel,
+            ChannelMetadataDto metadata,
             String iconKey,
             String type,
             SignalChannelStatsDto stats,

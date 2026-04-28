@@ -88,6 +88,35 @@ public final class SignalListenerStore {
         ).normalized());
     }
 
+    public static synchronized SignalListenerData updateBasicConfigForWebAdmin(
+            MinecraftServer server,
+            String listenerRef,
+            boolean enabled,
+            String channel,
+            int cooldownTicks
+    ) {
+        return replaceReturning(server, listenerRef, listener -> withBasicConfigForWebAdmin(listener, enabled, channel, cooldownTicks));
+    }
+
+    public static SignalListenerData withBasicConfigForWebAdmin(
+            SignalListenerData listener,
+            boolean enabled,
+            String channel,
+            int cooldownTicks
+    ) {
+        if (listener == null) {
+            return null;
+        }
+        return new SignalListenerData(
+                listener.id(),
+                listener.name(),
+                SignalChannel.normalize(channel),
+                enabled,
+                cooldownTicks,
+                listener.actions()
+        ).normalized();
+    }
+
     public static synchronized boolean addAction(MinecraftServer server, String listenerRef, ActionConfig action) {
         if (action == null) {
             return false;
@@ -162,9 +191,13 @@ public final class SignalListenerStore {
     }
 
     private static boolean replace(MinecraftServer server, String listenerRef, Function<SignalListenerData, SignalListenerData> updater) {
+        return replaceReturning(server, listenerRef, updater) != null;
+    }
+
+    private static SignalListenerData replaceReturning(MinecraftServer server, String listenerRef, Function<SignalListenerData, SignalListenerData> updater) {
         ResolveResult resolved = resolveListener(server, listenerRef);
         if (!resolved.foundUnique()) {
-            return false;
+            return null;
         }
         State state = getState(server);
         for (int i = 0; i < state.listeners.size(); i++) {
@@ -172,11 +205,12 @@ public final class SignalListenerStore {
             if (!listener.id().equals(resolved.listener().id())) {
                 continue;
             }
-            state.listeners.set(i, updater.apply(listener).normalized());
+            SignalListenerData updated = updater.apply(listener).normalized();
+            state.listeners.set(i, updated);
             state.markDirty();
-            return true;
+            return updated;
         }
-        return false;
+        return null;
     }
 
     private static State getState(MinecraftServer server) {
