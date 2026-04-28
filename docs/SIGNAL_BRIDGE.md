@@ -965,6 +965,40 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.8 实时同步基础
+
+6.8 建立 WebAdmin 只读实时同步基础。当前阶段采用认证后的 Server-Sent Events / Event Stream：
+
+```text
+GET /api/realtime/events
+```
+
+该连接必须携带有效 WebAdmin session cookie；未登录或 session 无效时不能建立连接。事件流只用于只读通知，不接受客户端写操作。
+
+### 事件驱动边界
+
+- 服务端只在状态变化时推送轻量事件。
+- 当前真实接入：`realtime_connected`、`heartbeat`、`webadmin_user_connected`、`webadmin_user_disconnected`、`signal_emitted`、`history_appended`。
+- 预留类型：`device_updated`、`doctor_changed`、`action_executed`、`receiver_pulse`、`region_event`、`config_changed`。
+- 事件不包含完整 devices / history / doctor DTO。
+- 事件不包含 password hash、salt、session token、cookie value 或内部大对象。
+- 慢客户端使用有界队列保护，断开后释放资源。
+
+### 前端处理方式
+
+WebAdmin 登录后建立 realtime event stream，topbar 显示实时同步状态和最后事件时间。前端收到事件后按当前 hash route 过滤：
+
+- Dashboard 处理 Signal/history/doctor/device/session 相关提示。
+- History 处理 `history_appended` / `signal_emitted`。
+- Signal 列表处理频道相关事件。
+- Signal 详情仅处理当前 channel 匹配事件。
+- Device 详情仅处理当前 deviceId 匹配事件。
+- Region / Action 详情仅处理对应 regionId / actionId 匹配事件。
+
+当前阶段采用“事件通知 + 当前页面静默局部 refetch”的稳定策略，并带 700ms 合并窗口和 pending guard，避免高频事件造成 API 风暴。浏览器标签页在后台时只记录 dirty route，回到前台后再刷新当前相关页面；刷新会保留滚动位置、筛选条件和折叠状态。6.8 不做全站轮询、不做 WebSocket 配置项、不做自动修复、不做配置写入。
+
+更多实现说明见 `docs/WEBADMIN_REALTIME_SYNC_6_8.md`，回归测试见 `docs/REGRESSION_TEST_6_8.md`。
+
 ## WebAdmin 6.7 只读层稳定化 / 前端架构整理
 
 6.7 是 WebAdmin 只读观察层稳定化阶段，不新增业务页面、不新增写 API、不接入 WebSocket。当前 WebAdmin 只读覆盖范围包括：
