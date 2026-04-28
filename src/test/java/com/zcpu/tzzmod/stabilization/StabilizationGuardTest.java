@@ -37,6 +37,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
@@ -45,6 +46,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
@@ -822,6 +824,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
@@ -829,6 +832,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
@@ -837,6 +841,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.RELEASE_EDIT_LOCK, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_REGION, true);
@@ -906,6 +911,100 @@ public final class StabilizationGuardTest {
         requireEquals(false, changedBasicConfig.enabled(), "enabled updated");
         requireEquals(baseConfigDevice.offChannel(), changedBasicConfig.offChannel(), "offChannel preserved by basic config edit");
         requireEquals(baseConfigDevice.mode(), changedBasicConfig.mode(), "redstone mode preserved by basic config edit");
+
+        WebAdminDeviceExtendedConfigUpdateRequest validExtendedConfig = new WebAdminDeviceExtendedConfigUpdateRequest();
+        validExtendedConfig.interactChannel = "guard.ext.interact";
+        validExtendedConfig.successChannel = "guard.ext.success";
+        validExtendedConfig.failChannel = "guard.ext.fail";
+        validExtendedConfig.interactionCooldownTicks = 20;
+        requireTrue(WebAdminDeviceExtendedConfigService.validateRequest(validExtendedConfig, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_INTERACT_CHANNEL,
+                WebAdminDeviceExtendedConfigService.FIELD_SUCCESS_CHANNEL,
+                WebAdminDeviceExtendedConfigService.FIELD_FAIL_CHANNEL,
+                WebAdminDeviceExtendedConfigService.FIELD_INTERACTION_COOLDOWN_TICKS
+        )).isEmpty(), "valid virtual block extended config is accepted");
+        WebAdminDeviceExtendedConfigUpdateRequest unsupportedPulse = new WebAdminDeviceExtendedConfigUpdateRequest();
+        unsupportedPulse.pulseTicks = 4;
+        requireFalse(WebAdminDeviceExtendedConfigService.validateRequest(unsupportedPulse, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_INTERACT_CHANNEL
+        )).isEmpty(), "unsupported extended field is rejected");
+        WebAdminDeviceExtendedConfigUpdateRequest longExtendedChannel = new WebAdminDeviceExtendedConfigUpdateRequest();
+        longExtendedChannel.successChannel = "a".repeat(WebAdminDeviceExtendedConfigService.MAX_CHANNEL_LENGTH + 1);
+        requireFalse(WebAdminDeviceExtendedConfigService.validateRequest(longExtendedChannel, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_SUCCESS_CHANNEL
+        )).isEmpty(), "long extended channel is rejected");
+        WebAdminDeviceExtendedConfigUpdateRequest controlExtendedChannel = new WebAdminDeviceExtendedConfigUpdateRequest();
+        controlExtendedChannel.failChannel = "bad\u0001channel";
+        requireFalse(WebAdminDeviceExtendedConfigService.validateRequest(controlExtendedChannel, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_FAIL_CHANNEL
+        )).isEmpty(), "control characters in extended channel are rejected");
+        WebAdminDeviceExtendedConfigUpdateRequest clearExtendedChannel = new WebAdminDeviceExtendedConfigUpdateRequest();
+        clearExtendedChannel.clearSuccessChannel = Boolean.TRUE;
+        requireTrue(WebAdminDeviceExtendedConfigService.validateRequest(clearExtendedChannel, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_SUCCESS_CHANNEL
+        )).isEmpty(), "optional extended channel can be explicitly cleared");
+        WebAdminDeviceExtendedConfigUpdateRequest validPulse = new WebAdminDeviceExtendedConfigUpdateRequest();
+        validPulse.pulseTicks = 1;
+        requireTrue(WebAdminDeviceExtendedConfigService.validateRequest(validPulse, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_PULSE_TICKS
+        )).isEmpty(), "valid receiver pulse ticks are accepted");
+        WebAdminDeviceExtendedConfigUpdateRequest invalidPulse = new WebAdminDeviceExtendedConfigUpdateRequest();
+        invalidPulse.pulseTicks = 0;
+        requireFalse(WebAdminDeviceExtendedConfigService.validateRequest(invalidPulse, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_PULSE_TICKS
+        )).isEmpty(), "zero receiver pulse ticks are rejected");
+        WebAdminDeviceExtendedConfigUpdateRequest negativeCooldown = new WebAdminDeviceExtendedConfigUpdateRequest();
+        negativeCooldown.interactionCooldownTicks = -1;
+        requireFalse(WebAdminDeviceExtendedConfigService.validateRequest(negativeCooldown, List.of(
+                WebAdminDeviceExtendedConfigService.FIELD_INTERACTION_COOLDOWN_TICKS
+        )).isEmpty(), "negative extended cooldown ticks are rejected");
+        String extendedFingerprint = WebAdminDeviceExtendedConfigService.fingerprintFor(baseConfigDevice);
+        requireTrue(WebAdminDeviceExtendedConfigService.fingerprintMatches(baseConfigDevice, extendedFingerprint), "extended config fingerprint matches current device");
+        SignalDeviceStore.ExtendedConfigPatch extendedPatch = new SignalDeviceStore.ExtendedConfigPatch(
+                "changed.interact",
+                true,
+                false,
+                "changed.success",
+                true,
+                false,
+                "changed.fail",
+                true,
+                false,
+                0,
+                null,
+                null
+        );
+        SignalDeviceData changedExtendedConfig = SignalDeviceStore.withExtendedConfigForWebAdmin(baseConfigDevice, extendedPatch);
+        requireFalse(WebAdminDeviceExtendedConfigService.fingerprintMatches(changedExtendedConfig, extendedFingerprint), "extended config fingerprint detects stale edits");
+        requireEquals("changed.interact", changedExtendedConfig.interactChannel(), "interact channel updated by extended config edit");
+        requireEquals(0, changedExtendedConfig.interactionCooldownTicks(), "interaction cooldown updated by extended config edit");
+        requireEquals("changed.success", changedExtendedConfig.interactionItemMatcher().successChannel(), "success channel updated by extended config edit");
+        requireEquals("changed.fail", changedExtendedConfig.interactionItemMatcher().failChannel(), "fail channel updated by extended config edit");
+        requireEquals(baseConfigDevice.channel(), changedExtendedConfig.channel(), "primary channel preserved by extended config edit");
+        requireEquals(baseConfigDevice.enabled(), changedExtendedConfig.enabled(), "enabled preserved by extended config edit");
+        requireEquals(baseConfigDevice.interactionItemMatcher().templateItemId(), changedExtendedConfig.interactionItemMatcher().templateItemId(), "matcher template item preserved by extended config edit");
+        requireEquals(baseConfigDevice.interactionItemMatcher().consumeCount(), changedExtendedConfig.interactionItemMatcher().consumeCount(), "matcher consume count preserved by extended config edit");
+        assertSubmitPreserved(baseConfigDevice, changedExtendedConfig);
+        assertContainerPreserved(baseConfigDevice, changedExtendedConfig);
+        assertItemConditionsPreserved(baseConfigDevice, changedExtendedConfig);
+        assertRedstoneAndConditionPreserved(baseConfigDevice, changedExtendedConfig);
+        SignalDeviceData clearedExtendedConfig = SignalDeviceStore.withExtendedConfigForWebAdmin(baseConfigDevice, new SignalDeviceStore.ExtendedConfigPatch(
+                "",
+                false,
+                false,
+                "",
+                true,
+                true,
+                "",
+                true,
+                true,
+                null,
+                null,
+                null
+        ));
+        requireEquals("", clearedExtendedConfig.interactionItemMatcher().successChannel(), "success channel can be cleared explicitly");
+        requireEquals("", clearedExtendedConfig.interactionItemMatcher().failChannel(), "fail channel can be cleared explicitly");
+        assertSubmitPreserved(baseConfigDevice, clearedExtendedConfig);
 
         WebAdminWriteTarget target = new WebAdminWriteTarget("DEVICE", "device-1", "测试设备");
         WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA).asWriteResult(target);
@@ -1031,6 +1130,53 @@ public final class StabilizationGuardTest {
                 true
         );
         requireTrue(basicLockRelease.success(), "editor can release basic config edit lock");
+        WebAdminEditLockService extendedConfigLocks = new WebAdminEditLockService(permissions, security, 1_000L);
+        WebAdminEditLockRequest extendedLockRequest = new WebAdminEditLockRequest();
+        extendedLockRequest.targetType = WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG;
+        extendedLockRequest.targetId = baseConfigDevice.id();
+        WebAdminWriteResult viewerExtendedLock = extendedConfigLocks.acquire(
+                webAdminUser("viewer", WebAdminRole.VIEWER),
+                session,
+                "127.0.0.1",
+                extendedLockRequest,
+                csrfToken,
+                true
+        );
+        requireFalse(viewerExtendedLock.success(), "viewer cannot acquire extended config edit lock");
+        WebAdminWriteResult editorExtendedLock = extendedConfigLocks.acquire(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                extendedLockRequest,
+                basicEditorCsrf,
+                true
+        );
+        requireTrue(editorExtendedLock.success(), "editor can acquire extended config edit lock");
+        WebAdminEditLockStatusDto extendedLockStatus = (WebAdminEditLockStatusDto) editorExtendedLock.data().get("lock");
+        requireNotBlank(extendedLockStatus.lockId(), "extended config lock id returned");
+        requireTrue(extendedConfigLocks.validateLock(
+                WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG,
+                baseConfigDevice.id(),
+                extendedLockStatus.lockId(),
+                basicEditor,
+                basicEditorSession
+        ).success(), "extended config valid lock accepted");
+        requireFalse(extendedConfigLocks.validateLock(
+                WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG,
+                baseConfigDevice.id(),
+                "wrong-lock",
+                basicEditor,
+                basicEditorSession
+        ).success(), "wrong extended config lock rejected");
+        extendedLockRequest.lockId = extendedLockStatus.lockId();
+        requireTrue(extendedConfigLocks.release(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                extendedLockRequest,
+                basicEditorCsrf,
+                true
+        ).success(), "editor can release extended config edit lock");
         requireTrue(security.isSameOriginOrReferer("", "http://127.0.0.1:18080/app#/settings", "127.0.0.1", 18080),
                 "same referer accepted");
         requireFalse(security.isSameOriginOrReferer("", "http://evil.example/app", "127.0.0.1", 18080),
@@ -1132,6 +1278,7 @@ public final class StabilizationGuardTest {
         Map<String, Object> capabilities = new WebAdminWriteFoundationService(security).capabilities(owner, session);
         String capabilitiesJson = WebAdminJsonResponse.GSON.toJson(capabilities);
         requireContains(capabilitiesJson, "metadataWriteEnabled", "capabilities describe metadata write stage");
+        requireContains(capabilitiesJson, "deviceExtendedConfigWriteEnabled", "capabilities describe extended config write stage");
         requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
         requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
         requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
@@ -1143,10 +1290,13 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
         requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes scoped device metadata write endpoint");
         requireContains(js, "/api/webadmin/device-basic-config/", "frontend exposes scoped device basic config write endpoint");
+        requireContains(js, "/api/webadmin/device-extended-config/", "frontend exposes scoped device extended config write endpoint");
         requireContains(js, "/api/signals/channels", "basic config channel picker reuses readonly signal channel API");
         requireContains(js, "channel-combo", "basic config channel field uses custom dark combobox");
         requireContains(js, "role=\"combobox\"", "basic config channel field keeps typed input semantics");
         requireContains(js, "handleDeviceBasicConfigChannelKey", "basic config channel combobox supports keyboard handling");
+        requireContains(js, "handleDeviceExtendedConfigChannelKey", "extended config channel combobox supports keyboard handling");
+        requireContains(js, "renderDeviceExtendedConfigChannelCombo", "extended config channel fields reuse dark combobox helper");
         requireContains(js, "channelOptionLabel", "basic config channel candidates include display helper");
         requireFalse(js.contains("<datalist"), "basic config channel picker does not use native datalist menu");
         requireContains(js, "该频道当前未在系统中发现", "basic config channel input warns about unseen channels");
@@ -1155,8 +1305,16 @@ public final class StabilizationGuardTest {
         requireContains(js, "/api/webadmin/edit-locks/heartbeat", "frontend heartbeats edit lock during metadata edit");
         requireContains(js, "/api/webadmin/edit-locks/release", "frontend releases edit lock after edit");
         requireContains(js, "device_basic_config", "frontend uses distinct basic config edit lock target");
+        requireContains(js, "device_extended_config", "frontend uses distinct extended config edit lock target");
         requireContains(js, "expectedVersion", "frontend sends expectedVersion for metadata writes");
         requireContains(js, "expectedFingerprint", "frontend sends expectedFingerprint for basic config writes");
+        requireContains(js, "saveDeviceExtendedConfig", "frontend contains scoped extended config save handler");
+        requireContains(js, "clearInteractChannel", "frontend can explicitly clear optional interact channel");
+        requireContains(js, "clearSuccessChannel", "frontend can explicitly clear optional success channel");
+        requireContains(js, "clearFailChannel", "frontend can explicitly clear optional fail channel");
+        requireContains(js, "interactionCooldownTicks", "frontend exposes interaction cooldown as an extended config field");
+        requireContains(js, "pulseTicks", "frontend exposes receiver pulse ticks as an extended config field");
+        requireContains(js, "cooldownTicks", "frontend exposes action relay cooldown as an extended config field");
         requireContains(js, "lockId", "frontend sends lock id for metadata writes");
         requireContains(js, "edit_lock_changed", "frontend listens for edit lock realtime events");
         requireContains(js, "saveDeviceBasicConfig", "frontend contains scoped basic config save handler");

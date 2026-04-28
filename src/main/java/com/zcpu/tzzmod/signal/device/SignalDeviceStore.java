@@ -233,6 +233,138 @@ public final class SignalDeviceStore {
         return withVirtualSettings(device.normalized(), SignalChannel.normalize(channel), device.offChannel(), device.mode(), enabled);
     }
 
+    public static synchronized SignalDeviceData updateExtendedConfig(MinecraftServer server, String deviceId, ExtendedConfigPatch patch) {
+        if (server == null || deviceId == null || deviceId.isBlank() || patch == null) {
+            return null;
+        }
+        State state = getState(server);
+        refreshLoadedDevices(server, state);
+        SignalDeviceData existing = findById(state, cleanUserText(deviceId));
+        if (existing == null) {
+            return null;
+        }
+
+        SignalDeviceData updated = null;
+        if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(existing.type())) {
+            updated = applyVirtualExtendedPatch(existing, patch);
+            replaceOrAdd(state, updated);
+            state.markDirty();
+        } else {
+            ServerWorld world = getDeviceWorld(server, existing);
+            if (world == null) {
+                return null;
+            }
+            BlockPos pos = new BlockPos(existing.x(), existing.y(), existing.z());
+            if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(existing.type()) && patch.pulseTicks() != null) {
+                SignalReceiverBlockEntity receiver = getLoadedReceiver(server, existing);
+                if (receiver == null) {
+                    return null;
+                }
+                receiver.setPulseTicks(patch.pulseTicks());
+                updated = updatePulse(world, pos, receiver);
+            } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(existing.type()) && patch.cooldownTicks() != null) {
+                ActionRelayBlockEntity relay = getLoadedActionRelay(server, existing);
+                if (relay == null) {
+                    return null;
+                }
+                relay.setCooldownTicks(patch.cooldownTicks());
+                updated = updateCooldown(world, pos, relay);
+            }
+        }
+        if (updated != null) {
+            state.flushDirty(true, currentGameTime(server));
+        }
+        return updated == null ? null : updated.normalized();
+    }
+
+    public static SignalDeviceData withExtendedConfigForWebAdmin(SignalDeviceData device, ExtendedConfigPatch patch) {
+        if (device == null || patch == null) {
+            return device;
+        }
+        SignalDeviceData normalized = device.normalized();
+        if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(normalized.type())) {
+            return applyVirtualExtendedPatch(normalized, patch);
+        }
+        if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(normalized.type()) && patch.pulseTicks() != null) {
+            return withPulseCooldown(normalized, patch.pulseTicks(), normalized.cooldownTicks());
+        }
+        if (SignalDeviceData.TYPE_ACTION_RELAY.equals(normalized.type()) && patch.cooldownTicks() != null) {
+            return withPulseCooldown(normalized, normalized.pulseTicks(), patch.cooldownTicks());
+        }
+        return normalized;
+    }
+
+    private static SignalDeviceData applyVirtualExtendedPatch(SignalDeviceData existing, ExtendedConfigPatch patch) {
+        SignalDeviceData updated = existing.normalized();
+        if (patch.updateInteractChannel()) {
+            String normalizedChannel = patch.clearInteractChannel() ? "" : SignalChannel.normalize(patch.interactChannel());
+            updated = withInteraction(
+                    updated,
+                    !normalizedChannel.isBlank(),
+                    normalizedChannel,
+                    updated.interactionCooldownTicks(),
+                    updated.lastInteractionGameTime(),
+                    updated.lastInteractionWallTimeMillis(),
+                    updated.lastInteractionPlayerName(),
+                    updated.lastInteractionPlayerUuid(),
+                    updated.lastInteractionResult(),
+                    updated.lastInteractionHand(),
+                    updated.lastInteractionSide()
+            );
+        }
+        if (patch.interactionCooldownTicks() != null) {
+            updated = withInteraction(
+                    updated,
+                    updated.interactionEnabled(),
+                    updated.interactChannel(),
+                    patch.interactionCooldownTicks(),
+                    updated.lastInteractionGameTime(),
+                    updated.lastInteractionWallTimeMillis(),
+                    updated.lastInteractionPlayerName(),
+                    updated.lastInteractionPlayerUuid(),
+                    updated.lastInteractionResult(),
+                    updated.lastInteractionHand(),
+                    updated.lastInteractionSide()
+            );
+        }
+        ItemStackMatcherData matcher = updated.interactionItemMatcher();
+        boolean matcherChanged = false;
+        if (patch.updateSuccessChannel()) {
+            matcher = ItemStackMatcherSupport.withSuccessChannel(matcher, patch.clearSuccessChannel() ? "" : SignalChannel.normalize(patch.successChannel()));
+            matcherChanged = true;
+        }
+        if (patch.updateFailChannel()) {
+            matcher = ItemStackMatcherSupport.withFailChannel(matcher, patch.clearFailChannel() ? "" : SignalChannel.normalize(patch.failChannel()));
+            matcherChanged = true;
+        }
+        if (matcherChanged) {
+            updated = withInteractionItemMatcher(
+                    updated,
+                    updated.interactionItemMatcherEnabled(),
+                    matcher,
+                    updated.lastInteractionItemMatched(),
+                    updated.lastInteractionItemResult()
+            );
+        }
+        return updated.normalized();
+    }
+
+    public record ExtendedConfigPatch(
+            String interactChannel,
+            boolean updateInteractChannel,
+            boolean clearInteractChannel,
+            String successChannel,
+            boolean updateSuccessChannel,
+            boolean clearSuccessChannel,
+            String failChannel,
+            boolean updateFailChannel,
+            boolean clearFailChannel,
+            Integer interactionCooldownTicks,
+            Integer pulseTicks,
+            Integer cooldownTicks
+    ) {
+    }
+
     public static synchronized SignalDeviceData refreshVirtualBlock(ServerWorld world, BlockPos pos) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
@@ -3036,6 +3168,83 @@ public final class SignalDeviceStore {
                 device.pulseTicks(),
                 device.remainingPulseTicks(),
                 device.cooldownTicks(),
+                device.actionCount(),
+                device.createdWallTimeMillis(),
+                System.currentTimeMillis(),
+                device.lastTriggerGameTime(),
+                device.lastTriggerWallTimeMillis(),
+                device.lastResult(),
+                device.blockId(),
+                device.offChannel(),
+                device.mode(),
+                device.lastPowered(),
+                device.lastPowerLevel(),
+                device.conditionEnabled(),
+                device.conditionBlockId(),
+                device.conditionProperties(),
+                device.conditionRaw(),
+                device.conditionMode(),
+                device.lastConditionMatched(),
+                device.lastConditionCheckGameTime(),
+                device.lastConditionResult(),
+                device.interactionEnabled(),
+                device.interactChannel(),
+                device.interactionCooldownTicks(),
+                device.lastInteractionGameTime(),
+                device.lastInteractionWallTimeMillis(),
+                device.lastInteractionPlayerName(),
+                device.lastInteractionPlayerUuid(),
+                device.lastInteractionResult(),
+                device.lastInteractionHand(),
+                device.lastInteractionSide(),
+                device.containerEnabled(),
+                device.containerOpenChannel(),
+                device.containerCloseChannel(),
+                device.containerChangeChannel(),
+                device.containerCooldownTicks(),
+                device.containerChangeCheckIntervalTicks(),
+                device.lastContainerCheckGameTime(),
+                device.lastContainerFingerprint(),
+                device.lastContainerOpenGameTime(),
+                device.lastContainerOpenWallTimeMillis(),
+                device.lastContainerCloseGameTime(),
+                device.lastContainerCloseWallTimeMillis(),
+                device.lastContainerChangeGameTime(),
+                device.lastContainerChangeWallTimeMillis(),
+                device.lastContainerPlayerName(),
+                device.lastContainerPlayerUuid(),
+                device.lastContainerResult(),
+                device.lastContainerEventType(),
+                device.itemConditions(),
+                device.interactionItemMatcherEnabled(),
+                device.interactionItemMatcher(),
+                device.lastInteractionItemMatched(),
+                device.lastInteractionItemResult(),
+                device.itemSubmitEnabled(),
+                device.itemSubmitConsumeEnabled(),
+                device.itemSubmitConsumeOrder(),
+                device.itemSubmitRequirements(),
+                device.lastItemSubmitMatched(),
+                device.lastItemSubmitFailureReason(),
+                device.lastItemSubmitConsumedSummary(),
+                device.lastItemSubmitResult()
+        ).normalized();
+    }
+
+    private static SignalDeviceData withPulseCooldown(SignalDeviceData device, int pulseTicks, int cooldownTicks) {
+        return new SignalDeviceData(
+                device.id(),
+                device.type(),
+                device.name(),
+                device.dimension(),
+                device.x(),
+                device.y(),
+                device.z(),
+                device.channel(),
+                device.enabled(),
+                pulseTicks,
+                device.remainingPulseTicks(),
+                cooldownTicks,
                 device.actionCount(),
                 device.createdWallTimeMillis(),
                 System.currentTimeMillis(),

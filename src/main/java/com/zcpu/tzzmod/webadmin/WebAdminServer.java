@@ -4,12 +4,14 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -43,6 +45,7 @@ public final class WebAdminServer {
     private final WebAdminEditLockService editLockService = new WebAdminEditLockService(permissionService, writeSecurityService);
     private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -181,6 +184,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/device-basic-config/")) {
                 handleDeviceBasicConfig(exchange, auth, path, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/device-extended-config/")) {
+                handleDeviceExtendedConfig(exchange, auth, path, method);
                 return;
             }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
@@ -394,6 +401,45 @@ public final class WebAdminServer {
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result = deviceBasicConfigService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                request,
+                csrfToken,
+                sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleDeviceExtendedConfig(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/device-extended-config/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            var config = deviceExtendedConfigService.configFor(minecraftServer, auth.user, auth.session, deviceId);
+            if (config == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "设备不存在或已被删除。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, config);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminDeviceExtendedConfigUpdateRequest request = readJson(exchange, WebAdminDeviceExtendedConfigUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminDeviceExtendedConfigUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
+        boolean sameOrigin = isWriteSameOrigin(exchange);
+        WebAdminWriteResult result = deviceExtendedConfigService.update(
                 minecraftServer,
                 auth.user,
                 auth.session,

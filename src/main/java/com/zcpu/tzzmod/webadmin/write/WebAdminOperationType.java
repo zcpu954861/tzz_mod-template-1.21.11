@@ -7,6 +7,7 @@ public enum WebAdminOperationType {
     RELEASE_EDIT_LOCK("RELEASE_EDIT_LOCK", "释放编辑锁"),
     EDIT_DEVICE_METADATA("EDIT_DEVICE_METADATA", "编辑 WebAdmin 设备显示信息"),
     EDIT_DEVICE_BASIC_CONFIG("EDIT_DEVICE_BASIC_CONFIG", "编辑 WebAdmin 设备基础配置"),
+    EDIT_DEVICE_EXTENDED_CONFIG("EDIT_DEVICE_EXTENDED_CONFIG", "编辑 WebAdmin 设备扩展配置"),
     EDIT_DEVICE("EDIT_DEVICE", "编辑设备配置"),
     EDIT_SIGNAL("EDIT_SIGNAL", "编辑 Signal 配置"),
     EDIT_REGION("EDIT_REGION", "编辑区域配置"),

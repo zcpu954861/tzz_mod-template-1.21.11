@@ -120,7 +120,7 @@ public final class WebAdminFrontendAssets {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -230,6 +230,67 @@ public final class WebAdminFrontendAssets {
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncDeviceBasicConfigChannelCombo(deviceId);return;}
                   if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectDeviceBasicConfigChannel(deviceId,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
                 }
+                function extendedFieldId(field){return String(field||'').replace(/[^a-zA-Z0-9_-]/g,'_');}
+                function isExtendedChannelField(field){return ['interactChannel','successChannel','failChannel'].includes(String(field||''));}
+                function isExtendedTickField(field){return ['interactionCooldownTicks','pulseTicks','cooldownTicks'].includes(String(field||''));}
+                function extendedChannelComboOptionsHtml(deviceId,field,draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const value=(draft.values||{})[field]||'', options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],value), current=normalizeChannelName(value).toLowerCase(), indexes=draft.channelComboIndex||{}, active=Math.max(0,Number(indexes[field]||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectDeviceExtendedConfigChannel(${jsString(deviceId)},${jsString(field)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function renderDeviceExtendedConfigChannelCombo(deviceId,field,draft){
+                  const id=extendedFieldId(field), open=(draft.channelComboOpen||{})[field]?' open':'', value=(draft.values||{})[field]||'';
+                  return `<div id="extended-channel-combo-${id}" class="channel-combo extended-channel-combo${open}"><div class="channel-combo-control"><input id="extended-${id}" class="input" maxlength="128" value="${esc(value)}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${(draft.channelComboOpen||{})[field]?'true':'false'}" aria-controls="extended-${id}-menu" onfocus='openDeviceExtendedConfigChannelMenu(${jsString(deviceId)},${jsString(field)})' oninput='updateDeviceExtendedConfigDraftFromForm(${jsString(deviceId)},${jsString(field)})' onkeydown='handleDeviceExtendedConfigChannelKey(event,${jsString(deviceId)},${jsString(field)})'><button class="channel-combo-toggle" type="button" onclick='toggleDeviceExtendedConfigChannelMenu(${jsString(deviceId)},${jsString(field)})' aria-label="显示已有频道">⌄</button></div><div id="extended-${id}-menu" class="channel-combo-menu" role="listbox">${extendedChannelComboOptionsHtml(deviceId,field,draft)}</div></div>`;
+                }
+                function updateDeviceExtendedConfigDraftFromForm(deviceId,openField=''){
+                  const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  draft.values=draft.values||{};draft.clear=draft.clear||{};draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};
+                  (draft.supportedFields||[]).forEach(field=>{
+                    const id=extendedFieldId(field);
+                    if(isExtendedChannelField(field)){
+                      draft.values[field]=document.getElementById(`extended-${id}`)?.value||'';
+                      draft.clear[field]=!!document.getElementById(`extended-clear-${id}`)?.checked;
+                    }else if(isExtendedTickField(field)){
+                      draft.values[field]=document.getElementById(`extended-${id}`)?.value||'';
+                    }
+                  });
+                  if(openField){draft.channelComboOpen[openField]=true;draft.channelComboIndex[openField]=0;}
+                  (draft.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>{
+                    const id=extendedFieldId(field), hint=document.getElementById(`extended-${id}-hint`);
+                    if(hint)hint.innerHTML=channelHintHtml((draft.values||{})[field],draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
+                    syncDeviceExtendedConfigChannelCombo(deviceId,field);
+                  });
+                }
+                function syncDeviceExtendedConfigChannelCombo(deviceId,field){
+                  const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  const id=extendedFieldId(field), combo=document.getElementById(`extended-channel-combo-${id}`), menu=document.getElementById(`extended-${id}-menu`), input=document.getElementById(`extended-${id}`);
+                  if(combo)combo.classList.toggle('open',!!(draft.channelComboOpen||{})[field]);
+                  if(input)input.setAttribute('aria-expanded',(draft.channelComboOpen||{})[field]?'true':'false');
+                  if(menu)menu.innerHTML=extendedChannelComboOptionsHtml(deviceId,field,draft);
+                }
+                function openDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=true;syncDeviceExtendedConfigChannelCombo(deviceId,field);}
+                function closeDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=false;syncDeviceExtendedConfigChannelCombo(deviceId,field);}
+                function toggleDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=!draft.channelComboOpen[field];syncDeviceExtendedConfigChannelCombo(deviceId,field);document.getElementById(`extended-${extendedFieldId(field)}`)?.focus();}
+                function selectDeviceExtendedConfigChannel(deviceId,field,channel){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.values=draft.values||{};draft.clear=draft.clear||{};draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.values[field]=channel||'';draft.clear[field]=false;draft.channelComboOpen[field]=false;draft.channelComboIndex[field]=0;const id=extendedFieldId(field), input=document.getElementById(`extended-${id}`), clear=document.getElementById(`extended-clear-${id}`);if(input)input.value=draft.values[field];if(clear)clear.checked=false;const hint=document.getElementById(`extended-${id}-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.values[field],draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceExtendedConfigChannelCombo(deviceId,field);}
+                function handleDeviceExtendedConfigChannelKey(event,deviceId,field){
+                  const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById(`extended-${extendedFieldId(field)}`)?.value||(draft.values||{})[field]);
+                  draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};
+                  if(event.key==='Escape'){draft.channelComboOpen[field]=false;syncDeviceExtendedConfigChannelCombo(deviceId,field);return;}
+                  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen[field]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex[field]||0)+1:Number(draft.channelComboIndex[field]||0)-1;draft.channelComboIndex[field]=Math.min(max,Math.max(0,next));syncDeviceExtendedConfigChannelCombo(deviceId,field);return;}
+                  if(event.key==='Enter'&&draft.channelComboOpen[field]&&options.length>0){event.preventDefault();selectDeviceExtendedConfigChannel(deviceId,field,options[Math.min(options.length-1,Number(draft.channelComboIndex[field]||0))].channel);return;}
+                }
+                function maybeReleaseDeviceExtendedConfigEditForRoute(hash){const draft=appState.deviceExtendedConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
+                async function startDeviceExtendedConfigEdit(deviceId){if(!canEditDeviceExtendedConfig())return;try{const cfg=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`);if(cfg.supported===false||!(cfg.supportedFields||[]).length){toast(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。');return;}const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:deviceId})});if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();appState.deviceExtendedConfigEdit={deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}catch(err){toast(err.message||'无法获取编辑锁');}}
+                async function cancelDeviceExtendedConfigEdit(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceExtendedConfigLock(draft,false);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function reloadDeviceExtendedConfigAfterConflict(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                function scheduleDeviceExtendedConfigLockHeartbeat(){stopDeviceExtendedConfigLockHeartbeat();appState.deviceExtendedConfigLockTimer=setTimeout(async()=>{await heartbeatDeviceExtendedConfigLock();if(appState.deviceExtendedConfigEdit)scheduleDeviceExtendedConfigLockHeartbeat();},30000);}
+                function stopDeviceExtendedConfigLockHeartbeat(){if(appState.deviceExtendedConfigLockTimer){clearTimeout(appState.deviceExtendedConfigLockTimer);appState.deviceExtendedConfigLockTimer=null;}}
+                async function heartbeatDeviceExtendedConfigLock(){const draft=appState.deviceExtendedConfigEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.deviceExtendedConfigEdit=draft;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(draft.deviceId),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();}}
+                async function releaseDeviceExtendedConfigLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
+                function deviceExtendedConfigPatchBody(draft){const body={expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''};const original=draft.originalValues||{};const addChannel=(field,value,clearName,valueName)=>{if((draft.clear||{})[field]){body[clearName]=true;return;}const text=String(value??'').trim(), before=String(original[field]??'').trim();if(text||before)body[valueName]=value||'';};(draft.supportedFields||[]).forEach(field=>{const value=(draft.values||{})[field];if(field==='interactChannel')addChannel(field,value,'clearInteractChannel','interactChannel');else if(field==='successChannel')addChannel(field,value,'clearSuccessChannel','successChannel');else if(field==='failChannel')addChannel(field,value,'clearFailChannel','failChannel');else if(field==='interactionCooldownTicks')body.interactionCooldownTicks=Number(value);else if(field==='pulseTicks')body.pulseTicks=Number(value);else if(field==='cooldownTicks')body.cooldownTicks=Number(value);});return body;}
+                async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}}
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
@@ -349,6 +410,7 @@ public final class WebAdminFrontendAssets {
                   const hash=decodeURIComponent(location.hash || '#/dashboard');
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
+                  maybeReleaseDeviceExtendedConfigEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
@@ -485,7 +547,13 @@ public final class WebAdminFrontendAssets {
                   return h;
                 }
                 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh();}});
-                document.addEventListener('click',event=>{const draft=appState.deviceBasicConfigEdit;if(!draft)return;const target=event.target;if(target&&target.closest&&target.closest('#basic-channel-combo'))return;draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(draft.deviceId);});
+                document.addEventListener('click',event=>{
+                  const target=event.target;
+                  const basic=appState.deviceBasicConfigEdit;
+                  if(basic&&!(target&&target.closest&&target.closest('#basic-channel-combo'))){basic.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(basic.deviceId);}
+                  const extended=appState.deviceExtendedConfigEdit;
+                  if(extended&&!(target&&target.closest&&target.closest('.extended-channel-combo'))){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
+                });
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
                   const [status,devices,channels,history,doctor,regions,actions]=await Promise.all([
@@ -560,10 +628,12 @@ public final class WebAdminFrontendAssets {
                   if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
                   let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
-                  const [debug,history,doctor,lockStatus,basicConfig]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`)]);
+                  const [debug,history,doctor,lockStatus,basicConfig,extendedConfig]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`)]);
                   detail.metadataLock=lockStatus.ok?lockStatus.data:null;
                   detail.basicConfig=basicConfig.ok?basicConfig.data:null;
                   detail.basicConfigError=basicConfig.ok?null:basicConfig.error;
+                  detail.extendedConfig=extendedConfig.ok?extendedConfig.data:null;
+                  detail.extendedConfigError=extendedConfig.ok?null:extendedConfig.error;
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
                   setView(`
@@ -573,6 +643,7 @@ public final class WebAdminFrontendAssets {
                       <div class="device-detail-main">
                         <article class="panel-card"><h2>设备基础信息</h2><div class="identity-grid">${row('名称',esc(detail.displayName))}${row('类型',esc(labelType(detail.type)))}${row('启用状态',esc(labelBool(detail.enabled)))}${row('最近触发',fmtTime(detail.lastTriggeredAt))}</div></article>
                         <article class="panel-card"><h2>设备基础配置</h2>${deviceBasicConfigCard(detail)}</article>
+                        <article class="panel-card"><h2>设备扩展配置</h2>${deviceExtendedConfigCard(detail)}</article>
                         <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
                         <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关历史</button>`}</p></article>
                         <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
@@ -589,6 +660,7 @@ public final class WebAdminFrontendAssets {
                 }
                 function canEditDeviceMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditDeviceBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function canEditDeviceExtendedConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function csrfToken(){return appState.capabilities?.csrf?.token || '';}
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
@@ -646,6 +718,58 @@ public final class WebAdminFrontendAssets {
                     <p class="muted">保存会写入真实设备基础配置，仅限 enabled / 主频道；不会修改 itemSubmit、matcher、action、region、用户或系统设置。7.2 暂不支持清空主频道。</p>
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceBasicConfigEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
+                }
+                function deviceExtendedConfigCard(detail){
+                  if(detail.extendedConfigError)return errorBlock(detail.extendedConfigError.message||'设备扩展配置加载失败');
+                  const cfg=detail.extendedConfig||{}, lock=cfg.lockStatus||{}, editable=canEditDeviceExtendedConfig(), editing=appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser, fields=cfg.supportedFields||[];
+                  if(editing)return deviceExtendedConfigForm(detail,appState.deviceExtendedConfigEdit);
+                  if(cfg.supported===false||fields.length===0)return `<p class="muted">${esc(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。')}</p>`;
+                  const values=cfg.values||{}, labels=cfg.fieldLabels||{};
+                  const rows=fields.map(field=>row(labels[field]||field,extendedFieldDisplay(field,values[field]))).join('');
+                  const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑扩展配置，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
+                  let action='';
+                  if(editable&&!lockedByOther)action=`<button class="secondary" onclick='startDeviceExtendedConfigEdit(${jsString(detail.id)})'>编辑扩展配置</button>`;
+                  else if(editable)action=lockHint;
+                  else action='<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备扩展配置。</div>';
+                  return `<div class="identity-grid">${rows}</div><p class="readonly-note">这些配置会影响设备交互、反馈频道或时间参数；不会编辑 itemSubmit、matcher、action、region、用户或系统设置。</p>${action}`;
+                }
+                function extendedFieldDisplay(field,value){
+                  if(isExtendedChannelField(field))return channelCell(value);
+                  if(isExtendedTickField(field))return isBlank(value)?'<span class="muted">暂无</span>':esc(formatTicks(value));
+                  return isBlank(value)?'<span class="muted">暂无</span>':esc(value);
+                }
+                function extendedFieldHelp(field){
+                  return {
+                    interactChannel:'交互触发时使用的扩展频道；可选择已有频道，也可以输入新频道。',
+                    successChannel:'交互匹配成功后的反馈频道；可选字段，可明确设为未设置。',
+                    failChannel:'交互匹配失败后的反馈频道；可选字段，可明确设为未设置。',
+                    interactionCooldownTicks:'虚拟方块交互冷却时间，0 表示无冷却。',
+                    pulseTicks:'signal_receiver 输出脉冲时间，必须大于 0。',
+                    cooldownTicks:'action_relay 动作冷却时间，0 表示无冷却。'
+                  }[field]||'设备扩展配置字段。';
+                }
+                function deviceExtendedConfigForm(detail,draft){
+                  const errors=draft.errors&&draft.errors.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||'输入未通过校验')}</li>`).join('')}</ul>`:'';
+                  const lock=draft.lock||{}, lockLine=lock.locked?`<div class="readonly-note">正在编辑扩展配置 · 锁到期：${esc(formatDateTime(lock.expiresAt))} · 持有人：${esc(lock.holderUsername||appState.me?.username||'当前用户')}</div>`:'<div class="readonly-note">正在获取编辑锁...</div>';
+                  const conflict=draft.conflict?`<div class="readonly-note">设备扩展配置已被其他操作修改，请刷新后再编辑。<button class="link-button" type="button" onclick='reloadDeviceExtendedConfigAfterConflict(${jsString(detail.id)})'>刷新当前配置</button></div>`:'';
+                  const fields=draft.supportedFields||[], body=fields.length?fields.map(field=>extendedFieldForm(detail.id,field,draft)).join(''):'<p class="muted">该设备类型暂无可编辑扩展配置。</p>';
+                  return `<form class="edit-form" onsubmit='event.preventDefault();saveDeviceExtendedConfig(${jsString(detail.id)})'>
+                    ${lockLine}
+                    ${body}
+                    ${errors}
+                    ${conflict}
+                    <p class="muted">保存会写入真实设备扩展配置；仅限当前设备类型支持的扩展频道或基础时间参数。不会修改 itemSubmit、matcher、interactionItem 复杂条件、action、region、用户或系统设置。</p>
+                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceExtendedConfigEdit(${jsString(detail.id)})'>取消</button></div>
+                  </form>`;
+                }
+                function extendedFieldForm(deviceId,field,draft){
+                  const label=(draft.fieldLabels||{})[field]||field, value=(draft.values||{})[field]??'', id=extendedFieldId(field), help=extendedFieldHelp(field);
+                  if(isExtendedChannelField(field)){
+                    const combo=renderDeviceExtendedConfigChannelCombo(deviceId,field,draft), hint=channelHintHtml(value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError), clearable=(draft.clearableFields||{})[field]===true, checked=(draft.clear||{})[field]?'checked':'';
+                    return `<label>${esc(label)}${combo}</label>${clearable?`<label class="readonly-note"><input id="extended-clear-${id}" type="checkbox" ${checked} onchange='updateDeviceExtendedConfigDraftFromForm(${jsString(deviceId)})'> 设为未设置</label>`:''}<p id="extended-${id}-hint" class="readonly-note">${hint}</p><p class="muted">${esc(help)}</p>`;
+                  }
+                  const min=field==='pulseTicks'?1:0, max=72000;
+                  return `<label>${esc(label)}<input id="extended-${id}" class="input" type="number" min="${min}" max="${max}" step="1" value="${esc(value)}" oninput='updateDeviceExtendedConfigDraftFromForm(${jsString(deviceId)})'></label><p class="muted">${esc(help)}</p>`;
                 }
                 function deviceDoctorSideCard(detail,issues){
                   const list=issues||[], status=detail.doctorStatus||detail.debugSummary?.status||(list.length?'WARNING':'OK');
