@@ -20,6 +20,7 @@ public enum WebAdminRealtimeEventType {
     SIGNAL_CONFIG_CHANGED("signal_config_changed", "Signal 配置已变化"),
     REGION_CONFIG_CHANGED("region_config_changed", "区域配置已变化"),
     ACTION_CONFIG_CHANGED("action_config_changed", "动作配置已变化"),
+    EDIT_LOCK_CHANGED("edit_lock_changed", "编辑锁状态已变化"),
     WEBADMIN_USER_CONNECTED("webadmin_user_connected", "WebAdmin 用户已连接"),
     WEBADMIN_USER_DISCONNECTED("webadmin_user_disconnected", "WebAdmin 用户已断开");
 

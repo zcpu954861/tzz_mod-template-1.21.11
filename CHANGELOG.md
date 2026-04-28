@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.30.0-web-admin-edit-locks
+
+- Added 7.1 WebAdmin object versioning, conflict detection, and edit lock foundation for device display metadata.
+- Added `expectedVersion` checking to `PATCH /api/webadmin/device-metadata/{deviceId}` so stale saves return `conflict_detected` and do not overwrite newer metadata.
+- Added transient WebAdmin edit lock APIs: acquire, heartbeat, release, and status for `device_metadata` targets.
+- Added in-memory edit lock TTL handling, holder summaries, lock conflict responses, and realtime `edit_lock_changed` events.
+- Updated the device detail metadata editor to acquire a lock before editing, heartbeat while editing, release on save/cancel/route leave, and preserve form input on validation or conflict failures.
+- Kept the editable scope limited to WebAdmin display metadata: `displayName`, `note`, and `iconKey`.
+- No enabled/channel/itemSubmit/matcher/consume/action/region/user/settings editing, no `signal_devices.json` write, no gameplay logic schema change, and no 5.x semantics change is included.
+
 ## v1.29.0-web-admin-editing-foundation
 
 - Added 7.0 WebAdmin Editing Foundation as the first minimal safe write loop.

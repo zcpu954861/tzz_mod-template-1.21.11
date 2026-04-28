@@ -120,7 +120,7 @@ public final class WebAdminFrontendAssets {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,deviceMetadataEdit:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                const appState={me:null,status:null,capabilities:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -190,9 +190,9 @@ public final class WebAdminFrontendAssets {
                 function posText(pos){return pos?`${pos.x} ${pos.y} ${pos.z}`:'-';}
                 function deviceIcon(type){const v=String(type||'UNKNOWN').toUpperCase();return icon({SIGNAL_EMITTER:'signal',SIGNAL_RECEIVER:'receiver',ACTION_RELAY:'relay',VIRTUAL_BLOCK_DEVICE:'virtual',REGION_CONTROLLER:'region',UNKNOWN:'device'}[v]||'device');}
                 function deviceMetadataIcon(detail){const key=String(detail?.metadata?.effectiveIconKey||detail?.metadata?.iconKey||'auto').toLowerCase();if(key&&key!=='auto')return icon({signal_emitter:'signal',signal_receiver:'receiver',action_relay:'relay',virtual_block_device:'virtual',region:'region',action:'action',warning:'warning',key:'settings',chest:'device',door:'device',signal:'signal',custom_1:'device'}[key]||key);return deviceIcon(detail?.type);}
-                function parseTime(value){if(isBlank(value))return null;const d=new Date(String(value));return Number.isNaN(d.getTime())?null:d;}
+                function parseTime(value){if(isBlank(value))return null;const raw=typeof value==='number'?value:String(value).trim();const d=new Date(raw);return Number.isNaN(d.getTime())?null:d;}
                 function pad2(value){return String(value).padStart(2,'0');}
-                function formatDateTime(value){if(isBlank(value))return '暂无';const text=String(value).trim();if(text.length>=19&&text.charAt(4)==='-'&&text.charAt(7)==='-'&&(text.charAt(10)==='T'||text.charAt(10)===' '))return `${text.slice(0,10)} ${text.slice(11,19)}`;const d=parseTime(text);if(!d)return '暂无';return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
+                function formatDateTime(value){const d=parseTime(value);if(!d)return '暂无';return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
                 function formatRelativeTime(value){const d=parseTime(value);if(!d)return '暂无';const seconds=Math.max(0,Math.floor((Date.now()-d.getTime())/1000));if(seconds<60)return `${seconds} 秒前`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes} 分钟前`;const hours=Math.floor(minutes/60);if(hours<24)return `${hours} 小时前`;return `${Math.floor(hours/24)} 天前`;}
                 function fmtTime(value){return esc(formatDateTime(value));}
                 function appView(){return document.getElementById('app-view');}
@@ -287,6 +287,7 @@ public final class WebAdminFrontendAssets {
                 }
                 function route(options={}){
                   const hash=decodeURIComponent(location.hash || '#/dashboard');
+                  maybeReleaseDeviceMetadataEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
@@ -326,7 +327,7 @@ public final class WebAdminFrontendAssets {
                   appState.realtime.source=source;
                   source.onopen=()=>{appState.realtime.reconnectAttempt=0;setRealtimeStatus('CONNECTED');};
                   source.onerror=()=>{if(appState.realtime.source===source){source.close();appState.realtime.source=null;scheduleRealtimeReconnect();}};
-                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','device_config_changed','write_audit_appended','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
+                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','device_config_changed','edit_lock_changed','write_audit_appended','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
                     source.addEventListener(type,event=>handleRealtimeEvent(type,event));
                   });
                 }
@@ -497,7 +498,8 @@ public final class WebAdminFrontendAssets {
                   if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
                   let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
-                  const [debug,history,doctor]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor')]);
+                  const [debug,history,doctor,lockStatus]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`)]);
+                  detail.metadataLock=lockStatus.ok?lockStatus.data:null;
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
                   setView(`
@@ -525,19 +527,25 @@ public final class WebAdminFrontendAssets {
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
                 function deviceMetadataCard(detail){
-                  const meta=detail.metadata||{}, editable=canEditDeviceMetadata(), editing=appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id;
+                  const meta=detail.metadata||{}, lock=detail.metadataLock||{}, editable=canEditDeviceMetadata(), editing=appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
                   if(editing)return deviceMetadataForm(detail,appState.deviceMetadataEdit);
                   const note=isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note);
-                  const updated=isBlank(meta.updatedAt)?'暂无':`${formatDateTime(meta.updatedAt)} · ${esc(meta.updatedBy||'未知用户')}`;
-                  return `<div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',note)}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('最后修改',esc(updated))}</div><p class="muted">此信息仅用于 WebAdmin 展示，不改变 Minecraft 游戏逻辑、SignalBridge 行为或设备配置。</p>${editable?`<button class="secondary" onclick='startDeviceMetadataEdit(${jsString(detail.id)},${jsString(meta.displayName||'')},${jsString(meta.note||'')},${jsString(meta.iconKey||'auto')})'>编辑显示信息</button>`:`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑 WebAdmin 显示信息。</div>`}`;
+                  const updated=isBlank(meta.updatedAt)?'暂无':`${formatDateTime(meta.updatedAt)} · ${esc(meta.updatedBy||'未知用户')}`, version=Number(meta.version||0);
+                  const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
+                  const action=editable&&!lockedByOther?`<button class="secondary" onclick='startDeviceMetadataEdit(${jsString(detail.id)},${jsString(meta.displayName||'')},${jsString(meta.note||'')},${jsString(meta.iconKey||'auto')},${version})'>编辑显示信息</button>`:(editable?lockHint:`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑 WebAdmin 显示信息。</div>`);
+                  return `<div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',note)}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('版本',esc(version))}${row('最后修改',esc(updated))}</div><p class="muted">此信息仅用于 WebAdmin 展示，不改变 Minecraft 游戏逻辑、SignalBridge 行为或设备配置。</p>${action}`;
                 }
                 function deviceMetadataForm(detail,draft){
                   const errors=draft.errors&&draft.errors.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||'输入未通过校验')}</li>`).join('')}</ul>`:'';
+                  const lock=draft.lock||{}, lockLine=lock.locked?`<div class="readonly-note">正在编辑 · 锁到期：${esc(formatDateTime(lock.expiresAt))} · 持有人：${esc(lock.holderUsername||appState.me?.username||'当前用户')}</div>`:'<div class="readonly-note">正在获取编辑锁...</div>';
+                  const conflict=draft.conflict?`<div class="readonly-note">检测到保存冲突。当前版本：${esc(draft.conflict.currentVersion ?? draft.conflict?.currentMetadata?.version ?? '未知')}。<button class="link-button" type="button" onclick='reloadDeviceMetadataAfterConflict(${jsString(detail.id)})'>刷新当前信息</button></div>`:'';
                   return `<form class="edit-form" onsubmit='event.preventDefault();saveDeviceMetadata(${jsString(detail.id)})'>
+                    ${lockLine}
                     <label>显示名称<input id="metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="${esc(detail.displayName||'')}"></label>
                     <label>备注<textarea id="metadata-note" maxlength="500" placeholder="仅用于 WebAdmin 管理备注，不支持富文本。">${esc(draft.note||'')}</textarea></label>
                     <label>图标<select id="metadata-icon" class="select">${metadataIconOptions().map(k=>`<option value="${esc(k)}" ${k===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(k))}</option>`).join('')}</select></label>
                     ${errors}
+                    ${conflict}
                     <p class="muted">保存只会写入 WebAdmin 元数据文件，不会修改 enabled、channel、itemSubmit、action 或 region 等游戏逻辑配置。</p>
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceMetadataEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
@@ -581,18 +589,34 @@ public final class WebAdminFrontendAssets {
                   return `<div class="identity-grid">${rows.map(([k,v])=>row(k,v)).join('')}</div>`;
                 }
                 function currentDeviceRouteArg(deviceId){const h=currentRouteHash();return h.startsWith('#/devices/')?h.substring('#/devices/'.length):deviceId;}
-                function startDeviceMetadataEdit(deviceId,displayName,note,iconKey){appState.deviceMetadataEdit={deviceId,displayName,note,iconKey:iconKey||'auto',errors:[],saving:false};renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
-                function cancelDeviceMetadataEdit(deviceId){if(appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===deviceId)appState.deviceMetadataEdit=null;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                function maybeReleaseDeviceMetadataEditForRoute(hash){const draft=appState.deviceMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceMetadataLock(draft,true);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}
+                async function startDeviceMetadataEdit(deviceId,displayName,note,iconKey,expectedVersion){
+                  if(!canEditDeviceMetadata())return;
+                  try{
+                    const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_metadata',targetId:deviceId})});
+                    if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    const lock=result.data?.lock||{};
+                    appState.deviceMetadataEdit={deviceId,displayName,note,iconKey:iconKey||'auto',expectedVersion:Number(expectedVersion||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    scheduleDeviceMetadataLockHeartbeat();
+                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }catch(err){toast(err.message||'无法获取编辑锁');}
+                }
+                async function cancelDeviceMetadataEdit(deviceId){const draft=appState.deviceMetadataEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceMetadataLock(draft,false);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function reloadDeviceMetadataAfterConflict(deviceId){const draft=appState.deviceMetadataEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceMetadataLock(draft,true);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                function scheduleDeviceMetadataLockHeartbeat(){stopDeviceMetadataLockHeartbeat();appState.deviceMetadataLockTimer=setTimeout(async()=>{await heartbeatDeviceMetadataLock();if(appState.deviceMetadataEdit)scheduleDeviceMetadataLockHeartbeat();},30000);}
+                function stopDeviceMetadataLockHeartbeat(){if(appState.deviceMetadataLockTimer){clearTimeout(appState.deviceMetadataLockTimer);appState.deviceMetadataLockTimer=null;}}
+                async function heartbeatDeviceMetadataLock(){const draft=appState.deviceMetadataEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_metadata',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.deviceMetadataEdit=draft;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];appState.deviceMetadataEdit=draft;stopDeviceMetadataLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(draft.deviceId),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];appState.deviceMetadataEdit=draft;stopDeviceMetadataLockHeartbeat();}}
+                async function releaseDeviceMetadataLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_metadata',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
                 async function saveDeviceMetadata(deviceId){
                   const draft=appState.deviceMetadataEdit||{deviceId};
                   draft.displayName=document.getElementById('metadata-display-name')?.value||'';
                   draft.note=document.getElementById('metadata-note')?.value||'';
                   draft.iconKey=document.getElementById('metadata-icon')?.value||'auto';
-                  draft.saving=true;draft.errors=[];appState.deviceMetadataEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceMetadataEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   try{
-                    const result=await api(`/api/webadmin/device-metadata/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey})});
-                    if(result.success){appState.deviceMetadataEdit=null;toast(result.changed?(result.message||'WebAdmin 显示信息已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
-                    draft.saving=false;draft.errors=result.validationErrors||[{message:result.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    const result=await api(`/api/webadmin/device-metadata/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey,expectedVersion:draft.expectedVersion,lockId:draft.lockId})});
+                    if(result.success){appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();toast(result.changed?(result.message||'WebAdmin 显示信息已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   }catch(err){
                     draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   }

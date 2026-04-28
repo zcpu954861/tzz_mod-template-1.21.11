@@ -5,4 +5,6 @@ public final class WebAdminDeviceMetadataUpdateRequest {
     public String displayName;
     public String note;
     public String iconKey;
+    public Long expectedVersion;
+    public String lockId;
 }

@@ -37,6 +37,8 @@ import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
@@ -44,6 +46,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
@@ -759,7 +762,10 @@ public final class StabilizationGuardTest {
         requireContains(js, "dirtyRoutes", "realtime hidden-tab dirty route tracking present");
         requireContains(js, "pendingRefresh", "realtime pending refresh guard present");
         requireContains(js, "route({silent:true,expectedHash:hash,expectedSeq:seq})", "realtime refresh uses silent route update");
-        requireContains(js, "text.slice(11,19)", "time formatter strips ISO separator and milliseconds");
+        requireContains(js, "getFullYear()", "time formatter uses local Date fields");
+        requireFalse(js.contains("text.slice(0,10)") || js.contains("text.slice(11,19)"),
+                "time formatter does not display UTC ISO strings by substring slicing");
+        requireFalse(js.contains("toISOString()"), "frontend does not expose ISO UTC strings as visible time");
         requireContains(js, "暂无", "Chinese empty state fallback present");
         requireContains(js, "只读", "readonly UI hint present");
         requireFalse(js.contains("'code=") || js.contains("\"code=") || js.contains(">code="),
@@ -807,20 +813,24 @@ public final class StabilizationGuardTest {
         WebAdminRealtimeEventBus.closeAll();
     }
 
-    private static void testWebAdminWriteFoundation() {
+    private static void testWebAdminWriteFoundation() throws Exception {
         WebAdminPermissionService permissions = new WebAdminPermissionService();
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.TEST, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.ACQUIRE_EDIT_LOCK, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.RELEASE_EDIT_LOCK, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
@@ -894,6 +904,9 @@ public final class StabilizationGuardTest {
                 WebAdminWriteResultCode.CSRF_INVALID,
                 WebAdminWriteResultCode.TARGET_NOT_FOUND,
                 WebAdminWriteResultCode.CONFLICT_DETECTED,
+                WebAdminWriteResultCode.EDIT_LOCK_REQUIRED,
+                WebAdminWriteResultCode.EDIT_LOCK_CONFLICT,
+                WebAdminWriteResultCode.EDIT_LOCK_EXPIRED,
                 WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION,
                 WebAdminWriteResultCode.INTERNAL_ERROR
         )) {
@@ -929,6 +942,39 @@ public final class StabilizationGuardTest {
                 "same referer accepted");
         requireFalse(security.isSameOriginOrReferer("", "http://evil.example/app", "127.0.0.1", 18080),
                 "cross referer rejected");
+
+        WebAdminUser editor = webAdminUser("editor", WebAdminRole.EDITOR);
+        WebAdminUser viewer = webAdminUser("viewer", WebAdminRole.VIEWER);
+        WebAdminUser otherEditor = webAdminUser("other", WebAdminRole.EDITOR);
+        WebAdminSession editorSession = new WebAdminSession("editor-session-hash-for-guard", "editor", WebAdminRole.EDITOR.id(), 1L, 10_000L, "127.0.0.1", "guard");
+        WebAdminSession otherSession = new WebAdminSession("other-session-hash-for-guard", "other", WebAdminRole.EDITOR.id(), 1L, 10_000L, "127.0.0.1", "guard");
+        WebAdminSession viewerSession = new WebAdminSession("viewer-session-hash-for-guard", "viewer", WebAdminRole.VIEWER.id(), 1L, 10_000L, "127.0.0.1", "guard");
+        WebAdminEditLockService locks = new WebAdminEditLockService(permissions, security, 1_000L);
+        WebAdminEditLockRequest lockRequest = new WebAdminEditLockRequest();
+        lockRequest.targetType = WebAdminEditLockService.TARGET_DEVICE_METADATA;
+        lockRequest.targetId = "device-1";
+        WebAdminWriteResult viewerAcquire = locks.acquire(viewer, viewerSession, "127.0.0.1", lockRequest, security.csrfTokenFor(viewerSession), true);
+        requireFalse(viewerAcquire.success(), "viewer cannot acquire device metadata edit lock");
+        WebAdminWriteResult acquired = locks.acquire(editor, editorSession, "127.0.0.1", lockRequest, security.csrfTokenFor(editorSession), true);
+        requireTrue(acquired.success(), "editor can acquire device metadata edit lock");
+        requireTrue(acquired.data().get("lock") instanceof WebAdminEditLockStatusDto, "lock acquire returns safe status dto");
+        WebAdminEditLockStatusDto lockStatus = (WebAdminEditLockStatusDto) acquired.data().get("lock");
+        requireNotBlank(lockStatus.lockId(), "holder receives lock id");
+        WebAdminWriteResult otherAcquire = locks.acquire(otherEditor, otherSession, "127.0.0.1", lockRequest, security.csrfTokenFor(otherSession), true);
+        requireFalse(otherAcquire.success(), "second editor cannot acquire same active lock");
+        requireEquals(WebAdminWriteResultCode.EDIT_LOCK_CONFLICT.id(), otherAcquire.code(), "lock conflict result code");
+        requireFalse(locks.validateLock(WebAdminEditLockService.TARGET_DEVICE_METADATA, "device-1", "", editor, editorSession).success(), "patch without lock fails");
+        requireTrue(locks.validateLock(WebAdminEditLockService.TARGET_DEVICE_METADATA, "device-1", lockStatus.lockId(), editor, editorSession).success(), "holder lock validates");
+        lockRequest.lockId = lockStatus.lockId();
+        requireFalse(locks.release(otherEditor, otherSession, "127.0.0.1", lockRequest, security.csrfTokenFor(otherSession), true).success(), "non-holder cannot release active lock");
+        requireTrue(locks.release(editor, editorSession, "127.0.0.1", lockRequest, security.csrfTokenFor(editorSession), true).success(), "holder can release active lock");
+        lockRequest.lockId = "";
+        WebAdminWriteResult reacquired = locks.acquire(editor, editorSession, "127.0.0.1", lockRequest, security.csrfTokenFor(editorSession), true);
+        WebAdminEditLockStatusDto expiringLock = (WebAdminEditLockStatusDto) reacquired.data().get("lock");
+        Thread.sleep(1_100L);
+        requireFalse(locks.validateLock(WebAdminEditLockService.TARGET_DEVICE_METADATA, "device-1", expiringLock.lockId(), editor, editorSession).success(), "expired lock fails validation");
+        requireTrue(WebAdminDeviceMetadataService.versionMatches(4L, 4L), "matching expectedVersion passes");
+        requireFalse(WebAdminDeviceMetadataService.versionMatches(4L, 3L), "stale expectedVersion fails");
 
         WebAdminWriteContext writeContext = new WebAdminWriteContext(
                 "owner",
@@ -969,7 +1015,8 @@ public final class StabilizationGuardTest {
                 WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.SIGNAL_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.REGION_CONFIG_CHANGED,
-                WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED
+                WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED,
+                WebAdminRealtimeEventType.EDIT_LOCK_CHANGED
         )) {
             requireNotBlank(type.id(), "write realtime event type id present");
             requireNotBlank(type.displayName(), "write realtime event display present");
@@ -1002,12 +1049,26 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("method:'DELETE'"), "frontend does not expose DELETE writes");
         requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
         requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes only device metadata write endpoint");
+        requireContains(js, "/api/webadmin/edit-locks/acquire", "frontend acquires edit lock before metadata write");
+        requireContains(js, "/api/webadmin/edit-locks/heartbeat", "frontend heartbeats edit lock during metadata edit");
+        requireContains(js, "/api/webadmin/edit-locks/release", "frontend releases edit lock after edit");
+        requireContains(js, "expectedVersion", "frontend sends expectedVersion for metadata writes");
+        requireContains(js, "lockId", "frontend sends lock id for metadata writes");
+        requireContains(js, "edit_lock_changed", "frontend listens for edit lock realtime events");
         requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
         requireContains(js, "此信息仅用于 WebAdmin 展示", "metadata edit warning describes display-only scope");
         requireFalse(js.contains("fetch('/api/actions', {method:'PATCH'"), "frontend does not expose action write PATCH");
         requireFalse(js.contains("fetch('/api/regions', {method:'PATCH'"), "frontend does not expose region write PATCH");
         requireFalse(js.contains("fetch('/api/webadmin/users', {method:'PATCH'"), "frontend does not expose user write PATCH");
         requireFalse(js.contains(">删除<"), "frontend does not expose delete button");
+    }
+
+    private static WebAdminUser webAdminUser(String username, WebAdminRole role) {
+        WebAdminUser user = new WebAdminUser();
+        user.username = username;
+        user.displayName = username;
+        user.role = role.id();
+        return user.normalized();
     }
 
     private static SignalDeviceData fullDevice() {

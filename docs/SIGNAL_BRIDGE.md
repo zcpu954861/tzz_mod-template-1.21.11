@@ -62,6 +62,34 @@ SignalBridge 不新增方块、GUI 或网络 payload。它只负责服务端事�
 - 命令、游戏内工具、Web UI 必须共用服务层。
 - 所有写操作应走服务端统一服务，并预留权限与审计。
 
+## 7.1 WebAdmin 对象版本 / 编辑锁
+
+7.1 只增强 7.0 已开放的 WebAdmin 设备显示元数据编辑链路，不扩大编辑范围。当前仍只允许编辑 `displayName`、`note`、`iconKey`，这些字段仅影响 WebAdmin 展示，不改变 Minecraft 游戏逻辑、SignalBridge 行为或 `signal_devices.json`。
+
+### 对象版本
+
+- WebAdmin 设备显示元数据继续存放在 `<world-save-root>/tzz/webadmin/web_admin_device_metadata.json`。
+- 每条 metadata 带有 `version`、`updatedAt`、`updatedBy`。
+- 前端保存时必须提交 `expectedVersion`。
+- 服务端发现 `expectedVersion` 与当前版本不一致时返回 `conflict_detected`，不会覆盖已有数据。
+
+### 编辑锁
+
+- 编辑锁是 WebAdmin 运行态协作状态，当前不持久化。
+- 锁目标为 `device_metadata:<deviceId>`。
+- EDITOR / OWNER 可以获取锁；VIEWER / TESTER 不能获取锁。
+- PATCH 保存必须持有有效锁，并继续通过 session、CSRF / same-origin、权限、校验、审计和 realtime 链路。
+- 锁默认 TTL 为 5 分钟，编辑模式会定期 heartbeat 续锁。
+- 保存成功或取消编辑会释放锁；页面关闭或断线由 TTL 兜底。
+
+### realtime 与审计
+
+- 锁获取、释放、过期会发布轻量 `edit_lock_changed` 事件，不包含 session token、cookie value、密码 hash 或 salt。
+- metadata 保存成功仍发布 `config_changed`、`device_config_changed`、`write_audit_appended`。
+- 冲突、权限拒绝、校验失败会通过统一 `WebAdminWriteResult` 返回，并写入安全摘要审计。
+
+7.1 仍不开放 enabled、channel、itemSubmit、action、region bounds、用户或系统设置编辑。后续 7.2 可在对象版本和编辑锁基础上逐步评估低风险设备逻辑配置编辑。
+
 ## channel
 
 channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：
