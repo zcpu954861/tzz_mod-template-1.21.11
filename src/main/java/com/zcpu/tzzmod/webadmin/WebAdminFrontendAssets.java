@@ -109,7 +109,7 @@ public final class WebAdminFrontendAssets {
                 .login-card,.status-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.login-card{padding:32px;max-width:440px;width:100%;justify-self:end}.server-pill{display:inline-flex;padding:7px 12px;border:1px solid #1f6d86;border-radius:999px;color:#9bf3ff;background:#092638;font-size:13px}.login-card h2,.status-card h2{margin:20px 0 22px;font-size:26px}
                 label{display:block;margin:16px 0 8px;color:#cfe6f4;font-size:14px}input{width:100%;height:44px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 12px;font-size:15px}input:focus{outline:2px solid #1fbce2;border-color:transparent}.password-row{display:flex;gap:8px}.password-row input{flex:1}.password-row button{min-width:64px;border-radius:10px;border:1px solid #28516d;background:#112a42;color:#bfeeff}.check-row{display:flex;gap:10px;align-items:center}.check-row input{width:auto;height:auto}.primary,.secondary{height:44px;border:0;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}.primary{width:100%;background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#04111d}.secondary{background:#12263e;color:#dff8ff;border:1px solid #284963}.secondary:disabled{opacity:.45;cursor:not-allowed}.message{min-height:20px;color:var(--danger)}.help{color:var(--muted);font-size:13px}.divider{display:flex;align-items:center;margin:20px 0;color:#6d8799}.divider:before,.divider:after{content:"";height:1px;background:#213d54;flex:1}.divider span{padding:0 10px}
                 .admin-shell{height:100vh;overflow:hidden;background:var(--bg)}.sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:#081625;padding:22px 18px;display:flex;flex-direction:column;gap:24px;z-index:10}.sidebar-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:#dffbff}.nav-list{display:grid;gap:8px}.nav-item{height:42px;border:1px solid transparent;border-radius:10px;background:transparent;color:#b9cfde;text-align:left;padding:0 12px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px}.nav-item:hover{background:#0f243b;color:#fff}.nav-item.active{background:#12334d;border-color:#1c6d88;color:#9bf3ff}.nav-icon{display:inline-grid;place-items:center;width:22px;height:22px;color:#72eaff}.icon-svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.workspace{min-width:0;margin-left:260px;height:100vh;overflow:hidden;display:grid;grid-template-rows:64px minmax(0,1fr)}.topbar{border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 24px;background:#091827}.topbar-status,.topbar-user{display:flex;align-items:center;gap:14px;color:#c7d9e6;font-size:14px}.view-panel{padding:26px;overflow:auto;height:calc(100vh - 64px)}.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:22px}.page-head h1{margin:0;font-size:30px}.page-head p{margin:8px 0 0;color:var(--muted)}.toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:18px 0}.filter-field{display:grid;gap:6px;margin:0}.filter-field span{font-size:12px;color:var(--muted);font-weight:700}.input,.select{height:38px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 10px}.input{min-width:280px}.select{min-width:150px}.card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.panel-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:18px}.metric-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.metric-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#0b2738;border:1px solid #27677e;color:#8ff5ff}.metric-card .label{color:var(--muted);font-size:13px}.metric-card .value{font-size:28px;font-weight:800;margin-top:8px}.content-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:16px;margin-top:16px}.panel-card h2{font-size:18px;margin:0 0 14px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#081725}.data-table{width:100%;border-collapse:collapse;min-width:760px}.data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid #142b42;text-align:left;font-size:13px}.data-table th{color:#9fb4c4;font-weight:700;background:#0a1b2c}.data-table tr:hover td{background:#0d2136}.link-button,.text-button{border:0;background:transparent;color:#7cecff;cursor:pointer;padding:0;font:inherit}.pill{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;border:1px solid #2a4c64;color:#d7edf7;background:#102237;font-size:12px}.pill.ok{border-color:#26775c;color:#a7f3d0}.pill.warning{border-color:#826d1b;color:#fde68a}.pill.error{border-color:#91414d;color:#fecdd3}.pill.info{border-color:#246e85;color:#a5f3fc}.muted{color:var(--muted)}.empty-state,.error-state,.loading-state{border:1px dashed #28516d;border-radius:14px;padding:24px;color:#b8cbd9;background:#081725}.error-state{border-color:#7f3542;color:#fecdd3}.list-stack{display:grid;gap:10px}.event-row,.issue-row,.check-row-card,.kv-row,.chain-row,.chain-node,.endpoint-row{display:grid;gap:5px;padding:12px;border:1px solid #17324b;border-radius:10px;background:#091b2d}.event-row .meta,.issue-row .meta,.endpoint-row .meta{color:#91a7b8;font-size:12px}.device-name{display:flex;align-items:center;gap:10px}.device-subtitle{display:block;margin-top:3px;color:var(--muted);font-size:12px}.device-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;border:1px solid #27677e;color:#8ff5ff;background:#0b2738}.device-icon .icon-svg{width:19px;height:19px}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.6fr);gap:16px}.device-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}.device-detail-main,.device-detail-side{display:grid;gap:16px;min-width:0}.device-detail-side{align-self:start}.side-card .identity-grid,.metadata-card .identity-grid{grid-template-columns:1fr;gap:6px}.side-card .identity-grid .k,.metadata-card .identity-grid .k{font-size:12px}.side-card .identity-grid .v,.metadata-card .identity-grid .v{white-space:pre-wrap;overflow-wrap:anywhere}.metadata-card .secondary{width:100%;margin-top:8px}.side-actions{display:grid;gap:8px}.side-actions .secondary,.side-actions .text-button,.side-actions .link-button{width:100%;text-align:left}.side-list{gap:8px}.side-list .issue-row,.side-list .event-row{padding:10px}.overview-card{grid-column:1/-1}.overview-inline{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.identity-grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 14px}.identity-grid .k{color:var(--muted)}.identity-grid .v{word-break:break-word}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.config-section{display:grid;gap:8px;margin-bottom:12px}.config-section summary{cursor:pointer;color:#dffbff;font-size:14px;font-weight:700}.config-section[open] summary{margin-bottom:8px}.raw-config{margin-top:12px;color:var(--muted)}.raw-config summary{cursor:pointer;color:#7cecff}.logic-chain{display:grid;grid-template-columns:minmax(180px,1fr) 38px minmax(190px,1fr) 38px minmax(220px,1.2fr) 38px minmax(220px,1.2fr);gap:10px;align-items:stretch}.chain-arrow{display:grid;place-items:center;color:#6ee7f9;font-weight:800}.chain-node h3{margin:0 0 8px;font-size:14px;color:#dffbff}.endpoint-grid{display:grid;gap:8px}.inline-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.toast{position:fixed;right:24px;bottom:24px;max-width:360px;background:#102b42;border:1px solid #2a7993;color:#dffbff;border-radius:12px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.35);z-index:20}.back-row{margin-bottom:16px}
-                .edit-form{display:grid;gap:12px}.edit-form textarea{min-height:110px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:10px 12px;font-size:14px;resize:vertical}.edit-form .input,.edit-form .select,.edit-form textarea{width:100%;min-width:0;box-sizing:border-box}.edit-form label{margin:0;color:#cfe6f4}.form-actions{display:flex;gap:10px;align-items:center}.validation-list{display:grid;gap:6px;margin:0;padding-left:18px;color:#fecdd3}.readonly-note{border:1px solid #21445e;background:#091b2d;border-radius:10px;padding:10px;color:var(--muted)}
+                .edit-form{display:grid;gap:12px}.edit-form textarea{min-height:110px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:10px 12px;font-size:14px;resize:vertical}.edit-form .input,.edit-form .select,.edit-form textarea{width:100%;min-width:0;box-sizing:border-box}.edit-form label{margin:0;color:#cfe6f4}.form-actions{display:flex;gap:10px;align-items:center}.validation-list{display:grid;gap:6px;margin:0;padding-left:18px;color:#fecdd3}.readonly-note{border:1px solid #21445e;background:#091b2d;border-radius:10px;padding:10px;color:var(--muted)}.channel-combo{position:relative;z-index:5}.channel-combo.open{z-index:50}.channel-combo-control{display:flex;align-items:center;border:1px solid #23445f;background:#081725;border-radius:10px;overflow:hidden}.channel-combo-control:focus-within,.channel-combo.open .channel-combo-control{border-color:#1fbce2;box-shadow:0 0 0 1px rgba(34,211,238,.28)}.channel-combo-control .input{height:38px;border:0;border-radius:0;background:transparent;outline:0;box-shadow:none;flex:1}.channel-combo-toggle{display:grid;place-items:center;width:42px;height:38px;border:0;border-left:1px solid #23445f;background:#0d2136;color:#8ff5ff;cursor:pointer;font-size:15px}.channel-combo-toggle:hover{background:#12334d}.channel-combo-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);display:none;max-height:260px;overflow:auto;border:1px solid #1f6d86;border-radius:12px;background:#081725;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:6px;z-index:60}.channel-combo.open .channel-combo-menu{display:grid;gap:4px}.channel-combo-option{width:100%;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--text);padding:9px 10px;text-align:left;cursor:pointer}.channel-combo-option:hover,.channel-combo-option.active{background:#12334d;border-color:#1c6d88}.channel-combo-option.selected{border-color:#22d3ee}.channel-combo-option strong{display:block;color:#dffbff}.channel-combo-option span,.channel-combo-empty{display:block;color:var(--muted);font-size:12px;margin-top:3px}.channel-combo-empty{padding:12px}
                 @media(max-width:1100px){.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content-grid,.detail-grid,.device-detail-layout,.logic-chain{grid-template-columns:1fr}.metadata-card{position:static}.chain-arrow{transform:rotate(90deg);min-height:24px}.sidebar{width:220px}.workspace{margin-left:220px}}
                 @media(max-width:760px){.login-shell{grid-template-columns:1fr;max-width:720px;gap:34px;align-items:start;padding:32px 20px}.brand-panel{min-height:auto;justify-content:flex-start;gap:32px}.hero-copy h1{font-size:42px}.hero-copy .lead{font-size:22px}.login-card{max-width:none;justify-self:stretch}.admin-shell{height:auto;min-height:100vh;overflow:visible}.sidebar{position:static;width:auto;height:auto;max-height:42vh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--line)}.workspace{margin-left:0;height:auto;min-height:100vh;overflow:visible}.nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.topbar{height:auto;min-height:76px;align-items:flex-start;gap:10px;flex-direction:column;padding:14px 18px}.topbar-status,.topbar-user{flex-wrap:wrap}.view-panel{padding:18px;height:auto;overflow:visible}.page-head{align-items:flex-start;flex-direction:column}.card-grid,.summary-grid{grid-template-columns:1fr}.input{min-width:100%}.identity-grid{grid-template-columns:1fr}}
                 """;
@@ -120,7 +120,7 @@ public final class WebAdminFrontendAssets {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -170,6 +170,66 @@ public final class WebAdminFrontendAssets {
                 function labelHistoryRange(value){return {ALL:'全部',M10:'最近 10 分钟',H1:'最近 1 小时',H24:'最近 24 小时'}[value]||value;}
                 function labelHistorySort(value){return {NEWEST:'最新优先',OLDEST:'最旧优先'}[value]||value;}
                 function consumerCount(c){return Number(c?.listenerCount||0)+Number(c?.receiverCount||0)+Number(c?.actionRelayCount||0);}
+                async function loadSignalChannelOptions(force=false){
+                  if(!force&&Array.isArray(appState.channelOptions))return appState.channelOptions;
+                  try{appState.channelOptions=await api('/api/signals/channels');appState.channelOptionsError=null;}
+                  catch(err){appState.channelOptions=Array.isArray(appState.channelOptions)?appState.channelOptions:[];appState.channelOptionsError=err.message||'频道候选加载失败';}
+                  return appState.channelOptions||[];
+                }
+                function normalizeChannelName(value){return String(value||'').trim();}
+                function findChannelOption(channel,options){const name=normalizeChannelName(channel).toLowerCase();if(!name)return null;return (options||[]).find(c=>String(c.channel||'').trim().toLowerCase()===name)||null;}
+                function channelOptionLabel(c){const parts=[`消费者：${consumerCount(c)}`];if(!isBlank(c?.lastTriggeredAt))parts.push(`最近触发：${formatDateTime(c.lastTriggeredAt)}`);if(!isBlank(c?.doctorStatus))parts.push(`诊断：${labelStatus(c.doctorStatus)}`);return parts.join(' · ');}
+                function filteredChannelOptions(options,channel){const query=normalizeChannelName(channel).toLowerCase();const list=(options||[]).filter(c=>!query||String(c.channel||'').toLowerCase().includes(query));return list.slice(0,50);}
+                function channelComboOptionsHtml(deviceId,draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectDeviceBasicConfigChannel(${jsString(deviceId)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function renderDeviceBasicConfigChannelCombo(deviceId,draft){
+                  const open=draft.channelComboOpen?' open':'';
+                  return `<div id="basic-channel-combo" class="channel-combo${open}"><div class="channel-combo-control"><input id="basic-channel" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="basic-channel-menu" onfocus='openDeviceBasicConfigChannelMenu(${jsString(deviceId)})' oninput='updateDeviceBasicConfigDraftFromForm(${jsString(deviceId)},true)' onkeydown='handleDeviceBasicConfigChannelKey(event,${jsString(deviceId)})'><button class="channel-combo-toggle" type="button" onclick='toggleDeviceBasicConfigChannelMenu(${jsString(deviceId)})' aria-label="显示已有频道">⌄</button></div><div id="basic-channel-menu" class="channel-combo-menu" role="listbox">${channelComboOptionsHtml(deviceId,draft)}</div></div>`;
+                }
+                function channelHintHtml(channel,options,loadError){
+                  if(loadError)return `<span class="muted">频道候选加载失败，仍可手动输入新的频道名。</span>`;
+                  const name=normalizeChannelName(channel);
+                  if(!name)return '<span class="muted">可选择已有频道，也可以输入新的频道名。新频道不会自动创建消费者。</span>';
+                  const found=findChannelOption(name,options);
+                  if(!found)return '<span class="muted">该频道当前未在系统中发现。保存后设备会使用此频道，但不会自动创建监听器、接收器或动作继电器。</span>';
+                  const count=consumerCount(found), bits=[`已选择已有频道：${found.channel||name}`, `消费者：${count}`];
+                  if(!isBlank(found.lastTriggeredAt))bits.push(`最近触发：${formatDateTime(found.lastTriggeredAt)}`);
+                  if(['WARNING','ERROR'].includes(String(found.doctorStatus||'').toUpperCase()))bits.push(`诊断：${labelStatus(found.doctorStatus)}`);
+                  if(count===0)bits.push('该频道当前暂无消费者。');
+                  return bits.map(esc).join('<br>');
+                }
+                function updateDeviceBasicConfigDraftFromForm(deviceId,openMenu=false){
+                  const draft=appState.deviceBasicConfigEdit;
+                  if(!draft||draft.deviceId!==deviceId)return;
+                  draft.enabled=(document.getElementById('basic-enabled')?.value||'false')==='true';
+                  draft.channel=document.getElementById('basic-channel')?.value||'';
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  const hint=document.getElementById('basic-channel-hint');
+                  if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
+                  syncDeviceBasicConfigChannelCombo(deviceId);
+                }
+                function syncDeviceBasicConfigChannelCombo(deviceId){
+                  const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  const combo=document.getElementById('basic-channel-combo'), menu=document.getElementById('basic-channel-menu'), input=document.getElementById('basic-channel');
+                  if(combo)combo.classList.toggle('open',!!draft.channelComboOpen);
+                  if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
+                  if(menu)menu.innerHTML=channelComboOptionsHtml(deviceId,draft);
+                }
+                function openDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=true;syncDeviceBasicConfigChannelCombo(deviceId);}
+                function closeDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(deviceId);}
+                function toggleDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=!draft.channelComboOpen;syncDeviceBasicConfigChannelCombo(deviceId);document.getElementById('basic-channel')?.focus();}
+                function selectDeviceBasicConfigChannel(deviceId,channel){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('basic-channel');if(input)input.value=draft.channel;const hint=document.getElementById('basic-channel-hint');if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceBasicConfigChannelCombo(deviceId);}
+                function handleDeviceBasicConfigChannelKey(event,deviceId){
+                  const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('basic-channel')?.value||draft.channel);
+                  if(event.key==='Escape'){draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(deviceId);return;}
+                  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncDeviceBasicConfigChannelCombo(deviceId);return;}
+                  if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectDeviceBasicConfigChannel(deviceId,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
+                }
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
@@ -288,6 +348,7 @@ public final class WebAdminFrontendAssets {
                 function route(options={}){
                   const hash=decodeURIComponent(location.hash || '#/dashboard');
                   maybeReleaseDeviceMetadataEditForRoute(hash);
+                  maybeReleaseDeviceBasicConfigEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
@@ -424,6 +485,7 @@ public final class WebAdminFrontendAssets {
                   return h;
                 }
                 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh();}});
+                document.addEventListener('click',event=>{const draft=appState.deviceBasicConfigEdit;if(!draft)return;const target=event.target;if(target&&target.closest&&target.closest('#basic-channel-combo'))return;draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(draft.deviceId);});
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
                   const [status,devices,channels,history,doctor,regions,actions]=await Promise.all([
@@ -498,8 +560,10 @@ public final class WebAdminFrontendAssets {
                   if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
                   let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
-                  const [debug,history,doctor,lockStatus]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`)]);
+                  const [debug,history,doctor,lockStatus,basicConfig]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`)]);
                   detail.metadataLock=lockStatus.ok?lockStatus.data:null;
+                  detail.basicConfig=basicConfig.ok?basicConfig.data:null;
+                  detail.basicConfigError=basicConfig.ok?null:basicConfig.error;
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
                   setView(`
@@ -508,6 +572,7 @@ public final class WebAdminFrontendAssets {
                     <section class="device-detail-layout">
                       <div class="device-detail-main">
                         <article class="panel-card"><h2>设备基础信息</h2><div class="identity-grid">${row('名称',esc(detail.displayName))}${row('类型',esc(labelType(detail.type)))}${row('启用状态',esc(labelBool(detail.enabled)))}${row('最近触发',fmtTime(detail.lastTriggeredAt))}</div></article>
+                        <article class="panel-card"><h2>设备基础配置</h2>${deviceBasicConfigCard(detail)}</article>
                         <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
                         <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关历史</button>`}</p></article>
                         <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
@@ -523,6 +588,7 @@ public final class WebAdminFrontendAssets {
                     </section>`,options);
                 }
                 function canEditDeviceMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function canEditDeviceBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function csrfToken(){return appState.capabilities?.csrf?.token || '';}
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
@@ -548,6 +614,37 @@ public final class WebAdminFrontendAssets {
                     ${conflict}
                     <p class="muted">保存只会写入 WebAdmin 元数据文件，不会修改 enabled、channel、itemSubmit、action 或 region 等游戏逻辑配置。</p>
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceMetadataEdit(${jsString(detail.id)})'>取消</button></div>
+                  </form>`;
+                }
+                function deviceBasicConfigCard(detail){
+                  if(detail.basicConfigError)return errorBlock(detail.basicConfigError.message||'设备基础配置加载失败');
+                  const cfg=detail.basicConfig||{}, lock=cfg.lockStatus||{}, editable=canEditDeviceBasicConfig(), editing=appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
+                  if(editing)return deviceBasicConfigForm(detail,appState.deviceBasicConfigEdit);
+                  const supported=cfg.supported!==false;
+                  const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑基础配置，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
+                  let action='';
+                  if(!supported)action=`<div class="readonly-note">${esc(cfg.unsupportedReason||'当前设备类型暂不支持基础配置编辑。')}</div>`;
+                  else if(editable&&!lockedByOther)action=`<button class="secondary" onclick='startDeviceBasicConfigEdit(${jsString(detail.id)},${cfg.enabled?'true':'false'},${jsString(cfg.channel||'')},${jsString(cfg.expectedFingerprint||'')})'>编辑基础配置</button>`;
+                  else if(editable)action=lockHint;
+                  else action='<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备基础配置。</div>';
+                  return `<div class="identity-grid">${row('启用状态',esc(labelEnabledState(cfg.enabled)))}${row('主频道',channelCell(cfg.channel))}</div><p class="readonly-note">这些配置会影响设备触发与 Signal 分发，修改后会立即应用到当前世界。7.2 仅支持 enabled / 主频道。</p>${action}`;
+                }
+                function deviceBasicConfigForm(detail,draft){
+                  const errors=draft.errors&&draft.errors.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||'输入未通过校验')}</li>`).join('')}</ul>`:'';
+                  const lock=draft.lock||{}, lockLine=lock.locked?`<div class="readonly-note">正在编辑基础配置 · 锁到期：${esc(formatDateTime(lock.expiresAt))} · 持有人：${esc(lock.holderUsername||appState.me?.username||'当前用户')}</div>`:'<div class="readonly-note">正在获取编辑锁...</div>';
+                  const conflict=draft.conflict?`<div class="readonly-note">设备基础配置已被其他操作修改，请刷新后再编辑。<button class="link-button" type="button" onclick='reloadDeviceBasicConfigAfterConflict(${jsString(detail.id)})'>刷新当前配置</button></div>`:'';
+                  const channelOptions=draft.channelOptions||appState.channelOptions||[], channelLoadError=draft.channelOptionsError||appState.channelOptionsError;
+                  const combo=renderDeviceBasicConfigChannelCombo(detail.id,draft), hint=channelHintHtml(draft.channel,channelOptions,channelLoadError);
+                  return `<form class="edit-form" onsubmit='event.preventDefault();saveDeviceBasicConfig(${jsString(detail.id)})'>
+                    ${lockLine}
+                    <label>启用状态<select id="basic-enabled" class="select" onchange='updateDeviceBasicConfigDraftFromForm(${jsString(detail.id)})'><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label>
+                    <label>主频道${combo}</label>
+                    <p class="muted">可选择已有频道，也可以输入新的频道名。新频道不会自动创建消费者。</p>
+                    <p id="basic-channel-hint" class="readonly-note">${hint}</p>
+                    ${errors}
+                    ${conflict}
+                    <p class="muted">保存会写入真实设备基础配置，仅限 enabled / 主频道；不会修改 itemSubmit、matcher、action、region、用户或系统设置。7.2 暂不支持清空主频道。</p>
+                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceBasicConfigEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
                 }
                 function deviceDoctorSideCard(detail,issues){
@@ -619,6 +716,38 @@ public final class WebAdminFrontendAssets {
                     draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   }catch(err){
                     draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }
+                }
+                function maybeReleaseDeviceBasicConfigEditForRoute(hash){const draft=appState.deviceBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
+                async function startDeviceBasicConfigEdit(deviceId,enabled,channel,expectedFingerprint){
+                  if(!canEditDeviceBasicConfig())return;
+                  try{
+                    const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_basic_config',targetId:deviceId})});
+                    if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    const lock=result.data?.lock||{};
+                    const channelOptions=await loadSignalChannelOptions();
+                    appState.deviceBasicConfigEdit={deviceId,enabled:!!enabled,channel:channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,expectedFingerprint:expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    scheduleDeviceBasicConfigLockHeartbeat();
+                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }catch(err){toast(err.message||'无法获取编辑锁');}
+                }
+                async function cancelDeviceBasicConfigEdit(deviceId){const draft=appState.deviceBasicConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceBasicConfigLock(draft,false);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function reloadDeviceBasicConfigAfterConflict(deviceId){const draft=appState.deviceBasicConfigEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                function scheduleDeviceBasicConfigLockHeartbeat(){stopDeviceBasicConfigLockHeartbeat();appState.deviceBasicConfigLockTimer=setTimeout(async()=>{await heartbeatDeviceBasicConfigLock();if(appState.deviceBasicConfigEdit)scheduleDeviceBasicConfigLockHeartbeat();},30000);}
+                function stopDeviceBasicConfigLockHeartbeat(){if(appState.deviceBasicConfigLockTimer){clearTimeout(appState.deviceBasicConfigLockTimer);appState.deviceBasicConfigLockTimer=null;}}
+                async function heartbeatDeviceBasicConfigLock(){const draft=appState.deviceBasicConfigEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_basic_config',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.deviceBasicConfigEdit=draft;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];appState.deviceBasicConfigEdit=draft;stopDeviceBasicConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(draft.deviceId),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];appState.deviceBasicConfigEdit=draft;stopDeviceBasicConfigLockHeartbeat();}}
+                async function releaseDeviceBasicConfigLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_basic_config',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
+                async function saveDeviceBasicConfig(deviceId){
+                  const draft=appState.deviceBasicConfigEdit||{deviceId};
+                  draft.enabled=(document.getElementById('basic-enabled')?.value||'false')==='true';
+                  draft.channel=document.getElementById('basic-channel')?.value||'';
+                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceBasicConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  try{
+                    const result=await api(`/api/webadmin/device-basic-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
+                    if(result.success){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();toast(result.changed?(result.message||'设备基础配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }catch(err){
+                    draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceBasicConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   }
                 }
                 function chainPreview(detail){if(isBlank(detail.channel))return '<span class="muted">当前设备没有主频道。</span>';return `<div class="chain-row"><strong>${esc(detail.displayName)}</strong><span class="muted">→ 主频道：${esc(detail.channel)}</span><span class="muted">→ 可在频道详情页查看消费者与最近事件</span></div>`}

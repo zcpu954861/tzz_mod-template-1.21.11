@@ -36,6 +36,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
@@ -43,6 +44,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
@@ -819,12 +821,14 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.TEST, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.TEST, true);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.ACQUIRE_EDIT_LOCK, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
@@ -832,6 +836,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.ACQUIRE_EDIT_LOCK, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.RELEASE_EDIT_LOCK, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_METADATA, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_REGION, true);
@@ -866,6 +871,41 @@ public final class StabilizationGuardTest {
         requireFalse(WebAdminDeviceMetadataService.validateRequest(controlCharMetadata).isEmpty(), "control characters are rejected");
         requireTrue(WebAdminDeviceMetadataService.isAllowedIconKey("signal_emitter"), "known metadata icon key is allowed");
         requireFalse(WebAdminDeviceMetadataService.isAllowedIconKey("http_icon"), "unknown metadata icon key is rejected");
+
+        WebAdminDeviceBasicConfigUpdateRequest validBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
+        validBasicConfig.enabled = Boolean.TRUE;
+        validBasicConfig.channel = "guard.channel";
+        requireTrue(WebAdminDeviceBasicConfigService.validateRequest(validBasicConfig).isEmpty(), "valid basic config is accepted");
+        WebAdminDeviceBasicConfigUpdateRequest invalidEnabledBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
+        invalidEnabledBasicConfig.enabled = "true";
+        invalidEnabledBasicConfig.channel = "guard.channel";
+        requireFalse(WebAdminDeviceBasicConfigService.validateRequest(invalidEnabledBasicConfig).isEmpty(), "non-boolean enabled is rejected");
+        WebAdminDeviceBasicConfigUpdateRequest emptyChannelBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
+        emptyChannelBasicConfig.enabled = Boolean.TRUE;
+        emptyChannelBasicConfig.channel = "";
+        requireFalse(WebAdminDeviceBasicConfigService.validateRequest(emptyChannelBasicConfig).isEmpty(), "empty primary channel is rejected in 7.2");
+        WebAdminDeviceBasicConfigUpdateRequest longChannelBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
+        longChannelBasicConfig.enabled = Boolean.TRUE;
+        longChannelBasicConfig.channel = "a".repeat(WebAdminDeviceBasicConfigService.MAX_CHANNEL_LENGTH + 1);
+        requireFalse(WebAdminDeviceBasicConfigService.validateRequest(longChannelBasicConfig).isEmpty(), "long primary channel is rejected");
+        WebAdminDeviceBasicConfigUpdateRequest controlChannelBasicConfig = new WebAdminDeviceBasicConfigUpdateRequest();
+        controlChannelBasicConfig.enabled = Boolean.TRUE;
+        controlChannelBasicConfig.channel = "bad\u0001channel";
+        requireFalse(WebAdminDeviceBasicConfigService.validateRequest(controlChannelBasicConfig).isEmpty(), "control characters in primary channel are rejected");
+
+        SignalDeviceData baseConfigDevice = fullDevice();
+        String baseFingerprint = WebAdminDeviceBasicConfigService.fingerprintFor(baseConfigDevice);
+        requireTrue(WebAdminDeviceBasicConfigService.fingerprintMatches(baseConfigDevice, baseFingerprint), "basic config fingerprint matches current device");
+        SignalDeviceData changedBasicConfig = SignalDeviceStore.withBasicConfigForWebAdmin(baseConfigDevice, false, "changed.channel");
+        requireFalse(WebAdminDeviceBasicConfigService.fingerprintMatches(changedBasicConfig, baseFingerprint), "basic config fingerprint detects stale edits");
+        assertInteractionMatcherPreserved(baseConfigDevice, changedBasicConfig);
+        assertSubmitPreserved(baseConfigDevice, changedBasicConfig);
+        assertContainerPreserved(baseConfigDevice, changedBasicConfig);
+        assertItemConditionsPreserved(baseConfigDevice, changedBasicConfig);
+        requireEquals("changed.channel", changedBasicConfig.channel(), "primary channel updated");
+        requireEquals(false, changedBasicConfig.enabled(), "enabled updated");
+        requireEquals(baseConfigDevice.offChannel(), changedBasicConfig.offChannel(), "offChannel preserved by basic config edit");
+        requireEquals(baseConfigDevice.mode(), changedBasicConfig.mode(), "redstone mode preserved by basic config edit");
 
         WebAdminWriteTarget target = new WebAdminWriteTarget("DEVICE", "device-1", "测试设备");
         WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA).asWriteResult(target);
@@ -938,6 +978,59 @@ public final class StabilizationGuardTest {
         requireTrue(security.requireValidCsrf(session, csrfToken).success(), "correct csrf token passes");
         requireTrue(security.isSameOrigin("http://127.0.0.1:18080", "127.0.0.1", 18080), "same origin accepted");
         requireFalse(security.isSameOrigin("http://evil.example:18080", "127.0.0.1", 18080), "cross origin rejected");
+
+        WebAdminEditLockService basicConfigLocks = new WebAdminEditLockService(permissions, security, 1_000L);
+        WebAdminEditLockRequest basicLockRequest = new WebAdminEditLockRequest();
+        basicLockRequest.targetType = WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG;
+        basicLockRequest.targetId = baseConfigDevice.id();
+        WebAdminWriteResult viewerBasicLock = basicConfigLocks.acquire(
+                webAdminUser("viewer", WebAdminRole.VIEWER),
+                session,
+                "127.0.0.1",
+                basicLockRequest,
+                csrfToken,
+                true
+        );
+        requireFalse(viewerBasicLock.success(), "viewer cannot acquire basic config edit lock");
+        WebAdminUser basicEditor = webAdminUser("basic-editor", WebAdminRole.EDITOR);
+        WebAdminSession basicEditorSession = new WebAdminSession("editor-session-for-basic-config", "basic-editor", WebAdminRole.EDITOR.id(), 1L, 10_000L, "127.0.0.1", "guard");
+        String basicEditorCsrf = security.csrfTokenFor(basicEditorSession);
+        WebAdminWriteResult editorBasicLock = basicConfigLocks.acquire(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                basicLockRequest,
+                basicEditorCsrf,
+                true
+        );
+        requireTrue(editorBasicLock.success(), "editor can acquire basic config edit lock");
+        WebAdminEditLockStatusDto basicLockStatus = (WebAdminEditLockStatusDto) editorBasicLock.data().get("lock");
+        String basicLockId = basicLockStatus.lockId();
+        requireNotBlank(basicLockId, "basic config lock id returned");
+        requireTrue(basicConfigLocks.validateLock(
+                WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG,
+                baseConfigDevice.id(),
+                basicLockId,
+                basicEditor,
+                basicEditorSession
+        ).success(), "basic config valid lock accepted");
+        requireFalse(basicConfigLocks.validateLock(
+                WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG,
+                baseConfigDevice.id(),
+                "wrong-lock",
+                basicEditor,
+                basicEditorSession
+        ).success(), "wrong basic config lock rejected");
+        basicLockRequest.lockId = basicLockId;
+        WebAdminWriteResult basicLockRelease = basicConfigLocks.release(
+                basicEditor,
+                basicEditorSession,
+                "127.0.0.1",
+                basicLockRequest,
+                basicEditorCsrf,
+                true
+        );
+        requireTrue(basicLockRelease.success(), "editor can release basic config edit lock");
         requireTrue(security.isSameOriginOrReferer("", "http://127.0.0.1:18080/app#/settings", "127.0.0.1", 18080),
                 "same referer accepted");
         requireFalse(security.isSameOriginOrReferer("", "http://evil.example/app", "127.0.0.1", 18080),
@@ -1048,18 +1141,32 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("fetch('/api/devices', {method:'POST'"), "frontend does not expose device write POST");
         requireFalse(js.contains("method:'DELETE'"), "frontend does not expose DELETE writes");
         requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
-        requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes only device metadata write endpoint");
+        requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes scoped device metadata write endpoint");
+        requireContains(js, "/api/webadmin/device-basic-config/", "frontend exposes scoped device basic config write endpoint");
+        requireContains(js, "/api/signals/channels", "basic config channel picker reuses readonly signal channel API");
+        requireContains(js, "channel-combo", "basic config channel field uses custom dark combobox");
+        requireContains(js, "role=\"combobox\"", "basic config channel field keeps typed input semantics");
+        requireContains(js, "handleDeviceBasicConfigChannelKey", "basic config channel combobox supports keyboard handling");
+        requireContains(js, "channelOptionLabel", "basic config channel candidates include display helper");
+        requireFalse(js.contains("<datalist"), "basic config channel picker does not use native datalist menu");
+        requireContains(js, "该频道当前未在系统中发现", "basic config channel input warns about unseen channels");
+        requireContains(js, "不会自动创建监听器", "basic config channel input explains manual channel behavior");
         requireContains(js, "/api/webadmin/edit-locks/acquire", "frontend acquires edit lock before metadata write");
         requireContains(js, "/api/webadmin/edit-locks/heartbeat", "frontend heartbeats edit lock during metadata edit");
         requireContains(js, "/api/webadmin/edit-locks/release", "frontend releases edit lock after edit");
+        requireContains(js, "device_basic_config", "frontend uses distinct basic config edit lock target");
         requireContains(js, "expectedVersion", "frontend sends expectedVersion for metadata writes");
+        requireContains(js, "expectedFingerprint", "frontend sends expectedFingerprint for basic config writes");
         requireContains(js, "lockId", "frontend sends lock id for metadata writes");
         requireContains(js, "edit_lock_changed", "frontend listens for edit lock realtime events");
+        requireContains(js, "saveDeviceBasicConfig", "frontend contains scoped basic config save handler");
         requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
         requireContains(js, "此信息仅用于 WebAdmin 展示", "metadata edit warning describes display-only scope");
         requireFalse(js.contains("fetch('/api/actions', {method:'PATCH'"), "frontend does not expose action write PATCH");
         requireFalse(js.contains("fetch('/api/regions', {method:'PATCH'"), "frontend does not expose region write PATCH");
         requireFalse(js.contains("fetch('/api/webadmin/users', {method:'PATCH'"), "frontend does not expose user write PATCH");
+        requireFalse(js.contains("saveItemSubmit") || js.contains("saveMatcher"), "frontend does not expose itemSubmit or matcher save flow");
+        requireFalse(js.contains("saveRegion") || js.contains("saveAction") || js.contains("saveSettings"), "frontend does not expose region/action/settings save flow");
         requireFalse(js.contains(">删除<"), "frontend does not expose delete button");
     }
 

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.30.0-web-admin-edit-locks`
-- 当前开发版本：`v1.30.0-web-admin-edit-locks`（7.1 WebAdmin 对象版本 / 冲突检测 / 编辑锁基础；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.31.0-web-admin-device-basic-config`
+- 当前开发版本：`v1.31.0-web-admin-device-basic-config`（7.2 WebAdmin 设备基础配置编辑；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,28 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 7.2 WebAdmin Device Basic Config Editing
+
+7.2 在 7.0 / 7.1 的安全写入链路基础上，开放第一批低风险但会影响游戏逻辑的设备基础配置编辑。当前只允许编辑：
+
+- `enabled`：设备启用 / 禁用状态。
+- `channel`：设备主频道 / primary channel。
+
+这些字段会影响当前世界中的设备触发和 Signal 分发，因此所有写入都必须经过 WebAdmin session、`EDITOR` / `OWNER` 权限、CSRF / 同源校验、`device_basic_config` 编辑锁、`expectedFingerprint` 冲突检测、输入校验、结构化 audit 和 realtime 事件发布。
+
+新增 API：
+
+```text
+GET /api/webadmin/device-basic-config/{deviceId}
+PATCH /api/webadmin/device-basic-config/{deviceId}
+```
+
+`GET` 对已登录用户只读开放，返回当前 enabled、主 channel、是否支持编辑、当前 fingerprint 和锁状态摘要。`PATCH` 只允许 `EDITOR` / `OWNER`，必须携带有效 lockId 与 expectedFingerprint；冲突时返回 `conflict_detected`，不会覆盖服务器上的新配置。
+
+7.2 不开放 `interactChannel`、success/fail/off channel、cooldown、pulseTicks、redstone mode、BlockState condition、interactionItem、itemSubmit、matcher、consume、action、command action、region bounds、用户或系统设置编辑。写入通过 `SignalDeviceStore` / domain service 路径执行，不允许前端直接改 JSON，并且必须保留 itemSubmit、interactionItem、container、itemConditions、redstone/condition 等既有字段。
+
+更多说明见 `docs/WEBADMIN_DEVICE_BASIC_CONFIG_7_2.md`，回归测试见 `docs/REGRESSION_TEST_7_2.md`。
 
 ### 7.0 WebAdmin Editing Foundation
 

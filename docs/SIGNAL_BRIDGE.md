@@ -90,6 +90,47 @@ SignalBridge 不新增方块、GUI 或网络 payload。它只负责服务端事�
 
 7.1 仍不开放 enabled、channel、itemSubmit、action、region bounds、用户或系统设置编辑。后续 7.2 可在对象版本和编辑锁基础上逐步评估低风险设备逻辑配置编辑。
 
+## 7.2 WebAdmin 设备基础配置编辑
+
+7.2 在 7.0 / 7.1 的写入安全链路上开放第一批低风险设备基础逻辑配置编辑。与 7.0 的 WebAdmin 显示元数据不同，本阶段的字段会影响当前世界中的设备触发与 Signal 分发，因此必须继续使用权限、CSRF、编辑锁、冲突检测、audit 和 realtime。
+
+当前只允许编辑：
+
+- `enabled`：设备启用 / 禁用状态。
+- `channel`：设备主频道 / primary channel。
+
+写入 API：
+
+```text
+GET /api/webadmin/device-basic-config/{deviceId}
+PATCH /api/webadmin/device-basic-config/{deviceId}
+```
+
+`PATCH` 要求：
+
+- 有效 WebAdmin session。
+- `EDITOR` 或 `OWNER` 权限。
+- CSRF / same-origin 校验。
+- `device_basic_config` 编辑锁。
+- `expectedFingerprint` 冲突检测。
+- 输入校验通过。
+- 通过 `SignalDeviceStore` / domain service 写入，不允许前端直接改 JSON。
+- 写入后记录 audit，并发布轻量 `config_changed`、`device_config_changed`、`write_audit_appended` realtime 事件。
+
+7.2 不改变 `SignalDeviceData` schema，不写入 WebAdmin metadata 文件之外的展示元数据，不修改 `signal_devices.json` 的复杂结构。修改 enabled / channel 时必须保留 interactionItem、itemSubmit、matcher、container、itemConditions、redstone mode、BlockState condition、success/fail/off channel、action、region、用户和系统设置等既有字段。
+
+暂不开放：
+
+- `interactChannel`、success/fail/off channel。
+- cooldown、pulseTicks、redstone mode。
+- BlockState condition。
+- interactionItem、itemSubmit、matcher、consume。
+- action、command action。
+- region bounds。
+- 用户和系统设置。
+
+后续阶段可在 7.2 的锁和冲突检测基础上继续评估 success/fail channel、cooldown、pulseTicks 等较低风险字段；itemSubmit、action command、region bounds 等高风险配置应继续单独分阶段设计。
+
 ## channel
 
 channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：

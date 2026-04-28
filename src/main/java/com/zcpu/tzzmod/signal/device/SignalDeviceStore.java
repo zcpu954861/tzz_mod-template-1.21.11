@@ -172,6 +172,67 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateBasicConfig(MinecraftServer server, String deviceId, boolean enabled, String channel) {
+        if (server == null || deviceId == null || deviceId.isBlank()) {
+            return null;
+        }
+        State state = getState(server);
+        refreshLoadedDevices(server, state);
+        SignalDeviceData existing = findById(state, cleanUserText(deviceId));
+        if (existing == null) {
+            return null;
+        }
+        String normalizedChannel = SignalChannel.normalize(channel);
+        SignalDeviceData updated = null;
+        if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(existing.type())) {
+            updated = withVirtualSettings(existing, normalizedChannel, existing.offChannel(), existing.mode(), enabled);
+            replaceOrAdd(state, updated);
+            state.markDirty();
+        } else {
+            ServerWorld world = getDeviceWorld(server, existing);
+            if (world == null) {
+                return null;
+            }
+            BlockPos pos = new BlockPos(existing.x(), existing.y(), existing.z());
+            if (SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(existing.type())) {
+                SignalEmitterBlockEntity emitter = getLoadedEmitter(server, existing);
+                if (emitter == null) {
+                    return null;
+                }
+                emitter.setEnabled(enabled);
+                emitter.setChannel(normalizedChannel);
+                updated = updateChannel(world, pos, emitter);
+            } else if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(existing.type())) {
+                SignalReceiverBlockEntity receiver = getLoadedReceiver(server, existing);
+                if (receiver == null) {
+                    return null;
+                }
+                receiver.setEnabled(enabled);
+                receiver.setChannel(normalizedChannel);
+                updated = updateChannel(world, pos, receiver);
+            } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(existing.type())) {
+                ActionRelayBlockEntity relay = getLoadedActionRelay(server, existing);
+                if (relay == null) {
+                    return null;
+                }
+                relay.setEnabled(enabled);
+                relay.setChannel(normalizedChannel);
+                updated = updateChannel(world, pos, relay);
+            }
+        }
+        if (updated != null) {
+            state.flushDirty(true, currentGameTime(server));
+        }
+        return updated == null ? null : updated.normalized();
+    }
+
+    public static SignalDeviceData withBasicConfigForWebAdmin(SignalDeviceData device, boolean enabled, String channel) {
+        if (device == null) {
+            return null;
+        }
+        return withVirtualSettings(device.normalized(), SignalChannel.normalize(channel), device.offChannel(), device.mode(), enabled);
+    }
+
     public static synchronized SignalDeviceData refreshVirtualBlock(ServerWorld world, BlockPos pos) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
