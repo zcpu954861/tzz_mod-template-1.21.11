@@ -78,6 +78,8 @@ public final class WebAdminFrontendAssets {
                         <div class="topbar-status">
                           <span id="server-state">服务器状态：加载中</span>
                           <span id="access-mode">访问模式：-</span>
+                          <span id="realtime-state">实时同步：未连接</span>
+                          <span id="last-realtime-event">最后事件：暂无</span>
                         </div>
                         <div class="topbar-user">
                           <span id="current-user">用户：-</span>
@@ -118,6 +120,7 @@ public final class WebAdminFrontendAssets {
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
                 const appState={me:null,status:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
                 function svg(paths){return `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`}
@@ -190,7 +193,40 @@ public final class WebAdminFrontendAssets {
                 function formatDateTime(value){if(isBlank(value))return '暂无';const text=String(value).trim();if(text.length>=19&&text.charAt(4)==='-'&&text.charAt(7)==='-'&&(text.charAt(10)==='T'||text.charAt(10)===' '))return `${text.slice(0,10)} ${text.slice(11,19)}`;const d=parseTime(text);if(!d)return '暂无';return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
                 function formatRelativeTime(value){const d=parseTime(value);if(!d)return '暂无';const seconds=Math.max(0,Math.floor((Date.now()-d.getTime())/1000));if(seconds<60)return `${seconds} 秒前`;const minutes=Math.floor(seconds/60);if(minutes<60)return `${minutes} 分钟前`;const hours=Math.floor(minutes/60);if(hours<24)return `${hours} 小时前`;return `${Math.floor(hours/24)} 天前`;}
                 function fmtTime(value){return esc(formatDateTime(value));}
-                function setView(html){document.getElementById('app-view').innerHTML=html;}
+                function appView(){return document.getElementById('app-view');}
+                function captureViewState(){
+                  const view=appView(), active=document.activeElement;
+                  return {
+                    scrollTop:view?view.scrollTop:0,
+                    activeId:active&&active.id?active.id:'',
+                    selectionStart:active&&typeof active.selectionStart==='number'?active.selectionStart:null,
+                    selectionEnd:active&&typeof active.selectionEnd==='number'?active.selectionEnd:null,
+                    details:[...((view&&view.querySelectorAll)?view.querySelectorAll('details'):[])].map((d,i)=>({key:detailPersistKey(d,i),open:d.open}))
+                  };
+                }
+                function detailPersistKey(detail,index){return detail.dataset.persistKey||detail.querySelector('summary')?.textContent?.trim()||`details-${index}`;}
+                function restoreViewState(state){
+                  if(!state)return;
+                  requestAnimationFrame(()=>{
+                    const view=appView();if(!view)return;
+                    [...view.querySelectorAll('details')].forEach((d,i)=>{const key=detailPersistKey(d,i), saved=(state.details||[]).find(item=>item.key===key);if(saved)d.open=!!saved.open;});
+                    view.scrollTop=state.scrollTop||0;
+                    if(state.activeId){const active=document.getElementById(state.activeId);if(active){active.focus({preventScroll:true});if(typeof active.setSelectionRange==='function'&&state.selectionStart!==null)active.setSelectionRange(state.selectionStart,state.selectionEnd ?? state.selectionStart);}}
+                  });
+                }
+                function setView(html,options={}){
+                  if(options.expectedHash&&currentRouteHash()!==options.expectedHash)return false;
+                  if(options.expectedSeq&&options.expectedHash&&appState.realtime.refreshSeq[realtimeRouteKey(options.expectedHash)]!==options.expectedSeq)return false;
+                  if(options.silent&&options.expectedHash&&appState.realtime.dirtyRoutes[realtimeRouteKey(options.expectedHash)])return false;
+                  const text=String(html ?? '');
+                  if(options.silent&&text.includes('loading-state'))return false;
+                  if(options.silent&&text.includes('error-state')){toast('实时同步刷新失败，已保留当前页面。');return false;}
+                  const view=appView();if(!view)return false;
+                  const snapshot=options.silent?captureViewState():null;
+                  view.innerHTML=text;
+                  if(snapshot)restoreViewState(snapshot);
+                  return true;
+                }
                 function loading(text='正在加载...'){return `<div class="loading-state">${esc(text)}</div>`}
                 function empty(text){return `<div class="empty-state">${esc(text)}</div>`}
                 function errorBlock(text){return `<div class="error-state">${esc(text)}</div>`}
@@ -203,6 +239,7 @@ public final class WebAdminFrontendAssets {
                   }catch(err){throw new ApiError(0,'NETWORK_ERROR','无法连接 WebAdmin 服务');}
                   const json=await res.json().catch(()=>({ok:false,error:{code:'BAD_JSON',message:'响应解析失败'}}));
                   if(res.status===401 && document.body.dataset.page==='app'){
+                    closeRealtime();
                     sessionStorage.setItem('webadmin.message','登录已失效，请重新登录');
                     location.href='/login';
                     throw new ApiError(401,'UNAUTHORIZED','登录已失效，请重新登录');
@@ -225,16 +262,17 @@ public final class WebAdminFrontendAssets {
                     appState.me=await api('/api/auth/me');
                     appState.status=await api('/api/status');
                     renderTopbar();
+                    connectRealtime();
                   }catch(err){return;}
                   if(!location.hash){location.hash='#/dashboard';return;}
-                  window.addEventListener('hashchange',route);
+                  window.addEventListener('hashchange',()=>route());
                   route();
                 }
                 function bindChrome(){
                   hydrateIcons();
                   document.querySelectorAll('.nav-item[data-route]').forEach(btn=>btn.onclick=()=>{location.hash=btn.dataset.route});
                   document.querySelectorAll('.nav-item[data-pending]').forEach(btn=>btn.onclick=()=>toast(btn.dataset.pending));
-                  document.getElementById('logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'});}finally{location.href='/login'}};
+                  document.getElementById('logout').onclick=async()=>{try{closeRealtime();await api('/api/auth/logout',{method:'POST',body:'{}'});}finally{location.href='/login'}};
                 }
                 function renderTopbar(){
                   const s=appState.status, me=appState.me;
@@ -242,28 +280,148 @@ public final class WebAdminFrontendAssets {
                   document.getElementById('access-mode').textContent=`访问模式：${labelAccessMode(s?.webAdmin?.accessMode)}`;
                   document.getElementById('current-user').textContent=`用户：${me?.displayName || me?.username || '-'}`;
                   document.getElementById('current-role').textContent=`角色：${labelRole(me?.role)}`;
+                  updateRealtimeStatus();
                 }
-                function route(){
+                function route(options={}){
                   const hash=decodeURIComponent(location.hash || '#/dashboard');
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
-                  if(hash==='#/dashboard') return renderDashboard();
-                  if(hash==='#/devices') return renderDevices();
-                  if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length));
-                  if(hash==='#/signals') return renderSignals();
-                  if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length));
-                  if(hash==='#/doctor') return renderDoctorPage();
-                  if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length));
-                  if(hash==='#/users') return renderUsersPage();
-                  if(hash==='#/settings') return renderSettingsPage();
-                  if(hash==='#/regions') return renderRegionsPage();
-                  if(hash.startsWith('#/regions/')) return renderRegionDetail(hash.substring('#/regions/'.length));
-                  if(hash==='#/actions') return renderActionsPage();
-                  if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length));
+                  if(hash==='#/dashboard') return renderDashboard(options);
+                  if(hash==='#/devices') return renderDevices(options);
+                  if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length),options);
+                  if(hash==='#/signals') return renderSignals(options);
+                  if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length),options);
+                  if(hash==='#/doctor') return renderDoctorPage(options);
+                  if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
+                  if(hash==='#/users') return renderUsersPage(options);
+                  if(hash==='#/settings') return renderSettingsPage(options);
+                  if(hash==='#/regions') return renderRegionsPage(options);
+                  if(hash.startsWith('#/regions/')) return renderRegionDetail(hash.substring('#/regions/'.length),options);
+                  if(hash==='#/actions') return renderActionsPage(options);
+                  if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length),options);
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
-                async function renderDashboard(){
-                  setView(loading('正在加载总览...'));
+                function setRealtimeStatus(status,lastEventAt){
+                  appState.realtime.status=status;
+                  if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
+                  updateRealtimeStatus();
+                }
+                function updateRealtimeStatus(){
+                  const state=document.getElementById('realtime-state'), last=document.getElementById('last-realtime-event');
+                  if(!state)return;
+                  const label={CONNECTED:'已连接',RECONNECTING:'正在重连',DISCONNECTED:'已断开',UNAVAILABLE:'不可用'}[appState.realtime.status]||'未连接';
+                  state.textContent=`实时同步：${label}`;
+                  if(last)last.textContent=`最后事件：${formatRelativeTime(appState.realtime.lastEventAt)}`;
+                }
+                function connectRealtime(){
+                  if(document.body.dataset.page!=='app')return;
+                  if(appState.realtime.source)return;
+                  if(typeof EventSource==='undefined'){setRealtimeStatus('UNAVAILABLE');return;}
+                  clearTimeout(appState.realtime.reconnectTimer);
+                  setRealtimeStatus(appState.realtime.reconnectAttempt>0?'RECONNECTING':'RECONNECTING');
+                  const source=new EventSource('/api/realtime/events');
+                  appState.realtime.source=source;
+                  source.onopen=()=>{appState.realtime.reconnectAttempt=0;setRealtimeStatus('CONNECTED');};
+                  source.onerror=()=>{if(appState.realtime.source===source){source.close();appState.realtime.source=null;scheduleRealtimeReconnect();}};
+                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
+                    source.addEventListener(type,event=>handleRealtimeEvent(type,event));
+                  });
+                }
+                function closeRealtime(){
+                  clearTimeout(appState.realtime.reconnectTimer);
+                  appState.realtime.reconnectTimer=null;
+                  if(appState.realtime.source){appState.realtime.source.close();appState.realtime.source=null;}
+                  appState.realtime.reconnectAttempt=0;
+                  setRealtimeStatus('DISCONNECTED');
+                }
+                function scheduleRealtimeReconnect(){
+                  if(document.body.dataset.page!=='app')return;
+                  if(appState.realtime.reconnectTimer)return;
+                  appState.realtime.reconnectAttempt=Math.min(appState.realtime.reconnectAttempt+1,6);
+                  const delay=Math.min(30000,1000*Math.pow(2,appState.realtime.reconnectAttempt-1));
+                  setRealtimeStatus('RECONNECTING');
+                  appState.realtime.reconnectTimer=setTimeout(()=>{appState.realtime.reconnectTimer=null;connectRealtime();},delay);
+                }
+                function handleRealtimeEvent(type,event){
+                  let data={type};
+                  try{data=JSON.parse(event.data||'{}');}catch(_){data={type};}
+                  data.type=data.type||type;
+                  setRealtimeStatus('CONNECTED',data.occurredAt);
+                  if(data.type==='heartbeat'||data.type==='realtime_connected')return;
+                  const hash=currentRouteHash();
+                  if(shouldHandleRealtimeEvent(hash,data)){
+                    if(document.hidden){markRealtimeDirty(hash,data);return;}
+                    scheduleRealtimeRefresh(hash,data);
+                  }
+                }
+                function shouldHandleRealtimeEvent(hash,event){
+                  const type=String(event.type||''), h=String(hash||'#/dashboard');
+                  if(h==='#/dashboard')return ['signal_emitted','history_appended','doctor_changed','device_updated','webadmin_user_connected','webadmin_user_disconnected'].includes(type);
+                  if(h.startsWith('#/history'))return ['signal_emitted','history_appended'].includes(type);
+                  if(h==='#/signals')return ['signal_emitted','history_appended','doctor_changed'].includes(type);
+                  if(h.startsWith('#/signals/'))return ['signal_emitted','history_appended','doctor_changed'].includes(type)&&event.channel===routeDetailId(h,'#/signals/');
+                  if(h==='#/devices')return type==='device_updated'||type==='history_appended';
+                  if(h.startsWith('#/devices/'))return event.deviceId&&event.deviceId===routeDetailId(h,'#/devices/');
+                  if(h==='#/doctor')return ['doctor_changed','device_updated','signal_emitted','history_appended'].includes(type);
+                  if(h==='#/regions')return type==='region_event';
+                  if(h.startsWith('#/regions/'))return type==='region_event'&&event.regionId===routeDetailId(h,'#/regions/');
+                  if(h==='#/actions')return type==='action_executed';
+                  if(h.startsWith('#/actions/'))return type==='action_executed'&&event.actionId===routeDetailId(h,'#/actions/');
+                  if(h==='#/users'||h==='#/settings')return ['webadmin_user_connected','webadmin_user_disconnected','config_changed'].includes(type);
+                  return false;
+                }
+                function routeDetailId(hash,prefix){const raw=String(hash||'').substring(prefix.length), q=raw.indexOf('?');return q>=0?raw.substring(0,q):raw;}
+                function scheduleRealtimeRefresh(hash,event){
+                  const key=realtimeRouteKey(hash);
+                  if(document.hidden){markRealtimeDirty(hash,event);return;}
+                  if(appState.realtime.pendingRefresh[key]){markRealtimeDirty(hash,event);return;}
+                  if(appState.realtime.refreshTimers[key])return;
+                  appState.realtime.refreshTimers[key]=setTimeout(()=>runRealtimeRefresh(hash,key),700);
+                }
+                async function runRealtimeRefresh(hash,key){
+                  delete appState.realtime.refreshTimers[key];
+                  if(currentRouteHash()!==hash)return;
+                  if(appState.realtime.pendingRefresh[key]){markRealtimeDirty(hash,{type:'pending'});return;}
+                  appState.realtime.pendingRefresh[key]=true;
+                  delete appState.realtime.dirtyRoutes[key];
+                  const seq=(appState.realtime.refreshSeq[key]||0)+1;
+                  appState.realtime.refreshSeq[key]=seq;
+                  try{
+                    await route({silent:true,expectedHash:hash,expectedSeq:seq});
+                  }catch(err){
+                    toast('实时同步刷新失败，已保留当前页面。');
+                  }finally{
+                    delete appState.realtime.pendingRefresh[key];
+                    if(appState.realtime.dirtyRoutes[key]&&currentRouteHash()===hash&&!document.hidden)scheduleRealtimeRefresh(hash,{type:'dirty'});
+                  }
+                }
+                function markRealtimeDirty(hash,event){
+                  appState.realtime.dirtyRoutes[realtimeRouteKey(hash)]={hash,event,at:Date.now()};
+                }
+                function flushVisibleRealtimeRefresh(){
+                  const hash=currentRouteHash(), key=realtimeRouteKey(hash);
+                  if(appState.realtime.dirtyRoutes[key])scheduleRealtimeRefresh(hash,appState.realtime.dirtyRoutes[key].event||{type:'visibility'});
+                }
+                function realtimeRouteKey(hash){
+                  const h=String(hash||'#/dashboard');
+                  if(h.startsWith('#/devices/'))return `deviceDetail:${routeDetailId(h,'#/devices/')}`;
+                  if(h.startsWith('#/signals/'))return `signalDetail:${routeDetailId(h,'#/signals/')}`;
+                  if(h.startsWith('#/regions/'))return `regionDetail:${routeDetailId(h,'#/regions/')}`;
+                  if(h.startsWith('#/actions/'))return `actionDetail:${routeDetailId(h,'#/actions/')}`;
+                  if(h.startsWith('#/history'))return 'history';
+                  if(h==='#/dashboard')return 'dashboard';
+                  if(h==='#/devices')return 'devices';
+                  if(h==='#/signals')return 'signals';
+                  if(h==='#/doctor')return 'doctor';
+                  if(h==='#/regions')return 'regions';
+                  if(h==='#/actions')return 'actions';
+                  if(h==='#/users')return 'users';
+                  if(h==='#/settings')return 'settings';
+                  return h;
+                }
+                document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh();}});
+                async function renderDashboard(options={}){
+                  if(!options.silent)setView(loading('正在加载总览...'));
                   const [status,devices,channels,history,doctor,regions,actions]=await Promise.all([
                     settle('/api/status'),settle('/api/devices'),settle('/api/signals/channels'),settle('/api/signals/history?limit=10'),settle('/api/doctor'),settle('/api/regions'),settle('/api/actions')
                   ]);
@@ -285,7 +443,7 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>诊断摘要</h2>${doctor.ok?doctorList(doc.issues||[],5):errorBlock(doctor.error.message)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor 诊断</button></p></article>
                       <article class="panel-card"><h2>设备概览</h2>${devices.ok?deviceOverview(deviceList):errorBlock(devices.error.message)}</article>
                       <article class="panel-card"><h2>WebAdmin 状态</h2><p class="muted">Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、区域管理和动作系统只读页面已接入。编辑、配置写入、WebSocket 和完整写操作将在后续阶段接入。</p><p><button class="link-button" onclick="location.hash='#/signals'">进入 Signal 管理</button> / <button class="link-button" onclick="location.hash='#/regions'">查看区域</button> / <button class="link-button" onclick="location.hash='#/actions'">查看动作</button> / <button class="link-button" onclick="location.hash='#/doctor'">查看 Doctor</button> / <button class="link-button" onclick="location.hash='#/history'">查看 History</button></p></article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function metric(label,value,kind='',iconName=''){return `<article class="metric-card ${kind}"><div class="metric-head"><div class="label">${esc(label)}</div>${iconName?`<span class="metric-icon">${icon(iconName)}</span>`:''}</div><div class="value">${esc(value)}</div></article>`}
                 function historyList(items){if(!items||items.length===0)return empty('暂无 Signal 历史记录。');return `<div class="list-stack">${items.map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} / ${esc(h.sourceName||'-')} · ${labelStatus(h.result)}</span><span>${esc(h.description||'')}</span></div>`).join('')}</div>`}
@@ -297,16 +455,16 @@ public final class WebAdminFrontendAssets {
                 function issueSuggestion(i){return esc(i?.suggestion||'暂无建议');}
                 function historyAction(h){const buttons=[];const type=String(h?.sourceType||'').toUpperCase();if(!isBlank(h?.channel))buttons.push(channelButton(h.channel));if(type==='DEVICE'&&!isBlank(h?.sourceId))buttons.push(navigationButton(`device:${h.sourceId}`,'查看设备'));if(type==='REGION'&&!isBlank(h?.sourceId))buttons.push(regionButton(h.sourceId,'查看区域'));if(type==='ACTION'&&!isBlank(h?.sourceId))buttons.push(actionButton(h.sourceId,'查看动作'));return buttons.length?buttons.join(' / '):'<span class="muted">暂无关联对象</span>';}
                 function deviceOverview(items){if(!items||items.length===0)return empty('当前暂无设备数据。');const enabled=items.filter(d=>d.enabled).length;const warn=items.filter(d=>['WARNING','ERROR'].includes(String(d.doctorStatus||'').toUpperCase())).length;return `<div class="summary-grid">${metric('启用设备',enabled)}${metric('禁用设备',items.length-enabled)}${metric('诊断警告/错误',warn)}${metric('虚拟方块设备',items.filter(d=>d.type==='VIRTUAL_BLOCK_DEVICE').length)}</div>`}
-                async function renderDevices(){
-                  setView(loading('正在加载设备列表...'));
-                  let devices;try{devices=await api('/api/devices')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderDevices(options={}){
+                  if(!options.silent)setView(loading('正在加载设备列表...'));
+                  let devices;try{devices=await api('/api/devices')}catch(err){if(options.silent){toast('设备列表实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.devices=devices||[];
-                  renderDeviceList('');
+                  renderDeviceList('',options);
                 }
-                function renderDeviceList(focusId){
+                function renderDeviceList(focusId,options={}){
                   const devices=appState.devices||[], worlds=[...new Set(devices.map(d=>d.world).filter(Boolean))].sort();
                   const filtered=filterDevices(devices);
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>设备管理</h1><p>查看信号设备、虚拟方块设备、动作继电器等状态</p></div></div>
                     <section class="card-grid">${metric('设备总数',devices.length,'','device')}${metric('启用设备',devices.filter(d=>d.enabled).length,'','ok')}${metric('禁用设备',devices.filter(d=>!d.enabled).length,'warning','warning')}${metric('诊断警告/错误',devices.filter(d=>['WARNING','ERROR'].includes(String(d.doctorStatus||'').toUpperCase())).length,'','doctor')}</section>
                     <div class="toolbar">
@@ -317,8 +475,7 @@ public final class WebAdminFrontendAssets {
                       ${filterSelect('世界/维度','device-world',['ALL',...worlds],appState.deviceFilters.world)}
                     </div>
                     ${filtered.length===0?(devices.length===0?empty('当前暂无设备数据。请在游戏内创建或绑定设备后刷新页面。'):empty('没有匹配当前筛选条件的设备。')):deviceTable(filtered)}
-                  `);
-                  bindDeviceFilters(focusId);
+                  `,options))bindDeviceFilters(focusId);
                 }
                 function filterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span>${select(id,options,value)}</label>`}
                 function select(id,options,value){return `<select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(optionLabel(o))}</option>`).join('')}</select>`}
@@ -332,10 +489,10 @@ public final class WebAdminFrontendAssets {
                 function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>`<tr onclick='navigateTo(${jsString('#/devices/'+encodeURIComponent(d.id))})'><td><span class="device-name"><span class="device-icon">${deviceIcon(d.type)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString('#/devices/'+encodeURIComponent(d.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
                 function deviceSubtitle(d){const id=shortId(d.id);if(!isBlank(id)&&!String(id).toLowerCase().startsWith('minecraf'))return `<span class="device-subtitle">ID：${esc(id)}</span>`;if(!isBlank(d.world))return `<span class="device-subtitle">维度：${esc(d.world)}</span>`;return '';}
                 function channelCell(channel){return channelButton(channel);}
-                async function renderDeviceDetail(id){
-                  setView(loading('正在加载设备详情...'));
+                async function renderDeviceDetail(id,options={}){
+                  if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
-                  let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
+                  let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
                   const [debug,history,doctor]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor')]);
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
@@ -350,7 +507,7 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>Doctor 问题</h2>${doctorList(uniqueIssues(relatedDoctor),8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
                       <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关历史</button>`}</p></article>
                       <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function chainPreview(detail){if(isBlank(detail.channel))return '<span class="muted">当前设备没有主频道。</span>';return `<div class="chain-row"><strong>${esc(detail.displayName)}</strong><span class="muted">→ 主频道：${esc(detail.channel)}</span><span class="muted">→ 可在频道详情页查看消费者与最近事件</span></div>`}
                 function debugChecks(data){const checks=data?.checks||[];if(checks.length===0)return empty('当前设备暂无 debug 数据。');return `<div class="list-stack">${checks.map(c=>`<div class="check-row-card"><strong>${pill(c.status)} ${esc(debugTitle(c))}</strong><span class="muted">${esc(debugMessage(c))}</span></div>`).join('')}</div>`}
@@ -399,16 +556,16 @@ public final class WebAdminFrontendAssets {
                 function flatten(obj,prefix=''){const out=[];for(const [k,v] of Object.entries(obj||{})){const key=prefix?`${prefix}.${k}`:k;if(v&&typeof v==='object'&&!Array.isArray(v)){out.push(...flatten(v,key));}else{out.push([key,Array.isArray(v)?`${v.length} 项`:(v ?? '')]);}}return out;}
                 function uniqueIssues(items){const seen=new Set();return (items||[]).filter(i=>{const key=i.id||`${i.title}:${i.relatedObjectId}`;if(seen.has(key))return false;seen.add(key);return true;});}
                 function shortId(id){return String(id||'').length>12?String(id).slice(0,8):String(id||'');}
-                async function renderDoctorPage(){
-                  setView(loading('正在加载 Doctor 诊断...'));
-                  let report;try{report=await api('/api/doctor')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderDoctorPage(options={}){
+                  if(!options.silent)setView(loading('正在加载 Doctor 诊断...'));
+                  let report;try{report=await api('/api/doctor')}catch(err){if(options.silent){toast('Doctor 诊断实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.doctorReport=report||{summary:{},issues:[]};
-                  renderDoctorList('');
+                  renderDoctorList('',options);
                 }
-                function renderDoctorList(focusId){
+                function renderDoctorList(focusId,options={}){
                   const report=appState.doctorReport||{summary:{},issues:[]}, issues=report.issues||[], filtered=filterDoctorIssues(issues), summary=report.summary||{};
                   const jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>Doctor 诊断</h1><p>查看设备、频道、Signal 与配置风险</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('错误数量',summary.errorCount||0,(summary.errorCount||0)>0?'error':'','doctor')}
@@ -427,8 +584,7 @@ public final class WebAdminFrontendAssets {
                     <section class="content-grid">
                       <article class="panel-card">${filtered.length?doctorTable(filtered):empty(issues.length?'没有匹配当前筛选条件的诊断问题。':'当前没有诊断问题。')}</article>
                       <aside class="panel-card"><h2>诊断摘要</h2>${doctorSummaryPanel(issues,jumpTargets)}</aside>
-                    </section>`);
-                  bindDoctorFilters(focusId);
+                    </section>`,options))bindDoctorFilters(focusId);
                 }
                 function doctorFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(doctorOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function doctorOptionLabel(v){return {ALL:'全部',ERROR:'错误',WARNING:'警告',INFO:'信息',DEVICE:'设备',CHANNEL:'频道',LISTENER:'监听器',RECEIVER:'接收器',ACTION_RELAY:'动作继电器',ACTION:'动作',REGION:'区域',SYSTEM:'系统',UNKNOWN:'未知',HAS_TARGET:'有跳转目标',NO_TARGET:'无跳转目标'}[v]||v;}
@@ -441,18 +597,18 @@ public final class WebAdminFrontendAssets {
                 function doctorTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>严重级别</th><th>问题标题</th><th>关联对象</th><th>对象类型</th><th>频道</th><th>影响说明</th><th>建议操作</th><th>诊断代码</th><th>操作</th></tr></thead><tbody>${items.map(i=>`<tr><td>${pill(i.severity)}</td><td><strong>${issueTitle(i)}</strong></td><td>${esc(i.relatedObjectName||i.relatedObjectId||'暂无')}</td><td>${esc(labelObjectType(i.relatedObjectType))}</td><td>${isBlank(i.channel)?'<span class="muted">暂无</span>':channelButton(i.channel)}</td><td>${issueMessage(i)}</td><td>${issueSuggestion(i)}</td><td><span class="muted">代码：${esc(i.id||'unknown')}</span></td><td>${issueNavigation(i)}</td></tr>`).join('')}</tbody></table></div>`}
                 function doctorSummaryPanel(issues,jumpTargets){if(!issues||issues.length===0)return empty('当前没有诊断问题。');const bySeverity=countBy(issues,i=>String(i.severity||'UNKNOWN').toUpperCase()), byObject=countBy(issues,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase());const top=issues.slice(0,5).map(i=>`<div class="issue-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('');return `<div class="summary-grid">${metric('可跳转问题',jumpTargets)}${metric('无跳转目标',issues.length-jumpTargets)}${metric('频道问题',byObject.CHANNEL||0)}${metric('设备问题',byObject.DEVICE||0)}</div><h3>严重级别分布</h3><div class="list-stack"><div class="kv-row"><span class="muted">错误</span><strong>${bySeverity.ERROR||0}</strong></div><div class="kv-row"><span class="muted">警告</span><strong>${bySeverity.WARNING||0}</strong></div><div class="kv-row"><span class="muted">信息</span><strong>${bySeverity.INFO||0}</strong></div></div><h3>最近问题</h3><div class="list-stack">${top}</div><p class="muted">Doctor 页面只读展示当前可低成本诊断结果，不扫描世界、不强制加载区块。</p>`;}
                 function countBy(items,mapper){return (items||[]).reduce((acc,item)=>{const key=mapper(item)||'UNKNOWN';acc[key]=(acc[key]||0)+1;return acc;},{});}
-                async function renderHistoryPage(queryTail=''){
+                async function renderHistoryPage(queryTail='',options={}){
                   const params=parseHashParams(queryTail);appState.historyFilters.channel=params.channel||'ALL';
-                  setView(loading('正在加载历史记录...'));
-                  let history;try{history=await api('/api/signals/history?limit=500')}catch(err){setView(errorBlock(err.message));return;}
+                  if(!options.silent)setView(loading('正在加载历史记录...'));
+                  let history;try{history=await api('/api/signals/history?limit=500')}catch(err){if(options.silent){toast('历史记录实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.historyItems=history||[];
-                  renderHistoryListPage('');
+                  renderHistoryListPage('',options);
                 }
                 function parseHashParams(tail){const raw=String(tail||'');const query=raw.startsWith('?')?raw.substring(1):(raw.includes('?')?raw.substring(raw.indexOf('?')+1):'');const params=new URLSearchParams(query);return {channel:params.get('channel')||''};}
-                function renderHistoryListPage(focusId){
+                function renderHistoryListPage(focusId,options={}){
                   const items=appState.historyItems||[], filtered=filterHistoryItems(items), channels=uniqueValues(items.map(h=>h.channel).filter(v=>!isBlank(v))), sourceTypes=uniqueValues(items.map(h=>h.sourceType).filter(v=>!isBlank(v)));
                   const success=items.filter(h=>String(h.result||'').toUpperCase()==='SUCCESS').length, failed=items.filter(h=>String(h.result||'').toUpperCase()==='FAILED').length, latest=items[0]?.time||'';
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>历史记录</h1><p>查看 Signal 事件、设备事件与系统观测记录</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('最近记录数',items.length,'','history')}
@@ -472,8 +628,7 @@ public final class WebAdminFrontendAssets {
                     <section class="content-grid">
                       <article class="panel-card">${filtered.length?historyTable(filtered):empty(items.length?'没有匹配当前筛选条件的历史事件。':'暂无历史事件。')}</article>
                       <aside class="panel-card"><h2>时间线摘要</h2>${historySummaryPanel(filtered,items)}</aside>
-                    </section>`);
-                  bindHistoryFilters(focusId);
+                    </section>`,options))bindHistoryFilters(focusId);
                 }
                 function historyFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(historyOptionLabel(id,o))}</option>`).join('')}</select></label>`}
                 function historyOptionLabel(id,v){if(v==='ALL')return'全部';if(id==='history-source')return labelSourceType(v);if(id==='history-result')return labelStatus(v);if(id==='history-range')return labelHistoryRange(v);if(id==='history-sort')return labelHistorySort(v);return v;}
@@ -487,15 +642,15 @@ public final class WebAdminFrontendAssets {
                 function historyTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>事件类型</th><th>频道</th><th>来源对象</th><th>来源类型</th><th>玩家 / 用户</th><th>结果</th><th>详情</th><th>操作</th></tr></thead><tbody>${items.map(h=>`<tr><td>${fmtTime(h.time)}</td><td>Signal 事件</td><td>${channelButton(h.channel)}</td><td>${esc(h.sourceName||h.sourceId||'暂无')}</td><td>${esc(labelSourceType(h.sourceType))}</td><td>${esc(h.playerName||'无玩家上下文')}</td><td>${pill(h.result||'UNKNOWN')}</td><td>${esc(h.description||'暂无详情')}</td><td>${historyAction(h)}</td></tr>`).join('')}</tbody></table></div>`;}
                 function historySummaryPanel(filtered,allItems){if(!allItems||allItems.length===0)return empty('暂无历史事件。');const byResult=countBy(filtered,h=>String(h.result||'UNKNOWN').toUpperCase()), bySource=countBy(filtered,h=>String(h.sourceType||'UNKNOWN').toUpperCase());const recent=filtered.slice(0,5).map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} · ${esc(labelStatus(h.result))}</span><span>${esc(h.description||'暂无详情')}</span></div>`).join('');return `<div class="summary-grid">${metric('当前筛选',filtered.length)}${metric('全部记录',allItems.length)}${metric('成功',byResult.SUCCESS||0)}${metric('失败',byResult.FAILED||0)}</div><h3>来源类型</h3><div class="list-stack">${Object.entries(bySource).slice(0,6).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(labelSourceType(k))}</span><strong>${v}</strong></div>`).join('')||empty('暂无来源统计。')}</div><h3>最近事件</h3><div class="list-stack">${recent||empty('当前筛选下暂无事件。')}</div><p class="muted">History 页面只读展示已有内存历史，不删除、不导出、不重放事件。</p>`;}
                 """).append("""
-                async function renderUsersPage(){
-                  setView(loading('正在加载用户管理...'));
-                  let data;try{data=await api('/api/webadmin/users')}catch(err){setView(`<div class="page-head"><div><h1>用户管理</h1><p>查看 WebAdmin 用户、角色、状态与登录情况</p></div><span class="pill info">只读模式</span></div>${err.status===403?errorBlock('权限不足：只有所有者可以查看用户管理。'):errorBlock(err.message)}`);return;}
+                async function renderUsersPage(options={}){
+                  if(!options.silent)setView(loading('正在加载用户管理...'));
+                  let data;try{data=await api('/api/webadmin/users')}catch(err){if(options.silent){toast('用户管理实时刷新失败，已保留当前页面。');return;}setView(`<div class="page-head"><div><h1>用户管理</h1><p>查看 WebAdmin 用户、角色、状态与登录情况</p></div><span class="pill info">只读模式</span></div>${err.status===403?errorBlock('权限不足：只有所有者可以查看用户管理。'):errorBlock(err.message)}`);return;}
                   appState.usersData=data||{summary:{},users:[],roles:[]};
-                  renderUserList('');
+                  renderUserList('',options);
                 }
-                function renderUserList(focusId){
+                function renderUserList(focusId,options={}){
                   const data=appState.usersData||{summary:{},users:[],roles:[]}, users=data.users||[], summary=data.summary||{}, filtered=filterUsers(users);
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>用户管理</h1><p>查看 WebAdmin 用户、角色、状态与登录情况</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('用户总数',summary.totalCount ?? users.length,'','user')}
@@ -515,8 +670,7 @@ public final class WebAdminFrontendAssets {
                     <section class="content-grid">
                       <article class="panel-card">${filtered.length?userTable(filtered):empty(users.length?'没有匹配当前筛选条件的用户。':'暂无 WebAdmin 用户。')}</article>
                       <aside class="panel-card"><h2>角色与安全说明</h2>${roleSummary(data.roles||[])}${securityTips()}</aside>
-                    </section>`);
-                  bindUserFilters(focusId);
+                    </section>`,options))bindUserFilters(focusId);
                 }
                 function userFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(userOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function userOptionLabel(v){return {ALL:'全部',OWNER:'所有者',EDITOR:'编辑者',TESTER:'测试者',VIEWER:'查看者',ENABLED:'启用',DISABLED:'禁用',ONLINE:'在线',OFFLINE:'离线'}[v]||v;}
@@ -529,9 +683,9 @@ public final class WebAdminFrontendAssets {
                 function userTable(users){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>在线状态</th><th>Session</th><th>最后登录</th><th>创建时间</th><th>创建者</th><th>说明</th></tr></thead><tbody>${users.map(u=>`<tr><td><span class="device-name"><span class="device-icon">${icon('user')}</span><span><strong>${esc(u.displayName||u.username)}</strong><span class="device-subtitle">用户名：${esc(u.username)}</span></span></span></td><td>${esc(labelRoleFull(u.role))}</td><td>${textPill(labelEnabledState(u.enabled),u.enabled?'ok':'warning')}</td><td>${textPill(labelOnline(u.online),u.online?'ok':'info')}</td><td>${esc(Number(u.sessionCount||0))}</td><td>${fmtTime(u.lastLoginAt)}</td><td>${fmtTime(u.createdAt)}</td><td>${esc(u.createdBy||'暂无')}</td><td>${u.forcePasswordChange?'<span class="pill warning">需首次改密</span>':'<span class="muted">暂无备注</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
                 function roleSummary(roles){const items=(roles&&roles.length?roles:[{role:'OWNER',displayName:'所有者（OWNER）',count:0},{role:'EDITOR',displayName:'编辑者（EDITOR）',count:0},{role:'TESTER',displayName:'测试者（TESTER）',count:0},{role:'VIEWER',displayName:'查看者（VIEWER）',count:0}]);return `<div class="list-stack">${items.map(r=>`<div class="kv-row"><span class="muted">${esc(r.displayName||labelRoleFull(r.role))}</span><strong>${esc(r.count ?? 0)}</strong></div>`).join('')}</div><h3>角色说明</h3><div class="list-stack"><div class="event-row"><strong>所有者</strong><span>完整管理权限。</span></div><div class="event-row"><strong>编辑者</strong><span>未来用于编辑配置。</span></div><div class="event-row"><strong>测试者</strong><span>未来用于测试触发。</span></div><div class="event-row"><strong>查看者</strong><span>只读查看。</span></div></div>`}
                 function securityTips(){return `<h3>安全提示</h3><div class="list-stack"><div class="event-row"><span>密码不会明文保存，服务端使用 PBKDF2 哈希。</span></div><div class="event-row"><span>WebAdmin 用户按当前世界 / 存档目录隔离存储。</span></div><div class="event-row"><span>请只给可信协作者创建账号，多人访问建议配合可信网络、防火墙或反向代理。</span></div><div class="event-row"><span>6.5 页面只读展示，不提供重置密码、禁用、删除或踢出 session。</span></div></div>`}
-                async function renderSettingsPage(){
-                  setView(loading('正在加载系统设置...'));
-                  let data;try{data=await api('/api/webadmin/settings')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderSettingsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载系统设置...'));
+                  let data;try{data=await api('/api/webadmin/settings')}catch(err){if(options.silent){toast('系统设置实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   const service=data.service||{}, storage=data.storage||{}, security=data.security||{}, audit=data.audit||{}, system=data.system||{}, visibility=data.visibility||{};
                   setView(`
                     <div class="page-head"><div><h1>系统设置</h1><p>查看 WebAdmin 服务、安全、存储与运行信息</p></div><span class="pill info">只读模式</span></div>
@@ -550,7 +704,7 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>审计 / History</h2><div class="identity-grid">${row('审计日志状态',esc(audit.enabled?'已启用':'已关闭'))}${row('审计文件',esc(audit.auditLogExists?'已存在':'暂无文件'))}${row('最近登录记录',esc(audit.recentLoginRecords||'暂无数据'))}${row('API 访问统计',esc(audit.apiAccessStats||'暂无数据'))}</div></article>
                       <article class="panel-card"><h2>系统信息</h2><div class="identity-grid">${row('TZZ Mod 版本',esc(system.modVersion||'暂无数据'))}${row('Minecraft 版本',esc(system.minecraftVersion||'暂无数据'))}${row('服务器类型',esc(labelServerType(system.serverType)))}${row('当前世界 / 存档',esc(system.worldName||'暂无数据'))}</div></article>
                       <article class="panel-card"><h2>危险操作说明</h2><p class="muted">6.5 系统设置页面只读展示。修改端口、访问模式、用户、密码等操作当前请使用 /tzz webadmin 命令或服务端配置文件；Web UI 写操作将在后续阶段谨慎开放。</p></article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function storagePanel(storage,visibility){const restricted=storage.restricted||visibility.sensitiveStorageHidden;const hidden='受限信息已隐藏';return `<div class="identity-grid">${row('存储作用域',esc(storage.scope||'WORLD_SAVE'))}${row('按世界隔离',esc(storage.worldScoped?'是':'否'))}${row('WebAdmin 存储目录',esc(restricted?hidden:(storage.directory||'暂无')))}${row('配置文件',esc(restricted?hidden:(storage.configPath||'暂无')))}${row('用户文件',esc(restricted?hidden:(storage.usersPath||'暂无')))}${row('审计日志',esc(restricted?hidden:(storage.auditLogPath||'暂无')))}${row('配置文件存在',esc(storage.configExists?'是':'否'))}${row('用户文件存在',esc(storage.usersExists?'是':'否'))}${row('审计日志存在',esc(storage.auditLogExists?'是':'否'))}${row('旧全局文件提示',esc(storage.legacyGlobalFilesDetected?'检测到旧 config/tzz WebAdmin 文件，但不会自动加载':'未检测到旧全局文件'))}</div><p class="muted">WebAdmin 持久化文件统一放在当前世界 / 存档目录下的 tzz/webadmin/，不再使用全局 config/tzz。</p>`}
                 function labelAuthMode(value){return {USERNAME_PASSWORD:'用户名 / 密码'}[String(value||'').toUpperCase()]||value||'暂无';}
@@ -571,16 +725,16 @@ public final class WebAdminFrontendAssets {
                 function labelActionResultFilter(value){return {ALL:'全部',SUCCESS:'成功',FAILED:'失败',UNKNOWN:'未执行'}[value]||value;}
                 function cleanActionSummary(value){const text=String(value||'').trim();return text.replace(/^command:\\s*/i,'命令：').replace(/^message:\\s*/i,'消息：').replace(/^sound:\\s*/i,'音效：').replace(/^signal:\\s*/i,'下游频道：').replace(/^unknown:\\s*/i,'未知：')||'暂无摘要';}
                 function ownerLink(action){const ownerType=String(action?.ownerType||action?.owner?.ownerType||'').toUpperCase(), ownerId=action?.ownerId||action?.owner?.ownerId||'', ownerName=action?.ownerName||action?.owner?.ownerName||ownerId||'暂无';if(ownerType.startsWith('REGION'))return regionButton(ownerId,ownerName);if(ownerType==='ACTION_RELAY'||ownerType==='DEVICE')return navigationButton(`device:${ownerId}`,ownerName);return esc(ownerName);}
-                async function renderRegionsPage(){
-                  setView(loading('正在加载区域管理...'));
-                  let regions;try{regions=await api('/api/regions')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderRegionsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载区域管理...'));
+                  let regions;try{regions=await api('/api/regions')}catch(err){if(options.silent){toast('区域管理实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.regions=regions||[];
-                  renderRegionList('');
+                  renderRegionList('',options);
                 }
-                function renderRegionList(focusId){
+                function renderRegionList(focusId,options={}){
                   const regions=appState.regions||[], worlds=uniqueValues(regions.map(r=>r.world).filter(v=>!isBlank(v))), filtered=filterRegions(regions);
                   const warning=regions.filter(r=>['WARNING','ERROR'].includes(String(r.doctorStatus||'').toUpperCase())).length;
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>区域管理</h1><p>查看 RegionController 区域、边界、目标过滤、事件动作与实时状态</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('区域总数',regions.length,'','region')}
@@ -598,8 +752,7 @@ public final class WebAdminFrontendAssets {
                       ${regionFilterSelect('排序','region-sort',['NAME','WORLD','PLAYERS','RECENT'],appState.regionFilters.sort)}
                     </div>
                     ${filtered.length===0?(regions.length===0?empty('当前暂无区域数据。请使用现有 RegionController 命令创建区域后刷新页面。'):empty('没有匹配当前筛选条件的区域。')):regionTable(filtered)}
-                  `);
-                  bindRegionFilters(focusId);
+                  `,options))bindRegionFilters(focusId);
                 }
                 function regionFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(regionOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function regionOptionLabel(v){return {ALL:'全部',ENABLED:'启用',DISABLED:'禁用',OK:'正常',INFO:'信息',WARNING:'警告',ERROR:'错误',UNKNOWN:'未知',HAS_PLAYERS:'有玩家',NO_PLAYERS:'无玩家',NAME:'区域名',WORLD:'世界/维度',PLAYERS:'当前玩家数',RECENT:'最近事件'}[v]||v;}
@@ -610,11 +763,11 @@ public final class WebAdminFrontendAssets {
                 }
                 function filterRegions(items){const f=appState.regionFilters;const filtered=(items||[]).filter(r=>{const hay=[r.id,r.name,r.world,r.boundChannel,r.targetFilter].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.world!=='ALL'&&r.world!==f.world)return false;if(f.enabled==='ENABLED'&&!r.enabled)return false;if(f.enabled==='DISABLED'&&r.enabled)return false;if(f.doctor!=='ALL'&&String(r.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.players==='HAS_PLAYERS'&&Number(r.playersInside||0)<=0)return false;if(f.players==='NO_PLAYERS'&&Number(r.playersInside||0)>0)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='WORLD')return String(a.world||'').localeCompare(String(b.world||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='PLAYERS')return Number(b.playersInside||0)-Number(a.playersInside||0);if(f.sort==='RECENT')return String(b.lastEventAt||'').localeCompare(String(a.lastEventAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
                 function regionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>区域</th><th>世界</th><th>坐标范围</th><th>尺寸</th><th>目标过滤</th><th>动作数量</th><th>绑定频道</th><th>玩家</th><th>最近事件</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(r=>`<tr onclick='navigateTo(${jsString(regionHash(r.id))})'><td><span class="device-name"><span class="device-icon">${icon('region')}</span><span><strong>${esc(r.name||r.id)}</strong><span class="device-subtitle">ID：${esc(shortId(r.id))}</span></span></span></td><td>${esc(r.world||'暂无')}</td><td>${esc(boundsText(r.bounds))}</td><td>${esc(boundsSize(r.bounds))}</td><td>${esc(labelTargetFilter(r.targetFilter))}</td><td>进入 ${esc(r.enterActionCount||0)} / 离开 ${esc(r.exitActionCount||0)} / 停留 ${esc(r.stayActionCount||0)}</td><td>${channelCell(r.boundChannel)}</td><td>${esc(r.playersInside ?? '暂无')}</td><td>${fmtTime(r.lastEventAt)}</td><td>${pill(r.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(regionHash(r.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
-                async function renderRegionDetail(id){
-                  setView(loading('正在加载区域详情...'));
+                async function renderRegionDetail(id,options={}){
+                  if(!options.silent)setView(loading('正在加载区域详情...'));
                   const routeInfo=detailRoute(id,'#/regions');
                   const [detailRes,listRes]=await Promise.all([settle(`/api/regions/${encodeURIComponent(routeInfo.id)}`),settle('/api/regions')]);
-                  if(!detailRes.ok){setView(`<div class="back-row">${backButton(routeInfo,'返回区域管理')}</div>${detailRes.error.status===404?errorBlock('区域不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
+                  if(!detailRes.ok){if(options.silent){toast('区域详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回区域管理')}</div>${detailRes.error.status===404?errorBlock('区域不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
                   const detail=detailRes.data, list=listRes.ok?listRes.data:[], entry=(list||[]).find(r=>r.id===detail.id)||{};
                   setView(`
                     <div class="back-row">${backButton(routeInfo,'返回区域管理')}</div>
@@ -628,21 +781,21 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>绑定 Channel / 逻辑链</h2>${regionChannels(detail.boundChannels||[])}</article>
                       <article class="panel-card"><h2>当前玩家 / 最近事件</h2>${regionPlayersAndEvents(detail)}</article>
                       <article class="panel-card"><h2>Doctor / Debug 摘要</h2>${doctorList(detail.doctorIssues||[],8)}</article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function regionActionGroups(actions){const groups=[['进入动作',actions.enter||[]],['离开动作',actions.exit||[]],['停留动作',actions.stay||[]]];return `<div class="list-stack">${groups.map(([name,items])=>`<div class="event-row"><strong>${esc(name)}：${items.length}</strong>${items.length?items.map(a=>`<span>${actionButton(a.id,labelActionType(a.type))} <span class="muted">${esc(cleanActionSummary(a.summary))} / ${a.enabled?'启用':'禁用'}</span></span>`).join(''):'<span class="muted">暂无动作</span>'}</div>`).join('')}</div>`}
                 function regionChannels(channels){if(!channels||channels.length===0)return empty('未绑定频道。');return `<div class="list-stack">${channels.map(c=>`<div class="event-row"><strong>关联频道</strong>${channelButton(c)}<span class="muted">点击可查看 Signal 频道详情。</span></div>`).join('')}</div>`}
                 function regionPlayersAndEvents(detail){const players=detail.playersInside||[], events=detail.recentEvents||[];return `<div class="list-stack"><div class="event-row"><strong>当前玩家</strong>${players.length?players.map(p=>`<span>${esc(p)}</span>`).join(''):'<span class="muted">暂无玩家状态数据</span>'}</div><div class="event-row"><strong>最近事件</strong>${events.length?events.map(e=>`<span>${esc(e.type||'事件')} · ${fmtTime(e.time)} · ${esc(e.playerName||'暂无玩家')}</span>`).join(''):'<span class="muted">暂无最近事件</span>'}</div></div>`}
-                async function renderActionsPage(){
-                  setView(loading('正在加载动作系统...'));
-                  let actions;try{actions=await api('/api/actions')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderActionsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载动作系统...'));
+                  let actions;try{actions=await api('/api/actions')}catch(err){if(options.silent){toast('动作系统实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.actions=actions||[];
-                  renderActionList('');
+                  renderActionList('',options);
                 }
-                function renderActionList(focusId){
+                function renderActionList(focusId,options={}){
                   const actions=appState.actions||[], ownerTypes=uniqueValues(actions.map(a=>a.ownerType).filter(v=>!isBlank(v))), filtered=filterActions(actions);
                   const warning=actions.filter(a=>['WARNING','ERROR'].includes(String(a.doctorStatus||'').toUpperCase())).length;
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>动作系统</h1><p>查看 ActionEngine 动作、引用来源、执行记录与诊断状态</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('Action 总数',actions.length,'','action')}
@@ -660,8 +813,7 @@ public final class WebAdminFrontendAssets {
                       ${actionFilterSelect('排序','action-sort',['NAME','TYPE','OWNER','RECENT'],appState.actionFilters.sort)}
                     </div>
                     ${filtered.length===0?(actions.length===0?empty('当前暂无动作数据。请配置 listener、action_relay 或 region action 后刷新页面。'):empty('没有匹配当前筛选条件的动作。')):actionTable(filtered)}
-                  `);
-                  bindActionFilters(focusId);
+                  `,options))bindActionFilters(focusId);
                 }
                 function actionFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(actionOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function actionOptionLabel(v){return {ALL:'全部',COMMAND:'命令动作',MESSAGE:'消息动作',SOUND:'音效动作',SIGNAL:'信号动作',UNKNOWN:'未执行 / 未知',OK:'正常',INFO:'信息',WARNING:'警告',ERROR:'错误',SUCCESS:'成功',FAILED:'失败',LISTENER:'监听器',ACTION_RELAY:'动作继电器',REGION_ENTER:'区域进入动作',REGION_EXIT:'区域离开动作',REGION_STAY:'区域停留动作',REGION:'区域',DEVICE:'设备',SYSTEM:'系统',NAME:'动作名',TYPE:'动作类型',OWNER:'归属对象',RECENT:'最近执行'}[v]||v;}
@@ -672,11 +824,11 @@ public final class WebAdminFrontendAssets {
                 }
                 function filterActions(items){const f=appState.actionFilters;const filtered=(items||[]).filter(a=>{const hay=[a.id,a.name,a.type,a.summary,a.ownerType,a.ownerName,a.ownerId,a.channel].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&String(a.type||'UNKNOWN').toUpperCase()!==f.type)return false;if(f.owner!=='ALL'&&String(a.ownerType||'UNKNOWN').toUpperCase()!==f.owner)return false;if(f.result!=='ALL'&&String(a.lastResult||'UNKNOWN').toUpperCase()!==f.result)return false;if(f.doctor!=='ALL'&&String(a.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='TYPE')return String(a.type||'').localeCompare(String(b.type||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='OWNER')return String(a.ownerName||a.ownerId||'').localeCompare(String(b.ownerName||b.ownerId||''));if(f.sort==='RECENT')return String(b.lastExecutedAt||'').localeCompare(String(a.lastExecutedAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
                 function actionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>动作</th><th>类型</th><th>归属对象</th><th>关联频道</th><th>引用</th><th>执行次数</th><th>最近结果</th><th>最近执行</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(a=>`<tr onclick='navigateTo(${jsString(actionHash(a.id))})'><td><span class="device-name"><span class="device-icon">${icon('action')}</span><span><strong>${esc(a.name||a.id)}</strong><span class="device-subtitle">ID：${esc(shortId(a.id))}</span></span></span></td><td>${esc(labelActionType(a.type))}</td><td>${ownerLink(a)} <span class="muted">(${esc(labelOwnerType(a.ownerType))})</span></td><td>${channelCell(a.channel)}</td><td>${esc(a.referencedByCount ?? 0)}</td><td>${esc(a.executionCount ?? 0)}</td><td>${pill(a.lastResult||'UNKNOWN')}</td><td>${fmtTime(a.lastExecutedAt)}</td><td>${pill(a.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(actionHash(a.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
-                async function renderActionDetail(id){
-                  setView(loading('正在加载动作详情...'));
+                async function renderActionDetail(id,options={}){
+                  if(!options.silent)setView(loading('正在加载动作详情...'));
                   const routeInfo=detailRoute(id,'#/actions');
                   const [detailRes,listRes]=await Promise.all([settle(`/api/actions/${encodeURIComponent(routeInfo.id)}`),settle('/api/actions')]);
-                  if(!detailRes.ok){setView(`<div class="back-row">${backButton(routeInfo,'返回动作系统')}</div>${detailRes.error.status===404?errorBlock('动作不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
+                  if(!detailRes.ok){if(options.silent){toast('动作详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回动作系统')}</div>${detailRes.error.status===404?errorBlock('动作不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
                   const detail=detailRes.data, list=listRes.ok?listRes.data:[], entry=(list||[]).find(a=>a.id===detail.id)||{}, owner=detail.owner||{};
                   setView(`
                     <div class="back-row">${backButton(routeInfo,'返回动作系统')}</div>
@@ -688,22 +840,22 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>引用来源</h2><div class="list-stack"><div class="event-row"><strong>${esc(labelOwnerType(owner.ownerType||entry.ownerType))}</strong><span>${ownerLink(entry)}</span><span class="muted">6.6 只读展示当前可从配置收集到的引用来源。</span></div></div></article>
                       <article class="panel-card"><h2>最近执行记录</h2>${actionExecutions(detail.recentExecutions||[])}</article>
                       <article class="panel-card"><h2>Doctor / Debug 摘要</h2>${doctorList(detail.doctorIssues||[],8)}</article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function actionConfigPanel(detail,entry){const type=String(detail.type||entry.type||'UNKNOWN').toUpperCase(), summary=cleanActionSummary(detail.summary||entry.summary);const rows=[['动作类型',labelActionType(type)],['摘要',summary],['下游频道',type==='SIGNAL'?(entry.channel||detail.owner?.channel):''],['Doctor 状态',entry.doctorStatus||detail.configSummary?.doctorStatus]];let html=configSection('关键配置',rows);if(type==='COMMAND')html+=`<p class="muted">命令动作仅只读展示摘要，不提供执行、复制执行或测试按钮。</p>`;if(type==='SIGNAL'&&!isBlank(entry.channel))html+=`<p>${channelButton(entry.channel)}</p>`;const raw=flatten(detail.configSummary||{}).slice(0,24).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');return `${html||empty('暂无可用配置摘要。')}<details class="raw-config"><summary>高级 / 原始字段</summary><div class="list-stack">${raw||'<span class="muted">暂无原始字段。</span>'}</div></details>`}
                 function actionExecutions(items){if(!items||items.length===0)return empty('暂无执行记录。');return `<div class="list-stack">${items.map(e=>`<div class="event-row"><strong>${fmtTime(e.time||e.executedAt)}</strong><span>${esc(e.owner||'暂无归属')} · ${esc(labelStatus(e.result||'UNKNOWN'))}</span><span class="muted">${esc(e.detail||'暂无详情')}</span></div>`).join('')}</div>`}
-                async function renderSignals(){
-                  setView(loading('正在加载 Signal 频道...'));
-                  let channels;try{channels=await api('/api/signals/channels')}catch(err){setView(errorBlock(err.message));return;}
+                async function renderSignals(options={}){
+                  if(!options.silent)setView(loading('正在加载 Signal 频道...'));
+                  let channels;try{channels=await api('/api/signals/channels')}catch(err){if(options.silent){toast('Signal 频道实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
                   appState.signals=channels||[];
-                  renderSignalList('');
+                  renderSignalList('',options);
                 }
-                function renderSignalList(focusId){
+                function renderSignalList(focusId,options={}){
                   const channels=appState.signals||[], filtered=filterSignalChannels(channels);
                   const hasConsumers=channels.filter(c=>consumerCount(c)>0).length;
                   const recent=channels.filter(c=>!isBlank(c.lastTriggeredAt)).length;
                   const warning=channels.filter(c=>['WARNING','ERROR'].includes(String(c.doctorStatus||'').toUpperCase())).length;
-                  setView(`
+                  if(setView(`
                     <div class="page-head"><div><h1>Signal 管理</h1><p>查看频道、消费者、最近触发与逻辑链入口</p></div><span class="pill info">只读模式</span></div>
                     <section class="card-grid">
                       ${metric('频道总数',channels.length,'','signal')}
@@ -721,8 +873,7 @@ public final class WebAdminFrontendAssets {
                     </div>
                     ${filtered.length===0?(channels.length===0?empty('当前暂无 Signal 频道数据。请在游戏内触发 signal 或配置 listener / receiver / action_relay 后刷新。'):empty('没有匹配当前筛选条件的频道。')):signalTable(filtered)}
                     <article class="panel-card" style="margin-top:16px"><h2>预设频道图标说明</h2><p class="muted">6.3 只读阶段按频道状态和类型显示预设 2D 图标，不提供图标编辑或上传。</p></article>
-                  `);
-                  bindSignalFilters(focusId);
+                  `,options))bindSignalFilters(focusId);
                 }
                 function signalFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(signalOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function signalOptionLabel(v){return {ALL:'全部',HAS_CONSUMER:'有消费者',NO_CONSUMER:'无消费者',HAS_LISTENER:'有监听器',HAS_RECEIVER:'有接收器',HAS_RELAY:'有动作继电器',RECENT:'最近有事件',NO_RECENT:'暂无事件',WARNING:'有警告',CHANNEL:'频道名',CONSUMERS:'消费者数量'}[v]||labelSignalSort(v)||v;}
@@ -753,10 +904,10 @@ public final class WebAdminFrontendAssets {
                 }
                 function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>`<tr onclick='navigateTo(${jsString(signalHash(c.channel))})'><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(labelChannelType(c.type))}</span></span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(c.channel))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
                 function consumerSummary(c){const count=consumerCount(c);if(count===0)return '<span class="muted">暂无消费者</span>';return `<span class="pill info">${count} 个消费者</span>`}
-                async function renderSignalDetail(channel){
+                async function renderSignalDetail(channel,options={}){
                   const routeInfo=detailRoute(channel,'#/signals'), decoded=routeInfo.id||'';
-                  setView(loading('正在加载频道详情...'));
-                  let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){setView(`<div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>${err.status===404?errorBlock('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}`);return;}
+                  if(!options.silent)setView(loading('正在加载频道详情...'));
+                  let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){if(options.silent){toast('频道详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>${err.status===404?errorBlock('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}`);return;}
                   const stats=detail.stats||{}, totalConsumers=Number(stats.listenerCount||0)+Number(stats.receiverCount||0)+Number(stats.actionRelayCount||0);
                   setView(`
                     <div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>
@@ -778,7 +929,7 @@ public final class WebAdminFrontendAssets {
                       <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
                       <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}<p class="muted"><button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看该频道历史</button></p></article>
                       <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
-                    </section>`);
+                    </section>`,options);
                 }
                 function logicChain(detail){
                   const sources=detail.sources||[], listeners=detail.listeners||[], receivers=detail.receivers||[], relays=detail.actionRelays||[], actions=detail.actions||[], downstream=detail.downstreamSignals||[];

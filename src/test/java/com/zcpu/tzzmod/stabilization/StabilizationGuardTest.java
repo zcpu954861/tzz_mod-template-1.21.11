@@ -32,10 +32,16 @@ import com.zcpu.tzzmod.signal.device.item.ItemSubmitInventoryAdapter;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
+import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +70,7 @@ public final class StabilizationGuardTest {
         testDiagnosticIssueRendering();
         testVirtualDeviceDiagnostics();
         testWebAdminReadonlyFrontendAssets();
+        testWebAdminRealtimeFoundation();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -714,13 +721,26 @@ public final class StabilizationGuardTest {
                 "withReturnContext",
                 "goBackOrFallback",
                 "backButton",
-                "navigationButton"
+                "navigationButton",
+                "connectRealtime",
+                "closeRealtime",
+                "handleRealtimeEvent",
+                "shouldHandleRealtimeEvent",
+                "markRealtimeDirty",
+                "flushVisibleRealtimeRefresh",
+                "runRealtimeRefresh",
+                "captureViewState",
+                "restoreViewState"
         )) {
             requireContains(js, helper, "WebAdmin frontend helper present: " + helper);
         }
 
         requireContains(appHtml, "区域管理", "sidebar contains Region navigation");
         requireContains(appHtml, "动作系统", "sidebar contains Action navigation");
+        requireContains(appHtml + js, "/api/realtime/events", "WebAdmin realtime event stream route present");
+        requireContains(js, "dirtyRoutes", "realtime hidden-tab dirty route tracking present");
+        requireContains(js, "pendingRefresh", "realtime pending refresh guard present");
+        requireContains(js, "route({silent:true,expectedHash:hash,expectedSeq:seq})", "realtime refresh uses silent route update");
         requireContains(js, "text.slice(11,19)", "time formatter strips ISO separator and milliseconds");
         requireContains(js, "暂无", "Chinese empty state fallback present");
         requireContains(js, "只读", "readonly UI hint present");
@@ -729,6 +749,44 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains(">undefined<"), "frontend does not render raw undefined marker");
         requireFalse(js.contains(">null<"), "frontend does not render raw null marker");
         requireFalse(js.contains("location.hash='http"), "frontend does not route to external URL");
+        requireFalse(js.contains("setInterval("), "frontend does not use global polling interval");
+    }
+
+    private static void testWebAdminRealtimeFoundation() throws Exception {
+        for (WebAdminRealtimeEventType type : WebAdminRealtimeEventType.values()) {
+            requireNotBlank(type.id(), "realtime event type id present");
+            requireNotBlank(type.displayName(), "realtime event type display name present");
+        }
+
+        WebAdminRealtimeEvent event = WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.SIGNAL_EMITTED)
+                .channel("guard.channel")
+                .sourceType("test")
+                .severity("INFO")
+                .summary("guard signal")
+                .routeTarget("#/signals/guard.channel")
+                .payload("result", "SUCCESS")
+                .payload("passwordHash", null)
+                .build("guard-1");
+        String json = WebAdminJsonResponse.GSON.toJson(event);
+        requireContains(json, "signal_emitted", "realtime event serializes type");
+        requireContains(json, "guard.channel", "realtime event serializes channel");
+        requireFalse(json.contains("passwordHash"), "realtime event omits null sensitive payload");
+        requireFalse(json.contains("passwordSalt"), "realtime event omits password salt");
+        requireFalse(json.contains("sessionId"), "realtime event omits session id");
+        requireFalse(json.contains("cookie"), "realtime event omits cookie value");
+
+        WebAdminRealtimeEventBus.closeAll();
+        WebAdminRealtimeClient client = WebAdminRealtimeEventBus.subscribe("guard", "VIEWER");
+        requireEquals(1, WebAdminRealtimeEventBus.clientCount(), "realtime client subscribed");
+        WebAdminRealtimeEvent connected = client.poll(Duration.ofMillis(200));
+        requireTrue(connected != null, "realtime client receives connected event");
+        WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.HEARTBEAT)
+                .summary("guard heartbeat"));
+        WebAdminRealtimeEvent received = client.poll(Duration.ofMillis(200));
+        requireTrue(received != null, "realtime client receives published event");
+        WebAdminRealtimeEventBus.unsubscribe(client);
+        requireEquals(0, WebAdminRealtimeEventBus.clientCount(), "realtime client unsubscribed");
+        WebAdminRealtimeEventBus.closeAll();
     }
 
     private static SignalDeviceData fullDevice() {

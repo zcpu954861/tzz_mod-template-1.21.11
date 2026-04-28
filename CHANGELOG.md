@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.26.0-web-admin-realtime-sync
+
+- Added 6.8 WebAdmin realtime sync foundation using authenticated Server-Sent Events at `GET /api/realtime/events`.
+- Added lightweight WebAdmin realtime event bus, client queue protection, heartbeat events, connection/disconnection events, and Signal history event publishing.
+- Added frontend realtime connection status, reconnect backoff, route-based event filtering, hidden-tab dirty refresh recovery, and throttled current-page silent refresh handling that preserves scroll and filter state.
+- Connected Signal history append path to lightweight `signal_emitted` / `history_appended` events without pushing full devices, history, or doctor DTOs.
+- Added realtime guard coverage to `stabilizationGuardTest` for event serialization, event type metadata, queue subscription/publish behavior, frontend helper presence, and realtime route presence.
+- Added WebAdmin realtime sync documentation and 6.8 regression checklist.
+- No write API, config editing, WebSocket dependency, full-site polling, automatic repair, ConditionEngine, or high-level game orchestration is included.
+
 ## v1.25.0-web-admin-readonly-stabilization
 
 - Added 6.7 WebAdmin readonly layer stabilization and frontend foundation cleanup.

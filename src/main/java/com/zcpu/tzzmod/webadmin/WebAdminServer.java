@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -23,6 +25,7 @@ public final class WebAdminServer {
     private final WebAdminSessionService sessionService;
     private final WebAdminReadonlyRoutes readonlyRoutes = new WebAdminReadonlyRoutes();
     private final WebAdminUserSettingsService userSettingsService = new WebAdminUserSettingsService();
+    private final WebAdminRealtimeService realtimeService = new WebAdminRealtimeService();
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -67,6 +70,7 @@ public final class WebAdminServer {
             executor.shutdownNow();
             executor = null;
         }
+        realtimeService.closeAll();
         sessionService.clear();
         WebAdminAuditLogger.server("stop", config);
     }
@@ -114,6 +118,14 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/status") && method.equalsIgnoreCase("GET")) {
                 handleStatus(exchange, auth);
+                return;
+            }
+            if (path.equals("/api/realtime/events")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                realtimeService.handleEventStream(exchange, auth.user);
                 return;
             }
             if (path.equals("/api/webadmin/users")) {
@@ -191,6 +203,7 @@ public final class WebAdminServer {
         webAdmin.put("port", config.port);
         webAdmin.put("accessMode", config.accessMode);
         webAdmin.put("sessionCount", sessionService.sessionCount());
+        webAdmin.put("realtimeClientCount", WebAdminRealtimeEventBus.clientCount());
         WebAdminStoragePaths storagePaths = WebAdminStoragePaths.resolve(minecraftServer);
         Map<String, Object> storage = new LinkedHashMap<>();
         storage.put("scope", WebAdminStoragePaths.STORAGE_SCOPE);

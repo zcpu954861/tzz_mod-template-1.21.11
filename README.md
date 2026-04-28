@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.25.0-web-admin-readonly-stabilization`
-- 当前开发版本：`v1.25.0-web-admin-readonly-stabilization`（6.7 WebAdmin 只读层稳定化 / 前端架构整理；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.26.0-web-admin-realtime-sync`
+- 当前开发版本：`v1.26.0-web-admin-realtime-sync`（6.8 WebAdmin 实时同步基础；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,16 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.8 WebAdmin Realtime Sync Foundation
+
+6.8 是 WebAdmin 实时同步基础阶段，不新增编辑能力、不新增写 API、不做配置写入。当前实现采用认证后的 Server-Sent Events / Event Stream：`GET /api/realtime/events`。
+
+服务端新增轻量 realtime event bus。Signal history 追加时会发布 `signal_emitted` / `history_appended` 事件；WebAdmin 连接建立、断开和 heartbeat 也会发出轻量事件。事件只包含 channel、sourceType、summary、routeTarget 和少量 payload，不推送完整 devices/history/doctor DTO，不包含 password、hash、salt、session token 或 cookie。
+
+前端登录后建立 realtime 连接，topbar 显示“实时同步”状态和最后事件时间。收到事件后按当前 hash route 过滤，并用节流后的当前页面静默局部 refetch 处理相关变化；浏览器标签页在后台时只记录 dirty route，回到前台后再刷新当前相关页面。不做全站轮询、不全页 reload，并保留滚动位置、筛选条件和折叠状态。
+
+更多说明见 `docs/WEBADMIN_REALTIME_SYNC_6_8.md`，完整人工回归清单见 `docs/REGRESSION_TEST_6_8.md`。
 
 ### 6.7 WebAdmin Readonly Stabilization
 

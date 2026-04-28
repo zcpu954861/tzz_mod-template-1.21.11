@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.signal;
 
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -12,15 +13,18 @@ public final class SignalEventHistory {
     private SignalEventHistory() {
     }
 
-    public static synchronized void record(SignalEventRecord record) {
+    public static void record(SignalEventRecord record) {
         if (record == null) {
             return;
         }
 
-        while (RECORDS.size() >= MAX_RECORDS) {
-            RECORDS.removeFirst();
+        synchronized (SignalEventHistory.class) {
+            while (RECORDS.size() >= MAX_RECORDS) {
+                RECORDS.removeFirst();
+            }
+            RECORDS.addLast(record);
         }
-        RECORDS.addLast(record);
+        WebAdminRealtimeEventBus.publishSignalHistory(record);
     }
 
     public static synchronized List<SignalEventRecord> snapshot() {
