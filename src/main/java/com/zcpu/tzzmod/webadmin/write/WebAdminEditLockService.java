@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_METADATA = "device_metadata";
     public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
+    public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
     private final Map<String, WebAdminEditLock> locks = new ConcurrentHashMap<>();
@@ -489,7 +490,9 @@ public final class WebAdminEditLockService {
 
     private static boolean isDeviceLockTarget(String targetType) {
         String safeTargetType = normalizeTargetType(targetType);
-        return TARGET_DEVICE_METADATA.equals(safeTargetType) || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType);
+        return TARGET_DEVICE_METADATA.equals(safeTargetType)
+                || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
+                || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType);
     }
 
     private static WebAdminOperationType operationTypeForTarget(String targetType) {
@@ -499,6 +502,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG;
+        }
+        if (TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG;
         }
         return null;
     }

@@ -131,6 +131,42 @@ PATCH /api/webadmin/device-basic-config/{deviceId}
 
 后续阶段可在 7.2 的锁和冲突检测基础上继续评估 success/fail channel、cooldown、pulseTicks 等较低风险字段；itemSubmit、action command、region bounds 等高风险配置应继续单独分阶段设计。
 
+## 7.3 WebAdmin 设备扩展基础配置编辑
+
+7.3 在 7.2 `enabled` / 主频道编辑稳定后，继续开放少量按设备类型支持的扩展基础配置字段。该阶段仍然只通过 WebAdmin 写入安全链路处理简单字段，不进入 itemSubmit、matcher、Action、Region 等复杂编辑。
+
+当前按设备类型支持：
+
+- `virtual_block_device`：`interactChannel`、`successChannel`、`failChannel`、`interactionCooldownTicks`。
+- `signal_receiver`：在接收器所在区块已加载时支持 `pulseTicks`。
+- `action_relay`：在继电器所在区块已加载时支持 `cooldownTicks`。
+- `signal_emitter`：当前没有可编辑扩展基础配置，只做只读展示。
+
+7.3 的 channel 字段继续复用深色 WebAdmin combobox，可选择 `/api/signals/channels` 返回的已有频道，也可手动输入新频道。手动输入不会自动创建 listener、receiver 或 action_relay。可选扩展频道支持显式“设为未设置”，但不会误把空输入当作清空操作。
+
+所有写入仍必须通过：
+
+- `EDITOR` / `OWNER` 权限。
+- CSRF / same-origin 校验。
+- `device_extended_config` 编辑锁。
+- `expectedFingerprint` 冲突检测。
+- `WebAdminWriteResult` / validationErrors。
+- audit 记录。
+- 轻量 `config_changed`、`device_config_changed`、`write_audit_appended` realtime 事件。
+
+7.3 不改变 `SignalDeviceData` schema，不绕过 `SignalDeviceStore`，不直接让前端写 JSON。修改扩展字段时必须保留 enabled、主频道、offChannel、interactionItem matcher/source/consume、itemSubmit、container、itemConditions、BlockState condition、redstone mode、WebAdmin metadata、runtime/history summary 等既有字段。
+
+暂不开放：
+
+- itemSubmit requirements / consume。
+- ItemStackMatcher / interactionItem source。
+- action 列表、command action 或 action 执行。
+- Region bounds / target filter。
+- 用户和系统设置。
+- Scratch-like 模块编辑器、ConditionEngine、GameController / MissionSystem。
+
+后续阶段可基于 7.3 的 supported-field、fingerprint、lock、audit 和 realtime 模式，继续设计 Signal / Listener / Receiver / ActionRelay 更系统化的编辑能力。
+
 ## channel
 
 channel 是事件频道名，也是技术标识。它会被自动规范化为小写，只允许：

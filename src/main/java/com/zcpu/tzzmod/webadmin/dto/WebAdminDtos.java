@@ -69,6 +69,20 @@ public final class WebAdminDtos {
     ) {
     }
 
+    public record DeviceExtendedConfigDto(
+            String deviceId,
+            String deviceType,
+            Map<String, Object> values,
+            List<String> supportedFields,
+            Map<String, String> fieldLabels,
+            Map<String, Boolean> clearableFields,
+            boolean supported,
+            String unsupportedReason,
+            String expectedFingerprint,
+            WebAdminEditLockStatusDto lockStatus
+    ) {
+    }
+
     public record DebugCheckDto(String name, String status, String message) {
     }
 

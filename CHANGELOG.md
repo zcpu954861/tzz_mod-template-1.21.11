@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.32.0-web-admin-device-extended-config
+
+- Added 7.3 WebAdmin device extended basic config editing for simple per-device fields.
+- Added readonly/write APIs for device extended config: `GET /api/webadmin/device-extended-config/{deviceId}` and `PATCH /api/webadmin/device-extended-config/{deviceId}`.
+- Added supported-field discovery so each device type only exposes real editable extended fields.
+- Supported virtual block device extension fields: `interactChannel`, `successChannel`, `failChannel`, and `interactionCooldownTicks`.
+- Supported loaded `signal_receiver` pulse editing through `pulseTicks`, and loaded `action_relay` cooldown editing through `cooldownTicks`; unsupported or unloaded targets return safe validation/unsupported responses without forcing chunk loads.
+- Reused the 7.2 dark channel combobox for extended channel fields, including existing-channel candidates from `/api/signals/channels`, manual new channel input, and explicit clear controls for optional extension channels.
+- Required `EDITOR` / `OWNER` permission, CSRF / same-origin checks, `device_extended_config` edit lock, expected fingerprint conflict detection, validation, audit, and realtime events for PATCH.
+- Preserved complex device data while changing extended config, including enabled, primary channel, itemSubmit, matcher, interactionItem source/consume, container, itemConditions, redstone mode, conditions, metadata, action, region, user, and settings data.
+- Kept 7.3 scope limited: no itemSubmit, matcher, action list, command action, region, user, system settings, Scratch-like editor, ConditionEngine, or GameController editing.
+- No SignalDeviceData schema change, no direct frontend JSON editing, and no 5.x gameplay semantics change is included.
+
 ## v1.31.0-web-admin-device-basic-config
 
 - Added 7.2 WebAdmin device basic config editing for the first low-risk gameplay-affecting device fields.
