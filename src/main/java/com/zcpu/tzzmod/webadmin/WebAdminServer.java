@@ -3,14 +3,19 @@ package com.zcpu.tzzmod.webadmin;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +35,7 @@ public final class WebAdminServer {
     private final WebAdminRealtimeService realtimeService = new WebAdminRealtimeService();
     private final WebAdminWriteSecurityService writeSecurityService = new WebAdminWriteSecurityService();
     private final WebAdminWriteFoundationService writeFoundationService = new WebAdminWriteFoundationService(writeSecurityService);
+    private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(new WebAdminPermissionService(), writeSecurityService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -157,6 +163,10 @@ public final class WebAdminServer {
                 handleWebAdminWriteCapabilities(exchange, auth);
                 return;
             }
+            if (path.startsWith("/api/webadmin/device-metadata/")) {
+                handleDeviceMetadata(exchange, auth, path, method);
+                return;
+            }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
                 return;
             }
@@ -261,6 +271,45 @@ public final class WebAdminServer {
         WebAdminJsonResponse.ok(exchange, writeFoundationService.capabilities(auth.user, auth.session));
     }
 
+    private void handleDeviceMetadata(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/device-metadata/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            var device = new com.zcpu.tzzmod.webadmin.service.WebAdminDeviceService().findDevice(minecraftServer, deviceId);
+            if (device == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "设备不存在或已被删除。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, deviceMetadataService.metadataFor(minecraftServer, device));
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminDeviceMetadataUpdateRequest request = readJson(exchange, WebAdminDeviceMetadataUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminDeviceMetadataUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
+        boolean sameOrigin = isWriteSameOrigin(exchange);
+        WebAdminWriteResult result = deviceMetadataService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                request,
+                csrfToken,
+                sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
     private AuthContext requireAuth(HttpExchange exchange) throws IOException {
         String token = cookie(exchange, WebAdminSessionService.COOKIE_NAME);
         WebAdminSession session = sessionService.get(token).orElse(null);
@@ -335,6 +384,37 @@ public final class WebAdminServer {
         return values == null || values.isEmpty() ? "" : values.get(0);
     }
 
+    private boolean isWriteSameOrigin(HttpExchange exchange) {
+        String origin = header(exchange, "Origin");
+        String referer = header(exchange, "Referer");
+        if (isBlank(origin) && isBlank(referer)) {
+            return true;
+        }
+        HostPort hostPort = requestHostPort(exchange);
+        return writeSecurityService.isSameOriginOrReferer(origin, referer, hostPort.host(), hostPort.port());
+    }
+
+    private HostPort requestHostPort(HttpExchange exchange) {
+        String hostHeader = header(exchange, "Host");
+        if (!isBlank(hostHeader)) {
+            String trimmed = hostHeader.trim();
+            int colon = trimmed.lastIndexOf(':');
+            if (colon > 0 && colon < trimmed.length() - 1) {
+                try {
+                    return new HostPort(trimmed.substring(0, colon), Integer.parseInt(trimmed.substring(colon + 1)));
+                } catch (NumberFormatException ignored) {
+                    return new HostPort(trimmed.substring(0, colon), config.port);
+                }
+            }
+            return new HostPort(trimmed, config.port);
+        }
+        return new HostPort(config.host, config.port);
+    }
+
+    private static String decodePathSegment(String value) {
+        return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
     private static String sourceIp(HttpExchange exchange) {
         return exchange.getRemoteAddress() == null || exchange.getRemoteAddress().getAddress() == null
                 ? ""
@@ -363,5 +443,8 @@ public final class WebAdminServer {
     }
 
     private record AuthContext(String rawToken, WebAdminSession session, WebAdminUser user) {
+    }
+
+    private record HostPort(String host, int port) {
     }
 }

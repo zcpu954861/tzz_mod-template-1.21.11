@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
@@ -42,6 +43,21 @@ public final class WebAdminAuditLogger {
     public static void logout(String username) {
         Tzz_mod.LOGGER.info("[WebAdminAudit] logout username={}", safe(username));
         append("logout username=" + safe(username));
+    }
+
+    public static void writeEvent(WebAdminAuditEvent event) {
+        if (event == null) {
+            return;
+        }
+        Tzz_mod.LOGGER.info(
+                "[WebAdminAudit] write operation={} targetType={} targetId={} result={} actor={}",
+                safe(event.operationType()),
+                safe(event.targetType()),
+                safe(event.targetId()),
+                safe(event.result()),
+                safe(event.actorUsername())
+        );
+        append("write event=" + WebAdminJsonResponse.GSON.toJson(event));
     }
 
     private static synchronized void append(String line) {

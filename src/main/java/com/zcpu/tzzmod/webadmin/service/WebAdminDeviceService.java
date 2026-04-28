@@ -21,6 +21,8 @@ import java.util.Map;
 import net.minecraft.server.MinecraftServer;
 
 public final class WebAdminDeviceService {
+    private final WebAdminDeviceMetadataService metadataService = new WebAdminDeviceMetadataService(null, null);
+
     public List<WebAdminDtos.DeviceListEntryDto> listDevices(MinecraftServer server, int requestedLimit) {
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
@@ -31,9 +33,10 @@ public final class WebAdminDeviceService {
             }
             SignalDeviceData device = raw.normalized();
             List<DiagnosticIssue> issues = diagnosticIssues(server, device);
+            WebAdminDtos.DeviceMetadataDto metadata = metadataService.metadataFor(server, device);
             result.add(new WebAdminDtos.DeviceListEntryDto(
                     device.id(),
-                    WebAdminReadonlySupport.deviceDisplayName(device),
+                    metadata.effectiveDisplayName(),
                     WebAdminReadonlySupport.deviceType(device),
                     device.dimension(),
                     WebAdminReadonlySupport.pos(device),
@@ -41,7 +44,8 @@ public final class WebAdminDeviceService {
                     device.channel(),
                     WebAdminReadonlySupport.isoTime(device.lastTriggerWallTimeMillis()),
                     WebAdminReadonlySupport.doctorStatus(issues),
-                    true
+                    true,
+                    metadata
             ));
         }
         return List.copyOf(result);
@@ -59,13 +63,14 @@ public final class WebAdminDeviceService {
         SignalDeviceData device = rawDevice.normalized();
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<DiagnosticIssue> issues = diagnosticIssues(server, device);
+        WebAdminDtos.DeviceMetadataDto metadata = metadataService.metadataFor(server, device);
         Map<String, String> navigation = new LinkedHashMap<>();
         if (!device.channel().isBlank()) {
             navigation.put("channelDetail", "/api/signals/channels/" + device.channel());
         }
         return new WebAdminDtos.DeviceDetailDto(
                 device.id(),
-                WebAdminReadonlySupport.deviceDisplayName(device),
+                metadata.effectiveDisplayName(),
                 WebAdminReadonlySupport.deviceType(device),
                 device.dimension(),
                 WebAdminReadonlySupport.pos(device),
@@ -74,6 +79,7 @@ public final class WebAdminDeviceService {
                 configSummary(device),
                 recentHistoryForDevice(device, devices),
                 doctorIssueDtos(issues),
+                metadata,
                 debugSummary(device, issues),
                 navigation
         );

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.28.0-web-admin-write-stabilization`
-- 当前开发版本：`v1.28.0-web-admin-write-stabilization`（6.10 WebAdmin 写入前置稳定化 / 编辑阶段前总审查；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.29.0-web-admin-editing-foundation`
+- 当前开发版本：`v1.29.0-web-admin-editing-foundation`（7.0 WebAdmin 配置编辑基础 / 最小安全写入闭环；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -19,7 +19,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region 管理和 Action 系统只读页面。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region 管理、Action 系统只读页面，以及 7.0 起低风险设备显示元数据编辑闭环。
 
 ## 命令入口
 
@@ -38,6 +38,31 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 7.0 WebAdmin Editing Foundation
+
+7.0 是 WebAdmin 配置编辑基础 / 最小安全写入闭环。本阶段只开放低风险 WebAdmin 设备显示元数据编辑：`displayName`、`note`、`iconKey`。这些字段只影响 WebAdmin 展示，不改变 Minecraft 游戏逻辑，不改变 SignalBridge、SignalDevice、VirtualBlockDevice、itemSubmit、RegionController 或 ActionEngine 的运行语义。
+
+新增世界级 WebAdmin 元数据文件：
+
+```text
+<world-save-root>/tzz/webadmin/web_admin_device_metadata.json
+```
+
+新增 API：
+
+```text
+GET /api/webadmin/device-metadata/{deviceId}
+PATCH /api/webadmin/device-metadata/{deviceId}
+```
+
+`GET` 要求登录，`VIEWER`、`TESTER`、`EDITOR`、`OWNER` 均可读取安全 DTO。`PATCH` 要求有效 WebAdmin session、`EDITOR` 或 `OWNER` 权限、CSRF / 同源写请求安全校验、JSON content、输入 validation、审计记录和 realtime 事件发布。写入结果统一使用 `WebAdminWriteResult`，校验失败返回 `validation_failed`，权限不足返回 `permission_denied`，无变化返回 `no_change`。
+
+设备详情页新增“WebAdmin 显示信息”卡片。`EDITOR` / `OWNER` 可以编辑显示名称、备注和预设图标；`VIEWER` / `TESTER` 只能查看并看到权限说明。保存成功后发布轻量 `config_changed`、`device_config_changed` 和 `write_audit_appended` 事件，前端静默更新，不跳页、不丢滚动位置、不影响详情页返回上下文。
+
+7.0 明确不开放 `enabled`、`channel`、`interactChannel`、success/fail channel、cooldown、redstone mode、interactionItem、itemSubmit、matcher、consume、action、command action、region bounds、用户或系统设置编辑。
+
+更多说明见 `docs/WEBADMIN_EDITING_FOUNDATION_7_0.md`，回归测试见 `docs/REGRESSION_TEST_7_0.md`。
 
 ### 6.10 WebAdmin Write Foundation Stabilization
 
