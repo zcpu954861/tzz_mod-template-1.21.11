@@ -965,6 +965,75 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 7.0 配置编辑基础 / 最小安全写入闭环
+
+7.0 正式进入 WebAdmin 编辑阶段，但第一批只开放低风险 WebAdmin 设备显示元数据编辑。本阶段不是游戏逻辑配置编辑，不修改 `SignalDeviceData` 业务语义，不写 `signal_devices.json`，不改变 SignalBridge、SignalDevice、VirtualBlockDevice、itemSubmit、RegionController 或 ActionEngine 的执行行为。
+
+### 允许编辑的字段
+
+7.0 仅允许通过 WebAdmin 设备详情页编辑：
+
+- `displayName`：WebAdmin 显示名称，可为空，为空时回退到原设备名称。
+- `note`：WebAdmin 备注，仅纯文本。
+- `iconKey`：WebAdmin 预设图标 key，不支持上传图片、外部 URL 或任意资源引用。
+
+这些字段保存到世界级 WebAdmin 元数据文件：
+
+```text
+<world-save-root>/tzz/webadmin/web_admin_device_metadata.json
+```
+
+每个世界拥有独立的设备显示元数据；旧世界没有该文件时使用空 metadata。
+
+### 写入安全链路
+
+7.0 的写入必须经过 6.9 / 6.10 建立的安全链路：
+
+```text
+Web UI
+→ PATCH /api/webadmin/device-metadata/{deviceId}
+→ WebAdmin session
+→ EDITOR / OWNER 权限检查
+→ CSRF / 同源写请求校验
+→ validation
+→ WebAdminDeviceMetadataService
+→ WebAdminDeviceMetadataStore
+→ structured audit
+→ realtime config_changed / device_config_changed
+→ WebAdminWriteResult
+```
+
+`VIEWER` 和 `TESTER` 不能写入；`EDITOR` 和 `OWNER` 可以写入显示元数据。前端权限提示只用于用户体验，后端仍强制执行 session、权限、CSRF 和 validation。
+
+### API
+
+```text
+GET /api/webadmin/device-metadata/{deviceId}
+PATCH /api/webadmin/device-metadata/{deviceId}
+```
+
+`GET` 是安全只读接口。`PATCH` 是 7.0 唯一新增的真实写 API，但它只写 WebAdmin 元数据，不写游戏逻辑配置。所有写入结果使用 `WebAdminWriteResult`，包括 `ok`、`no_change`、`validation_failed`、`permission_denied`、`target_not_found` 和 CSRF 相关错误。
+
+### 设备详情 UI 布局
+
+7.0 的设备详情页采用平衡式双栏布局。左侧主列保留设备基础信息、Debug 检查、最近事件和紧凑折叠的配置摘要；右侧侧栏保留 WebAdmin 显示信息、Doctor 状态摘要、关联频道摘要、设备标识 / 快捷信息、快捷跳转和最近状态。后续编辑页面应继续遵循“核心内容在主列，摘要 / 跳转 / WebAdmin 元数据在侧栏，避免重复展示并减少滚动”的原则。
+
+### 明确不包含
+
+7.0 不开放以下编辑：
+
+- `enabled`
+- 主 channel / success channel / fail channel / interactChannel
+- cooldown / redstone mode
+- interactionItem / itemSubmit / matcher / consume
+- action / command action
+- region bounds / target filter / enter-exit-stay actions
+- WebAdmin 用户、角色、密码、session、系统设置
+
+这些高风险编辑需要在后续阶段继续设计 preview、conflict detection、草稿 / 发布 / 回滚和更细的 validation。
+
+更多说明见 `docs/WEBADMIN_EDITING_FOUNDATION_7_0.md`，回归测试见 `docs/REGRESSION_TEST_7_0.md`。
+
 ## WebAdmin 6.10 写入前置稳定化 / 编辑阶段前总审查
 
 6.10 是 7.0 WebAdmin 配置编辑前的安全闸门。本阶段不开放真实编辑，不新增公开写 API，不写 JSON，也不改变 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController、ActionEngine 或 WebAdmin 只读页面的既有运行语义。

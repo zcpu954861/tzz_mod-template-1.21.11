@@ -12,7 +12,7 @@ public final class WebAdminRolePolicy {
         return switch (safeRole) {
             case OWNER -> true;
             case EDITOR -> switch (operation) {
-                case READ, TEST, EDIT_DEVICE, EDIT_SIGNAL, EDIT_REGION, EDIT_ACTION, EDIT_ITEM_MATCHER -> true;
+                case READ, TEST, EDIT_DEVICE_METADATA, EDIT_DEVICE, EDIT_SIGNAL, EDIT_REGION, EDIT_ACTION, EDIT_ITEM_MATCHER -> true;
                 default -> false;
             };
             case TESTER -> operation == WebAdminOperationType.READ || operation == WebAdminOperationType.TEST;

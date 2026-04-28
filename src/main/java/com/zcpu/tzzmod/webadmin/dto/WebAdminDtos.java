@@ -20,7 +20,8 @@ public final class WebAdminDtos {
             String channel,
             String lastTriggeredAt,
             String doctorStatus,
-            boolean debugAvailable
+            boolean debugAvailable,
+            DeviceMetadataDto metadata
     ) {
     }
 
@@ -35,8 +36,22 @@ public final class WebAdminDtos {
             Map<String, Object> configSummary,
             List<SignalHistoryEntryDto> recentHistory,
             List<DoctorIssueDto> doctorIssues,
+            DeviceMetadataDto metadata,
             Map<String, Object> debugSummary,
             Map<String, String> navigation
+    ) {
+    }
+
+    public record DeviceMetadataDto(
+            String deviceId,
+            String displayName,
+            String note,
+            String iconKey,
+            String effectiveDisplayName,
+            String effectiveIconKey,
+            String updatedAt,
+            String updatedBy,
+            long version
     ) {
     }
 

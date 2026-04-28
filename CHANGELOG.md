@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.29.0-web-admin-editing-foundation
+
+- Added 7.0 WebAdmin Editing Foundation as the first minimal safe write loop.
+- Added world-save scoped WebAdmin device metadata storage at `<world-save-root>/tzz/webadmin/web_admin_device_metadata.json`.
+- Added safe device metadata APIs: `GET /api/webadmin/device-metadata/{deviceId}` and `PATCH /api/webadmin/device-metadata/{deviceId}`.
+- Allowed editing only WebAdmin display metadata: `displayName`, `note`, and `iconKey`.
+- Kept the edited metadata separate from gameplay config; this version does not change `SignalDeviceData`, SignalBridge behavior, VBD logic, itemSubmit, actions, regions, users, or system settings.
+- Reused the 6.9 / 6.10 write foundation: `WebAdminWriteResult`, validation errors, permission matrix, CSRF / same-origin checks, structured audit, and realtime write events.
+- Restricted metadata writes to `EDITOR` and `OWNER`; `VIEWER` and `TESTER` remain readonly.
+- Added device detail UI for WebAdmin display information with inline validation, save / cancel flow, and permission-aware readonly state.
+- Refined the device detail page into a balanced two-column layout: core details and compact config summary stay in the main column, while WebAdmin metadata, Doctor/channel summaries, identity shortcuts, and recent status stay in the side column.
+- Published lightweight `config_changed`, `device_config_changed`, and `write_audit_appended` events after successful metadata writes.
+- Extended stabilization guards for metadata validation, write permissions, write result codes, audit redaction, realtime event safety, frontend metadata edit UI, and capabilities consistency.
+- No enabled/channel/itemSubmit/matcher/consume/action/region/user/settings editing, no direct JSON editing from the frontend, no WebSocket change, and no 5.x gameplay semantics change is included.
+
 ## v1.28.0-web-admin-write-stabilization
 
 - Added 6.10 WebAdmin write foundation stabilization as the safety gate before 7.0 editing work.

@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.webadmin.write;
 public enum WebAdminOperationType {
     READ("READ", "只读查看"),
     TEST("TEST", "测试 / 校验"),
+    EDIT_DEVICE_METADATA("EDIT_DEVICE_METADATA", "编辑 WebAdmin 设备显示信息"),
     EDIT_DEVICE("EDIT_DEVICE", "编辑设备配置"),
     EDIT_SIGNAL("EDIT_SIGNAL", "编辑 Signal 配置"),
     EDIT_REGION("EDIT_REGION", "编辑区域配置"),

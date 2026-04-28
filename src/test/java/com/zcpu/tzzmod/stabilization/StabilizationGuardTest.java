@@ -36,10 +36,12 @@ import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
@@ -809,14 +811,17 @@ public final class StabilizationGuardTest {
         WebAdminPermissionService permissions = new WebAdminPermissionService();
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.TEST, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_REGION, true);
@@ -829,8 +834,31 @@ public final class StabilizationGuardTest {
             requirePermission(permissions, WebAdminRole.OWNER, operation, true);
         }
 
+        WebAdminDeviceMetadataUpdateRequest validMetadata = new WebAdminDeviceMetadataUpdateRequest();
+        validMetadata.displayName = "";
+        validMetadata.note = "";
+        validMetadata.iconKey = "auto";
+        requireTrue(WebAdminDeviceMetadataService.validateRequest(validMetadata).isEmpty(), "empty device metadata values are allowed");
+        WebAdminDeviceMetadataUpdateRequest longNameMetadata = new WebAdminDeviceMetadataUpdateRequest();
+        longNameMetadata.displayName = "x".repeat(WebAdminDeviceMetadataService.MAX_DISPLAY_NAME_LENGTH + 1);
+        longNameMetadata.iconKey = "auto";
+        requireFalse(WebAdminDeviceMetadataService.validateRequest(longNameMetadata).isEmpty(), "long display name is rejected");
+        WebAdminDeviceMetadataUpdateRequest longNoteMetadata = new WebAdminDeviceMetadataUpdateRequest();
+        longNoteMetadata.note = "x".repeat(WebAdminDeviceMetadataService.MAX_NOTE_LENGTH + 1);
+        longNoteMetadata.iconKey = "auto";
+        requireFalse(WebAdminDeviceMetadataService.validateRequest(longNoteMetadata).isEmpty(), "long note is rejected");
+        WebAdminDeviceMetadataUpdateRequest invalidIconMetadata = new WebAdminDeviceMetadataUpdateRequest();
+        invalidIconMetadata.iconKey = "https://example.invalid/icon.png";
+        requireFalse(WebAdminDeviceMetadataService.validateRequest(invalidIconMetadata).isEmpty(), "external icon key is rejected");
+        WebAdminDeviceMetadataUpdateRequest controlCharMetadata = new WebAdminDeviceMetadataUpdateRequest();
+        controlCharMetadata.displayName = "bad\u0001name";
+        controlCharMetadata.iconKey = "auto";
+        requireFalse(WebAdminDeviceMetadataService.validateRequest(controlCharMetadata).isEmpty(), "control characters are rejected");
+        requireTrue(WebAdminDeviceMetadataService.isAllowedIconKey("signal_emitter"), "known metadata icon key is allowed");
+        requireFalse(WebAdminDeviceMetadataService.isAllowedIconKey("http_icon"), "unknown metadata icon key is rejected");
+
         WebAdminWriteTarget target = new WebAdminWriteTarget("DEVICE", "device-1", "测试设备");
-        WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE).asWriteResult(target);
+        WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_METADATA).asWriteResult(target);
         requireFalse(denied.success(), "permission denied write result fails");
         requireEquals(WebAdminWriteResultCode.PERMISSION_DENIED.id(), denied.code(), "permission denied code");
         requireNotBlank(denied.message(), "permission denied message is readable");
@@ -963,7 +991,7 @@ public final class StabilizationGuardTest {
         owner.normalized();
         Map<String, Object> capabilities = new WebAdminWriteFoundationService(security).capabilities(owner, session);
         String capabilitiesJson = WebAdminJsonResponse.GSON.toJson(capabilities);
-        requireContains(capabilitiesJson, "readonlyStage", "capabilities describe readonly stage");
+        requireContains(capabilitiesJson, "metadataWriteEnabled", "capabilities describe metadata write stage");
         requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
         requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
         requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
@@ -973,7 +1001,12 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("fetch('/api/devices', {method:'POST'"), "frontend does not expose device write POST");
         requireFalse(js.contains("method:'DELETE'"), "frontend does not expose DELETE writes");
         requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
-        requireFalse(js.contains(">保存<"), "frontend does not expose save button");
+        requireContains(js, "/api/webadmin/device-metadata/", "frontend exposes only device metadata write endpoint");
+        requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
+        requireContains(js, "此信息仅用于 WebAdmin 展示", "metadata edit warning describes display-only scope");
+        requireFalse(js.contains("fetch('/api/actions', {method:'PATCH'"), "frontend does not expose action write PATCH");
+        requireFalse(js.contains("fetch('/api/regions', {method:'PATCH'"), "frontend does not expose region write PATCH");
+        requireFalse(js.contains("fetch('/api/webadmin/users', {method:'PATCH'"), "frontend does not expose user write PATCH");
         requireFalse(js.contains(">删除<"), "frontend does not expose delete button");
     }
 

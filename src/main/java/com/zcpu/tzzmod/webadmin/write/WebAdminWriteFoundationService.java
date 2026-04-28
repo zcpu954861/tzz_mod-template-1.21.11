@@ -17,9 +17,10 @@ public final class WebAdminWriteFoundationService {
 
     public Map<String, Object> capabilities(WebAdminUser user, WebAdminSession session) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("readonlyStage", true);
-        data.put("writeApiEnabled", false);
-        data.put("message", "当前版本仅提供写入前置能力，尚未开放 Web UI 配置写入。");
+        data.put("readonlyStage", false);
+        data.put("writeApiEnabled", true);
+        data.put("metadataWriteEnabled", true);
+        data.put("message", "当前版本仅开放 WebAdmin 设备显示信息写入，不改变游戏逻辑配置。");
         data.put("permissions", permissionService.capabilitySummary(user == null ? null : user.roleEnum()));
         Map<String, Object> csrf = new LinkedHashMap<>();
         csrf.put("requiredForFutureWrites", true);
@@ -32,7 +33,7 @@ public final class WebAdminWriteFoundationService {
             entry.put("operation", operation.id());
             entry.put("displayName", operation.displayName());
             entry.put("allowed", permissionService.decide(user, operation).allowed());
-            entry.put("futureOnly", operation != WebAdminOperationType.READ);
+            entry.put("futureOnly", operation != WebAdminOperationType.READ && operation != WebAdminOperationType.EDIT_DEVICE_METADATA);
             operations.add(entry);
         }
         data.put("operations", operations);
