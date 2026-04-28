@@ -965,6 +965,27 @@ world/tzz_mod/signal_listeners.json
 
 这些命令不会新增配置文件，也不会改变 SignalBridge `emit`、listener cooldown、ActionEngine 或 RegionController 的执行语义。
 
+## WebAdmin 6.10 写入前置稳定化 / 编辑阶段前总审查
+
+6.10 是 7.0 WebAdmin 配置编辑前的安全闸门。本阶段不开放真实编辑，不新增公开写 API，不写 JSON，也不改变 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController、ActionEngine 或 WebAdmin 只读页面的既有运行语义。
+
+### 审查结论
+
+6.10 对 6.9 写入前置体系做了总审查：
+
+- 权限矩阵：VIEWER 只读，TESTER 预留测试 / dry-run，EDITOR 可进入普通配置编辑范围但不能管理用户、系统设置或危险操作，OWNER 拥有完整权限。
+- 写结果模型：未来写 API 必须统一返回 `WebAdminWriteResult`，包括 `ok`、`permission_denied`、`unauthenticated`、`csrf_required`、`csrf_invalid`、`validation_failed`、`target_not_found`、`conflict_detected`、`dangerous_operation_requires_confirmation`、`no_change` 和 `internal_error`。
+- CSRF / 安全：未来写 API 必须经过有效 session、后端权限判断、CSRF / 同源校验、validation、audit 和 realtime 事件发布链路。
+- 审计模型：写成功、写失败、权限拒绝、校验失败和内部错误都应可审计，且不记录明文密码、password hash、salt、session token 或 cookie value。
+- Mutation service：Web UI 不能直接改 JSON，必须通过 service / DTO / domain store；未来 service 应支持 preview、validate、apply、no-change、conflict detection 和审计。
+- Realtime 写事件：`config_changed`、`write_audit_appended`、`permission_denied`、`validation_failed` 以及对象级 config_changed 事件当前作为协议预留，不伪造、不推送敏感 payload。
+
+### 7.0 推荐入口
+
+6.10 建议 7.0 第一批只接入低风险编辑：设备名称 / 备注 / iconKey、基础 enabled 状态和基础 channel 字段。itemSubmit / matcher、action command、region bounds、用户管理和系统安全设置属于高风险编辑，应在后续阶段单独设计 validation、preview、冲突检测和回滚策略。
+
+更多说明见 `docs/WEBADMIN_WRITE_STABILIZATION_6_10.md`，回归测试见 `docs/REGRESSION_TEST_6_10.md`。
+
 ## WebAdmin 6.9 写入前置 / 权限审计 / Service API 基础
 
 6.9 是 WebAdmin 进入配置编辑前的安全前置阶段。该阶段不开放真实配置编辑，不新增公开可调用的写 API，不写 JSON，也不改变 SignalBridge、SignalDevice、VirtualBlockDevice、RegionController 或 ActionEngine 的既有运行语义。

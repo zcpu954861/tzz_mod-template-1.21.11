@@ -35,6 +35,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
+import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
@@ -46,6 +47,7 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteAuditContext;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteContext;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResultCode;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
@@ -805,12 +807,27 @@ public final class StabilizationGuardTest {
 
     private static void testWebAdminWriteFoundation() {
         WebAdminPermissionService permissions = new WebAdminPermissionService();
-        requireFalse(permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE).allowed(), "viewer cannot edit devices");
-        requireFalse(permissions.decide(WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE).allowed(), "tester cannot edit devices");
-        requireTrue(permissions.decide(WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE).allowed(), "editor can edit devices");
-        requireFalse(permissions.decide(WebAdminRole.EDITOR, WebAdminOperationType.EDIT_USER).allowed(), "editor cannot manage users");
-        requireTrue(permissions.decide(WebAdminRole.OWNER, WebAdminOperationType.EDIT_USER).allowed(), "owner can manage users");
-        requireTrue(permissions.decide(WebAdminRole.OWNER, WebAdminOperationType.DANGEROUS_OPERATION).allowed(), "owner can perform dangerous operations");
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.READ, true);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.TEST, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_USER, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.READ, true);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_USER, false);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.READ, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.TEST, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_REGION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_ACTION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_ITEM_MATCHER, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_USER, false);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SYSTEM_SETTINGS, false);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.DANGEROUS_OPERATION, false);
+        for (WebAdminOperationType operation : WebAdminOperationType.values()) {
+            requirePermission(permissions, WebAdminRole.OWNER, operation, true);
+        }
 
         WebAdminWriteTarget target = new WebAdminWriteTarget("DEVICE", "device-1", "测试设备");
         WebAdminWriteResult denied = permissions.decide(WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE).asWriteResult(target);
@@ -828,14 +845,45 @@ public final class StabilizationGuardTest {
         requireFalse(validation.success(), "validation failed result fails");
         requireEquals(1, validation.validationErrors().size(), "validation error list is present");
         requireEquals("已隐藏", validation.validationErrors().get(0).rejectedValueSummary(), "rejected sensitive value is hidden");
+        WebAdminValidationError sensitiveFieldError = new WebAdminValidationError(
+                "passwordHash",
+                "invalid",
+                "敏感字段不能提交。",
+                "plain-secret-value"
+        );
+        requireEquals("已隐藏", sensitiveFieldError.rejectedValueSummary(), "sensitive validation field is hidden");
 
         WebAdminWriteResult ok = WebAdminWriteResult.ok(target, true, "配置预览通过。");
         requireTrue(ok.success(), "ok write result succeeds");
         requireTrue(ok.changed(), "ok write result carries changed flag");
+        WebAdminWriteResult noChange = WebAdminWriteResult.noChange(target, "");
+        requireTrue(noChange.success(), "no-change result succeeds");
+        requireFalse(noChange.changed(), "no-change result carries unchanged flag");
+        requireEquals(WebAdminWriteResultCode.NO_CHANGE.id(), noChange.code(), "no-change result code");
+        for (WebAdminWriteResultCode code : List.of(
+                WebAdminWriteResultCode.UNAUTHENTICATED,
+                WebAdminWriteResultCode.CSRF_REQUIRED,
+                WebAdminWriteResultCode.CSRF_INVALID,
+                WebAdminWriteResultCode.TARGET_NOT_FOUND,
+                WebAdminWriteResultCode.CONFLICT_DETECTED,
+                WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION,
+                WebAdminWriteResultCode.INTERNAL_ERROR
+        )) {
+            WebAdminWriteResult failed = WebAdminWriteResult.failed(code, target, "");
+            requireFalse(failed.success(), "failed write result fails for " + code.id());
+            requireNotBlank(failed.message(), "failed write result message present for " + code.id());
+            requireFalse(failed.message().contains("Exception"), "failed write result omits stack trace");
+        }
+        requireTrue(WebAdminWriteResult.failed(
+                WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION,
+                target,
+                ""
+        ).requiresConfirmation(), "dangerous write result requires confirmation");
         String resultJson = WebAdminJsonResponse.GSON.toJson(Map.of(
                 "denied", denied,
                 "validation", validation,
-                "ok", ok
+                "ok", ok,
+                "noChange", noChange
         ));
         requireFalse(resultJson.contains("passwordHash"), "write result omits sensitive rejected key");
         requireFalse(resultJson.contains("secret"), "write result omits sensitive rejected value");
@@ -847,6 +895,12 @@ public final class StabilizationGuardTest {
         requireFalse(security.requireValidCsrf(session, "").success(), "missing csrf token fails");
         requireFalse(security.requireValidCsrf(session, "wrong").success(), "wrong csrf token fails");
         requireTrue(security.requireValidCsrf(session, csrfToken).success(), "correct csrf token passes");
+        requireTrue(security.isSameOrigin("http://127.0.0.1:18080", "127.0.0.1", 18080), "same origin accepted");
+        requireFalse(security.isSameOrigin("http://evil.example:18080", "127.0.0.1", 18080), "cross origin rejected");
+        requireTrue(security.isSameOriginOrReferer("", "http://127.0.0.1:18080/app#/settings", "127.0.0.1", 18080),
+                "same referer accepted");
+        requireFalse(security.isSameOriginOrReferer("", "http://evil.example/app", "127.0.0.1", 18080),
+                "cross referer rejected");
 
         WebAdminWriteContext writeContext = new WebAdminWriteContext(
                 "owner",
@@ -859,8 +913,8 @@ public final class StabilizationGuardTest {
         WebAdminAuditEvent auditEvent = WebAdminAuditWriter.eventForResult(
                 WebAdminWriteAuditContext.from(writeContext),
                 denied,
-                Map.of("passwordHash", "secret", "safeField", "before"),
-                Map.of("sessionToken", "token", "safeField", "after")
+                Map.of("passwordHash", "secret", "passwordSalt", "salt-value", "plainPassword", "plain-value", "safeField", "before"),
+                Map.of("sessionToken", "token", "cookieValue", "cookie-value", "safeField", "after")
         );
         requireNotBlank(auditEvent.auditId(), "audit id present");
         requireNotBlank(auditEvent.actorUsername(), "audit actor present");
@@ -868,14 +922,22 @@ public final class StabilizationGuardTest {
         String auditJson = WebAdminJsonResponse.GSON.toJson(auditEvent);
         requireFalse(auditJson.contains("passwordHash"), "audit event omits password hash key");
         requireFalse(auditJson.contains("sessionToken"), "audit event omits session token key");
+        requireFalse(auditJson.contains("passwordSalt"), "audit event omits password salt key");
+        requireFalse(auditJson.contains("plainPassword"), "audit event omits plain password key");
+        requireFalse(auditJson.contains("cookieValue"), "audit event omits cookie value key");
         requireFalse(auditJson.contains("secret"), "audit event omits sensitive value");
         requireFalse(auditJson.contains("token"), "audit event omits token value");
+        requireFalse(auditJson.contains("salt-value"), "audit event omits salt value");
+        requireFalse(auditJson.contains("plain-value"), "audit event omits plain password value");
+        requireFalse(auditJson.contains("cookie-value"), "audit event omits cookie value");
 
         for (WebAdminRealtimeEventType type : List.of(
                 WebAdminRealtimeEventType.CONFIG_CHANGED,
                 WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED,
                 WebAdminRealtimeEventType.PERMISSION_DENIED,
                 WebAdminRealtimeEventType.VALIDATION_FAILED,
+                WebAdminRealtimeEventType.USER_CHANGED,
+                WebAdminRealtimeEventType.SYSTEM_SETTINGS_CHANGED,
                 WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.SIGNAL_CONFIG_CHANGED,
                 WebAdminRealtimeEventType.REGION_CONFIG_CHANGED,
@@ -892,10 +954,27 @@ public final class StabilizationGuardTest {
         String eventJson = WebAdminJsonResponse.GSON.toJson(event);
         requireFalse(eventJson.contains("passwordSalt"), "write realtime event omits sensitive payload");
 
+        WebAdminUser owner = new WebAdminUser();
+        owner.username = "owner";
+        owner.displayName = "owner";
+        owner.role = WebAdminRole.OWNER.id();
+        owner.passwordHash = "passwordHash-should-not-leak";
+        owner.passwordSalt = "passwordSalt-should-not-leak";
+        owner.normalized();
+        Map<String, Object> capabilities = new WebAdminWriteFoundationService(security).capabilities(owner, session);
+        String capabilitiesJson = WebAdminJsonResponse.GSON.toJson(capabilities);
+        requireContains(capabilitiesJson, "readonlyStage", "capabilities describe readonly stage");
+        requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
+        requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
+        requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
+        requireFalse(capabilitiesJson.contains(session.sessionIdHash), "capabilities omit session hash");
+
         String js = WebAdminFrontendAssets.appJs();
         requireFalse(js.contains("fetch('/api/devices', {method:'POST'"), "frontend does not expose device write POST");
         requireFalse(js.contains("method:'DELETE'"), "frontend does not expose DELETE writes");
         requireFalse(js.contains("resetPassword("), "frontend does not expose reset password action");
+        requireFalse(js.contains(">保存<"), "frontend does not expose save button");
+        requireFalse(js.contains(">删除<"), "frontend does not expose delete button");
     }
 
     private static SignalDeviceData fullDevice() {
@@ -1255,6 +1334,16 @@ public final class StabilizationGuardTest {
         requireEquals(expectedMatcher.consumeCount(), actualMatcher.consumeCount(), "matcher consume count preserved");
         requireEquals(expectedMatcher.interactionItemSource(), actualMatcher.interactionItemSource(), "matcher source preserved");
         requireEquals(expectedMatcher.interactionItemVanillaPolicy(), actualMatcher.interactionItemVanillaPolicy(), "matcher vanilla policy preserved");
+    }
+
+    private static void requirePermission(
+            WebAdminPermissionService permissions,
+            WebAdminRole role,
+            WebAdminOperationType operation,
+            boolean expected
+    ) {
+        boolean actual = permissions.decide(role, operation).allowed();
+        requireEquals(expected, actual, "permission " + role.id() + " " + operation.id());
     }
 
     private static void requireTrue(boolean value, String message) {

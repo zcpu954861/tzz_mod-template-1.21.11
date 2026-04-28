@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
 
-- 最新发布版本：`v1.27.0-web-admin-write-foundation`
-- 当前开发版本：`v1.27.0-web-admin-write-foundation`（6.9 WebAdmin 写入前置 / 权限审计 / Service API 基础；以 `gradle.properties` 的 `mod_version` 为准）
+- 最新发布版本：`v1.28.0-web-admin-write-stabilization`
+- 当前开发版本：`v1.28.0-web-admin-write-stabilization`（6.10 WebAdmin 写入前置稳定化 / 编辑阶段前总审查；以 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,6 +38,16 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
 ## WebAdmin Foundation
+
+### 6.10 WebAdmin Write Foundation Stabilization
+
+6.10 是 7.0 WebAdmin 配置编辑前的安全闸门，定位为写入前置稳定化 / 编辑阶段前总审查。本阶段不开放真实配置编辑，不新增公开可调用的配置写入 API，不写 JSON，不改变 5.x 已封版底层工具链语义，也不改变 6.2～6.8 已完成的只读观察层和 realtime 行为。
+
+本阶段重点审查并补强 6.9 写入前置体系：权限矩阵、统一写结果模型、validation error 脱敏、CSRF / 同源写请求安全 helper、结构化审计模型、mutation service 规范、realtime 写入事件类型、前端只读边界和敏感信息保护。`stabilizationGuardTest` 增加 6.10 guard，用于确认 VIEWER / TESTER / EDITOR / OWNER 权限矩阵、CSRF token 校验、审计脱敏、写结果 code、realtime 写事件类型和前端无真实写入口。
+
+6.10 结论用于判断是否可以进入 7.0。推荐 7.0 第一批只开放低风险编辑对象，例如设备名称 / 备注 / iconKey、基础 enabled 状态和基础 channel 字段；itemSubmit、action command、region bounds、用户 / 系统安全设置等高风险编辑应继续放到后续独立阶段。
+
+更多说明见 `docs/WEBADMIN_WRITE_STABILIZATION_6_10.md`，回归测试见 `docs/REGRESSION_TEST_6_10.md`。
 
 ### 6.9 WebAdmin Write Permission / Audit / Service API Foundation
 
