@@ -3,11 +3,13 @@ package com.zcpu.tzzmod.webadmin;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -40,6 +42,7 @@ public final class WebAdminServer {
     private final WebAdminWriteFoundationService writeFoundationService = new WebAdminWriteFoundationService(writeSecurityService);
     private final WebAdminEditLockService editLockService = new WebAdminEditLockService(permissionService, writeSecurityService);
     private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -174,6 +177,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/device-metadata/")) {
                 handleDeviceMetadata(exchange, auth, path, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/device-basic-config/")) {
+                handleDeviceBasicConfig(exchange, auth, path, method);
                 return;
             }
             if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
@@ -348,6 +355,45 @@ public final class WebAdminServer {
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result = deviceMetadataService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                request,
+                csrfToken,
+                sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleDeviceBasicConfig(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/device-basic-config/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            var config = deviceBasicConfigService.configFor(minecraftServer, auth.user, auth.session, deviceId);
+            if (config == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "设备不存在或已被删除。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, config);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminDeviceBasicConfigUpdateRequest request = readJson(exchange, WebAdminDeviceBasicConfigUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminDeviceBasicConfigUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
+        boolean sameOrigin = isWriteSameOrigin(exchange);
+        WebAdminWriteResult result = deviceBasicConfigService.update(
                 minecraftServer,
                 auth.user,
                 auth.session,

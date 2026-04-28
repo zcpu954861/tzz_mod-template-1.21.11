@@ -55,6 +55,20 @@ public final class WebAdminDtos {
     ) {
     }
 
+    public record DeviceBasicConfigDto(
+            String deviceId,
+            String deviceType,
+            boolean enabled,
+            String channel,
+            boolean enabledEditable,
+            boolean channelEditable,
+            boolean supported,
+            String unsupportedReason,
+            String expectedFingerprint,
+            WebAdminEditLockStatusDto lockStatus
+    ) {
+    }
+
     public record DebugCheckDto(String name, String status, String message) {
     }
 

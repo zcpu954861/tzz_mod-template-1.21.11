@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.31.0-web-admin-device-basic-config
+
+- Added 7.2 WebAdmin device basic config editing for the first low-risk gameplay-affecting device fields.
+- Added readonly/write APIs for device basic config: `GET /api/webadmin/device-basic-config/{deviceId}` and `PATCH /api/webadmin/device-basic-config/{deviceId}`.
+- Allowed editing only `enabled` and the primary `channel` field through the WebAdmin write foundation.
+- Required `EDITOR` / `OWNER` permission, CSRF / same-origin checks, `device_basic_config` edit lock, expected fingerprint conflict detection, validation, audit, and realtime events for PATCH.
+- Preserved all complex device fields when changing enabled/channel, including itemSubmit, matcher, interactionItem, container, itemConditions, redstone mode, condition, action, region, user, and settings data.
+- Added device detail UI for "设备基础配置" with lock-aware editing, validation errors, conflict handling, no-change handling, and silent realtime refresh behavior.
+- Kept 7.2 scope limited: no interact/success/fail/off channel, cooldown, pulseTicks, redstone mode, BlockState condition, itemSubmit, matcher, consume, action, command action, region bounds, user, or settings editing.
+- No direct frontend JSON editing, no SignalDeviceData schema change, no `signal_devices.json` schema rewrite, and no 5.x gameplay semantics change is included.
+
 ## v1.30.0-web-admin-edit-locks
 
 - Added 7.1 WebAdmin object versioning, conflict detection, and edit lock foundation for device display metadata.

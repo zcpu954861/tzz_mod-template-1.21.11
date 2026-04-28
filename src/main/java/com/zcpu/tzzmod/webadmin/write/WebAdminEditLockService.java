@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_METADATA = "device_metadata";
+    public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
     private final Map<String, WebAdminEditLock> locks = new ConcurrentHashMap<>();
@@ -279,7 +280,8 @@ public final class WebAdminEditLockService {
             String targetType,
             WebAdminWriteTarget target
     ) {
-        if (!TARGET_DEVICE_METADATA.equals(normalizeTargetType(targetType))) {
+        WebAdminOperationType operationType = operationTypeForTarget(targetType);
+        if (operationType == null) {
             return WebAdminWriteResult.validationFailed(target, java.util.List.of(new WebAdminValidationError(
                     "targetType",
                     "unsupported_target",
@@ -287,7 +289,7 @@ public final class WebAdminEditLockService {
                     targetType
             )));
         }
-        WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_METADATA);
+        WebAdminPermissionDecision permission = permissionService.decide(user, operationType);
         if (!permission.allowed()) {
             return permission.asWriteResult(target);
         }
@@ -405,8 +407,8 @@ public final class WebAdminEditLockService {
     }
 
     private boolean canEdit(WebAdminUser user, String targetType) {
-        return TARGET_DEVICE_METADATA.equals(normalizeTargetType(targetType))
-                && permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_METADATA).allowed();
+        WebAdminOperationType operationType = operationTypeForTarget(targetType);
+        return operationType != null && permissionService.decide(user, operationType).allowed();
     }
 
     private WebAdminAuditEvent audit(
@@ -435,10 +437,10 @@ public final class WebAdminEditLockService {
             return;
         }
         WebAdminRealtimeEvent event = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.EDIT_LOCK_CHANGED)
-                .deviceId(TARGET_DEVICE_METADATA.equals(lock.targetType()) ? lock.targetId() : "")
+                .deviceId(isDeviceLockTarget(lock.targetType()) ? lock.targetId() : "")
                 .severity(locked ? "INFO" : "OK")
                 .summary(locked ? "设备显示信息编辑锁已获取。" : "设备显示信息编辑锁已释放。")
-                .routeTarget(TARGET_DEVICE_METADATA.equals(lock.targetType()) ? "#/devices/" + encode(lock.targetId()) : "")
+                .routeTarget(isDeviceLockTarget(lock.targetType()) ? "#/devices/" + encode(lock.targetId()) : "")
                 .payload("targetType", lock.targetType())
                 .payload("targetId", lock.targetId())
                 .payload("locked", locked)
@@ -483,6 +485,22 @@ public final class WebAdminEditLockService {
 
     private static String normalizeTargetType(String targetType) {
         return safe(targetType).trim().toLowerCase();
+    }
+
+    private static boolean isDeviceLockTarget(String targetType) {
+        String safeTargetType = normalizeTargetType(targetType);
+        return TARGET_DEVICE_METADATA.equals(safeTargetType) || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType);
+    }
+
+    private static WebAdminOperationType operationTypeForTarget(String targetType) {
+        String safeTargetType = normalizeTargetType(targetType);
+        if (TARGET_DEVICE_METADATA.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_DEVICE_METADATA;
+        }
+        if (TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG;
+        }
+        return null;
     }
 
     private static String iso(long epochMillis) {
