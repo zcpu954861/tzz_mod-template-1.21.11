@@ -50,6 +50,24 @@ public final class WebAdminWriteSecurityService {
         return origin.equalsIgnoreCase(expectedHttp) || origin.equalsIgnoreCase(expectedHttps);
     }
 
+    public boolean isSameOriginOrReferer(String origin, String referer, String expectedHost, int expectedPort) {
+        if (isSameOrigin(origin, expectedHost, expectedPort)) {
+            return true;
+        }
+        if (referer == null || referer.isBlank()) {
+            return false;
+        }
+        String expectedHttp = "http://" + expectedHost + ":" + expectedPort;
+        String expectedHttps = "https://" + expectedHost + ":" + expectedPort;
+        return matchesRefererOrigin(referer, expectedHttp) || matchesRefererOrigin(referer, expectedHttps);
+    }
+
+    private static boolean matchesRefererOrigin(String referer, String expectedOrigin) {
+        return referer.equalsIgnoreCase(expectedOrigin)
+                || referer.regionMatches(true, 0, expectedOrigin + "/", 0, expectedOrigin.length() + 1)
+                || referer.regionMatches(true, 0, expectedOrigin + "?", 0, expectedOrigin.length() + 1);
+    }
+
     public void clear() {
         csrfTokensBySessionHash.clear();
     }

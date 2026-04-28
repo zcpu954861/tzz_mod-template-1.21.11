@@ -47,6 +47,24 @@ public record WebAdminWriteResult(
         );
     }
 
+    public static WebAdminWriteResult noChange(WebAdminWriteTarget target, String message) {
+        WebAdminWriteTarget safeTarget = target == null ? WebAdminWriteTarget.none() : target;
+        return new WebAdminWriteResult(
+                true,
+                WebAdminWriteResultCode.NO_CHANGE.id(),
+                isBlank(message) ? WebAdminWriteResultCode.NO_CHANGE.defaultMessage() : message,
+                safeTarget.targetType(),
+                safeTarget.targetId(),
+                false,
+                List.of(),
+                "",
+                "",
+                false,
+                Map.of(),
+                Map.of()
+        );
+    }
+
     public static WebAdminWriteResult failed(WebAdminWriteResultCode code, WebAdminWriteTarget target, String message) {
         WebAdminWriteResultCode resultCode = code == null ? WebAdminWriteResultCode.INTERNAL_ERROR : code;
         WebAdminWriteTarget safeTarget = target == null ? WebAdminWriteTarget.none() : target;

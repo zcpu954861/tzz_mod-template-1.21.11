@@ -10,7 +10,9 @@ public record WebAdminValidationError(
         field = safe(field);
         code = safe(code);
         message = safe(message);
-        rejectedValueSummary = WebAdminWriteSanitizer.summarize(rejectedValueSummary);
+        rejectedValueSummary = WebAdminWriteSanitizer.isSensitiveKey(field)
+                ? "已隐藏"
+                : WebAdminWriteSanitizer.summarize(rejectedValueSummary);
     }
 
     private static String safe(String value) {

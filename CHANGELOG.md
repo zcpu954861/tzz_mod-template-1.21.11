@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.28.0-web-admin-write-stabilization
+
+- Added 6.10 WebAdmin write foundation stabilization as the safety gate before 7.0 editing work.
+- Reviewed and strengthened the WebAdmin permission matrix for VIEWER / TESTER / EDITOR / OWNER.
+- Clarified unified write result semantics, including permission denied, validation failed, CSRF failure, no-change, conflict, dangerous confirmation, and internal error results.
+- Strengthened validation error redaction so sensitive field names hide rejected value summaries even when the submitted value itself does not contain a sensitive keyword.
+- Added a no-change write result helper for future mutation services.
+- Extended write request security helpers for CSRF and same-origin / referer checks.
+- Reviewed structured write audit event redaction and future mutation service contracts.
+- Reviewed realtime write event type contracts for config changes, audit append, permission denial, validation failure, and object-specific config changes.
+- Extended `stabilizationGuardTest` for the 6.10 permission matrix, write result shape, CSRF/origin safety, audit redaction, sensitive validation fields, realtime write events, capabilities safety, and frontend readonly guard.
+- Added 6.10 stabilization report and regression checklist.
+- No real config edit UI, public config write API, JSON write, user write, device / Signal / Region / Action mutation, WebSocket change, ConditionEngine, or high-level game orchestration is included.
+
 ## v1.27.0-web-admin-write-foundation
 
 - Added 6.9 WebAdmin write foundation primitives without enabling real config editing.
