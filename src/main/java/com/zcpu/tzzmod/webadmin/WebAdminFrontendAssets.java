@@ -5,114 +5,15 @@ public final class WebAdminFrontendAssets {
     }
 
     public static String loginHtml() {
-        return """
-                <!doctype html>
-                <html lang="zh-CN">
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                  <title>游戏开发编辑平台 - 登录</title>
-                  <link rel="stylesheet" href="/assets/app.css">
-                </head>
-                <body data-page="login">
-                  <main class="login-shell">
-                    <section class="brand-panel">
-                      <div class="topline"><span class="logo-mark">T</span><span>游戏开发编辑平台</span></div>
-                      <div class="hero-copy">
-                        <h1>游戏开发编辑平台</h1>
-                        <p class="lead">高效管理游戏事件与逻辑</p>
-                        <p>信号、设备、区域、动作、任务一体化管理</p>
-                        <p class="tags">多人协作 · 实时同步 · 安全稳定 · 高效开发</p>
-                      </div>
-                    </section>
-                    <section class="login-card">
-                      <div class="server-pill">服务器状态：运行中</div>
-                      <h2>用户登录</h2>
-                      <form id="login-form">
-                        <label>用户名<input id="username" autocomplete="username" required></label>
-                        <label>密码<div class="password-row"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="toggle-password">显示</button></div></label>
-                        <label class="check-row"><input id="remember" type="checkbox"> 记住我（2 小时内自动登录）</label>
-                        <button class="primary" type="submit">登录</button>
-                        <p class="message" id="message"></p>
-                        <div class="divider"><span>或</span></div>
-                        <button class="secondary" type="button" disabled>使用一次性登录码登录</button>
-                        <p class="help">忘记密码？请联系服务器管理员</p>
-                        <p class="help">需要帮助？请联系服务器管理员</p>
-                      </form>
-                    </section>
-                  </main>
-                  <script src="/assets/app.js"></script>
-                </body>
-                </html>
-                """;
+        return WebAdminFrontendShell.loginHtml();
     }
 
     public static String appHtml() {
-        return """
-                <!doctype html>
-                <html lang="zh-CN">
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                  <title>游戏开发编辑平台 - WebAdmin</title>
-                  <link rel="stylesheet" href="/assets/app.css">
-                </head>
-                <body data-page="app">
-                  <main class="admin-shell">
-                    <aside class="sidebar">
-                      <div class="sidebar-brand"><span class="logo-mark">T</span><span>游戏开发编辑平台</span></div>
-                      <nav class="nav-list" aria-label="主导航">
-                        <button class="nav-item" data-route="#/dashboard"><span class="nav-icon" data-icon="dashboard"></span>总览</button>
-                        <button class="nav-item" data-route="#/devices"><span class="nav-icon" data-icon="device"></span>设备管理</button>
-                        <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signal"></span>Signal 管理</button>
-                        <button class="nav-item" data-route="#/regions"><span class="nav-icon" data-icon="region"></span>区域管理</button>
-                        <button class="nav-item" data-route="#/actions"><span class="nav-icon" data-icon="action"></span>动作系统</button>
-                        <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>Doctor 诊断</button>
-                        <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>历史记录</button>
-                        <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户管理</button>
-                        <button class="nav-item" data-route="#/settings"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
-                      </nav>
-                    </aside>
-                    <section class="workspace">
-                      <header class="topbar">
-                        <div class="topbar-status">
-                          <span id="server-state">服务器状态：加载中</span>
-                          <span id="access-mode">访问模式：-</span>
-                          <span id="realtime-state">实时同步：未连接</span>
-                          <span id="last-realtime-event">最后事件：暂无</span>
-                        </div>
-                        <div class="topbar-user">
-                          <span id="current-user">用户：-</span>
-                          <span id="current-role">角色：-</span>
-                          <button id="logout" class="secondary">退出登录</button>
-                        </div>
-                      </header>
-                      <div id="toast" class="toast" hidden></div>
-                      <section id="app-view" class="view-panel" aria-live="polite">
-                        <div class="loading-state">正在加载 WebAdmin...</div>
-                      </section>
-                    </section>
-                  </main>
-                  <script src="/assets/app.js"></script>
-                </body>
-                </html>
-                """;
+        return WebAdminFrontendShell.appHtml();
     }
 
     public static String appCss() {
-        return """
-                :root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2e;--panel2:#101f35;--panel3:#0b1728;--text:#e7f7ff;--muted:#93a8b8;--cyan:#22d3ee;--cyan2:#0ea5e9;--line:#1e3a52;--danger:#fb7185;--warning:#facc15;--ok:#34d399}
-                *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,Segoe UI,Arial,sans-serif;background:#07111f;color:var(--text);letter-spacing:0}
-                .login-shell{min-height:100vh;width:min(100%,1360px);margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:64px;align-items:center;justify-content:center;padding:48px clamp(24px,5vw,56px)}
-                .brand-panel{min-height:420px;display:flex;flex-direction:column;justify-content:center;gap:72px}.topline,.app-header>div{display:flex;align-items:center;gap:12px;color:#c8f7ff;font-weight:700}.logo-mark{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#04111d;font-weight:900}
-                .hero-copy{max-width:760px}.hero-copy h1{font-size:64px;line-height:1.05;margin:0 0 22px}.hero-copy p{font-size:20px;color:var(--muted);margin:12px 0}.hero-copy .lead{font-size:28px;color:#fff}.tags{color:#9bf3ff!important}
-                .login-card,.status-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.login-card{padding:32px;max-width:440px;width:100%;justify-self:end}.server-pill{display:inline-flex;padding:7px 12px;border:1px solid #1f6d86;border-radius:999px;color:#9bf3ff;background:#092638;font-size:13px}.login-card h2,.status-card h2{margin:20px 0 22px;font-size:26px}
-                label{display:block;margin:16px 0 8px;color:#cfe6f4;font-size:14px}input{width:100%;height:44px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 12px;font-size:15px}input:focus{outline:2px solid #1fbce2;border-color:transparent}.password-row{display:flex;gap:8px}.password-row input{flex:1}.password-row button{min-width:64px;border-radius:10px;border:1px solid #28516d;background:#112a42;color:#bfeeff}.check-row{display:flex;gap:10px;align-items:center}.check-row input{width:auto;height:auto}.primary,.secondary{height:44px;border:0;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}.primary{width:100%;background:linear-gradient(135deg,var(--cyan),var(--cyan2));color:#04111d}.secondary{background:#12263e;color:#dff8ff;border:1px solid #284963}.secondary:disabled{opacity:.45;cursor:not-allowed}.message{min-height:20px;color:var(--danger)}.help{color:var(--muted);font-size:13px}.divider{display:flex;align-items:center;margin:20px 0;color:#6d8799}.divider:before,.divider:after{content:"";height:1px;background:#213d54;flex:1}.divider span{padding:0 10px}
-                .admin-shell{height:100vh;overflow:hidden;background:var(--bg)}.sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:#081625;padding:22px 18px;display:flex;flex-direction:column;gap:24px;z-index:10}.sidebar-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:#dffbff}.nav-list{display:grid;gap:8px}.nav-item{height:42px;border:1px solid transparent;border-radius:10px;background:transparent;color:#b9cfde;text-align:left;padding:0 12px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px}.nav-item:hover{background:#0f243b;color:#fff}.nav-item.active{background:#12334d;border-color:#1c6d88;color:#9bf3ff}.nav-icon{display:inline-grid;place-items:center;width:22px;height:22px;color:#72eaff}.icon-svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.workspace{min-width:0;margin-left:260px;height:100vh;overflow:hidden;display:grid;grid-template-rows:64px minmax(0,1fr)}.topbar{border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:0 24px;background:#091827}.topbar-status,.topbar-user{display:flex;align-items:center;gap:14px;color:#c7d9e6;font-size:14px}.view-panel{padding:26px;overflow:auto;height:calc(100vh - 64px)}.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:22px}.page-head h1{margin:0;font-size:30px}.page-head p{margin:8px 0 0;color:var(--muted)}.toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:18px 0}.filter-field{display:grid;gap:6px;margin:0}.filter-field span{font-size:12px;color:var(--muted);font-weight:700}.input,.select{height:38px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:0 10px}.input{min-width:280px}.select{min-width:150px}.card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.panel-card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:18px}.metric-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.metric-icon{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#0b2738;border:1px solid #27677e;color:#8ff5ff}.metric-card .label{color:var(--muted);font-size:13px}.metric-card .value{font-size:28px;font-weight:800;margin-top:8px}.content-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr);gap:16px;margin-top:16px}.panel-card h2{font-size:18px;margin:0 0 14px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#081725}.data-table{width:100%;border-collapse:collapse;min-width:760px}.data-table th,.data-table td{padding:12px 14px;border-bottom:1px solid #142b42;text-align:left;font-size:13px}.data-table th{color:#9fb4c4;font-weight:700;background:#0a1b2c}.data-table tr:hover td{background:#0d2136}.link-button,.text-button{border:0;background:transparent;color:#7cecff;cursor:pointer;padding:0;font:inherit}.pill{display:inline-flex;align-items:center;height:24px;border-radius:999px;padding:0 9px;border:1px solid #2a4c64;color:#d7edf7;background:#102237;font-size:12px}.pill.ok{border-color:#26775c;color:#a7f3d0}.pill.warning{border-color:#826d1b;color:#fde68a}.pill.error{border-color:#91414d;color:#fecdd3}.pill.info{border-color:#246e85;color:#a5f3fc}.muted{color:var(--muted)}.empty-state,.error-state,.loading-state{border:1px dashed #28516d;border-radius:14px;padding:24px;color:#b8cbd9;background:#081725}.error-state{border-color:#7f3542;color:#fecdd3}.list-stack{display:grid;gap:10px}.event-row,.issue-row,.check-row-card,.kv-row,.chain-row,.chain-node,.endpoint-row{display:grid;gap:5px;padding:12px;border:1px solid #17324b;border-radius:10px;background:#091b2d}.event-row .meta,.issue-row .meta,.endpoint-row .meta{color:#91a7b8;font-size:12px}.device-name{display:flex;align-items:center;gap:10px}.device-subtitle{display:block;margin-top:3px;color:var(--muted);font-size:12px}.device-icon{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;border:1px solid #27677e;color:#8ff5ff;background:#0b2738}.device-icon .icon-svg{width:19px;height:19px}.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.6fr);gap:16px}.device-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}.device-detail-main,.device-detail-side{display:grid;gap:16px;min-width:0}.device-detail-side{align-self:start}.side-card .identity-grid,.metadata-card .identity-grid{grid-template-columns:1fr;gap:6px}.side-card .identity-grid .k,.metadata-card .identity-grid .k{font-size:12px}.side-card .identity-grid .v,.metadata-card .identity-grid .v{white-space:pre-wrap;overflow-wrap:anywhere}.metadata-card .secondary{width:100%;margin-top:8px}.side-actions{display:grid;gap:8px}.side-actions .secondary,.side-actions .text-button,.side-actions .link-button{width:100%;text-align:left}.side-list{gap:8px}.side-list .issue-row,.side-list .event-row{padding:10px}.overview-card{grid-column:1/-1}.overview-inline{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.identity-grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px 14px}.identity-grid .k{color:var(--muted)}.identity-grid .v{word-break:break-word}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.config-section{display:grid;gap:8px;margin-bottom:12px}.config-section summary{cursor:pointer;color:#dffbff;font-size:14px;font-weight:700}.config-section[open] summary{margin-bottom:8px}.raw-config{margin-top:12px;color:var(--muted)}.raw-config summary{cursor:pointer;color:#7cecff}.logic-chain{display:grid;grid-template-columns:minmax(180px,1fr) 38px minmax(190px,1fr) 38px minmax(220px,1.2fr) 38px minmax(220px,1.2fr);gap:10px;align-items:stretch}.chain-arrow{display:grid;place-items:center;color:#6ee7f9;font-weight:800}.chain-node h3{margin:0 0 8px;font-size:14px;color:#dffbff}.endpoint-grid{display:grid;gap:8px}.inline-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.toast{position:fixed;right:24px;bottom:24px;max-width:360px;background:#102b42;border:1px solid #2a7993;color:#dffbff;border-radius:12px;padding:12px 14px;box-shadow:0 18px 50px rgba(0,0,0,.35);z-index:20}.back-row{margin-bottom:16px}
-                .edit-form{display:grid;gap:12px}.edit-form textarea{min-height:110px;border-radius:10px;border:1px solid #23445f;background:#081725;color:var(--text);padding:10px 12px;font-size:14px;resize:vertical}.edit-form .input,.edit-form .select,.edit-form textarea{width:100%;min-width:0;box-sizing:border-box}.edit-form label{margin:0;color:#cfe6f4}.form-actions{display:flex;gap:10px;align-items:center}.validation-list{display:grid;gap:6px;margin:0;padding-left:18px;color:#fecdd3}.readonly-note{border:1px solid #21445e;background:#091b2d;border-radius:10px;padding:10px;color:var(--muted)}.channel-combo{position:relative;z-index:5}.channel-combo.open{z-index:50}.channel-combo-control{display:flex;align-items:center;border:1px solid #23445f;background:#081725;border-radius:10px;overflow:hidden}.channel-combo-control:focus-within,.channel-combo.open .channel-combo-control{border-color:#1fbce2;box-shadow:0 0 0 1px rgba(34,211,238,.28)}.channel-combo-control .input{height:38px;border:0;border-radius:0;background:transparent;outline:0;box-shadow:none;flex:1}.channel-combo-toggle{display:grid;place-items:center;width:42px;height:38px;border:0;border-left:1px solid #23445f;background:#0d2136;color:#8ff5ff;cursor:pointer;font-size:15px}.channel-combo-toggle:hover{background:#12334d}.channel-combo-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);display:none;max-height:260px;overflow:auto;border:1px solid #1f6d86;border-radius:12px;background:#081725;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:6px;z-index:60}.channel-combo.open .channel-combo-menu{display:grid;gap:4px}.channel-combo-option{width:100%;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--text);padding:9px 10px;text-align:left;cursor:pointer}.channel-combo-option:hover,.channel-combo-option.active{background:#12334d;border-color:#1c6d88}.channel-combo-option.selected{border-color:#22d3ee}.channel-combo-option strong{display:block;color:#dffbff}.channel-combo-option span,.channel-combo-empty{display:block;color:var(--muted);font-size:12px;margin-top:3px}.channel-combo-empty{padding:12px}
-                @media(max-width:1100px){.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.content-grid,.detail-grid,.device-detail-layout,.logic-chain{grid-template-columns:1fr}.metadata-card{position:static}.chain-arrow{transform:rotate(90deg);min-height:24px}.sidebar{width:220px}.workspace{margin-left:220px}}
-                @media(max-width:760px){.login-shell{grid-template-columns:1fr;max-width:720px;gap:34px;align-items:start;padding:32px 20px}.brand-panel{min-height:auto;justify-content:flex-start;gap:32px}.hero-copy h1{font-size:42px}.hero-copy .lead{font-size:22px}.login-card{max-width:none;justify-self:stretch}.admin-shell{height:auto;min-height:100vh;overflow:visible}.sidebar{position:static;width:auto;height:auto;max-height:42vh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--line)}.workspace{margin-left:0;height:auto;min-height:100vh;overflow:visible}.nav-list{grid-template-columns:repeat(2,minmax(0,1fr))}.topbar{height:auto;min-height:76px;align-items:flex-start;gap:10px;flex-direction:column;padding:14px 18px}.topbar-status,.topbar-user{flex-wrap:wrap}.view-panel{padding:18px;height:auto;overflow:visible}.page-head{align-items:flex-start;flex-direction:column}.card-grid,.summary-grid{grid-template-columns:1fr}.input{min-width:100%}.identity-grid{grid-template-columns:1fr}}
-                """;
+        return WebAdminFrontendStyles.appCss();
     }
 
     public static String appJs() {
