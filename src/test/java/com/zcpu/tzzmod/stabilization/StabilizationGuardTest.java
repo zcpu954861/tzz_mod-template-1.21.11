@@ -37,6 +37,7 @@ import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendShell;
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendScripts;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendStyles;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
@@ -733,6 +734,7 @@ public final class StabilizationGuardTest {
         String shellLoginHtml = WebAdminFrontendShell.loginHtml();
         String shellAppHtml = WebAdminFrontendShell.appHtml();
         String stylesCss = WebAdminFrontendStyles.appCss();
+        String scriptsJs = WebAdminFrontendScripts.appJs();
 
         requireNotBlank(loginHtml, "WebAdmin login HTML asset");
         requireNotBlank(appHtml, "WebAdmin app HTML asset");
@@ -741,9 +743,11 @@ public final class StabilizationGuardTest {
         requireNotBlank(shellLoginHtml, "WebAdmin frontend shell login HTML asset");
         requireNotBlank(shellAppHtml, "WebAdmin frontend shell app HTML asset");
         requireNotBlank(stylesCss, "WebAdmin frontend styles CSS asset");
+        requireNotBlank(scriptsJs, "WebAdmin frontend scripts JS asset");
         requireEquals(shellLoginHtml, loginHtml, "WebAdminFrontendAssets delegates login HTML to shell");
         requireEquals(shellAppHtml, appHtml, "WebAdminFrontendAssets delegates app HTML to shell");
         requireEquals(stylesCss, css, "WebAdminFrontendAssets delegates CSS to styles");
+        requireEquals(scriptsJs, js, "WebAdminFrontendAssets delegates JS to scripts");
         requireContains(appHtml, "id=\"app-view\"", "WebAdmin app root container remains present");
         requireContains(appHtml, "class=\"sidebar\"", "WebAdmin sidebar shell remains present");
         requireContains(appHtml, "class=\"topbar\"", "WebAdmin topbar shell remains present");
@@ -762,6 +766,7 @@ public final class StabilizationGuardTest {
                 "#/actions"
         )) {
             requireContains(appHtml + js, route, "WebAdmin readonly route present: " + route);
+            requireContains(js, route, "WebAdmin JS route present: " + route);
         }
 
         for (String cssClass : List.of(
