@@ -1,6 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
+    private static final String ASSET_VERSION = "7.5-step1-flat-geometry-icons";
+
     private WebAdminFrontendShell() {
     }
 
@@ -13,39 +15,43 @@ public final class WebAdminFrontendShell {
                   <meta name="viewport" content="width=device-width, initial-scale=1">
                   <title>游戏开发编辑平台 - 登录</title>
                   <link rel="icon" href="data:,">
-                  <link rel="stylesheet" href="/assets/app.css">
+                  <link rel="stylesheet" href="/assets/app.css?v=%s">
                 </head>
                 <body data-page="login">
-                  <main class="login-shell">
-                    <section class="brand-panel">
-                      <div class="topline"><span class="logo-mark">T</span><span>游戏开发编辑平台</span></div>
-                      <div class="hero-copy">
-                        <h1>游戏开发编辑平台</h1>
-                        <p class="lead">高效管理游戏事件与逻辑</p>
-                        <p>信号、设备、区域、动作、任务一体化管理</p>
-                        <p class="tags">多人协作 · 实时同步 · 安全稳定 · 高效开发</p>
-                      </div>
+                  <main class="login-shell" data-ui="v75">
+                    <section class="login-brand-v75" aria-label="TZZ Mod WebAdmin">
+                      <span class="logo-mark" data-icon="logo" aria-hidden="true"></span>
+                      <h1>游戏开发编辑平台</h1>
+                      <p>TZZ Mod WebAdmin 控制台</p>
                     </section>
-                    <section class="login-card">
-                      <div class="server-pill">服务器状态：运行中</div>
-                      <h2>用户登录</h2>
+                    <section class="login-card" data-ui="v75">
+                      <div class="login-card-head">
+                        <span class="login-card-icon" data-icon="settings"></span>
+                        <div>
+                          <h2>管理员登录</h2>
+                          <p>请输入您的管理员账户信息</p>
+                        </div>
+                      </div>
                       <form id="login-form">
-                        <label>用户名<input id="username" autocomplete="username" required></label>
-                        <label>密码<div class="password-row"><input id="password" type="password" autocomplete="current-password" required><button type="button" id="toggle-password">显示</button></div></label>
-                        <label class="check-row"><input id="remember" type="checkbox"> 记住我（2 小时内自动登录）</label>
-                        <button class="primary" type="submit">登录</button>
+                        <label class="field-v75"><span>用户名 / 邮箱</span><input id="username" autocomplete="username" required placeholder="用户名 / 邮箱"></label>
+                        <label class="field-v75"><span>密码</span><div class="password-row password-row-v75"><input id="password" type="password" autocomplete="current-password" required placeholder="密码"><button type="button" id="toggle-password" aria-label="显示或隐藏密码"><span data-icon="eye"></span></button></div></label>
+                        <div class="login-options-v75">
+                          <label class="check-row"><input id="remember" type="checkbox" checked> 记住我</label>
+                          <button class="link-button" type="button" disabled>忘记密码？</button>
+                        </div>
+                        <button class="primary login-submit-v75" type="submit"><span data-icon="login"></span><span>登录</span></button>
                         <p class="message" id="message"></p>
-                        <div class="divider"><span>或</span></div>
-                        <button class="secondary" type="button" disabled>使用一次性登录码登录</button>
-                        <p class="help">忘记密码？请联系服务器管理员</p>
-                        <p class="help">需要帮助？请联系服务器管理员</p>
+                        <div class="security-note-v75">
+                          <span data-icon="warning"></span>
+                          <div><strong>安全提示</strong><p>请勿将账户信息泄露给他人，所有操作都会被记录。</p></div>
+                        </div>
                       </form>
                     </section>
                   </main>
-                  <script src="/assets/app.js"></script>
+                  <script src="/assets/app.js?v=%s"></script>
                 </body>
                 </html>
-                """;
+                """.formatted(ASSET_VERSION, ASSET_VERSION);
     }
 
     public static String appHtml() {
@@ -57,47 +63,67 @@ public final class WebAdminFrontendShell {
                   <meta name="viewport" content="width=device-width, initial-scale=1">
                   <title>游戏开发编辑平台 - WebAdmin</title>
                   <link rel="icon" href="data:,">
-                  <link rel="stylesheet" href="/assets/app.css">
+                  <link rel="stylesheet" href="/assets/app.css?v=%s">
                 </head>
                 <body data-page="app">
-                  <main class="admin-shell">
-                    <aside class="sidebar">
-                      <div class="sidebar-brand"><span class="logo-mark">T</span><span>游戏开发编辑平台</span></div>
-                      <nav class="nav-list" aria-label="主导航">
-                        <button class="nav-item" data-route="#/dashboard"><span class="nav-icon" data-icon="dashboard"></span>总览</button>
-                        <button class="nav-item" data-route="#/devices"><span class="nav-icon" data-icon="device"></span>设备管理</button>
-                        <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signal"></span>Signal 管理</button>
-                        <button class="nav-item" data-route="#/regions"><span class="nav-icon" data-icon="region"></span>区域管理</button>
-                        <button class="nav-item" data-route="#/actions"><span class="nav-icon" data-icon="action"></span>动作系统</button>
-                        <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>Doctor 诊断</button>
-                        <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>历史记录</button>
-                        <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户管理</button>
-                        <button class="nav-item" data-route="#/settings"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
-                      </nav>
-                    </aside>
-                    <section class="workspace">
-                      <header class="topbar">
-                        <div class="topbar-status">
-                          <span id="server-state">服务器状态：加载中</span>
-                          <span id="access-mode">访问模式：-</span>
-                          <span id="realtime-state">实时同步：未连接</span>
-                          <span id="last-realtime-event">最后事件：暂无</span>
+                  <main class="admin-shell" data-ui="v75">
+                    <aside class="sidebar" data-ui="v75">
+                      <div class="sidebar-brand" data-ui="v75"><span class="logo-mark" data-icon="logo" aria-hidden="true"></span><span><strong>游戏开发编辑平台</strong><small>TZZ Mod WebAdmin</small></span></div>
+                      <nav class="nav-list" data-ui="v75" aria-label="主导航">
+                        <div class="nav-section">
+                          <button class="nav-item" data-route="#/dashboard"><span class="nav-icon" data-icon="dashboard"></span>总览</button>
                         </div>
-                        <div class="topbar-user">
-                          <span id="current-user">用户：-</span>
-                          <span id="current-role">角色：-</span>
-                          <button id="logout" class="secondary">退出登录</button>
+                        <div class="nav-section">
+                          <div class="nav-section-title">事件与信号</div>
+                          <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signalbridge-main"></span>SignalBridge</button>
+                          <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
+                          <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>
+                          <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>信号诊断</button>
+                        </div>
+                        <div class="nav-section">
+                          <div class="nav-section-title">区域控制</div>
+                          <button class="nav-item" data-route="#/regions"><span class="nav-icon" data-icon="region"></span>区域管理</button>
+                        </div>
+                        <div class="nav-section">
+                          <div class="nav-section-title">设备管理</div>
+                          <button class="nav-item" data-route="#/devices"><span class="nav-icon" data-icon="device"></span>信号设备</button>
+                        </div>
+                        <div class="nav-section">
+                          <div class="nav-section-title">动作系统</div>
+                          <button class="nav-item" data-route="#/actions"><span class="nav-icon" data-icon="action"></span>动作列表</button>
+                        </div>
+                        <div class="nav-section">
+                          <div class="nav-section-title">系统管理</div>
+                          <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户与权限</button>
+                          <button class="nav-item" data-route="#/settings"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
+                        </div>
+                      </nav>
+                      <button class="sidebar-collapse" type="button" disabled><span data-icon="chevronLeft"></span><span>收起侧边栏</span></button>
+                    </aside>
+                    <section class="workspace" data-ui="v75">
+                      <header class="topbar" data-ui="v75">
+                        <div class="topbar-status" data-ui="v75">
+                          <span id="server-state" class="status-badge status-badge-ok"><span data-icon="server-online"></span><span>服务器状态：加载中</span></span>
+                          <span id="access-mode" class="topbar-chip">访问模式：-</span>
+                          <span id="realtime-state" class="topbar-chip">实时同步：未连接</span>
+                          <span id="last-realtime-event" class="topbar-chip">最后事件：暂无</span>
+                        </div>
+                        <div class="topbar-user" data-ui="v75">
+                          <span id="topbar-clock" class="topbar-clock">--:--:--</span>
+                          <span id="current-user" class="topbar-user-name">用户：-</span>
+                          <span id="current-role" class="role-badge">角色：-</span>
+                          <button id="logout" class="wa-btn ghost" type="button"><span data-icon="logout"></span><span>退出登录</span></button>
                         </div>
                       </header>
                       <div id="toast" class="toast" hidden></div>
-                      <section id="app-view" class="view-panel" aria-live="polite">
+                      <section id="app-view" class="view-panel" data-ui="v75" aria-live="polite">
                         <div class="loading-state">正在加载 WebAdmin...</div>
                       </section>
                     </section>
                   </main>
-                  <script src="/assets/app.js"></script>
+                  <script src="/assets/app.js?v=%s"></script>
                 </body>
                 </html>
-                """;
+                """.formatted(ASSET_VERSION, ASSET_VERSION);
     }
 }

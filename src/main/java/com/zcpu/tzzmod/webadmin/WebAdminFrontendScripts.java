@@ -1,11 +1,127 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendScripts {
+    private static final String[] FLAT_ICON_KEYS = {
+            "logo", "dashboard", "signalbridge-main", "receiver-main", "history", "doctor", "region", "device",
+            "action", "user", "settings", "server-online", "logout", "device-overview", "doctor-overview", "signal-overview",
+            "region-overview", "action-overview", "user-overview", "signal-device", "signal-receiver", "virtual-block-device", "action-relay", "critical-issue",
+            "warning-issue", "info-issue", "check-pass", "active-channel", "listener-receiver", "recent-event", "response-time", "region-controller",
+            "active-region", "action-binding", "today-trigger", "action-total", "enabled", "success-rate", "user-total", "current-user",
+            "current-role", "session", "channel-total", "channel-with-consumers", "channel-orphan", "channel-error", "consumer-listener", "consumer-receiver",
+            "consumer-relay", "consumer-region", "doctor-ok", "doctor-warning", "doctor-error", "receiver-total", "receiver-enabled", "receiver-disabled",
+            "receiver-outputting", "receiver-trigger-today", "pulse-duration", "redstone-output", "receiver-row", "channel-list", "refresh", "more"
+    };
+
+    private static final String[][] FLAT_ICON_GEOMETRY = {
+            {"logo", "<path d=\"M12 3 20 7.5v9L12 21 4 16.5v-9L12 3Z\"/><path d=\"M12 12 4 7.5M12 12l8-4.5M12 12v9\"/><path d=\"M8 9.7v4.8l4 2.3 4-2.3V9.7\"/>"},
+            {"dashboard", "<rect x=\"4\" y=\"4\" width=\"6\" height=\"6\" rx=\"1.4\"/><rect x=\"14\" y=\"4\" width=\"6\" height=\"6\" rx=\"1.4\"/><rect x=\"4\" y=\"14\" width=\"6\" height=\"6\" rx=\"1.4\"/><rect x=\"14\" y=\"14\" width=\"6\" height=\"6\" rx=\"1.4\"/>"},
+            {"signalbridge-main", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"1.7\"/><path d=\"M8.3 15a5.2 5.2 0 0 1 0-8M15.7 7a5.2 5.2 0 0 1 0 8M5.5 17.8a9 9 0 0 1 0-13.6M18.5 4.2a9 9 0 0 1 0 13.6\"/>"},
+            {"receiver-main", "<path d=\"M12 21v-8\"/><path d=\"M7.5 9.5a4.5 4.5 0 0 1 9 0\"/><path d=\"M4.5 10a7.5 7.5 0 0 1 15 0\"/><circle cx=\"12\" cy=\"11\" r=\"2\"/><path d=\"M9 21h6\"/>"},
+            {"history", "<path d=\"M5 7.5A8 8 0 1 1 4.4 16\"/><path d=\"M5 4v4h4\"/><path d=\"M12 8v5l3.2 2\"/>"},
+            {"doctor", "<path d=\"M7 4v5a4 4 0 0 0 8 0V4\"/><path d=\"M15 9v3.5a4.5 4.5 0 0 0 9 0v-.5\"/><circle cx=\"20\" cy=\"12\" r=\"2.1\"/><path d=\"M5 4h4M13 4h4\"/>"},
+            {"region", "<path d=\"M6 20V5\"/><path d=\"M6 6h10l-1.8 3L16 12H6\"/><path d=\"M4 20h9\"/><circle class=\"fill\" cx=\"17.5\" cy=\"17\" r=\"1.3\"/>"},
+            {"device", "<path d=\"M12 4 19 8v8l-7 4-7-4V8l7-4Z\"/><path d=\"M12 12 5 8M12 12l7-4M12 12v8\"/>"},
+            {"action", "<path d=\"M13 3 5 14h6l-1 7 9-12h-6l1-6Z\"/>"},
+            {"user", "<circle cx=\"12\" cy=\"8\" r=\"3.1\"/><path d=\"M5.5 20a6.5 6.5 0 0 1 13 0\"/><path d=\"M17 10.5a3 3 0 0 1 3.5 2.9M3.5 13.4A3 3 0 0 1 7 10.5\"/>"},
+            {"settings", "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1M3 12h2.2M18.8 12H21\"/>"},
+            {"server-online", "<rect x=\"4\" y=\"5\" width=\"16\" height=\"5\" rx=\"1.4\"/><rect x=\"4\" y=\"14\" width=\"16\" height=\"5\" rx=\"1.4\"/><circle class=\"fill\" cx=\"17\" cy=\"7.5\" r=\"1\"/><circle class=\"fill\" cx=\"17\" cy=\"16.5\" r=\"1\"/>"},
+            {"logout", "<path d=\"M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4\"/><path d=\"M13 8l4 4-4 4\"/><path d=\"M17 12H8\"/>"},
+            {"device-overview", "<path d=\"M12 4 19 8v8l-7 4-7-4V8l7-4Z\"/><path d=\"M12 12 5 8M12 12l7-4M12 12v8\"/><circle class=\"fill\" cx=\"4.5\" cy=\"4.5\" r=\"1.2\"/><circle class=\"fill\" cx=\"19.5\" cy=\"19.5\" r=\"1.2\"/><path d=\"M5.3 5.3 8 7M16 17l2.7 1.7\"/>"},
+            {"doctor-overview", "<path d=\"M5 6.5h8.5a4.5 4.5 0 0 1 4.5 4.5v7H5V6.5Z\"/><path d=\"M8 10h5M8 13.5h3.8\"/><path d=\"M17 5v5M14.5 7.5h5\"/><path d=\"M14.5 16l1.4-1.4 2.3 2.3 2.8-4\"/>"},
+            {"signal-overview", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"2\"/><path d=\"M8.6 14.4a4.8 4.8 0 0 1 0-6.8M15.4 7.6a4.8 4.8 0 0 1 0 6.8\"/><path d=\"M5.4 17.6a8.8 8.8 0 0 1 0-12.2M18.6 5.4a8.8 8.8 0 0 1 0 12.2\"/>"},
+            {"region-overview", "<path d=\"M6 20V5\"/><path d=\"M6 6h10l-1.7 3 1.7 3H6\"/><path d=\"M4 20h16\"/><path d=\"M9 17c1.6-1 4.4-1 6 0\"/><circle class=\"fill\" cx=\"18\" cy=\"17\" r=\"1.2\"/>"},
+            {"action-overview", "<path d=\"M13 3 5 14h6l-1 7 9-12h-6l1-6Z\"/><path d=\"M5 20h5M15 4h4\"/>"},
+            {"user-overview", "<circle cx=\"9\" cy=\"8\" r=\"2.8\"/><circle cx=\"16\" cy=\"9\" r=\"2.3\"/><path d=\"M3.8 20a5.4 5.4 0 0 1 10.4 0\"/><path d=\"M13.5 19.7a4.7 4.7 0 0 1 6.7-3.8\"/><path d=\"M17 15l1.5 1.5L21 13\"/>"},
+            {"signal-device", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"1.7\"/><path d=\"M8.8 14a4.5 4.5 0 0 1 0-6M15.2 8a4.5 4.5 0 0 1 0 6\"/><path d=\"M7 20h10\"/>"},
+            {"signal-receiver", "<path d=\"M12 20v-6\"/><path d=\"M8 10a4 4 0 0 1 8 0M5 10a7 7 0 0 1 14 0\"/><path d=\"M9 15l3-3 3 3\"/>"},
+            {"virtual-block-device", "<path d=\"M12 4 19 8v8l-7 4-7-4V8l7-4Z\"/><path d=\"M12 12 5 8M12 12l7-4M12 12v8\"/><path d=\"M8.2 6.2 15.8 17.8\"/>"},
+            {"action-relay", "<circle cx=\"6\" cy=\"12\" r=\"2\"/><circle cx=\"18\" cy=\"7\" r=\"2\"/><circle cx=\"18\" cy=\"17\" r=\"2\"/><path d=\"M8 11.2 16 7.8M8 12.8l8 3.4\"/>"},
+            {"critical-issue", "<path d=\"M12 4 21 20H3L12 4Z\"/><path d=\"M12 9v5\"/><circle class=\"fill\" cx=\"12\" cy=\"17\" r=\"1\"/>"},
+            {"warning-issue", "<path d=\"M12 4 21 20H3L12 4Z\"/><path d=\"M12 9.5v4\"/><circle class=\"fill\" cx=\"12\" cy=\"16.8\" r=\"1\"/>"},
+            {"info-issue", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 11v5\"/><circle class=\"fill\" cx=\"12\" cy=\"8\" r=\"1\"/>"},
+            {"check-pass", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M8 12.3l2.6 2.6L16.5 9\"/>"},
+            {"active-channel", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"2\"/><path d=\"M7 7a7 7 0 0 0 0 10M17 7a7 7 0 0 1 0 10\"/>"},
+            {"listener-receiver", "<path d=\"M7 17v-5\"/><path d=\"M12 19v-7\"/><path d=\"M17 17v-5\"/><circle cx=\"7\" cy=\"10\" r=\"2\"/><circle cx=\"12\" cy=\"9\" r=\"2\"/><circle cx=\"17\" cy=\"10\" r=\"2\"/><path d=\"M7 12l5 3 5-3\"/>"},
+            {"recent-event", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 8v4l3 2\"/><path d=\"M4 6l2.2-.3M18 18l2 .4\"/>"},
+            {"response-time", "<path d=\"M3 13h4l2-5 3 9 2-6h7\"/>"},
+            {"region-controller", "<rect x=\"4\" y=\"5\" width=\"16\" height=\"14\" rx=\"2\"/><path d=\"M8 16V8\"/><path d=\"M8 9h7l-1.2 2.4L15 14H8\"/>"},
+            {"active-region", "<path d=\"M6 20V5\"/><path d=\"M6 6h9l-1.4 2.7L15 11H6\"/><path d=\"M13 17l2 2 4-5\"/>"},
+            {"action-binding", "<circle cx=\"7\" cy=\"12\" r=\"2.2\"/><circle cx=\"17\" cy=\"7\" r=\"2.2\"/><circle cx=\"17\" cy=\"17\" r=\"2.2\"/><path d=\"M9.2 11.2 14.8 7.8M9.2 12.8l5.6 3.4\"/>"},
+            {"today-trigger", "<rect x=\"5\" y=\"5\" width=\"14\" height=\"15\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M5 10h14\"/><path d=\"M13 12l-3 4h3l-1 3\"/>"},
+            {"action-total", "<path d=\"M8 7h10M6 12h10M8 17h10\"/><path d=\"M5 5l2 2-2 2M17 11l2 2-2 2\"/>"},
+            {"enabled", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M10 8.5 16 12l-6 3.5V8.5Z\"/>"},
+            {"success-rate", "<path d=\"M5 19V9M10 19v-6M15 19V6M20 19v-9\"/><path d=\"M4 19h17\"/><path d=\"M5 10l4 2 5-6 5 3\"/>"},
+            {"user-total", "<circle cx=\"9\" cy=\"8\" r=\"2.7\"/><circle cx=\"16\" cy=\"9\" r=\"2.2\"/><path d=\"M4 20a5 5 0 0 1 10 0\"/><path d=\"M13.5 20a4.2 4.2 0 0 1 6.7-3.2\"/>"},
+            {"current-user", "<circle cx=\"12\" cy=\"8\" r=\"3\"/><path d=\"M5.5 20a6.5 6.5 0 0 1 13 0\"/><circle class=\"fill\" cx=\"17.5\" cy=\"17.5\" r=\"1.2\"/>"},
+            {"current-role", "<path d=\"M12 3 19 6v5c0 4.5-2.8 8-7 10-4.2-2-7-5.5-7-10V6l7-3Z\"/><path d=\"M9 12l2 2 4-5\"/>"},
+            {"session", "<rect x=\"4\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/><path d=\"M8 10h8M8 14h5\"/><circle class=\"fill\" cx=\"17\" cy=\"14\" r=\"1\"/>"},
+            {"channel-total", "<path d=\"M5 7h14M5 12h14M5 17h14\"/><circle class=\"fill\" cx=\"3.5\" cy=\"7\" r=\"1\"/><circle class=\"fill\" cx=\"3.5\" cy=\"12\" r=\"1\"/><circle class=\"fill\" cx=\"3.5\" cy=\"17\" r=\"1\"/>"},
+            {"channel-with-consumers", "<path d=\"M5 7h7M5 12h6M5 17h7\"/><circle cx=\"17\" cy=\"9\" r=\"2\"/><path d=\"M13.5 19a3.8 3.8 0 0 1 7 0\"/>"},
+            {"channel-orphan", "<path d=\"M5 7h8M5 12h6M5 17h8\"/><path d=\"M16 8l4 4-4 4M20 12h-7\"/>"},
+            {"channel-error", "<path d=\"M12 4 21 20H3L12 4Z\"/><path d=\"M9 10l6 6M15 10l-6 6\"/>"},
+            {"consumer-listener", "<path d=\"M7 18v-5\"/><circle cx=\"7\" cy=\"11\" r=\"2\"/><path d=\"M12 20v-8\"/><circle cx=\"12\" cy=\"10\" r=\"2\"/><path d=\"M17 18v-5\"/><circle cx=\"17\" cy=\"11\" r=\"2\"/>"},
+            {"consumer-receiver", "<path d=\"M12 20v-6\"/><path d=\"M8 10a4 4 0 0 1 8 0M5 10a7 7 0 0 1 14 0\"/><circle cx=\"12\" cy=\"12\" r=\"1.8\"/>"},
+            {"consumer-relay", "<circle cx=\"6\" cy=\"12\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><circle cx=\"18\" cy=\"16\" r=\"2\"/><path d=\"M8 11l8-3M8 13l8 3\"/>"},
+            {"consumer-region", "<path d=\"M6 20V5\"/><path d=\"M6 6h9l-1.4 2.7L15 11H6\"/><path d=\"M14 18h5M16.5 15.5V20.5\"/>"},
+            {"doctor-ok", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M8 12.5l2.4 2.4 5.8-6\"/>"},
+            {"doctor-warning", "<path d=\"M12 4 21 20H3L12 4Z\"/><path d=\"M12 9.5v4\"/><circle class=\"fill\" cx=\"12\" cy=\"16.8\" r=\"1\"/>"},
+            {"doctor-error", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M9 9l6 6M15 9l-6 6\"/>"},
+            {"receiver-total", "<path d=\"M12 20v-6\"/><path d=\"M8 10a4 4 0 0 1 8 0M5 10a7 7 0 0 1 14 0\"/><path d=\"M6 21h12\"/>"},
+            {"receiver-enabled", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M10 8.5 16 12l-6 3.5V8.5Z\"/>"},
+            {"receiver-disabled", "<circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M9 8.5v7M15 8.5v7\"/>"},
+            {"receiver-outputting", "<path d=\"M3 13h4l2-5 3 9 2-6h7\"/><circle class=\"fill\" cx=\"18\" cy=\"7\" r=\"1.2\"/>"},
+            {"receiver-trigger-today", "<rect x=\"5\" y=\"5\" width=\"14\" height=\"15\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M5 10h14\"/><path d=\"M9 15h6\"/>"},
+            {"pulse-duration", "<path d=\"M4 13h4l2-5 3 9 2-6h5\"/><path d=\"M18 4v4M16 6h4\"/>"},
+            {"redstone-output", "<path d=\"M4 12h4l2-5 4 10 2-5h4\"/><path d=\"M6 18h12\"/><circle class=\"fill\" cx=\"20\" cy=\"12\" r=\"1.1\"/>"},
+            {"receiver-row", "<path d=\"M12 20v-6\"/><path d=\"M8 10a4 4 0 0 1 8 0M5 10a7 7 0 0 1 14 0\"/><path d=\"M7 18h10\"/>"},
+            {"channel-list", "<path d=\"M6 7h12M6 12h12M6 17h12\"/><circle class=\"fill\" cx=\"3.8\" cy=\"7\" r=\"1\"/><circle class=\"fill\" cx=\"3.8\" cy=\"12\" r=\"1\"/><circle class=\"fill\" cx=\"3.8\" cy=\"17\" r=\"1\"/>"},
+            {"refresh", "<path d=\"M19 8a7 7 0 0 0-12-2l-2 2\"/><path d=\"M5 4v4h4\"/><path d=\"M5 16a7 7 0 0 0 12 2l2-2\"/><path d=\"M19 20v-4h-4\"/>"},
+            {"more", "<circle class=\"fill\" cx=\"6\" cy=\"12\" r=\"1.5\"/><circle class=\"fill\" cx=\"12\" cy=\"12\" r=\"1.5\"/><circle class=\"fill\" cx=\"18\" cy=\"12\" r=\"1.5\"/>"}
+    };
+
     private WebAdminFrontendScripts() {
     }
 
+    private static String flatIconRegistryJs() {
+        StringBuilder js = new StringBuilder("const FLAT_ICON_KEYS=[");
+        boolean first = true;
+        for (String key : FLAT_ICON_KEYS) {
+            if (!first) {
+                js.append(',');
+            }
+            js.append(jsString(key));
+            first = false;
+        }
+        return js.append("];const FLAT_ICON_ASSETS=Object.fromEntries(FLAT_ICON_KEYS.map(key=>[key,key]));").toString();
+    }
+
+    private static String flatIconGeometryJs() {
+        StringBuilder js = new StringBuilder("const ICON_GEOMETRY={");
+        boolean first = true;
+        for (String[] entry : FLAT_ICON_GEOMETRY) {
+            if (!first) {
+                js.append(',');
+            }
+            js.append(jsString(entry[0])).append(':').append(jsString(entry[1]));
+            first = false;
+        }
+        return js.append("};").toString();
+    }
+    private static String jsString(String value) {
+        return "\"" + String.valueOf(value)
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r") + "\"";
+    }
+
     public static String appJs() {
-        return new StringBuilder().append("""
+        return new StringBuilder()
+                .append(flatIconRegistryJs())
+                .append("\n")
+                .append(flatIconGeometryJs())
+                .append("\n")
+                .append("""
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
@@ -13,25 +129,34 @@ public final class WebAdminFrontendScripts {
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
-                function svg(paths){return `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`}
-                function icon(name){const p={
-                  logo:'<path d="M5 6h14M12 6v12M8 18h8"/>',
-                  dashboard:'<path d="M4 13h7V4H4zM13 20h7V4h-7zM4 20h7v-5H4z"/>',
-                  device:'<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/>',
-                  signal:'<path d="M4 12h3M17 12h3M8 12a4 4 0 0 1 8 0M11 12a1 1 0 0 1 2 0"/>',
-                  receiver:'<path d="M5 12h8M13 8l4 4-4 4"/><path d="M19 5v14"/>',
-                  relay:'<path d="M5 7h5v5H5zM14 12h5v5h-5zM10 10h4"/>',
-                  virtual:'<path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M12 3v18M4 7l8 4 8-4"/>',
-                  region:'<path d="M5 5h14v14H5z"/><path d="M9 5v14M15 5v14M5 9h14M5 15h14"/>',
-                  action:'<path d="M5 12h12M13 8l4 4-4 4"/><circle cx="5" cy="12" r="2"/>',
-                  doctor:'<path d="M12 4v9"/><path d="M12 17h.01"/><path d="M4 20h16L12 3z"/>',
-                  history:'<path d="M4 12a8 8 0 1 0 3-6"/><path d="M4 5v5h5"/><path d="M12 8v5l3 2"/>',
-                  user:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',
-                  settings:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.8-1L14.5 3h-5l-.3 3.1a7 7 0 0 0-1.8 1l-2.3-1-2 3.4L5.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.8 1l.3 3.1h5l.3-3.1a7 7 0 0 0 1.8-1l2.3 1 2-3.4-2-1.5q.1-.5.1-1z"/>',
-                  ok:'<path d="M20 6L9 17l-5-5"/>',
-                  warning:'<path d="M12 4v9"/><path d="M12 17h.01"/><path d="M4 20h16L12 3z"/>'
-                }[name]||'<circle cx="12" cy="12" r="8"/><path d="M12 8v4M12 16h.01"/>';return svg(p);}
-                function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});}
+                function iconKey(name){
+                  const raw=String(name||'').trim().toLowerCase().replace(/_/g,'-');
+                  const compact=raw.replace(/[^a-z0-9]/g,'');
+                  const aliases={
+                    signal:'signalbridge-main',signalbridge:'signalbridge-main',channel:'active-channel',broadcast:'signal-overview',
+                    receiver:'receiver-main',listener:'consumer-listener',relay:'action-relay',virtual:'virtual-block-device',auto:'device',
+                    cube:'device-overview',deviceoverview:'device-overview',doctoroverview:'doctor-overview',signaloverview:'signal-overview',regionoverview:'region-overview',actionoverview:'action-overview',useroverview:'user-overview',
+                    signaldevice:'signal-device',signalemitter:'signal-device',signallistener:'consumer-listener',signalreceiver:'signal-receiver',virtualblockdevice:'virtual-block-device',actionrelay:'action-relay',regioncontroller:'region-controller',
+                    critical:'critical-issue',danger:'critical-issue',error:'critical-issue',warning:'warning-issue',info:'info-issue',ok:'check-pass',pass:'check-pass',success:'check-pass',healthy:'doctor-ok',
+                    active:'active-region',consumers:'listener-receiver',consumer:'listener-receiver',response:'response-time',avgresponse:'response-time',today:'today-trigger',lightning:'action-overview',pulse:'pulse-duration',
+                    users:'user-total',role:'current-role',status:'doctor-ok',enabled:'enabled',disabled:'receiver-disabled',pause:'receiver-disabled',play:'enabled',
+                    orphan:'channel-orphan',search:'doctor-overview',eye:'current-user',login:'logout',plus:'receiver-total',upload:'action-binding',download:'channel-total',archive:'history',copy:'session',edit:'settings',pencil:'settings',close:'channel-error',chevronleft:'logout',chevronright:'logout','import':'action-binding','export':'channel-total',
+                    key:'current-role',chest:'channel-total',door:'logout',custom1:'device-overview'
+                  };
+                  return FLAT_ICON_ASSETS[raw]?raw:(aliases[raw]||aliases[compact]||raw||'doctor-ok');
+                }
+                function iconClassName(name){return iconKey(name).replace(/[^a-z0-9_-]/g,'-');}
+                function iconAssetKey(name){const key=iconKey(name);return FLAT_ICON_ASSETS[key]?key:'doctor-ok';}
+                function iconSvgBody(key){return ICON_GEOMETRY[key]||ICON_GEOMETRY['doctor-ok'];}
+                function icon(name){
+                  const key=iconAssetKey(name);
+                  const classes=`icon-img icon-geo icon-${iconClassName(name)} icon-asset-${key}`;
+                  return `<svg class="${classes}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${iconSvgBody(key)}</svg>`;
+                }
+                function hydrateIcons(){
+                  if(Object.keys(ICON_GEOMETRY).length===0)document.documentElement.classList.add('flat-icons-missing');
+                  document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});
+                }
                 function statusClass(value){const v=String(value||'').toUpperCase();if(v==='ERROR'||v==='FAILED')return'error';if(v==='WARNING')return'warning';if(v==='INFO'||v==='UNKNOWN')return'info';return'ok';}
                 function pill(value){return `<span class="pill ${statusClass(value)}">${esc(labelStatus(value))}</span>`}
                 function textPill(text, kind='info'){return `<span class="pill ${esc(kind)}">${esc(text)}</span>`}
@@ -184,15 +309,19 @@ public final class WebAdminFrontendScripts {
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
                 function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/signals','#/doctor','#/history','#/users','#/settings','#/regions','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/receivers','#/signals','#/signalbridge','#/doctor','#/history','#/users','#/settings','#/regions','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
                 function navigateTo(targetHash){location.hash=withReturnContext(targetHash);}
                 function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), id=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
                 function goBackOrFallback(returnTo,fallback){location.hash=isValidReturnHash(returnTo)?returnTo:fallback;}
                 function jsString(value){return JSON.stringify(String(value||''));}
-                function backButton(route,fallbackLabel){const label=route.returnTo?'返回上一页':fallbackLabel;return `<button class="secondary" onclick='goBackOrFallback(${jsString(route.returnTo)},${jsString(route.fallback)})'>${esc(label)}</button>`}
-                function channelButton(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(channel))})'>${esc(channel)}</button>`}
-                function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString('#/devices/'+encodeURIComponent(String(target).substring(7)))})'>${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(String(target).substring(8)))})'>${esc(label)}</button>`;if(String(target).startsWith('region:'))return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString('#/regions/'+encodeURIComponent(String(target).substring(7)))})'>${esc(label)}</button>`;if(String(target).startsWith('action:'))return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString('#/actions/'+encodeURIComponent(String(target).substring(7)))})'>${esc(label)}</button>`;return esc(label||target);}
+                function htmlHandler(script){return `onclick="${esc(script)}"`;}
+                function navigationAttr(target,stop=true){return htmlHandler(`${stop?'event.stopPropagation();':''}navigateTo(${jsString(target)})`);}
+                function navDataAttr(target,label='打开详情'){if(isBlank(target))return 'aria-disabled="true"';return `data-nav-route="${esc(target)}" role="link" tabindex="0" aria-label="${esc(label)}"`;}
+                function activateNavRoute(el){const target=el&&el.dataset?el.dataset.navRoute:'';if(!target)return;navigateTo(target);}
+                function backButton(route,fallbackLabel){const label=route.returnTo?'返回上一页':fallbackLabel;return `<button class="secondary" ${htmlHandler(`goBackOrFallback(${jsString(route.returnTo)},${jsString(route.fallback)})`)}>${esc(label)}</button>`}
+                function channelButton(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" ${navigationAttr(signalHash(channel))}>${esc(channel)}</button>`}
+                function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" ${navigationAttr('#/devices/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" ${navigationAttr(signalHash(String(target).substring(8)))}>${esc(label)}</button>`;if(String(target).startsWith('region:'))return `<button class="link-button" ${navigationAttr('#/regions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('action:'))return `<button class="link-button" ${navigationAttr('#/actions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;return esc(label||target);}
                 function labelInteractionSource(value){return {main_hand:'主手',off_hand:'副手',inventory_contains:'背包/热键栏',armor_head:'头盔槽',armor_chest:'胸甲槽',armor_legs:'护腿槽',armor_feet:'靴子槽',armor_any:'任意盔甲槽'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeSource(value){return {matched_source:'匹配来源',main_hand:'主手',off_hand:'副手',inventory:'背包/热键栏'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeOrder(value){return {hotbar_first:'优先热键栏',main_inventory_first:'优先主背包'}[String(value||'').toLowerCase()]||value;}
@@ -263,6 +392,7 @@ public final class WebAdminFrontendScripts {
                 }
                 async function initLogin(){
                   const form=document.getElementById('login-form'); if(!form) return;
+                  hydrateIcons();
                   const pending=sessionStorage.getItem('webadmin.message'); if(pending){document.getElementById('message').textContent=pending;sessionStorage.removeItem('webadmin.message');}
                   document.getElementById('toggle-password').onclick=()=>{const p=document.getElementById('password');p.type=p.type==='password'?'text':'password'};
                   form.onsubmit=async e=>{e.preventDefault();const msg=document.getElementById('message');msg.textContent='正在登录...';try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:username.value,password:password.value,rememberMe:remember.checked})});location.href='/app#/dashboard'}catch(err){msg.textContent=err.message}};
@@ -275,6 +405,7 @@ public final class WebAdminFrontendScripts {
                     appState.status=await api('/api/status');
                     appState.capabilities=await api('/api/webadmin/write/capabilities');
                     renderTopbar();
+                    startTopbarClock();
                     connectRealtime();
                   }catch(err){return;}
                   if(!location.hash){location.hash='#/dashboard';return;}
@@ -289,12 +420,15 @@ public final class WebAdminFrontendScripts {
                 }
                 function renderTopbar(){
                   const s=appState.status, me=appState.me;
-                  document.getElementById('server-state').textContent=`服务器状态：${labelServerStatus(s?.server?.status)}`;
+                  const serverState=document.getElementById('server-state');
+                  if(serverState)serverState.innerHTML=`${icon('server-online')}<span>服务器在线</span>`;
                   document.getElementById('access-mode').textContent=`访问模式：${labelAccessMode(s?.webAdmin?.accessMode)}`;
-                  document.getElementById('current-user').textContent=`用户：${me?.displayName || me?.username || '-'}`;
-                  document.getElementById('current-role').textContent=`角色：${labelRole(me?.role)}`;
+                  document.getElementById('current-user').textContent=`${me?.displayName || me?.username || '-'}`;
+                  document.getElementById('current-role').textContent=`${labelRole(me?.role)}`;
                   updateRealtimeStatus();
                 }
+                function startTopbarClock(){if(appState.topbarClockTimer)clearTimeout(appState.topbarClockTimer);const tick=()=>{updateTopbarClock();appState.topbarClockTimer=setTimeout(tick,1000);};tick();}
+                function updateTopbarClock(){const el=document.getElementById('topbar-clock');if(!el)return;const d=new Date();el.textContent=`${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
                 function route(options={}){
                   const hash=decodeURIComponent(location.hash || '#/dashboard');
                   maybeReleaseDeviceMetadataEditForRoute(hash);
@@ -302,11 +436,13 @@ public final class WebAdminFrontendScripts {
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
                   maybeReleaseChannelMetadataEditForRoute(hash);
                   maybeReleaseSignalListenerBasicConfigEditForRoute(hash);
-                  document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && hash.startsWith(btn.dataset.route)));
+                  document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && (hash.startsWith(btn.dataset.route)||(btn.dataset.route==='#/signals'&&hash.startsWith('#/signalbridge')))));
+                  startRouteSilentPolling(hash);
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length),options);
-                  if(hash==='#/signals') return renderSignals(options);
+                  if(hash==='#/receivers') return renderReceivers(options);
+                  if(hash==='#/signals'||hash==='#/signalbridge') return renderSignals(options);
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length),options);
                   if(hash==='#/doctor') return renderDoctorPage(options);
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
@@ -376,9 +512,9 @@ public final class WebAdminFrontendScripts {
                   const type=String(event.type||''), h=String(hash||'#/dashboard');
                   if(h==='#/dashboard')return ['signal_emitted','history_appended','doctor_changed','device_updated','device_config_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','webadmin_user_connected','webadmin_user_disconnected'].includes(type);
                   if(h.startsWith('#/history'))return ['signal_emitted','history_appended'].includes(type);
-                  if(h==='#/signals')return ['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','edit_lock_changed'].includes(type);
+                  if(h==='#/signals'||h==='#/signalbridge')return ['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','edit_lock_changed'].includes(type);
                   if(h.startsWith('#/signals/'))return (['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed'].includes(type)&&event.channel===routeDetailId(h,'#/signals/'))||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
-                  if(h==='#/devices')return ['device_updated','device_config_changed','config_changed','history_appended'].includes(type);
+                  if(h==='#/devices'||h==='#/receivers')return ['device_updated','device_config_changed','config_changed','history_appended','receiver_pulse'].includes(type);
                   if(h.startsWith('#/devices/'))return event.deviceId&&event.deviceId===routeDetailId(h,'#/devices/');
                   if(h==='#/doctor')return ['doctor_changed','device_updated','signal_emitted','history_appended'].includes(type);
                   if(h==='#/regions')return type==='region_event';
@@ -429,13 +565,37 @@ public final class WebAdminFrontendScripts {
                   if(h.startsWith('#/history'))return 'history';
                   if(h==='#/dashboard')return 'dashboard';
                   if(h==='#/devices')return 'devices';
-                  if(h==='#/signals')return 'signals';
+                  if(h==='#/receivers')return 'receivers';
+                  if(h==='#/signals'||h==='#/signalbridge')return 'signals';
                   if(h==='#/doctor')return 'doctor';
                   if(h==='#/regions')return 'regions';
                   if(h==='#/actions')return 'actions';
                   if(h==='#/users')return 'users';
                   if(h==='#/settings')return 'settings';
                   return h;
+                }
+                function routePollInterval(hash){
+                  const h=String(hash||'#/dashboard');
+                  if(h==='#/receivers')return 5000;
+                  if(h==='#/signals'||h==='#/signalbridge')return 10000;
+                  if(h==='#/dashboard')return 15000;
+                  return 0;
+                }
+                function startRouteSilentPolling(hash){
+                  clearTimeout(appState.realtime.pollTimer);
+                  appState.realtime.pollTimer=null;
+                  const delay=routePollInterval(hash);
+                  if(!delay||document.body.dataset.page!=='app')return;
+                  const key=realtimeRouteKey(hash);
+                  appState.realtime.pollHash=hash;
+                  appState.realtime.pollTimer=setTimeout(()=>{
+                    appState.realtime.pollTimer=null;
+                    const current=currentRouteHash();
+                    if(realtimeRouteKey(current)!==key)return;
+                    if(document.hidden){markRealtimeDirty(current,{type:'poll'});startRouteSilentPolling(current);return;}
+                    scheduleRealtimeRefresh(current,{type:'poll'});
+                    startRouteSilentPolling(current);
+                  },delay);
                 }
                 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh();}});
                 document.addEventListener('click',event=>{
@@ -446,6 +606,17 @@ public final class WebAdminFrontendScripts {
                   if(extended&&!(target&&target.closest&&target.closest('.extended-channel-combo'))){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
                   const listener=appState.signalListenerBasicConfigEdit;
                   if(listener&&!(target&&target.closest&&target.closest('.listener-channel-combo'))){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
+                  const nav=target&&target.closest?target.closest('[data-nav-route]'):null;
+                  if(nav){
+                    const interactive=target.closest('button,a,input,select,textarea,[data-no-nav]');
+                    if(!interactive||interactive===nav){event.preventDefault();event.stopPropagation();activateNavRoute(nav);}
+                  }
+                });
+                document.addEventListener('keydown',event=>{
+                  if(event.key!=='Enter'&&event.key!==' ')return;
+                  const nav=event.target&&event.target.closest?event.target.closest('[data-nav-route]'):null;
+                  if(!nav||event.target!==nav||nav.tagName==='BUTTON'||nav.tagName==='A')return;
+                  event.preventDefault();activateNavRoute(nav);
                 });
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
@@ -454,7 +625,7 @@ public final class WebAdminFrontendScripts {
                   ]);
                   const deviceList=devices.ok?devices.data:[], channelList=channels.ok?channels.data:[], regionList=regions.ok?regions.data:[], actionList=actions.ok?actions.data:[], hist=history.ok?history.data:[], doc=doctor.ok?doctor.data:{summary:{errorCount:0,warningCount:0,infoCount:0},issues:[]};
                   setView(`
-                    <div class="page-head"><div><h1>总览</h1><p>查看服务器、设备、信号与诊断状态</p></div><button class="secondary" onclick="location.reload()">刷新</button></div>
+                    <div class="page-head"><div><h1>总览</h1><p>查看服务器、设备、信号与诊断状态</p></div><button class="secondary" onclick="renderDashboard()">刷新</button></div>
                     <section class="card-grid">
                       ${metric('服务器状态',status.ok?labelServerStatus(status.data.server?.status):'加载失败','','dashboard')}
                       ${metric('设备总数',deviceList.length,'','device')}
@@ -477,7 +648,7 @@ public final class WebAdminFrontendScripts {
                 function historyList(items){if(!items||items.length===0)return empty('暂无 Signal 历史记录。');return `<div class="list-stack">${items.map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} / ${esc(h.sourceName||'-')} · ${labelStatus(h.result)}</span><span>${esc(h.description||'')}</span></div>`).join('')}</div>`}
                 function doctorList(items,limit){if(!items||items.length===0)return empty('当前没有诊断问题。');return `<div class="list-stack">${items.slice(0,limit).map(i=>`<div class="issue-row"><strong>${pill(i.severity)} ${esc(i.title||'诊断问题')}</strong><span class="meta">${esc(issueContext(i))}</span><span>${esc(i.suggestion||i.message||'')}</span></div>`).join('')}</div>`}
                 function issueContext(i){if(!i)return '';if(!isBlank(i.relatedObjectName))return i.relatedObjectType==='DEVICE'?`设备：${i.relatedObjectName}`:i.relatedObjectName;if(!isBlank(i.channel))return `频道：${i.channel}`;if(!isBlank(i.relatedObjectId))return `${labelSourceType(i.relatedObjectType)}：${i.relatedObjectId}`;return '';}
-                function issueNavigation(i){if(!i)return '<span class="muted">暂无跳转目标</span>';const target=i.navigationTarget||(!isBlank(i.relatedObjectId)&&String(i.relatedObjectType).toUpperCase()==='DEVICE'?`device:${i.relatedObjectId}`:(!isBlank(i.channel)?`channel:${i.channel}`:''));const buttons=[];if(target)buttons.push(navigationButton(target,'查看对象'));if(!isBlank(i.channel))buttons.push(`<button class="link-button" onclick="event.stopPropagation();location.hash='${historyHash(i.channel)}'">查看历史</button>`);return buttons.length?buttons.join(' / '):'<span class="muted">暂无跳转目标</span>';}
+                function issueNavigation(i){if(!i)return '<span class="muted">暂无跳转目标</span>';const target=i.navigationTarget||(!isBlank(i.relatedObjectId)&&String(i.relatedObjectType).toUpperCase()==='DEVICE'?`device:${i.relatedObjectId}`:(!isBlank(i.channel)?`channel:${i.channel}`:''));const buttons=[];if(target)buttons.push(navigationButton(target,'查看对象'));if(!isBlank(i.channel))buttons.push(`<button class="link-button" ${navigationAttr(historyHash(i.channel))}>查看历史</button>`);return buttons.length?buttons.join(' / '):'<span class="muted">暂无跳转目标</span>';}
                 function issueTitle(i){return esc(i?.title||'诊断问题');}
                 function issueMessage(i){return esc(i?.message||i?.impact||'暂无说明');}
                 function issueSuggestion(i){return esc(i?.suggestion||'暂无建议');}
@@ -514,7 +685,7 @@ public final class WebAdminFrontendScripts {
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterDevices(items){const f=appState.deviceFilters;return items.filter(d=>{const hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),d.type].join(' ').toLowerCase();if(f.search&& !hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&d.type!==f.type)return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.world!=='ALL'&&d.world!==f.world)return false;return true;});}
-                function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>`<tr onclick='navigateTo(${jsString('#/devices/'+encodeURIComponent(d.id))})'><td><span class="device-name"><span class="device-icon">${deviceMetadataIcon(d)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString('#/devices/'+encodeURIComponent(d.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${deviceMetadataIcon(d)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 function deviceSubtitle(d){const id=shortId(d.id);if(!isBlank(id)&&!String(id).toLowerCase().startsWith('minecraf'))return `<span class="device-subtitle">ID：${esc(id)}</span>`;if(!isBlank(d.world))return `<span class="device-subtitle">维度：${esc(d.world)}</span>`;return '';}
                 function channelCell(channel){return channelButton(channel);}
                 async function renderDeviceDetail(id,options={}){
@@ -538,7 +709,7 @@ public final class WebAdminFrontendScripts {
                         <article class="panel-card"><h2>设备基础配置</h2>${deviceBasicConfigCard(detail)}</article>
                         <article class="panel-card"><h2>设备扩展配置</h2>${deviceExtendedConfigCard(detail)}</article>
                         <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
-                        <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关历史</button>`}</p></article>
+                        <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p></article>
                         <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
                       </div>
                       <aside class="device-detail-side">
@@ -674,7 +845,7 @@ public final class WebAdminFrontendScripts {
                 function deviceChannelSideCard(detail){
                   const success=detail.configSummary?.interactionItem?.successChannel, fail=detail.configSummary?.interactionItem?.failChannel;
                   let html=`<div class="identity-grid">${row('主频道',channelCell(detail.channel))}${row('成功频道',channelCell(success))}${row('失败频道',channelCell(fail))}</div>`;
-                  html+=isBlank(detail.channel)?'<p class="muted">主频道未设置。</p>':`<p><button class="link-button" onclick='navigateTo(${jsString(signalHash(detail.channel))})'>查看频道详情 / 逻辑链</button></p>`;
+                  html+=isBlank(detail.channel)?'<p class="muted">主频道未设置。</p>':`<p><button class="link-button" ${navigationAttr(signalHash(detail.channel),false)}>查看频道详情 / 逻辑链</button></p>`;
                   return html;
                 }
                 function deviceIdentitySideCard(detail){
@@ -689,8 +860,8 @@ public final class WebAdminFrontendScripts {
                   return `<div class="identity-grid">${rows.map(([k,v])=>row(k,v)).join('')}</div>`;
                 }
                 function deviceQuickLinksCard(detail,routeInfo){
-                  const historyLink=isBlank(detail.channel)?'<span class="muted">暂无相关 History</span>':`<button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看相关 History</button>`;
-                  const signalLink=isBlank(detail.channel)?'<span class="muted">暂无相关 Signal 频道</span>':`<button class="link-button" onclick='navigateTo(${jsString(signalHash(detail.channel))})'>查看相关 Signal 频道</button>`;
+                  const historyLink=isBlank(detail.channel)?'<span class="muted">暂无相关 History</span>':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关 History</button>`;
+                  const signalLink=isBlank(detail.channel)?'<span class="muted">暂无相关 Signal 频道</span>':`<button class="link-button" ${navigationAttr(signalHash(detail.channel),false)}>查看相关 Signal 频道</button>`;
                   return `<div class="side-actions">${historyLink}${signalLink}<button class="link-button" onclick="location.hash='#/doctor'">查看全局 Doctor</button><button class="link-button" onclick="location.hash='#/devices'">返回设备列表</button></div>`;
                 }
                 function deviceRecentStatusCard(detail,historyItems){
@@ -1019,8 +1190,8 @@ public final class WebAdminFrontendScripts {
                 function uniqueValues(items){return [...new Set(items)].sort((a,b)=>String(a).localeCompare(String(b)));}
                 function regionHash(id){return `#/regions/${encodeURIComponent(id||'')}`;}
                 function actionHash(id){return `#/actions/${encodeURIComponent(id||'')}`;}
-                function regionButton(id,label){if(isBlank(id))return '<span class="muted">暂无区域</span>';return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString(regionHash(id))})'>${esc(label||id)}</button>`}
-                function actionButton(id,label){if(isBlank(id))return '<span class="muted">暂无动作</span>';return `<button class="link-button" onclick='event.stopPropagation();navigateTo(${jsString(actionHash(id))})'>${esc(label||id)}</button>`}
+                function regionButton(id,label){if(isBlank(id))return '<span class="muted">暂无区域</span>';return `<button class="link-button" ${navigationAttr(regionHash(id))}>${esc(label||id)}</button>`}
+                function actionButton(id,label){if(isBlank(id))return '<span class="muted">暂无动作</span>';return `<button class="link-button" ${navigationAttr(actionHash(id))}>${esc(label||id)}</button>`}
                 function boundsText(bounds){return bounds?`${bounds.minX} ${bounds.minY} ${bounds.minZ} → ${bounds.maxX} ${bounds.maxY} ${bounds.maxZ}`:'暂无';}
                 function boundsSize(bounds){if(!bounds)return '暂无';const x=Math.abs(Number(bounds.maxX)-Number(bounds.minX))+1,y=Math.abs(Number(bounds.maxY)-Number(bounds.minY))+1,z=Math.abs(Number(bounds.maxZ)-Number(bounds.minZ))+1;return `${x} × ${y} × ${z}`;}
                 function boundsVolume(bounds){if(!bounds)return '暂无';const x=Math.abs(Number(bounds.maxX)-Number(bounds.minX))+1,y=Math.abs(Number(bounds.maxY)-Number(bounds.minY))+1,z=Math.abs(Number(bounds.maxZ)-Number(bounds.minZ))+1;return `${x*y*z}`;}
@@ -1068,7 +1239,7 @@ public final class WebAdminFrontendScripts {
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterRegions(items){const f=appState.regionFilters;const filtered=(items||[]).filter(r=>{const hay=[r.id,r.name,r.world,r.boundChannel,r.targetFilter].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.world!=='ALL'&&r.world!==f.world)return false;if(f.enabled==='ENABLED'&&!r.enabled)return false;if(f.enabled==='DISABLED'&&r.enabled)return false;if(f.doctor!=='ALL'&&String(r.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.players==='HAS_PLAYERS'&&Number(r.playersInside||0)<=0)return false;if(f.players==='NO_PLAYERS'&&Number(r.playersInside||0)>0)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='WORLD')return String(a.world||'').localeCompare(String(b.world||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='PLAYERS')return Number(b.playersInside||0)-Number(a.playersInside||0);if(f.sort==='RECENT')return String(b.lastEventAt||'').localeCompare(String(a.lastEventAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
-                function regionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>区域</th><th>世界</th><th>坐标范围</th><th>尺寸</th><th>目标过滤</th><th>动作数量</th><th>绑定频道</th><th>玩家</th><th>最近事件</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(r=>`<tr onclick='navigateTo(${jsString(regionHash(r.id))})'><td><span class="device-name"><span class="device-icon">${icon('region')}</span><span><strong>${esc(r.name||r.id)}</strong><span class="device-subtitle">ID：${esc(shortId(r.id))}</span></span></span></td><td>${esc(r.world||'暂无')}</td><td>${esc(boundsText(r.bounds))}</td><td>${esc(boundsSize(r.bounds))}</td><td>${esc(labelTargetFilter(r.targetFilter))}</td><td>进入 ${esc(r.enterActionCount||0)} / 离开 ${esc(r.exitActionCount||0)} / 停留 ${esc(r.stayActionCount||0)}</td><td>${channelCell(r.boundChannel)}</td><td>${esc(r.playersInside ?? '暂无')}</td><td>${fmtTime(r.lastEventAt)}</td><td>${pill(r.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(regionHash(r.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function regionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>区域</th><th>世界</th><th>坐标范围</th><th>尺寸</th><th>目标过滤</th><th>动作数量</th><th>绑定频道</th><th>玩家</th><th>最近事件</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(r=>{const target=regionHash(r.id);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${icon('region')}</span><span><strong>${esc(r.name||r.id)}</strong><span class="device-subtitle">ID：${esc(shortId(r.id))}</span></span></span></td><td>${esc(r.world||'暂无')}</td><td>${esc(boundsText(r.bounds))}</td><td>${esc(boundsSize(r.bounds))}</td><td>${esc(labelTargetFilter(r.targetFilter))}</td><td>进入 ${esc(r.enterActionCount||0)} / 离开 ${esc(r.exitActionCount||0)} / 停留 ${esc(r.stayActionCount||0)}</td><td>${channelCell(r.boundChannel)}</td><td>${esc(r.playersInside ?? '暂无')}</td><td>${fmtTime(r.lastEventAt)}</td><td>${pill(r.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 async function renderRegionDetail(id,options={}){
                   if(!options.silent)setView(loading('正在加载区域详情...'));
                   const routeInfo=detailRoute(id,'#/regions');
@@ -1129,7 +1300,7 @@ public final class WebAdminFrontendScripts {
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterActions(items){const f=appState.actionFilters;const filtered=(items||[]).filter(a=>{const hay=[a.id,a.name,a.type,a.summary,a.ownerType,a.ownerName,a.ownerId,a.channel].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&String(a.type||'UNKNOWN').toUpperCase()!==f.type)return false;if(f.owner!=='ALL'&&String(a.ownerType||'UNKNOWN').toUpperCase()!==f.owner)return false;if(f.result!=='ALL'&&String(a.lastResult||'UNKNOWN').toUpperCase()!==f.result)return false;if(f.doctor!=='ALL'&&String(a.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='TYPE')return String(a.type||'').localeCompare(String(b.type||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='OWNER')return String(a.ownerName||a.ownerId||'').localeCompare(String(b.ownerName||b.ownerId||''));if(f.sort==='RECENT')return String(b.lastExecutedAt||'').localeCompare(String(a.lastExecutedAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
-                function actionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>动作</th><th>类型</th><th>归属对象</th><th>关联频道</th><th>引用</th><th>执行次数</th><th>最近结果</th><th>最近执行</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(a=>`<tr onclick='navigateTo(${jsString(actionHash(a.id))})'><td><span class="device-name"><span class="device-icon">${icon('action')}</span><span><strong>${esc(a.name||a.id)}</strong><span class="device-subtitle">ID：${esc(shortId(a.id))}</span></span></span></td><td>${esc(labelActionType(a.type))}</td><td>${ownerLink(a)} <span class="muted">(${esc(labelOwnerType(a.ownerType))})</span></td><td>${channelCell(a.channel)}</td><td>${esc(a.referencedByCount ?? 0)}</td><td>${esc(a.executionCount ?? 0)}</td><td>${pill(a.lastResult||'UNKNOWN')}</td><td>${fmtTime(a.lastExecutedAt)}</td><td>${pill(a.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(actionHash(a.id))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function actionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>动作</th><th>类型</th><th>归属对象</th><th>关联频道</th><th>引用</th><th>执行次数</th><th>最近结果</th><th>最近执行</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(a=>{const target=actionHash(a.id);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${icon('action')}</span><span><strong>${esc(a.name||a.id)}</strong><span class="device-subtitle">ID：${esc(shortId(a.id))}</span></span></span></td><td>${esc(labelActionType(a.type))}</td><td>${ownerLink(a)} <span class="muted">(${esc(labelOwnerType(a.ownerType))})</span></td><td>${channelCell(a.channel)}</td><td>${esc(a.referencedByCount ?? 0)}</td><td>${esc(a.executionCount ?? 0)}</td><td>${pill(a.lastResult||'UNKNOWN')}</td><td>${fmtTime(a.lastExecutedAt)}</td><td>${pill(a.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 async function renderActionDetail(id,options={}){
                   if(!options.silent)setView(loading('正在加载动作详情...'));
                   const routeInfo=detailRoute(id,'#/actions');
@@ -1208,7 +1379,7 @@ public final class WebAdminFrontendScripts {
                     return String(b.lastTriggeredAt||'').localeCompare(String(a.lastTriggeredAt||'')) || String(a.channel||'').localeCompare(String(b.channel||''));
                   });
                 }
-                function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>`<tr onclick='navigateTo(${jsString(signalHash(c.channel))})'><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(c.channel||'未命名频道')}</span>${!isBlank(c.note)?`<span class="device-subtitle">${esc(c.note)}</span>`:''}</span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" onclick='event.stopPropagation();navigateTo(${jsString(signalHash(c.channel))})'>查看详情</button></td></tr>`).join('')}</tbody></table></div>`}
+                function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>{const target=signalHash(c.channel);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(c.channel||'未命名频道')}</span>${!isBlank(c.note)?`<span class="device-subtitle">${esc(c.note)}</span>`:''}</span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 function consumerSummary(c){const count=consumerCount(c);if(count===0)return '<span class="muted">暂无消费者</span>';return `<span class="pill info">${count} 个消费者</span>`}
                 async function renderSignalDetail(channel,options={}){
                   const routeInfo=detailRoute(channel,'#/signals'), decoded=routeInfo.id||'';
@@ -1239,7 +1410,7 @@ public final class WebAdminFrontendScripts {
                       <article class="panel-card overview-card"><h2>横向逻辑链</h2>${logicChain(detail)}</article>
                       <article class="panel-card"><h2>消费者</h2>${endpointGroups(detail)}</article>
                       <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
-                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}<p class="muted"><button class="link-button" onclick="location.hash='${historyHash(detail.channel)}'">查看该频道历史</button></p></article>
+                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}<p class="muted"><button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看该频道历史</button></p></article>
                       <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
                     </section>`,options);
                 }
@@ -1349,6 +1520,297 @@ public final class WebAdminFrontendScripts {
                   const actions=detail.actions||[], downstream=detail.downstreamSignals||[];
                   if(actions.length===0&&downstream.length===0)return empty('暂无可用动作详情。');
                   return `<div class="list-stack">${actions.map(a=>`<div class="event-row"><strong>${actionButton(a.id,labelActionType(a.type))}</strong><span class="meta">${esc(a.ownerName||a.ownerId||'-')} · ${esc(labelEndpointType(a.ownerType))}</span><span>${esc(cleanActionSummary(a.summary||''))}</span></div>`).join('')}${downstream.map(c=>`<div class="event-row"><strong>下游频道</strong><span>${channelButton(c)}</span></div>`).join('')}</div>`;
+                }
+                function waEnsureState(){
+                  appState.uiPages=appState.uiPages||{};
+                  appState.receiverFilters=appState.receiverFilters||{search:'',enabled:'ALL',output:'ALL',channel:'ALL'};
+                  appState.receiverDetailCache=appState.receiverDetailCache||{};
+                }
+                function waMetric(label,value,sub='',iconName='dashboard',kind=''){
+                  return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
+                }
+                function waPageHead(title,desc,actions=''){
+                  return `<div class="wa-head"><div><h1>${esc(title)}</h1><p>${esc(desc)}</p></div>${actions?`<div class="wa-actions">${actions}</div>`:''}</div>`;
+                }
+                function waButton(label,iconName='',attrs='',kind='ghost'){
+                  return `<button class="wa-btn ${esc(kind)}" ${attrs}>${iconName?icon(iconName):''}<span>${esc(label)}</span></button>`;
+                }
+                function waIconButton(label,iconName,attrs=''){
+                  return `<button class="wa-icon-btn" aria-label="${esc(label)}" title="${esc(label)}" ${attrs}>${icon(iconName)}</button>`;
+                }
+                function waSelect(id,options,value,labeler=(v)=>v){
+                  return `<select class="select" id="${esc(id)}">${options.map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(labeler(o))}</option>`).join('')}</select>`;
+                }
+                function waPageItems(key,items,pageSize=10){
+                  waEnsureState();
+                  const total=items.length, pages=Math.max(1,Math.ceil(total/pageSize)), current=Math.min(pages,Math.max(1,Number(appState.uiPages[key]||1)));
+                  appState.uiPages[key]=current;
+                  return {items:items.slice((current-1)*pageSize,current*pageSize),total,pages,current,pageSize};
+                }
+                function setWaPage(key,page){
+                  waEnsureState();
+                  appState.uiPages[key]=Math.max(1,Number(page)||1);
+                  if(key==='signalbridge')renderSignalList('');
+                  if(key==='receivers')renderReceiverList('');
+                }
+                function waPagination(key,page){
+                  if(page.total<=page.pageSize)return `<div class="wa-pagination"><span class="wa-page-meta">共 ${esc(page.total)} 条 · 每页 ${esc(page.pageSize)} 条</span></div>`;
+                  const nums=[1,2,3].filter(n=>n<=page.pages);
+                  if(page.pages>4)nums.push('…');
+                  if(page.pages>3)nums.push(page.pages);
+                  const prev=Math.max(1,page.current-1), next=Math.min(page.pages,page.current+1);
+                  return `<div class="wa-pagination"><div class="wa-page-buttons"><button class="wa-page-btn" onclick="setWaPage('${key}',${prev})">‹</button>${nums.map(n=>n==='…'?`<span class="wa-page-meta">…</span>`:`<button class="wa-page-btn ${n===page.current?'active':''}" onclick="setWaPage('${key}',${n})">${n}</button>`).join('')}<button class="wa-page-btn" onclick="setWaPage('${key}',${next})">›</button></div><span class="wa-page-meta">共 ${esc(page.total)} 条</span><span class="wa-page-meta">每页 ${esc(page.pageSize)} 条</span></div>`;
+                }
+                function openWebAdminModal(title,body,footer=''){
+                  closeWebAdminModal();
+                  const wrap=document.createElement('div');
+                  wrap.className='wa-modal-backdrop';
+                  wrap.id='wa-modal-root';
+                  wrap.innerHTML=`<section class="wa-modal" role="dialog" aria-modal="true" aria-labelledby="wa-modal-title"><header class="wa-modal-head"><h2 id="wa-modal-title" class="wa-modal-title">${esc(title)}</h2>${waIconButton('关闭','close','onclick="closeWebAdminModal()"')}</header><div class="wa-modal-body">${body}</div><footer class="wa-modal-foot">${footer||waButton('关闭','','onclick="closeWebAdminModal()"','ghost')}</footer></section>`;
+                  wrap.addEventListener('click',event=>{if(event.target===wrap)closeWebAdminModal();});
+                  document.body.appendChild(wrap);
+                }
+                function closeWebAdminModal(){document.getElementById('wa-modal-root')?.remove();}
+                document.addEventListener('keydown',event=>{if(event.key==='Escape')closeWebAdminModal();});
+                function unavailableFeature(title='功能暂未开放',message='当前版本没有完整后端支持，因此该操作保持不可用。'){
+                  openWebAdminModal(title,`<p>${esc(message)}</p><div class="wa-disabled-note">本轮前端重构只接入只读展示和布局基础，不新增 API 或真实写能力。</div>`);
+                }
+                function dashboardCard(title,desc,iconName,rows,target){
+                  const attrs=target?navDataAttr(target,`打开${title}`):'aria-disabled="true"';
+                  return `<article class="wa-dashboard-card${target?'':' disabled'}" ${attrs}><div class="wa-dash-title"><span class="wa-icon-bubble icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span><div><h2>${esc(title)}</h2><p>${esc(desc)}</p></div></div><div class="wa-metric-list">${rows.map(r=>`<div class="wa-metric-row"><span class="mini-icon mini-icon-${iconClassName(r.icon||'dashboard')}">${icon(r.icon||'dashboard')}</span><span class="label">${esc(r.label)}</span><span class="value">${esc(r.value)}</span></div>`).join('')}</div><span class="wa-card-link">查看详情 →</span></article>`;
+                }
+                function asArray(result){return result&&result.ok&&Array.isArray(result.data)?result.data:[];}
+                async function renderDashboard(options={}){
+                  if(!options.silent)setView(loading('正在加载总览...'));
+                  const [status,devices,channels,history,doctor,regions,actions,users]=await Promise.all([
+                    settle('/api/status'),settle('/api/devices'),settle('/api/signals/channels'),settle('/api/signals/history?limit=10'),settle('/api/doctor'),settle('/api/regions'),settle('/api/actions'),settle('/api/webadmin/users')
+                  ]);
+                  const deviceList=asArray(devices), channelList=asArray(channels), regionList=asArray(regions), actionList=asArray(actions), hist=asArray(history);
+                  const doc=doctor.ok?doctor.data:{summary:{errorCount:0,warningCount:0,infoCount:0},issues:[]};
+                  const userList=asArray(users);
+                  const receivers=deviceList.filter(d=>String(d.type||'').toUpperCase()==='SIGNAL_RECEIVER');
+                  const relays=deviceList.filter(d=>String(d.type||'').toUpperCase()==='ACTION_RELAY');
+                  const virtuals=deviceList.filter(d=>String(d.type||'').toUpperCase()==='VIRTUAL_BLOCK_DEVICE');
+                  const signalEvents=hist.length;
+                  setView(`<section class="wa-page">
+                    ${waPageHead('总览','关键系统概览与快速访问',waButton('刷新','refresh','onclick="renderDashboard()"','ghost'))}
+                    <section class="wa-dashboard-grid">
+                      ${dashboardCard('设备概览','信号设备、虚拟方块和动作继电器状态','device-overview',[
+                        {icon:'signal-device',label:'信号设备',value:deviceList.length},
+                        {icon:'signal-receiver',label:'信号接收器',value:receivers.length},
+                        {icon:'virtual-block-device',label:'虚拟方块设备',value:virtuals.length},
+                        {icon:'action-relay',label:'动作继电器',value:relays.length}
+                      ],'#/devices')}
+                      ${dashboardCard('Doctor 概览','系统健康检查与潜在问题诊断','doctor-overview',[
+                        {icon:'critical-issue',label:'严重问题',value:doc.summary?.errorCount||0},
+                        {icon:'warning-issue',label:'警告',value:doc.summary?.warningCount||0},
+                        {icon:'info-issue',label:'信息提示',value:doc.summary?.infoCount||0},
+                        {icon:'check-pass',label:'检查通过',value:Math.max(0,deviceList.length-(doc.summary?.affectedDeviceCount||0))}
+                      ],'#/doctor')}
+                      ${dashboardCard('Signal 概览','信号通道与监听器运行状态','signal-overview',[
+                        {icon:'active-channel',label:'活跃信号通道',value:channelList.length},
+                        {icon:'listener-receiver',label:'信号监听/接收',value:channelList.reduce((n,c)=>n+Number(c.listenerCount||0)+Number(c.receiverCount||0),0)},
+                        {icon:'recent-event',label:'最近事件',value:signalEvents},
+                        {icon:'response-time',label:'平均响应',value:'--'}
+                      ],'#/signals')}
+                      ${dashboardCard('区域概览','区域控制器和区域运行状态','region-overview',[
+                        {icon:'region-controller',label:'区域控制器',value:regionList.length},
+                        {icon:'active-region',label:'活跃区域',value:regionList.filter(r=>r.enabled!==false).length},
+                        {icon:'action-binding',label:'动作绑定',value:regionList.reduce((n,r)=>n+Number(r.enterActionCount||0)+Number(r.exitActionCount||0)+Number(r.stayActionCount||0),0)},
+                        {icon:'today-trigger',label:'今日触发',value:'--'}
+                      ],'#/regions')}
+                      ${dashboardCard('动作概览','动作执行与配置使用情况','action-overview',[
+                        {icon:'action-total',label:'动作总数',value:actionList.length},
+                        {icon:'enabled',label:'启用中',value:actionList.filter(a=>a.enabled!==false).length},
+                        {icon:'today-trigger',label:'今日触发',value:actionList.reduce((n,a)=>n+Number(a.executionCountToday||0),0)},
+                        {icon:'success-rate',label:'执行成功率',value:'--'}
+                      ],'#/actions')}
+                      ${dashboardCard('用户概览','用户与权限管理','user-overview',[
+                        {icon:'user-total',label:'用户总数',value:userList.length||'权限限制'},
+                        {icon:'current-user',label:'当前用户',value:appState.me?.displayName||appState.me?.username||'-'},
+                        {icon:'current-role',label:'当前角色',value:labelRole(appState.me?.role)},
+                        {icon:'session',label:'Session',value:status.ok?status.data.webAdmin?.sessionCount||0:'--'}
+                      ],'#/users')}
+                    </section>
+                  </section>`,options);
+                }
+                function signalDotClass(c){const status=String(c.doctorStatus||'').toUpperCase();if(status==='ERROR')return 'error';if(status==='WARNING')return 'warning';if(consumerCount(c)===0)return 'muted';return 'ok';}
+                function signalStatusLabel(c){const status=String(c.doctorStatus||'UNKNOWN').toUpperCase();if(status==='ERROR')return '错误';if(status==='WARNING')return '警告';if(consumerCount(c)===0)return '无消费者';return '正常';}
+                async function renderSignals(options={}){
+                  if(!options.silent)setView(loading('正在加载 SignalBridge...'));
+                  let channels;try{channels=await api('/api/signals/channels')}catch(err){if(options.silent){toast('SignalBridge 实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.signals=channels||[];
+                  renderSignalList('',options);
+                }
+                function renderSignalList(focusId,options={}){
+                  waEnsureState();
+                  const channels=appState.signals||[], filtered=filterSignalChannels(channels);
+                  const page=waPageItems('signalbridge',filtered,10);
+                  const hasConsumers=channels.filter(c=>consumerCount(c)>0).length;
+                  const abnormal=channels.filter(c=>['WARNING','ERROR'].includes(String(c.doctorStatus||'').toUpperCase())).length;
+                  if(setView(`<section class="wa-page">
+                    ${waPageHead('SignalBridge','管理信号频道（Channel），查看消费者连接关系与逻辑链入口。',waButton('刷新','refresh','onclick="renderSignals()"','ghost'))}
+                    <section class="wa-card-grid wa-metrics-4">
+                      ${waMetric('频道总数',channels.length,'所有已创建的信号频道','channel-total')}
+                      ${waMetric('有消费者频道',hasConsumers,'至少有消费者的频道','channel-with-consumers','ok')}
+                      ${waMetric('无消费者频道',channels.length-hasConsumers,'暂无任何消费者连接','channel-orphan','warning')}
+                      ${waMetric('异常频道',abnormal,'存在问题的频道','channel-error',abnormal?'error':'')}
+                    </section>
+                    <section class="wa-table-card">
+                      <div class="wa-filter-bar">
+                        <label class="filter-field search-control"><span>搜索</span><input class="input" id="signal-search" placeholder="搜索频道名或频道 ID..." value="${esc(appState.signalFilters.search)}"></label>
+                        <label class="filter-field"><span>状态</span>${waSelect('signal-status',['ALL','RECENT','NO_RECENT','WARNING'],appState.signalFilters.status,signalOptionLabel)}</label>
+                        <label class="filter-field"><span>排序</span>${waSelect('signal-sort',['RECENT','CHANNEL','CONSUMERS'],appState.signalFilters.sort,signalOptionLabel)}</label>
+                        ${waButton('刷新','refresh','onclick="renderSignals()"','ghost')}
+                      </div>
+                      ${page.items.length===0?empty(channels.length===0?'当前暂无 SignalBridge 频道数据。':'没有匹配当前筛选条件的频道。'):signalBridgeTable(page.items)}
+                      ${waPagination('signalbridge',page)}
+                    </section>
+                  </section>`,options))bindSignalFilters(focusId);
+                }
+                function signalBridgeTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>显示名</th><th>Raw Channel</th><th>消费者摘要</th><th>最后触发</th><th>Doctor 状态</th><th>操作</th></tr></thead><tbody>${items.map(c=>{const target=signalHash(c.channel), title=c.displayName||c.channel||'未命名频道';return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看频道 ${title}`)}><td><div class="wa-row-title"><span class="wa-status-dot ${signalDotClass(c)}"></span><span class="wa-truncate"><strong>${esc(title)}</strong></span></div></td><td class="truncate" title="${esc(c.channel||'')}">${esc(c.channel||'-')}</td><td>${signalConsumerSummary(c)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${pill(c.doctorStatus)} <span class="muted">${esc(signalStatusLabel(c))}</span></td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看频道 ${title}`)}>详情</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function signalConsumerSummary(c){
+                  const regionCount=Number(c.regionControllerCount||c.regionCount||c.regionControllerConsumerCount||0);
+                  const pairs=[['consumer-listener','listener',Number(c.listenerCount||0)],['consumer-receiver','receiver',Number(c.receiverCount||0)],['consumer-relay','relay',Number(c.actionRelayCount||0)],['consumer-region','region',regionCount]];
+                  return `<span class="wa-consumers">${pairs.map(([name,kind,count])=>`<span class="wa-consumer wa-consumer-${kind}">${icon(name)}<span>${esc(count)}</span></span>`).join('')}</span>`;
+                }
+                function bindSignalFilters(focusId){
+                  const update=(event)=>{appState.signalFilters.search=document.getElementById('signal-search')?.value||'';appState.signalFilters.consumer=document.getElementById('signal-consumer')?.value||'ALL';appState.signalFilters.status=document.getElementById('signal-status')?.value||'ALL';appState.signalFilters.sort=document.getElementById('signal-sort')?.value||'RECENT';appState.uiPages.signalbridge=1;renderSignalList(event?.target?.id||'');};
+                  ['signal-search','signal-status','signal-sort'].forEach(id=>document.getElementById(id)?.addEventListener(id==='signal-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                const RECEIVER_DEFAULT_PULSE_TICKS=5;
+                function firstPulseValue(...values){for(const value of values){if(!isBlank(value))return value;}return null;}
+                function normalizePulseTicks(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:null;}
+                function receiverPulseValueFrom(data){
+                  if(!data)return null;
+                  return firstPulseValue(data.pulseTicks,data.receiverPulseTicks,data.config?.pulseTicks,data.configSummary?.pulseTicks,data.extendedConfig?.values?.pulseTicks,data.extendedConfig?.pulseTicks,data.debug?.pulseTicks,data.debugSummary?.pulseTicks,data.blockEntity?.pulseTicks);
+                }
+                function receiverPulseState(d){
+                  const direct=normalizePulseTicks(receiverPulseValueFrom(d));
+                  if(direct!==null)return{state:'ready',value:direct,source:'list'};
+                  const id=String(d?.id||''), cache=id?(appState.receiverDetailCache||{})[id]:null;
+                  if(cache&&cache.status==='ok'){
+                    const cached=normalizePulseTicks(receiverPulseValueFrom(cache.detail));
+                    if(cached!==null)return{state:'ready',value:cached,source:'detail'};
+                    if(isReceiver(d))return{state:'ready',value:RECEIVER_DEFAULT_PULSE_TICKS,source:'default'};
+                  }
+                  if(cache&&cache.status==='error')return{state:'error',message:cache.message||'详情加载失败'};
+                  if(isReceiver(d)&&id)return{state:'loading'};
+                  return{state:'missing'};
+                }
+                function receiverPulseTicks(d){const state=receiverPulseState(d);return state.state==='ready'?state.value:null;}
+                function receiverPulseText(ticks){const n=normalizePulseTicks(ticks);return n===null?'--':`${n} tick`;}
+                function receiverPulseCell(d){
+                  const state=receiverPulseState(d);
+                  if(state.state==='ready')return `<span class="wa-pulse-value">${esc(receiverPulseText(state.value))}</span>`;
+                  if(state.state==='loading')return '<span class="wa-skeleton-text">加载中</span>';
+                  if(state.state==='error')return `<span class="muted" title="${esc(state.message||'详情加载失败')}">--</span>`;
+                  return '<span class="muted">--</span>';
+                }
+                async function refreshVisibleReceiverDetails(items,options={}){
+                  waEnsureState();
+                  if(document.hidden)return;
+                  const now=Date.now(), force=!!options.force;
+                  const targets=(items||[]).filter(d=>isReceiver(d)&&!isBlank(d.id)).slice(0,10);
+                  const jobs=[];
+                  targets.forEach(d=>{
+                    const id=String(d.id), cache=appState.receiverDetailCache[id];
+                    if(cache&&cache.status==='loading')return;
+                    if(cache&&cache.status==='ok'&&!force)return;
+                    if(cache&&cache.status==='error'&&!force&&now-Number(cache.at||0)<5000)return;
+                    if(cache&&cache.status==='ok')appState.receiverDetailCache[id]={...cache,refreshing:true};
+                    else appState.receiverDetailCache[id]={status:'loading',at:now};
+                    jobs.push((async()=>{
+                      try{
+                        const detail=await api(`/api/devices/${encodeURIComponent(id)}`);
+                        appState.receiverDetailCache[id]={status:'ok',detail,at:Date.now(),refreshing:false};
+                        return true;
+                      }catch(err){
+                        const latest=appState.receiverDetailCache[id];
+                        if(latest&&latest.status==='ok'){
+                          appState.receiverDetailCache[id]={...latest,refreshing:false,errorAt:Date.now(),message:err.message||'详情加载失败'};
+                          return false;
+                        }
+                        appState.receiverDetailCache[id]={status:'error',message:err.message||'详情加载失败',at:Date.now()};
+                        return true;
+                      }
+                    })());
+                  });
+                  if(jobs.length===0)return;
+                  const results=await Promise.all(jobs);
+                  if(results.some(Boolean)&&currentRouteHash()==='#/receivers')renderReceiverList('',{silent:true,skipDetailRefresh:true});
+                }
+                function receiverOutputActive(d){return !!(d.outputActive||d.outputting||String(d.outputStatus||'').toUpperCase()==='OUTPUTTING');}
+                function isReceiver(d){return String(d.type||'').toUpperCase()==='SIGNAL_RECEIVER'||String(d.subType||'').toLowerCase()==='signal_receiver';}
+                async function renderReceivers(options={}){
+                  if(!options.silent)setView(loading('正在加载接收器...'));
+                  let devices;try{devices=await api('/api/devices')}catch(err){if(options.silent){toast('接收器实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.receivers=(devices||[]).filter(isReceiver);
+                  renderReceiverList('',options);
+                }
+                function renderReceiverList(focusId,options={}){
+                  waEnsureState();
+                  const receivers=appState.receivers||[], filtered=filterReceivers(receivers);
+                  const page=waPageItems('receivers',filtered,10);
+                  const enabled=receivers.filter(d=>d.enabled).length, outputting=receivers.filter(receiverOutputActive).length, today=receivers.reduce((n,d)=>n+Number(d.triggerCountToday||d.todayTriggerCount||0),0);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('接收器','信号接收器用于监听指定频道，当接收到 signal 时输出红石脉冲。',`${waButton('添加接收器','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('接收器总数',receivers.length,'较昨日 --','receiver-total')}
+                      ${waMetric('启用中',enabled,'已启用接收器','receiver-enabled','ok')}
+                      ${waMetric('禁用中',receivers.length-enabled,'已禁用接收器','receiver-disabled','warning')}
+                      ${waMetric('当前输出中',outputting,'正在输出红石脉冲','receiver-outputting',outputting?'error':'')}
+                      ${waMetric('今日触发次数',today||'--','API 未提供时显示占位','receiver-trigger-today')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="receiver-search" placeholder="搜索接收器名称 / ID / 频道..." value="${esc(appState.receiverFilters.search)}"></label>
+                          <label class="filter-field"><span>状态</span>${waSelect('receiver-enabled',['ALL','ENABLED','DISABLED'],appState.receiverFilters.enabled,optionLabel)}</label>
+                          <label class="filter-field"><span>输出状态</span>${waSelect('receiver-output',['ALL','OUTPUTTING','IDLE'],appState.receiverFilters.output,v=>({ALL:'全部输出状态',OUTPUTTING:'输出中',IDLE:'空闲'}[v]||v))}</label>
+                          ${waButton('刷新','refresh','onclick="renderReceivers()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(receivers.length===0?'当前暂无信号接收器。':'没有匹配当前筛选条件的接收器。'):receiverTable(page.items)}
+                        ${waPagination('receivers',page)}
+                      </div>
+                      ${receiverRightRail(receivers)}
+                    </section>
+                  </section>`,options);
+                  if(rendered){bindReceiverFilters(focusId);if(!options.skipDetailRefresh)refreshVisibleReceiverDetails(page.items,{force:!!options.silent});}
+                }
+                function receiverTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>接收器名称 / ID</th><th>监听频道</th><th>位置</th><th>脉冲时长</th><th>输出状态</th><th>启用状态</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看接收器 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('receiver-row')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td class="truncate">${channelCell(d.channel)}</td><td class="truncate">${esc(posText(d.pos))}</td><td>${receiverPulseCell(d)}</td><td>${receiverOutputActive(d)?textPill('输出中','error'):textPill('空闲','info')}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(d.enabled?'启用':'禁用')}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看接收器 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function filterReceivers(items){
+                  const f=appState.receiverFilters||{};
+                  return items.filter(d=>{const hay=[d.id,d.displayName,d.channel,posText(d.pos),d.world].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.output==='OUTPUTTING'&&!receiverOutputActive(d))return false;if(f.output==='IDLE'&&receiverOutputActive(d))return false;return true;});
+                }
+                function bindReceiverFilters(focusId){
+                  const update=(event)=>{appState.receiverFilters.search=document.getElementById('receiver-search').value;appState.receiverFilters.enabled=document.getElementById('receiver-enabled').value;appState.receiverFilters.output=document.getElementById('receiver-output').value;appState.uiPages.receivers=1;renderReceiverList(event.target.id);};
+                  ['receiver-search','receiver-enabled','receiver-output'].forEach(id=>document.getElementById(id)?.addEventListener(id==='receiver-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                function receiverRightRail(receivers){
+                  const enabled=receivers.filter(d=>d.enabled).length, outputting=receivers.filter(receiverOutputActive).length;
+                  const pulseBuckets=receiverPulseBuckets(receivers);
+                  return `<aside class="wa-right-rail">
+                    <article class="wa-panel"><h2>全部接收器状态分布</h2>${progressList([{label:'输出中',value:outputting,total:receivers.length,kind:'error'},{label:'空闲中',value:Math.max(0,enabled-outputting),total:receivers.length,kind:'ok'},{label:'禁用中',value:receivers.length-enabled,total:receivers.length,kind:'warning'}])}</article>
+                    <article class="wa-panel"><h2>脉冲时长分布</h2>${progressList(pulseBuckets)}</article>
+                    <article class="wa-panel"><h2>筛选</h2><div class="wa-rail-filter"><label><span>频道</span><input class="input" id="receiver-rail-search" placeholder="搜索频道名称..." oninput="document.getElementById('receiver-search').value=this.value;appState.receiverFilters.search=this.value;appState.uiPages.receivers=1;renderReceiverList('receiver-rail-search')"></label><label><span>启用状态</span>${waSelect('receiver-rail-enabled',['ALL','ENABLED','DISABLED'],appState.receiverFilters.enabled,optionLabel)}</label><div class="wa-button-row"><button class="wa-btn primary" onclick="appState.receiverFilters.enabled=document.getElementById('receiver-rail-enabled').value;appState.uiPages.receivers=1;renderReceiverList()">应用筛选</button><button class="wa-btn ghost" onclick="appState.receiverFilters={search:'',enabled:'ALL',output:'ALL',channel:'ALL'};appState.uiPages.receivers=1;renderReceiverList()">重置筛选</button></div></div></article>
+                    <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('批量启用','receiver-enabled','disabled','ghost')}${waButton('批量禁用','receiver-disabled','disabled','ghost')}${waButton('测试脉冲','pulse-duration','disabled','ghost')}${waButton('清空记录','channel-error','disabled','danger')}</div><p class="wa-disabled-note">批量操作和清空记录需要后端写入、权限、CSRF、审计与 edit lock 完整支持，当前保持禁用。</p></article>
+                  </aside>`;
+                }
+                function receiverPulseBuckets(items){
+                  const buckets=[{label:'1-10 tick',value:0,total:items.length,kind:'ok'},{label:'11-20 tick',value:0,total:items.length,kind:''},{label:'21+ tick',value:0,total:items.length,kind:'warning'},{label:'加载中',value:0,total:items.length,kind:'info'},{label:'--',value:0,total:items.length,kind:'info'}];
+                  items.forEach(d=>{const state=receiverPulseState(d);if(state.state==='ready'){const t=Number(state.value);if(t<=10)buckets[0].value++;else if(t<=20)buckets[1].value++;else buckets[2].value++;}else if(state.state==='loading')buckets[3].value++;else buckets[4].value++;});
+                  return buckets.filter(b=>b.value>0||items.length===0);
+                }
+                function progressList(items){
+                  if(!items||items.length===0)return empty('暂无数据。');
+                  return `<div class="wa-progress-list">${items.map(item=>{const total=Math.max(1,Number(item.total||item.value||0)), pct=Math.min(100,Math.round(Number(item.value||0)*100/total));return `<div class="wa-progress-item"><div><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong></div><div class="wa-progress-track"><div class="wa-progress-bar ${esc(item.kind||'')}" style="width:${pct}%"></div></div></div>`;}).join('')}</div>`;
                 }
                 function renderPlaceholder(title,message){setView(`<div class="page-head"><div><h1>${esc(title)}</h1><p>${esc(message)}</p></div></div>${empty('该模块将在后续版本接入。')}`)}
                 initLogin();initApp();
