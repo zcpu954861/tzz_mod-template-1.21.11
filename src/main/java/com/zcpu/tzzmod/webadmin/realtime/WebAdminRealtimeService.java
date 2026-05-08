@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
@@ -21,10 +22,11 @@ public final class WebAdminRealtimeService {
         headers.set("X-Accel-Buffering", "no");
         exchange.sendResponseHeaders(200, 0);
 
-        WebAdminRealtimeClient client = WebAdminRealtimeEventBus.subscribe(user.username, user.role);
+        long lastSeenSeq = lastSeenSeq(exchange);
+        WebAdminRealtimeClient client = WebAdminRealtimeEventBus.subscribe(user.username, user.role, lastSeenSeq);
         try (OutputStream output = exchange.getResponseBody()) {
             writeRaw(output, "retry: 3000\n\n");
-            writeEvent(output, WebAdminRealtimeEventBus.connectedEvent(user.username, user.role));
+            writeEvent(output, WebAdminRealtimeEventBus.connectedEvent(user.username, user.role, lastSeenSeq));
             while (!client.closed()) {
                 WebAdminRealtimeEvent event = client.poll(HEARTBEAT_INTERVAL);
                 writeEvent(output, event == null ? WebAdminRealtimeEventBus.heartbeatEvent() : event);
@@ -51,6 +53,48 @@ public final class WebAdminRealtimeService {
         writeRaw(output, "event: " + event.type() + "\n");
         writeRaw(output, "data: " + WebAdminJsonResponse.GSON.toJson(event) + "\n\n");
         output.flush();
+    }
+
+    private static long lastSeenSeq(HttpExchange exchange) {
+        if (exchange == null) {
+            return 0L;
+        }
+        String header = exchange.getRequestHeaders().getFirst("Last-Event-ID");
+        long fromHeader = parseSeq(header);
+        if (fromHeader > 0L) {
+            return fromHeader;
+        }
+        return parseSeq(queryParam(exchange.getRequestURI() == null ? "" : exchange.getRequestURI().getRawQuery(), "lastEventId"));
+    }
+
+    private static long parseSeq(String value) {
+        if (value == null || value.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Math.max(0L, Long.parseLong(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
+    }
+
+    private static String queryParam(String query, String name) {
+        if (query == null || query.isBlank() || name == null || name.isBlank()) {
+            return "";
+        }
+        for (String pair : query.split("&")) {
+            int split = pair.indexOf('=');
+            String key = split >= 0 ? pair.substring(0, split) : pair;
+            if (!name.equals(decode(key))) {
+                continue;
+            }
+            return decode(split >= 0 ? pair.substring(split + 1) : "");
+        }
+        return "";
+    }
+
+    private static String decode(String value) {
+        return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
     private static void writeRaw(OutputStream output, String value) throws IOException {

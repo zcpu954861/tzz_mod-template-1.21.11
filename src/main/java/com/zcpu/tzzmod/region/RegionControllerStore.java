@@ -2,6 +2,8 @@ package com.zcpu.tzzmod.region;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,14 +60,31 @@ public final class RegionControllerStore {
         ).normalized();
         state.controllers.add(controller);
         state.markDirty();
+        WebAdminRealtimeEventBus.publishRegionControllerEvent(
+                WebAdminRealtimeEventType.REGION_CONTROLLER_CHANGED,
+                controller,
+                "区域控制器已创建：" + displayName(controller)
+        );
         return controller;
     }
 
     public static synchronized boolean deleteController(MinecraftServer server, String controllerId) {
         State state = getState(server);
+        RegionControllerData removedController = null;
+        for (RegionControllerData controller : state.controllers) {
+            if (controller.id().equals(controllerId)) {
+                removedController = controller;
+                break;
+            }
+        }
         boolean removed = state.controllers.removeIf(controller -> controller.id().equals(controllerId));
         if (removed) {
             state.markDirty();
+            WebAdminRealtimeEventBus.publishRegionControllerEvent(
+                    WebAdminRealtimeEventType.REGION_CONTROLLER_CHANGED,
+                    removedController,
+                    "区域控制器已删除：" + displayName(removedController)
+            );
         }
         return removed;
     }
@@ -183,11 +202,24 @@ public final class RegionControllerStore {
             if (!controller.id().equals(controllerId)) {
                 continue;
             }
-            state.controllers.set(i, updater.apply(controller).normalized());
+            RegionControllerData updated = updater.apply(controller).normalized();
+            state.controllers.set(i, updated);
             state.markDirty();
+            WebAdminRealtimeEventBus.publishRegionControllerEvent(
+                    WebAdminRealtimeEventType.REGION_CONTROLLER_CHANGED,
+                    updated,
+                    "区域控制器已变化：" + displayName(updated)
+            );
             return true;
         }
         return false;
+    }
+
+    private static String displayName(RegionControllerData controller) {
+        if (controller == null) {
+            return "unknown";
+        }
+        return controller.name() == null || controller.name().isBlank() ? controller.id() : controller.name();
     }
 
     private static State getState(MinecraftServer server) {

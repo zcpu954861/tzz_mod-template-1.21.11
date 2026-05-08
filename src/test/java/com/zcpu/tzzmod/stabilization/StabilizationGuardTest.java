@@ -36,6 +36,9 @@ import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendShell;
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendScripts;
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendStyles;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
@@ -728,11 +731,28 @@ public final class StabilizationGuardTest {
         String appHtml = WebAdminFrontendAssets.appHtml();
         String css = WebAdminFrontendAssets.appCss();
         String js = WebAdminFrontendAssets.appJs();
+        String shellLoginHtml = WebAdminFrontendShell.loginHtml();
+        String shellAppHtml = WebAdminFrontendShell.appHtml();
+        String stylesCss = WebAdminFrontendStyles.appCss();
+        String scriptsJs = WebAdminFrontendScripts.appJs();
 
         requireNotBlank(loginHtml, "WebAdmin login HTML asset");
         requireNotBlank(appHtml, "WebAdmin app HTML asset");
         requireNotBlank(css, "WebAdmin CSS asset");
         requireNotBlank(js, "WebAdmin JS asset");
+        requireNotBlank(shellLoginHtml, "WebAdmin frontend shell login HTML asset");
+        requireNotBlank(shellAppHtml, "WebAdmin frontend shell app HTML asset");
+        requireNotBlank(stylesCss, "WebAdmin frontend styles CSS asset");
+        requireNotBlank(scriptsJs, "WebAdmin frontend scripts JS asset");
+        requireEquals(shellLoginHtml, loginHtml, "WebAdminFrontendAssets delegates login HTML to shell");
+        requireEquals(shellAppHtml, appHtml, "WebAdminFrontendAssets delegates app HTML to shell");
+        requireEquals(stylesCss, css, "WebAdminFrontendAssets delegates CSS to styles");
+        requireEquals(scriptsJs, js, "WebAdminFrontendAssets delegates JS to scripts");
+        requireContains(appHtml, "id=\"app-view\"", "WebAdmin app root container remains present");
+        requireContains(appHtml, "class=\"sidebar\"", "WebAdmin sidebar shell remains present");
+        requireContains(appHtml, "class=\"topbar\"", "WebAdmin topbar shell remains present");
+        requireContains(loginHtml, "rel=\"icon\" href=\"data:,\"", "WebAdmin login shell suppresses favicon 404");
+        requireContains(appHtml, "rel=\"icon\" href=\"data:,\"", "WebAdmin app shell suppresses favicon 404");
 
         for (String route : List.of(
                 "#/dashboard",
@@ -746,6 +766,34 @@ public final class StabilizationGuardTest {
                 "#/actions"
         )) {
             requireContains(appHtml + js, route, "WebAdmin readonly route present: " + route);
+            requireContains(js, route, "WebAdmin JS route present: " + route);
+        }
+
+        for (String cssClass : List.of(
+                ".sidebar",
+                ".topbar",
+                ".panel-card",
+                ".pill",
+                ".toast",
+                ".validation-list",
+                ".readonly-note",
+                ".channel-combo",
+                ".select option"
+        )) {
+            requireContains(css, cssClass, "WebAdmin CSS class remains present: " + cssClass);
+        }
+        requireContains(css, "color-scheme:dark", "WebAdmin form controls remain in dark color scheme");
+        requireContains(css, "select option{background:#081725;color:var(--text)}", "WebAdmin native select options keep dark styling");
+        requireContains(css, ".channel-combo-menu", "custom channel combobox menu style remains present");
+
+        for (String editEntry : List.of(
+                "WebAdmin 显示信息",
+                "设备基础配置",
+                "设备扩展配置",
+                "频道显示信息",
+                "Signal Listener 基础配置"
+        )) {
+            requireContains(js, editEntry, "WebAdmin edit entry remains present: " + editEntry);
         }
 
         for (String helper : List.of(
@@ -766,6 +814,18 @@ public final class StabilizationGuardTest {
                 "restoreViewState"
         )) {
             requireContains(js, helper, "WebAdmin frontend helper present: " + helper);
+        }
+
+        for (String saveHelper : List.of(
+                "function route",
+                "handleRealtimeEvent",
+                "saveDeviceMetadata",
+                "saveDeviceBasicConfig",
+                "saveDeviceExtendedConfig",
+                "saveChannelMetadata",
+                "saveSignalListenerBasicConfig"
+        )) {
+            requireContains(js, saveHelper, "WebAdmin JS remains wired for: " + saveHelper);
         }
 
         requireContains(appHtml, "区域管理", "sidebar contains Region navigation");

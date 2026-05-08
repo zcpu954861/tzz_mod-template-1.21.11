@@ -6,6 +6,7 @@ import java.util.Map;
 
 public record WebAdminRealtimeEvent(
         String id,
+        long seq,
         String type,
         String occurredAt,
         String channel,
@@ -20,6 +21,7 @@ public record WebAdminRealtimeEvent(
 ) {
     public WebAdminRealtimeEvent {
         id = safe(id);
+        seq = Math.max(0L, seq);
         type = safe(type);
         occurredAt = safe(occurredAt);
         channel = safe(channel);
@@ -104,10 +106,19 @@ public record WebAdminRealtimeEvent(
             return this;
         }
 
+        public WebAdminRealtimeEvent build(long seq) {
+            return buildInternal(String.valueOf(Math.max(0L, seq)), seq);
+        }
+
         public WebAdminRealtimeEvent build(String id) {
+            return buildInternal(id, parseSeq(id));
+        }
+
+        private WebAdminRealtimeEvent buildInternal(String id, long seq) {
             WebAdminRealtimeEventType eventType = type == null ? WebAdminRealtimeEventType.HEARTBEAT : type;
             return new WebAdminRealtimeEvent(
                     id,
+                    seq,
                     eventType.id(),
                     Instant.now().toString(),
                     channel,
@@ -120,6 +131,17 @@ public record WebAdminRealtimeEvent(
                     routeTarget,
                     payload
             );
+        }
+
+        private static long parseSeq(String value) {
+            if (value == null || value.isBlank()) {
+                return 0L;
+            }
+            try {
+                return Math.max(0L, Long.parseLong(value.trim()));
+            } catch (NumberFormatException ignored) {
+                return 0L;
+            }
         }
     }
 }

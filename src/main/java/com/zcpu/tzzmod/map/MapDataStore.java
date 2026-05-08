@@ -1,6 +1,8 @@
 package com.zcpu.tzzmod.map;
 
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -114,6 +116,7 @@ public final class MapDataStore {
         state.plannerRegions.add(region);
         state.sortPlannerRegions();
         state.markDirty();
+        publishPlannerRegionChanged(WebAdminRealtimeEventType.REGION_CHANGED, region, "区域已创建：" + region.name());
         return new PlannerRegionResult(PlannerRegionStatus.OK, region);
     }
 
@@ -135,6 +138,7 @@ public final class MapDataStore {
             state.plannerRegions.set(index, updated);
             state.sortPlannerRegions();
             state.markDirty();
+            publishPlannerRegionChanged(WebAdminRealtimeEventType.REGION_CHANGED, updated, "区域已重命名：" + updated.name());
             return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
         }
         return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
@@ -157,6 +161,7 @@ public final class MapDataStore {
             state.plannerRegions.set(index, updated);
             state.sortPlannerRegions();
             state.markDirty();
+            publishPlannerRegionChanged(WebAdminRealtimeEventType.REGION_CHANGED, updated, "区域颜色已更新：" + updated.name());
             return new PlannerRegionResult(PlannerRegionStatus.OK, updated);
         }
         return new PlannerRegionResult(PlannerRegionStatus.NOT_FOUND, null);
@@ -164,11 +169,19 @@ public final class MapDataStore {
 
     public static synchronized boolean deletePlannerRegion(MinecraftServer server, String regionId) {
         MapState state = getState(server);
-        boolean removed = state.plannerRegions.removeIf(region -> region.id().equals(regionId));
-        if (removed) {
-            state.markDirty();
+        PlannerRegionData removedRegion = null;
+        for (PlannerRegionData region : state.plannerRegions) {
+            if (region.id().equals(regionId)) {
+                removedRegion = region;
+                break;
+            }
         }
-        return removed;
+        if (removedRegion != null && state.plannerRegions.removeIf(region -> region.id().equals(regionId))) {
+            state.markDirty();
+            publishPlannerRegionChanged(WebAdminRealtimeEventType.REGION_CHANGED, removedRegion, "区域已删除：" + removedRegion.name());
+            return true;
+        }
+        return false;
     }
 
     public static synchronized PlannerRegionData getPlannerRegion(MinecraftServer server, String regionId) {
@@ -327,6 +340,10 @@ public final class MapDataStore {
             rgb = MapColors.paletteColor(fallbackIndex) & 0xFFFFFF;
         }
         return 0xFF000000 | rgb;
+    }
+
+    private static void publishPlannerRegionChanged(WebAdminRealtimeEventType type, PlannerRegionData region, String summary) {
+        WebAdminRealtimeEventBus.publishPlannerRegionEvent(type, region, summary);
     }
 
     private static List<RegionGeometry.Point> normalizePolygon(List<RegionGeometry.Point> points) {
