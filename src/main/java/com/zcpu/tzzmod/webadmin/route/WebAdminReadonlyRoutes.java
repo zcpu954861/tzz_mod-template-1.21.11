@@ -1,9 +1,9 @@
 package com.zcpu.tzzmod.webadmin.route;
 
 import com.sun.net.httpserver.HttpExchange;
-import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import com.zcpu.tzzmod.webadmin.service.WebAdminActionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDoctorService;
@@ -93,12 +93,12 @@ public final class WebAdminReadonlyRoutes {
                 return true;
             }
             String id = decode(path.substring("/api/regions/".length()));
-            RegionControllerData region = regionService.findRegion(server, id);
+            WebAdminDtos.RegionDetailDto region = regionService.detail(server, id);
             if (region == null) {
                 WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "区域不存在。");
                 return true;
             }
-            WebAdminJsonResponse.ok(exchange, regionService.detail(server, region));
+            WebAdminJsonResponse.ok(exchange, region);
             return true;
         }
 

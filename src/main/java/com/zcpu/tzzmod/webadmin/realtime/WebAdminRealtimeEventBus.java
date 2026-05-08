@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.webadmin.realtime;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
+import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionTriggerType;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
@@ -229,6 +230,22 @@ public final class WebAdminRealtimeEventBus {
                 .payload("controllerId", normalized.id())
                 .payload("regionId", normalized.regionId())
                 .payload("enabled", normalized.enabled()));
+    }
+
+    public static void publishPlannerRegionEvent(WebAdminRealtimeEventType type, MapDataStore.PlannerRegionData region, String summary) {
+        if (region == null) {
+            return;
+        }
+        publish(WebAdminRealtimeEvent.builder(type == null ? WebAdminRealtimeEventType.REGION_CHANGED : type)
+                .regionId(region.id())
+                .sourceType("region")
+                .severity("INFO")
+                .summary(summary == null || summary.isBlank() ? "区域已变化：" + region.name() : summary)
+                .routeTarget("#/regions/" + encode(region.id()))
+                .payload("regionId", region.id())
+                .payload("name", region.name())
+                .payload("world", region.dimensionId())
+                .payload("type", "planner_region"));
     }
 
     public static void publishRegionRuntimeEvent(RegionControllerData controller, RegionTriggerType triggerType, ServerPlayerEntity player) {

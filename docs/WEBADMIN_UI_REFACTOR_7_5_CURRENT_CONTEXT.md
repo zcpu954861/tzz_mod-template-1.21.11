@@ -10,9 +10,9 @@
 
 当前阶段是：
 
-**7.5 WebAdmin Frontend Refactor / Step 2.5 Realtime Auto Sync Integration**
+**7.5 WebAdmin Frontend Refactor / Step 3 第二批主页面开发**
 
-Step 1 已完成并通过浏览器验收。当前 Step 2 目标是在不重写基础层的前提下，复用 Step 1 的 shell、tokens、表格、筛选、分页、right rail、图标和 silent refresh，扩展第一批剩余主页面。
+Step 1、Step 2 和 Step 2.5 已完成并通过浏览器验收。当前 Step 3 目标是在不重写基础层的前提下，复用 Step 1/2/2.5 的 shell、tokens、表格、筛选、分页、right rail、图标和 realtime auto sync，扩展第二批剩余主页面。
 
 Step 1 已落地 3 个代表页面：
 
@@ -52,13 +52,21 @@ Step 2.5 范围：
 - 前端处理 seq gap、reconnect sync、document hidden -> visible sync、offline -> online sync。
 - 当前覆盖 Dashboard、SignalBridge、Receivers、信号监听器、动作列表、信号设备、虚拟方块设备、事件历史，以及已存在的 doctor / users / settings / regions 路由映射。
 
+Step 3 第二批范围已在当前工作树落地：
+
+1. 配置管理
+2. 用户与权限
+3. 系统设置
+4. 区域列表
+5. 区域控制器
+
 当前仍不是 18 页全量前端落地阶段。
 
 ## 当前最新同步
 
 截至本阶段修复，前端落地继续保持只改 Java 内嵌前端资源，不新增后端 API：
 
-- CSS / JS 资源版本参数已推进到 `7.5-step2.5-realtime-sync`，用于避免浏览器继续拿旧资源。
+- CSS / JS 资源版本参数已推进到 `7.5-step3-pages-batch2`，用于避免浏览器继续拿旧资源。
 - Dashboard 概览卡已按统一 `data-nav-route` 导航模式支持整卡点击、hover、键盘 Enter / Space。
 - SignalBridge 表格行已按统一 `data-nav-route` 导航模式支持整行点击到频道详情，详情按钮仍保留。
 - 接收器表格行在已有设备详情路由可用时也使用同一行导航模式，不新增接收器详情页。
@@ -69,6 +77,14 @@ Step 2.5 范围：
 - Realtime 后端当前已接入 `seq`、recent buffer replay、`sync_required`，并在 Signal history append、device / receiver / virtual block device store 变化、Signal Listener store 变化、Action execution audit、Region controller store / runtime event 变化、WebAdmin 写服务已有审计与配置事件处发布事件。
 - 已定义但不一定已有实际 publish 点的预留事件包括部分 `doctor_issues_changed`、`webadmin_settings_changed`、`webadmin_user_changed`、`action_changed`、`region_changed` 等；不要因为预留事件类型而新增业务功能。
 - Step 2 第一批新增 / 更新 `docs/test/测试_7.5_WebAdmin前端重构第二阶段第一批页面验收.md`，记录 5 个页面、现有命令、disabled 写操作、silent refresh、row click 和响应式验收。
+- Step 3 第二批只做前端主页面扩展，不生成新的验收 Markdown；配置管理、用户与权限、系统设置、区域列表、区域控制器均复用既有 readonly API 和 Step 2.5 realtime route dirty mapping。
+- 配置管理复用 `/api/webadmin/settings`、`/api/status`、`/api/webadmin/write/capabilities`，只读展示配置文件、服务、存储、审计和安全边界；发布、回滚、Diff、导入覆盖等真实配置版本系统仍未实现。
+- 用户与权限复用 `/api/webadmin/users`，只读展示用户、角色、在线状态和权限概览；不实现真实用户权限写入、重置密码、踢出会话或删除用户。
+- 系统设置复用 `/api/webadmin/settings`、`/api/status`、`/api/webadmin/write/capabilities`，只读展示平台信息、服务信息、功能开关和运行环境；不实现真实系统设置写入。
+- 区域列表复用 `/api/regions?limit=500` 和已有 `#/regions/<id>` 详情路由；只读展示区域、坐标、范围、状态和统计。
+- 区域控制器复用 `/api/regions?limit=500` 以 RegionController 视角展示 enter / exit / stay、目标过滤和动作数量；不新增 `/api/region-controllers`，不做 ConditionEngine 或复杂规则编辑。
+- `/api/regions` 已修正为以 `MapDataStore` 中游戏内实际创建的 planner region 为基础数据源，再叠加 `RegionControllerStore` 中同 regionId 的控制器动作 / 状态信息；没有 RegionController 的游戏内区域也会出现在区域列表。
+- planner region 新建、重命名、删除、颜色变化成功后会发布 `region_changed`，前端继续通过既有 Step 2.5 realtime route dirty 机制刷新区域列表，不新增后端 API 或区域写能力。
 
 Step 2 第一批实现边界：
 
@@ -77,7 +93,7 @@ Step 2 第一批实现边界：
 - 信号设备复用现有 `/api/devices` 与已有 `#/devices/<id>` 详情 route。
 - 虚拟方块设备复用 `/api/devices` 过滤 `virtual_block_device`，可见行用已有 `/api/devices/<id>` 详情缓存补齐配置摘要；不使用 WebAdmin 图标伪造 Minecraft 原版材质。
 - 事件历史复用 `/api/signals/history?limit=500`；无 history 详情页时不启用整行跳坏路由。
-- 新增页面继续使用 route-level silent refresh：监听器和历史约 10 秒，动作约 15 秒，设备 / 虚拟方块设备约 8 秒。
+- Step 2 / Step 3 页面继续使用 route-level silent refresh，但不再靠页面级 5 / 8 / 10 / 15 秒高频 polling 追实时；刷新由 SSE event、route enter、reconnect、visible 和 online 补同步驱动。
 
 ## 当前主要修改文件
 
@@ -99,7 +115,7 @@ Step 2 第一批实现边界：
 
 ## 当前已完成方向
 
-当前 7.5 Step 2 第一批已开始落地：
+当前 7.5 Step 3 第二批已开始落地：
 
 - 登录页正在迁移为 7.5 暗色品牌登录页。
 - 登录后 app shell 正在迁移为 7.5 sidebar / topbar。
@@ -107,6 +123,7 @@ Step 2 第一批实现边界：
 - SignalBridge 已有全宽表格方向，并作为 Step 1 基线保持不回退。
 - Receivers 已有 table + right rail 方向，并作为 Step 1 基线保持不回退。
 - Step 2 第一批页面方向：信号监听器全宽列表，动作列表 / 信号设备 / 虚拟方块设备 / 事件历史使用 table + right rail 或全宽表格。
+- Step 3 第二批页面方向：配置管理 / 用户与权限 / 系统设置 / 区域列表 / 区域控制器复用 table + right rail、tabs、只读设置卡和 disabled 操作边界。
 - 当前可见 WebAdmin 自定义 UI 图标已转向 2D 平面、纯色、简单几何线条的 inline SVG registry；Minecraft 原版方块 / 物品仍使用原版材质资源。
 - 无后端支持的写入类按钮应保持 disabled / unavailable。
 - CSS/JS 资源需要使用版本参数或其它 cache-busting，避免浏览器继续加载旧资源。

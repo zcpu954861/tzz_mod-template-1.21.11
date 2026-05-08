@@ -248,7 +248,11 @@ public final class WebAdminDtos {
             int playersInside,
             String lastEventAt,
             boolean enabled,
-            String doctorStatus
+            String doctorStatus,
+            String type,
+            String description,
+            String controllerId,
+            int controllerCount
     ) {
     }
 

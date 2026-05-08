@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "7.5-step2.5-realtime-sync";
+    private static final String ASSET_VERSION = "7.5-step3-pages-batch2";
 
     private WebAdminFrontendShell() {
     }
@@ -84,6 +84,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">区域控制</div>
                           <button class="nav-item" data-route="#/regions"><span class="nav-icon" data-icon="region"></span>区域管理</button>
+                          <button class="nav-item" data-route="#/region-controllers"><span class="nav-icon" data-icon="region-controller"></span>区域控制器</button>
                         </div>
                         <div class="nav-section">
                           <div class="nav-section-title">设备管理</div>
@@ -97,6 +98,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">系统管理</div>
                           <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户与权限</button>
+                          <button class="nav-item" data-route="#/config"><span class="nav-icon" data-icon="settings"></span>配置管理</button>
                           <button class="nav-item" data-route="#/settings"><span class="nav-icon" data-icon="settings"></span>系统设置</button>
                         </div>
                       </nav>

@@ -309,7 +309,7 @@ public final class WebAdminFrontendScripts {
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
                 function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/history','#/events','#/users','#/settings','#/regions','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
                 function navigateTo(targetHash){location.hash=withReturnContext(targetHash);}
                 function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), id=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
@@ -400,6 +400,7 @@ public final class WebAdminFrontendScripts {
                   document.getElementById('toggle-password').onclick=()=>{const p=document.getElementById('password');p.type=p.type==='password'?'text':'password'};
                   form.onsubmit=async e=>{e.preventDefault();const msg=document.getElementById('message');msg.textContent='正在登录...';try{await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:username.value,password:password.value,rememberMe:remember.checked})});location.href='/app#/dashboard'}catch(err){msg.textContent=err.message}};
                 }
+                """).append("""
                 async function initApp(){
                   if(document.body.dataset.page!=='app') return;
                   bindChrome();
@@ -452,9 +453,11 @@ public final class WebAdminFrontendScripts {
                   if(hash==='#/doctor') return renderDoctorPage(options);
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
                   if(hash.startsWith('#/events')) return renderHistoryPage(hash.substring('#/events'.length),options);
-                  if(hash==='#/users') return renderUsersPage(options);
-                  if(hash==='#/settings') return renderSettingsPage(options);
-                  if(hash==='#/regions') return renderRegionsPage(options);
+                  if(hash==='#/config'||hash==='#/config-management'||hash==='#/settings/config') return renderConfigPage(options);
+                  if(hash==='#/users'||hash==='#/permissions'||hash==='#/users-permissions') return renderUsersPage(options);
+                  if(hash==='#/settings'||hash==='#/system-settings') return renderSettingsPage(options);
+                  if(hash==='#/regions'||hash==='#/region-list') return renderRegionsPage(options);
+                  if(hash==='#/region-controllers'||hash==='#/regionctl') return renderRegionControllersPage(options);
                   if(hash.startsWith('#/regions/')) return renderRegionDetail(hash.substring('#/regions/'.length),options);
                   if(hash==='#/actions') return renderActionsPage(options);
                   if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length),options);
@@ -469,12 +472,16 @@ public final class WebAdminFrontendScripts {
                   if(r==='#/devices')return h==='#/devices'||h.startsWith('#/devices/');
                   if(r==='#/virtual-block-devices')return h==='#/virtual-block-devices'||h==='#/block-devices';
                   if(r==='#/actions')return h==='#/actions'||h.startsWith('#/actions/');
-                  if(r==='#/regions')return h==='#/regions'||h.startsWith('#/regions/');
+                  if(r==='#/regions')return h==='#/regions'||h==='#/region-list'||h.startsWith('#/regions/');
+                  if(r==='#/region-controllers')return h==='#/region-controllers'||h==='#/regionctl';
+                  if(r==='#/users')return h==='#/users'||h==='#/permissions'||h==='#/users-permissions';
+                  if(r==='#/settings')return h==='#/settings'||h==='#/system-settings';
+                  if(r==='#/config')return h==='#/config'||h==='#/config-management'||h==='#/settings/config';
                   return h===r||h.startsWith(r+'/')||h.startsWith(r+'?');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
                 const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
-                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','devices','virtualBlockDevices','history','doctor','regions','users','settings'];
+                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
                   if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
@@ -582,24 +589,28 @@ public final class WebAdminFrontendScripts {
                   if(isAny('config_changed'))add(...REALTIME_KNOWN_ROUTE_KEYS);
                   if(starts('device_')||starts('receiver_')||starts('virtual_block_device_')||isAny('device_updated','receiver_pulse','device_config_changed')){
                     add('dashboard','devices','receivers','virtualBlockDevices','doctor');
+                    if(isAny('device_config_changed'))add('config');
                     if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);
                   }
                   if(starts('signal_')||isAny('signal_emitted','history_appended','signal_history_appended','channel_metadata_changed','signal_listener_config_changed','signal_config_changed')){
                     add('dashboard','signals','listeners','history','doctor');
+                    if(isAny('signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','signal_listener_config_changed','signal_config_changed'))add('config');
                     if(event?.channel)add(`signalDetail:${event.channel}`);
                   }
                   if(starts('action_')||isAny('action_executed','action_config_changed')){
                     add('dashboard','actions','history');
+                    if(isAny('action_changed','action_config_changed'))add('config','regionControllers');
                     if(event?.actionId)add(`actionDetail:${event.actionId}`);
                   }
                   if(starts('region_')||isAny('region_event','region_config_changed')){
-                    add('dashboard','regions','history');
+                    add('dashboard','regions','regionControllers','history');
+                    if(isAny('region_changed','region_config_changed','region_controller_changed'))add('config');
                     if(event?.regionId)add(`regionDetail:${event.regionId}`);
                   }
-                  if(starts('doctor_')||isAny('doctor_changed'))add('dashboard','doctor');
+                  if(starts('doctor_')||isAny('doctor_changed'))add('dashboard','doctor','settings');
                   if(starts('webadmin_user_')||isAny('webadmin_user_connected','webadmin_user_disconnected','user_changed'))add('dashboard','users');
-                  if(starts('webadmin_audit_')||isAny('write_audit_appended'))add('dashboard','history','settings');
-                  if(starts('webadmin_settings_')||isAny('system_settings_changed'))add('settings','dashboard');
+                  if(starts('webadmin_audit_')||isAny('write_audit_appended'))add('dashboard','history','settings','config','users');
+                  if(starts('webadmin_settings_')||isAny('system_settings_changed'))add('settings','config','dashboard');
                   if(type==='edit_lock_changed'){
                     const target=String(event?.payload?.targetType||'');
                     if(target.includes('device'))add('devices');
@@ -664,10 +675,12 @@ public final class WebAdminFrontendScripts {
                   if(h==='#/receivers')return 'receivers';
                   if(h==='#/signals'||h==='#/signalbridge')return 'signals';
                   if(h==='#/doctor')return 'doctor';
-                  if(h==='#/regions')return 'regions';
+                  if(h==='#/regions'||h==='#/region-list')return 'regions';
+                  if(h==='#/region-controllers'||h==='#/regionctl')return 'regionControllers';
                   if(h==='#/actions')return 'actions';
-                  if(h==='#/users')return 'users';
-                  if(h==='#/settings')return 'settings';
+                  if(h==='#/users'||h==='#/permissions'||h==='#/users-permissions')return 'users';
+                  if(h==='#/settings'||h==='#/system-settings')return 'settings';
+                  if(h==='#/config'||h==='#/config-management'||h==='#/settings/config')return 'config';
                   return h;
                 }
                 function routePollInterval(hash){
@@ -1629,6 +1642,10 @@ public final class WebAdminFrontendScripts {
                   appState.actionFilters=appState.actionFilters||{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'};
                   appState.receiverFilters=appState.receiverFilters||{search:'',enabled:'ALL',output:'ALL',channel:'ALL'};
                   appState.receiverDetailCache=appState.receiverDetailCache||{};
+                  appState.configFilters=appState.configFilters||{search:'',status:'ALL',type:'ALL'};
+                  appState.userFilters=appState.userFilters||{search:'',role:'ALL',enabled:'ALL',online:'ALL'};
+                  appState.regionFilters=appState.regionFilters||{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};
+                  appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
                 }
                 function waMetric(label,value,sub='',iconName='dashboard',kind=''){
                   return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
@@ -1661,6 +1678,10 @@ public final class WebAdminFrontendScripts {
                   if(key==='virtualBlockDevices')renderVirtualBlockList('');
                   if(key==='actions')renderActionList('');
                   if(key==='history')renderHistoryListPage('');
+                  if(key==='config')renderConfigList('');
+                  if(key==='users')renderUserList('');
+                  if(key==='regions')renderRegionList('');
+                  if(key==='regionControllers')renderRegionControllerList('');
                 }
                 function waPagination(key,page){
                   if(page.total<=page.pageSize)return `<div class="wa-pagination"><span class="wa-page-meta">共 ${esc(page.total)} 条 · 每页 ${esc(page.pageSize)} 条</span></div>`;
@@ -2228,6 +2249,240 @@ public final class WebAdminFrontendScripts {
                     <article class="wa-panel"><h2>操作</h2><div class="wa-quick-grid">${waButton('实时流 Live','signalbridge-main','disabled','ghost')}${waButton('导出事件记录','download','disabled','ghost')}${waButton('清空历史记录','channel-error','disabled','danger')}</div><p class="wa-disabled-note">导出、清空和完整实时流没有后端写入或流式能力，本轮保持禁用。</p></article>
                   </aside>`;
                 }
+                """).append("""
+                async function renderConfigPage(options={}){
+                  if(!options.silent)setView(loading('正在加载配置管理...'));
+                  const [settings,status,capabilities]=await Promise.all([settle('/api/webadmin/settings'),settle('/api/status'),settle('/api/webadmin/write/capabilities')]);
+                  if(!settings.ok){if(options.silent){toast('配置管理实时刷新失败，已保留当前页面。');return;}setView(errorBlock(settings.error.message));return;}
+                  appState.configData={settings:settings.data||{},status:status.ok?status.data:{},capabilities:capabilities.ok?capabilities.data:{}};
+                  renderConfigList('',options);
+                }
+                function renderConfigList(focusId,options={}){
+                  waEnsureState();
+                  const data=appState.configData||{}, settings=data.settings||{}, storage=settings.storage||{}, service=settings.service||{}, rows=filterConfigRows(configRows(data));
+                  const page=waPageItems('config',rows,10), warning=rows.filter(r=>r.status!=='OK').length;
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('配置管理','只读查看 WebAdmin 配置文件、存储状态与写入边界；不实现发布、回滚或版本系统。',`${waButton('新建草稿','plus','disabled','primary')}${waButton('导入配置包','upload','disabled','ghost')}${waButton('导出当前配置','download','disabled','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('当前配置版本',storage.configExists?'当前文件':'未检测到','来自 /api/webadmin/settings','settings')}
+                      ${waMetric('草稿数量','--','无配置版本系统','archive')}
+                      ${waMetric('备份数量','--','无备份列表 API','archive')}
+                      ${waMetric('未发布变更','--','无发布流程 API','warning-issue',warning?'warning':'')}
+                      ${waMetric('最近发布时间','--','当前后端未提供','clock')}
+                      ${waMetric('配置警告',warning,'路径隐藏或文件缺失','warning-issue',warning?'warning':'')}
+                    </section>
+                    <div class="wa-tabs"><button class="wa-tab active">配置版本列表</button><button class="wa-tab" disabled>草稿</button><button class="wa-tab" disabled>发布记录</button><button class="wa-tab" disabled>备份记录</button><button class="wa-tab" disabled>导入记录</button><button class="wa-tab" disabled>变更对比 Diff</button><button class="wa-tab" disabled>审计日志</button></div>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="config-search" placeholder="搜索配置项 / 路径 / 类型..." value="${esc(appState.configFilters.search)}"></label>
+                          <label class="filter-field"><span>类型</span>${waSelect('config-type',['ALL','SERVICE','STORAGE','SECURITY','USERS','AUDIT'],appState.configFilters.type,configOptionLabel)}</label>
+                          <label class="filter-field"><span>状态</span>${waSelect('config-status',['ALL','OK','WARNING','DISABLED'],appState.configFilters.status,configOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderConfigPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty('没有匹配当前筛选条件的配置项。'):configTable(page.items)}
+                        ${waPagination('config',page)}
+                      </div>
+                      ${configRightRail(data,rows,service)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindConfigFilters(focusId);
+                }
+                function configRows(data){
+                  const settings=data.settings||{}, storage=settings.storage||{}, service=settings.service||{}, security=settings.security||{}, audit=settings.audit||{}, system=settings.system||{};
+                  const hidden=storage.restricted?'受限信息已隐藏':'';
+                  return [
+                    {name:'WebAdmin 服务配置',type:'SERVICE',status:service.running?'OK':'WARNING',path:`${service.host||'-'}:${service.port||'-'}`,desc:`访问模式：${labelAccessMode(service.accessMode)}`},
+                    {name:'当前配置文件',type:'STORAGE',status:storage.configExists?'OK':'WARNING',path:hidden||storage.configPath||'--',desc:`存储作用域：${storage.scope||'WORLD_SAVE'}`},
+                    {name:'用户配置文件',type:'USERS',status:storage.usersExists?'OK':'WARNING',path:hidden||storage.usersPath||'--',desc:'WebAdmin 用户与角色存储文件'},
+                    {name:'审计日志文件',type:'AUDIT',status:audit.enabled?(storage.auditLogExists?'OK':'WARNING'):'DISABLED',path:hidden||storage.auditLogPath||'--',desc:`审计日志：${audit.enabled?'启用':'关闭'}`},
+                    {name:'认证与 Session',type:'SECURITY',status:'OK',path:security.sessionCookieName||'--',desc:`${security.authMode||'USERNAME_PASSWORD'} / ${formatMinutes(security.sessionTtlMinutes)}`},
+                    {name:'运行环境摘要',type:'SERVICE',status:'OK',path:system.worldName||'--',desc:`${system.minecraftVersion||'--'} / ${system.serverType||'--'}`}
+                  ];
+                }
+                function filterConfigRows(rows){const f=appState.configFilters;return (rows||[]).filter(r=>{const hay=[r.name,r.type,r.status,r.path,r.desc].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&r.type!==f.type)return false;if(f.status!=='ALL'&&r.status!==f.status)return false;return true;});}
+                function bindConfigFilters(focusId){
+                  const update=(event)=>{appState.configFilters.search=document.getElementById('config-search')?.value||'';appState.configFilters.type=document.getElementById('config-type')?.value||'ALL';appState.configFilters.status=document.getElementById('config-status')?.value||'ALL';appState.uiPages.config=1;renderConfigList(event?.target?.id||'');};
+                  ['config-search','config-type','config-status'].forEach(id=>document.getElementById(id)?.addEventListener(id==='config-search'?'input':'change',update));
+                  restoreFocusEnd(focusId);
+                }
+                function configTable(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>配置项</th><th>类型</th><th>状态</th><th>位置 / 标识</th><th>说明</th><th>操作</th></tr></thead><tbody>${items.map(r=>`<tr><td><span class="device-name"><span class="device-icon">${icon(configIcon(r.type))}</span><span><strong>${esc(r.name)}</strong><span class="device-subtitle">${esc(r.type)}</span></span></span></td><td>${textPill(configOptionLabel(r.type),'info')}</td><td>${pill(r.status)}</td><td class="truncate" title="${esc(r.path)}">${esc(r.path)}</td><td class="truncate" title="${esc(r.desc)}">${esc(r.desc)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" disabled>Diff</button>${waIconButton('更多不可用','more','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;}
+                function configRightRail(data,rows,service){const settings=data.settings||{}, storage=settings.storage||{};return `<aside class="wa-right-rail">
+                  <article class="wa-panel"><h2>配置状态</h2><div class="list-stack">${rows.map(r=>`<div class="kv-row"><span class="muted">${esc(r.name)}</span><strong>${pill(r.status)}</strong></div>`).join('')}</div></article>
+                  <article class="wa-panel"><h2>最近发布记录</h2>${empty('当前没有配置发布记录 API。')}</article>
+                  <article class="wa-panel"><h2>最近备份</h2>${empty('当前没有备份列表 API。')}</article>
+                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('创建备份','archive','disabled','ghost')}${waButton('查看 Diff','eye','disabled','ghost')}${waButton('发布','enabled','disabled','primary')}${waButton('回滚到此版本','warning-issue','disabled','danger')}</div><p class="wa-disabled-note">发布、回滚、导入覆盖和删除没有完整后端安全能力，本轮保持禁用。</p></article>
+                  <article class="wa-panel"><h2>存储边界</h2><div class="list-stack"><div class="kv-row"><span class="muted">作用域</span><strong>${esc(storage.scope||'WORLD_SAVE')}</strong></div><div class="kv-row"><span class="muted">按世界隔离</span><strong>${esc(storage.worldScoped?'是':'否')}</strong></div><div class="kv-row"><span class="muted">当前服务</span><strong>${esc(service.url||'--')}</strong></div></div></article>
+                </aside>`;}
+                function configOptionLabel(value){return {ALL:'全部',SERVICE:'服务',STORAGE:'存储',SECURITY:'安全',USERS:'用户',AUDIT:'审计',OK:'正常',WARNING:'需关注',DISABLED:'禁用'}[String(value||'')]||value;}
+                function configIcon(type){return {SERVICE:'settings',STORAGE:'archive',SECURITY:'doctor-ok',USERS:'user-total',AUDIT:'history'}[String(type||'')]||'settings';}
+                function restoreFocusEnd(focusId){if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}}
+                async function renderUsersPage(options={}){
+                  if(!options.silent)setView(loading('正在加载用户与权限...'));
+                  let data;try{data=await api('/api/webadmin/users')}catch(err){if(options.silent){toast('用户与权限实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page">${waPageHead('用户与权限','查看 WebAdmin 用户、角色、权限与 session 状态。',`${waButton('添加用户','plus','disabled','primary')}${waButton('角色管理','user','disabled','ghost')}${waButton('权限策略管理','critical-issue','disabled','danger')}`)}${err.status===403?errorBlock('权限不足：只有所有者可以查看用户与权限。'):errorBlock(err.message)}</section>`);return;}
+                  appState.usersData=data||{summary:{},users:[],roles:[]};
+                  renderUserList('',options);
+                }
+                function renderUserList(focusId,options={}){
+                  waEnsureState();
+                  const data=appState.usersData||{summary:{},users:[],roles:[]}, users=data.users||[], summary=data.summary||{}, filtered=filterUsersStep3(users), page=waPageItems('users',filtered,10);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('用户与权限','查看 WebAdmin 用户、角色、权限与登录状态；不启用用户写操作。',`${waButton('添加用户','plus','disabled','primary')}${waButton('角色管理','user','disabled','ghost')}${waButton('权限策略管理','critical-issue','disabled','danger')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('用户总数',summary.totalCount ?? users.length,'来自 /api/webadmin/users','user-total')}
+                      ${waMetric('在线用户',summary.onlineCount ?? users.filter(u=>u.online).length,'当前 session','current-user','ok')}
+                      ${waMetric('角色数量',(data.roles||[]).length || 4,'OWNER / EDITOR / TESTER / VIEWER','current-role')}
+                      ${waMetric('今日登录次数','--','后端未提供登录统计','today-trigger')}
+                      ${waMetric('今日操作次数','--','审计聚合未提供','action-total')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="user-search" placeholder="搜索用户名 / UID / 角色..." value="${esc(appState.userFilters.search)}"></label>
+                          <label class="filter-field"><span>角色</span>${waSelect('user-role',['ALL','OWNER','EDITOR','TESTER','VIEWER'],appState.userFilters.role,userOptionLabel)}</label>
+                          <label class="filter-field"><span>状态</span>${waSelect('user-enabled',['ALL','ENABLED','DISABLED'],appState.userFilters.enabled,userOptionLabel)}</label>
+                          <label class="filter-field"><span>在线</span>${waSelect('user-online',['ALL','ONLINE','OFFLINE'],appState.userFilters.online,userOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderUsersPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(users.length?'没有匹配当前筛选条件的用户。':'暂无 WebAdmin 用户。'):userTableStep3(page.items)}
+                        ${waPagination('users',page)}
+                      </div>
+                      ${userRightRail(data,users)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindUserFiltersStep3(focusId);
+                }
+                function filterUsersStep3(users){const f=appState.userFilters;return (users||[]).filter(u=>{const hay=[u.username,u.displayName,u.role,u.roleDisplayName,u.createdBy].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.role!=='ALL'&&String(u.role||'').toUpperCase()!==f.role)return false;if(f.enabled==='ENABLED'&&!u.enabled)return false;if(f.enabled==='DISABLED'&&u.enabled)return false;if(f.online==='ONLINE'&&!u.online)return false;if(f.online==='OFFLINE'&&u.online)return false;return true;});}
+                function bindUserFiltersStep3(focusId){const update=(event)=>{appState.userFilters.search=document.getElementById('user-search')?.value||'';appState.userFilters.role=document.getElementById('user-role')?.value||'ALL';appState.userFilters.enabled=document.getElementById('user-enabled')?.value||'ALL';appState.userFilters.online=document.getElementById('user-online')?.value||'ALL';appState.uiPages.users=1;renderUserList(event?.target?.id||'');};['user-search','user-role','user-enabled','user-online'].forEach(id=>document.getElementById(id)?.addEventListener(id==='user-search'?'input':'change',update));restoreFocusEnd(focusId);}
+                function userTableStep3(users){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>用户名 / UID</th><th>角色</th><th>状态</th><th>在线状态</th><th>最后登录</th><th>今日操作</th><th>操作</th></tr></thead><tbody>${users.map(u=>`<tr><td><span class="device-name"><span class="device-icon">${icon('user')}</span><span><strong>${esc(u.displayName||u.username)}</strong><span class="device-subtitle">UID: ${esc(u.username)}</span></span></span></td><td>${textPill(u.roleDisplayName||labelRoleFull(u.role),'info')}</td><td>${textPill(labelEnabledState(u.enabled),u.enabled?'ok':'warning')}</td><td>${textPill(labelOnline(u.online),u.online?'ok':'info')} <span class="muted">${esc(Number(u.sessionCount||0))} session</span></td><td>${fmtTime(u.lastLoginAt)}</td><td>--</td><td><div class="wa-action-cell"><button class="wa-btn ghost" disabled>查看</button><button class="wa-btn ghost" disabled>编辑</button>${waIconButton('更多不可用','more','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;}
+                function userRightRail(data,users){const roles=data.roles||[];return `<aside class="wa-right-rail">
+                  <article class="wa-panel"><h2>角色分布</h2>${progressList(roles.map(r=>({label:r.displayName||labelRoleFull(r.role),value:r.count,total:Math.max(1,users.length),kind:'info'})))}</article>
+                  <article class="wa-panel"><h2>状态分布</h2>${progressList([{label:'启用中',value:users.filter(u=>u.enabled).length,total:Math.max(1,users.length),kind:'ok'},{label:'禁用中',value:users.filter(u=>!u.enabled).length,total:Math.max(1,users.length),kind:'error'},{label:'在线',value:users.filter(u=>u.online).length,total:Math.max(1,users.length),kind:'info'}])}</article>
+                  <article class="wa-panel"><h2>权限概览</h2><div class="list-stack"><div class="kv-row"><span class="muted">权限策略</span><strong>当前命令 / 服务端配置管理</strong></div><div class="kv-row"><span class="muted">密码策略</span><strong>PBKDF2 哈希</strong></div><div class="kv-row"><span class="muted">明文密码</span><strong>不展示</strong></div></div></article>
+                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('重置密码','key','disabled','ghost')}${waButton('禁用用户','receiver-disabled','disabled','ghost')}${waButton('踢出会话','logout','disabled','ghost')}${waButton('删除用户','critical-issue','disabled','danger')}</div><p class="wa-disabled-note">用户写操作没有完整 WebAdmin HTTP 后端和审计边界，本轮保持禁用。</p></article>
+                </aside>`;}
+                async function renderSettingsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载系统设置...'));
+                  const [settings,status,capabilities]=await Promise.all([settle('/api/webadmin/settings'),settle('/api/status'),settle('/api/webadmin/write/capabilities')]);
+                  if(!settings.ok){if(options.silent){toast('系统设置实时刷新失败，已保留当前页面。');return;}setView(errorBlock(settings.error.message));return;}
+                  const data=settings.data||{}, service=data.service||{}, storage=data.storage||{}, security=data.security||{}, audit=data.audit||{}, system=data.system||{}, visibility=data.visibility||{}, runtime=status.ok?status.data:{};
+                  setView(`<section class="wa-page">
+                    ${waPageHead('系统设置','只读查看 WebAdmin 服务状态、运行环境、安全设置和功能开关。',`${waButton('保存设置','settings','disabled','primary')}${waButton('重置默认','archive','disabled','ghost')}`)}
+                    <div class="wa-tabs"><button class="wa-tab active">通用设置</button><button class="wa-tab" disabled>安全设置</button><button class="wa-tab" disabled>性能设置</button><button class="wa-tab" disabled>界面设置</button><button class="wa-tab" disabled>通知设置</button><button class="wa-tab" disabled>备份与维护</button><button class="wa-tab" disabled>关于</button></div>
+                    <section class="wa-two-column">
+                      <div class="wa-settings-main">
+                        <article class="wa-panel"><h2>平台信息（只读）</h2><div class="identity-grid">${row('平台名称',esc('TZZ Mod WebAdmin'))}${row('平台版本',esc(system.modVersion||'unknown'))}${row('Minecraft 版本',esc(system.minecraftVersion||'--'))}${row('服务器类型',esc(labelServerType(system.serverType)))}${row('当前世界 / 存档',esc(system.worldName||'--'))}${row('访问模式',esc(labelAccessMode(service.accessMode)))}</div></article>
+                        <article class="wa-panel"><h2>服务信息（只读）</h2><div class="identity-grid">${row('服务状态',pill(service.running?'OK':'WARNING'))}${row('服务地址',esc(service.url||'--'))}${row('监听地址',esc(`${service.host||'-'}:${service.port||'-'}`))}${row('当前用户',esc(service.currentUser||'--'))}${row('当前角色',esc(labelRoleFull(service.currentRole)))}${row('Session 数量',esc(runtime.webAdmin?.sessionCount ?? system.sessionCount ?? '--'))}</div></article>
+                        <article class="wa-panel"><h2>功能开关（只读）</h2><div class="wa-setting-grid">${settingReadonlyToggle('启用 SignalBridge','信号系统由当前服务端模块提供',true)}${settingReadonlyToggle('启用事件记录','记录 signal/action 等已有历史',true)}${settingReadonlyToggle('启用审计日志','WebAdmin 写操作审计',!!audit.enabled)}${settingReadonlyToggle('启用 Web API','当前 WebAdmin API 正在服务',true)}${settingReadonlyToggle('启用自动修复','Doctor 自动修复未开放',false)}${settingReadonlyToggle('启用设置写入','系统设置写入未开放',false)}</div></article>
+                        <article class="wa-panel"><h2>运行环境信息（只读）</h2><div class="identity-grid">${row('认证方式',esc(security.authMode||'USERNAME_PASSWORD'))}${row('密码算法',esc(security.passwordHashAlgorithm||'PBKDF2'))}${row('Session Cookie',esc(security.sessionCookieName||'--'))}${row('Session 有效期',esc(formatMinutes(security.sessionTtlMinutes)))}${row('Remember Me 有效期',esc(formatMinutes(security.rememberMeTtlMinutes)))}${row('Secure Cookie',esc(security.secureCookie?'启用':'未启用'))}</div></article>
+                      </div>
+                      ${settingsRightRail(data,runtime,capabilities.ok?capabilities.data:{})}
+                    </section>
+                  </section>`,options);
+                }
+                function settingReadonlyToggle(label,desc,enabled){return `<div class="setting-row"><span><strong>${esc(label)}</strong><small>${esc(desc)}</small></span>${textPill(enabled?'启用':'禁用',enabled?'ok':'info')}</div>`;}
+                function settingsRightRail(data,status,capabilities){const storage=data.storage||{}, security=data.security||{}, service=data.service||{}, system=data.system||{};return `<aside class="wa-right-rail">
+                  <article class="wa-panel"><h2>系统状态</h2><div class="list-stack"><div class="kv-row"><span class="muted">平台状态</span><strong>${pill(service.running?'OK':'WARNING')}</strong></div><div class="kv-row"><span class="muted">在线连接</span><strong>${esc(status.webAdmin?.sessionCount ?? system.sessionCount ?? '--')}</strong></div><div class="kv-row"><span class="muted">审计日志</span><strong>${esc(security.auditEnabled?'启用':'关闭')}</strong></div></div></article>
+                  <article class="wa-panel"><h2>环境摘要</h2><div class="list-stack"><div class="kv-row"><span class="muted">存储作用域</span><strong>${esc(storage.scope||'WORLD_SAVE')}</strong></div><div class="kv-row"><span class="muted">按世界隔离</span><strong>${esc(storage.worldScoped?'是':'否')}</strong></div><div class="kv-row"><span class="muted">敏感路径</span><strong>${esc(storage.restricted?'已隐藏':'可见')}</strong></div><div class="kv-row"><span class="muted">旧全局文件</span><strong>${esc(storage.legacyGlobalFilesDetected?'检测到':'未检测到')}</strong></div></div></article>
+                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('查看系统日志','eye','disabled','ghost')}${waButton('查看审计日志','history','disabled','ghost')}${waButton('检查更新','refresh','disabled','ghost')}${waButton('导出诊断','download','disabled','ghost')}${waButton('重启 WebAdmin','critical-issue','disabled','danger')}</div><p class="wa-disabled-note">保存、重启、清理缓存和危险维护操作没有完整后端安全能力，本轮保持禁用。</p></article>
+                </aside>`;}
+                async function renderRegionsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载区域列表...'));
+                  let regions;try{regions=await api('/api/regions?limit=500')}catch(err){if(options.silent){toast('区域列表实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.regions=regions||[];
+                  renderRegionList('',options);
+                }
+                function renderRegionList(focusId,options={}){
+                  waEnsureState();
+                  const regions=appState.regions||[], worlds=uniqueNonBlank(regions.map(r=>r.world)), filtered=filterRegionsStep3(regions), page=waPageItems('regions',filtered,10);
+                  const enabled=regions.filter(r=>r.enabled).length, warnings=regions.filter(r=>['WARNING','ERROR'].includes(String(r.doctorStatus||'').toUpperCase())).length;
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('区域列表','查看已登记区域、坐标边界和当前只读运行状态；不是 RegionController 编辑器。',`${waButton('添加区域','plus','disabled','primary')}${waButton('导入区域配置','upload','disabled','ghost')}${waButton('导出区域配置','download','disabled','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('区域总数',regions.length,'来自 /api/regions','region')}
+                      ${waMetric('启用中',enabled,'enabled=true','enabled','ok')}
+                      ${waMetric('禁用中',regions.length-enabled,'enabled=false','receiver-disabled',regions.length-enabled?'warning':'')}
+                      ${waMetric('今日进入事件','--','当前 API 未提供','today-trigger')}
+                      ${waMetric('今日离开事件','--','当前 API 未提供','history')}
+                      ${waMetric('有问题区域',warnings,'Doctor 非 OK','warning-issue',warnings?'warning':'')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="region-search" placeholder="搜索区域名称 / ID / world / channel..." value="${esc(appState.regionFilters.search)}"></label>
+                          <label class="filter-field"><span>世界</span>${waSelect('region-world',['ALL',...worlds],appState.regionFilters.world,v=>v==='ALL'?'全部世界':v)}</label>
+                          <label class="filter-field"><span>状态</span>${waSelect('region-enabled',['ALL','ENABLED','DISABLED'],appState.regionFilters.enabled,regionOptionLabel)}</label>
+                          <label class="filter-field"><span>Doctor</span>${waSelect('region-doctor',['ALL','OK','INFO','WARNING','ERROR','UNKNOWN'],appState.regionFilters.doctor,regionOptionLabel)}</label>
+                          <label class="filter-field"><span>排序</span>${waSelect('region-sort',['NAME','WORLD','PLAYERS','RECENT'],appState.regionFilters.sort,regionOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderRegionsPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(regions.length?'没有匹配当前筛选条件的区域。':'当前暂无区域数据。'):regionTableStep3(page.items)}
+                        ${waPagination('regions',page)}
+                      </div>
+                      ${regionsRightRail(regions)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindRegionFiltersStep3(focusId);
+                }
+                function filterRegionsStep3(items){const f=appState.regionFilters;const filtered=(items||[]).filter(r=>{const hay=[r.id,r.name,r.world,r.boundChannel,r.targetFilter].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.world!=='ALL'&&r.world!==f.world)return false;if(f.enabled==='ENABLED'&&!r.enabled)return false;if(f.enabled==='DISABLED'&&r.enabled)return false;if(f.doctor!=='ALL'&&String(r.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.players==='HAS_PLAYERS'&&Number(r.playersInside||0)<=0)return false;if(f.players==='NO_PLAYERS'&&Number(r.playersInside||0)>0)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='WORLD')return String(a.world||'').localeCompare(String(b.world||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='PLAYERS')return Number(b.playersInside||0)-Number(a.playersInside||0);if(f.sort==='RECENT')return String(b.lastEventAt||'').localeCompare(String(a.lastEventAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
+                function bindRegionFiltersStep3(focusId){const update=(event)=>{appState.regionFilters.search=document.getElementById('region-search')?.value||'';appState.regionFilters.world=document.getElementById('region-world')?.value||'ALL';appState.regionFilters.enabled=document.getElementById('region-enabled')?.value||'ALL';appState.regionFilters.doctor=document.getElementById('region-doctor')?.value||'ALL';appState.regionFilters.sort=document.getElementById('region-sort')?.value||'NAME';appState.uiPages.regions=1;renderRegionList(event?.target?.id||'');};['region-search','region-world','region-enabled','region-doctor','region-sort'].forEach(id=>document.getElementById(id)?.addEventListener(id==='region-search'?'input':'change',update));restoreFocusEnd(focusId);}
+                function regionTableStep3(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>区域名称 / ID</th><th>类型</th><th>所在世界</th><th>坐标范围</th><th>大小</th><th>状态</th><th>描述</th><th>操作</th></tr></thead><tbody>${items.map(r=>{const target=regionHash(r.id), title=r.name||r.id, type=String(r.type||'').toUpperCase(), desc=r.description||(r.boundChannel?`绑定频道 ${r.boundChannel}`:`目标 ${labelTargetFilter(r.targetFilter)}`);return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看区域 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('region')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(r.id))}</span></span></span></td><td>${textPill(type==='POLYGON'?'polygon':(type==='CONTROLLER'?'controller':'region'),'info')}</td><td>${esc(r.world||'--')}</td><td class="truncate" title="${esc(boundsText(r.bounds))}">${esc(boundsText(r.bounds))}</td><td><span>${esc(boundsSize(r.bounds))}</span><span class="device-subtitle">体积 ${esc(boundsVolume(r.bounds))}</span></td><td>${textPill(labelEnabledState(r.enabled),r.enabled?'ok':'warning')} ${pill(r.doctorStatus||'UNKNOWN')}</td><td class="truncate" title="${esc(desc)}">${esc(desc)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看区域 ${title}`)}>查看</button>${waIconButton('更多不可用','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;}
+                function regionsRightRail(regions){const total=regions.length;return `<aside class="wa-right-rail">
+                  <article class="wa-panel"><h2>区域统计</h2><div class="summary-grid">${waMetric('总区域数',total,'','region')}${waMetric('启用中',regions.filter(r=>r.enabled).length,'','enabled','ok')}${waMetric('已禁用',regions.filter(r=>!r.enabled).length,'','receiver-disabled')}${waMetric('多边形区域','--','当前 API 未提供','virtual-block-device')}</div></article>
+                  <article class="wa-panel"><h2>Doctor 分布</h2>${progressList(distributionItems(regions,r=>String(r.doctorStatus||'UNKNOWN').toUpperCase(),labelStatus,Math.max(1,total)))}</article>
+                  <article class="wa-panel"><h2>快速筛选</h2><div class="wa-rail-filter"><label><span>状态</span>${waSelect('region-rail-enabled',['ALL','ENABLED','DISABLED'],appState.regionFilters.enabled,regionOptionLabel)}</label><button class="wa-btn primary" onclick="appState.regionFilters.enabled=document.getElementById('region-rail-enabled').value;appState.uiPages.regions=1;renderRegionList()">应用筛选</button><button class="wa-btn ghost" onclick="appState.regionFilters={search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};appState.uiPages.regions=1;renderRegionList()">重置筛选</button></div></article>
+                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('定位区域','eye','disabled','ghost')}${waButton('编辑区域','pencil','disabled','ghost')}${waButton('导出区域配置','download','disabled','ghost')}${waButton('清空禁用区域缓存','critical-issue','disabled','danger')}</div><p class="wa-disabled-note">区域增删改、定位和导入导出没有 WebAdmin 写 API，本轮保持禁用。</p></article>
+                </aside>`;}
+                async function renderRegionControllersPage(options={}){
+                  if(!options.silent)setView(loading('正在加载区域控制器...'));
+                  let controllers;try{controllers=await api('/api/regions?limit=500')}catch(err){if(options.silent){toast('区域控制器实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.regionControllers=(controllers||[]).filter(c=>Number(c.controllerCount||0)>0||!isBlank(c.controllerId));
+                  renderRegionControllerList('',options);
+                }
+                function renderRegionControllerList(focusId,options={}){
+                  waEnsureState();
+                  const items=appState.regionControllers||[], filtered=filterRegionControllers(items), page=waPageItems('regionControllers',filtered,10), enabled=items.filter(c=>c.enabled).length, actionTotal=sumRegionControllerActions(items);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('区域控制器','查看 RegionController enter / exit / stay 触发配置；不实现 ConditionEngine 或动作链编辑。',`${waButton('添加控制器','plus','disabled','primary')}${waButton('导入配置','upload','disabled','ghost')}${waButton('导出配置','download','disabled','danger')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('总控制器数',items.length,'来自 /api/regions','region-controller')}
+                      ${waMetric('启用中',enabled,'enabled=true','enabled','ok')}
+                      ${waMetric('已禁用',items.length-enabled,'enabled=false','receiver-disabled',items.length-enabled?'warning':'')}
+                      ${waMetric('关联区域数',uniqueNonBlank(items.map(c=>c.id)).length,'controller id','region')}
+                      ${waMetric('今日触发次数','--','当前 API 未提供','today-trigger')}
+                      ${waMetric('动作执行次数',actionTotal,'enter / exit / stay','action-total')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="region-controller-search" placeholder="搜索控制器 / 区域 / 目标过滤..." value="${esc(appState.regionControllerFilters.search)}"></label>
+                          <label class="filter-field"><span>状态</span>${waSelect('region-controller-enabled',['ALL','ENABLED','DISABLED'],appState.regionControllerFilters.enabled,regionOptionLabel)}</label>
+                          <label class="filter-field"><span>目标</span>${waSelect('region-controller-target',['ALL','OP','TAG','TEAM','UNKNOWN'],appState.regionControllerFilters.target,regionTargetOptionLabel)}</label>
+                          <label class="filter-field"><span>事件</span>${waSelect('region-controller-event',['ALL','ENTER','EXIT','STAY'],appState.regionControllerFilters.event,regionEventOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderRegionControllersPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(items.length?'没有匹配当前筛选条件的控制器。':'当前暂无 RegionController 数据。'):regionControllerTable(page.items)}
+                        ${waPagination('regionControllers',page)}
+                      </div>
+                      ${regionControllerRightRail(items)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindRegionControllerFilters(focusId);
+                }
+                function filterRegionControllers(items){const f=appState.regionControllerFilters;return (items||[]).filter(c=>{const hay=[c.id,c.name,c.world,c.targetFilter,c.boundChannel].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.enabled==='ENABLED'&&!c.enabled)return false;if(f.enabled==='DISABLED'&&c.enabled)return false;if(f.target!=='ALL'&&String(c.targetFilter||'UNKNOWN').toUpperCase()!==f.target)return false;if(f.event==='ENTER'&&Number(c.enterActionCount||0)<=0)return false;if(f.event==='EXIT'&&Number(c.exitActionCount||0)<=0)return false;if(f.event==='STAY'&&Number(c.stayActionCount||0)<=0)return false;return true;});}
+                function bindRegionControllerFilters(focusId){const update=(event)=>{appState.regionControllerFilters.search=document.getElementById('region-controller-search')?.value||'';appState.regionControllerFilters.enabled=document.getElementById('region-controller-enabled')?.value||'ALL';appState.regionControllerFilters.target=document.getElementById('region-controller-target')?.value||'ALL';appState.regionControllerFilters.event=document.getElementById('region-controller-event')?.value||'ALL';appState.uiPages.regionControllers=1;renderRegionControllerList(event?.target?.id||'');};['region-controller-search','region-controller-enabled','region-controller-target','region-controller-event'].forEach(id=>document.getElementById(id)?.addEventListener(id==='region-controller-search'?'input':'change',update));restoreFocusEnd(focusId);}
+                function regionControllerTable(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>名称 / ID</th><th>关联区域</th><th>目标过滤</th><th>状态</th><th>事件配置</th><th>动作数</th><th>今日触发</th><th>操作</th></tr></thead><tbody>${items.map(c=>{const target=regionHash(c.id), total=regionControllerActionCount(c);return `<tr><td><span class="device-name"><span class="device-icon">${icon('region-controller')}</span><span><strong>${esc(c.name||c.id)}</strong><span class="device-subtitle">ID: ${esc(shortId(c.id))}</span></span></span></td><td>${regionButton(c.id,c.name||c.id)}<span class="device-subtitle">${esc(c.world||'world 未提供')}</span></td><td>${textPill(labelTargetFilter(c.targetFilter),'info')}</td><td>${textPill(labelEnabledState(c.enabled),c.enabled?'ok':'warning')} ${pill(c.doctorStatus||'UNKNOWN')}</td><td>${controllerEventChips(c)}</td><td>${esc(total)}</td><td>--</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看关联区域 ${c.name||c.id}`)}>查看区域</button><button class="wa-btn ghost" disabled>编辑</button>${waIconButton('更多不可用','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;}
+                function controllerEventChips(c){return `<span class="pill info">进 ${esc(c.enterActionCount||0)}</span> <span class="pill ok">出 ${esc(c.exitActionCount||0)}</span> <span class="pill warning">停 ${esc(c.stayActionCount||0)}</span>`;}
+                function regionControllerActionCount(c){return Number(c.enterActionCount||0)+Number(c.exitActionCount||0)+Number(c.stayActionCount||0);}
+                function sumRegionControllerActions(items){return (items||[]).reduce((sum,item)=>sum+regionControllerActionCount(item),0);}
+                function regionControllerRightRail(items){const total=items.length;return `<aside class="wa-right-rail">
+                  <article class="wa-panel"><h2>事件类型说明</h2><div class="list-stack"><div class="kv-row"><span class="muted">enter / 进</span><strong>玩家进入区域触发</strong></div><div class="kv-row"><span class="muted">exit / 出</span><strong>玩家离开区域触发</strong></div><div class="kv-row"><span class="muted">stay / 停</span><strong>玩家停留间隔触发</strong></div></div></article>
+                  <article class="wa-panel"><h2>触发目标说明</h2><div class="list-stack"><div class="kv-row"><span class="muted">all</span><strong>所有玩家</strong></div><div class="kv-row"><span class="muted">op</span><strong>服务器管理员</strong></div><div class="kv-row"><span class="muted">tag/team</span><strong>标签或队伍过滤</strong></div></div></article>
+                  <article class="wa-panel"><h2>事件配置分布</h2>${progressList([{label:'配置 enter',value:items.filter(c=>Number(c.enterActionCount||0)>0).length,total:Math.max(1,total),kind:'info'},{label:'配置 exit',value:items.filter(c=>Number(c.exitActionCount||0)>0).length,total:Math.max(1,total),kind:'ok'},{label:'配置 stay',value:items.filter(c=>Number(c.stayActionCount||0)>0).length,total:Math.max(1,total),kind:'warning'}])}</article>
+                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('批量启用','enabled','disabled','ghost')}${waButton('批量禁用','receiver-disabled','disabled','ghost')}${waButton('测试 enter','play','disabled','ghost')}${waButton('测试 exit','logout','disabled','ghost')}${waButton('清空今日统计','critical-issue','disabled','danger')}</div><p class="wa-disabled-note">RegionController 新增、编辑、测试和清空统计没有 WebAdmin 写 API，本轮保持禁用。</p></article>
+                </aside>`;}
+                function regionTargetOptionLabel(value){return {ALL:'全部目标',OP:'管理员',TAG:'标签过滤',TEAM:'队伍过滤',UNKNOWN:'未知'}[String(value||'')]||value;}
+                function regionEventOptionLabel(value){return {ALL:'全部事件',ENTER:'进入 enter',EXIT:'离开 exit',STAY:'停留 stay'}[String(value||'')]||value;}
                 function progressList(items){
                   if(!items||items.length===0)return empty('暂无数据。');
                   return `<div class="wa-progress-list">${items.map(item=>{const total=Math.max(1,Number(item.total||item.value||0)), pct=Math.min(100,Math.round(Number(item.value||0)*100/total));return `<div class="wa-progress-item"><div><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong></div><div class="wa-progress-track"><div class="wa-progress-bar ${esc(item.kind||'')}" style="width:${pct}%"></div></div></div>`;}).join('')}</div>`;
