@@ -2,6 +2,8 @@ package com.zcpu.tzzmod.signal;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +52,11 @@ public final class SignalListenerStore {
         ).normalized();
         state.listeners.add(listener);
         state.markDirty();
+        WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                listener,
+                "Signal Listener 已创建：" + displayName(listener)
+        );
         return listener;
     }
 
@@ -62,12 +69,17 @@ public final class SignalListenerStore {
         boolean removed = state.listeners.removeIf(listener -> listener.id().equals(resolved.listener().id()));
         if (removed) {
             state.markDirty();
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                    resolved.listener(),
+                    "Signal Listener 已删除：" + displayName(resolved.listener())
+            );
         }
         return removed;
     }
 
     public static synchronized boolean setEnabled(MinecraftServer server, String listenerRef, boolean enabled) {
-        return replace(server, listenerRef, listener -> new SignalListenerData(
+        SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
                 listener.id(),
                 listener.name(),
                 listener.channel(),
@@ -75,10 +87,18 @@ public final class SignalListenerStore {
                 listener.cooldownTicks(),
                 listener.actions()
         ).normalized());
+        if (updated != null) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_ENABLED_CHANGED,
+                    updated,
+                    "Signal Listener 启用状态已变化：" + displayName(updated)
+            );
+        }
+        return updated != null;
     }
 
     public static synchronized boolean setCooldown(MinecraftServer server, String listenerRef, int ticks) {
-        return replace(server, listenerRef, listener -> new SignalListenerData(
+        SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
                 listener.id(),
                 listener.name(),
                 listener.channel(),
@@ -86,6 +106,14 @@ public final class SignalListenerStore {
                 ticks,
                 listener.actions()
         ).normalized());
+        if (updated != null) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                    updated,
+                    "Signal Listener 冷却时间已变化：" + displayName(updated)
+            );
+        }
+        return updated != null;
     }
 
     public static synchronized SignalListenerData updateBasicConfigForWebAdmin(
@@ -121,7 +149,7 @@ public final class SignalListenerStore {
         if (action == null) {
             return false;
         }
-        return replace(server, listenerRef, listener -> new SignalListenerData(
+        SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
                 listener.id(),
                 listener.name(),
                 listener.channel(),
@@ -129,10 +157,18 @@ public final class SignalListenerStore {
                 listener.cooldownTicks(),
                 appendAction(listener.actions(), action)
         ).normalized());
+        if (updated != null) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_ACTION_CHANGED,
+                    updated,
+                    "Signal Listener 动作已变化：" + displayName(updated)
+            );
+        }
+        return updated != null;
     }
 
     public static synchronized boolean clearActions(MinecraftServer server, String listenerRef) {
-        return replace(server, listenerRef, listener -> new SignalListenerData(
+        SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
                 listener.id(),
                 listener.name(),
                 listener.channel(),
@@ -140,6 +176,14 @@ public final class SignalListenerStore {
                 listener.cooldownTicks(),
                 List.of()
         ).normalized());
+        if (updated != null) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_ACTION_CHANGED,
+                    updated,
+                    "Signal Listener 动作已清空：" + displayName(updated)
+            );
+        }
+        return updated != null;
     }
 
     public static synchronized void flushDirty(MinecraftServer server) {
@@ -254,6 +298,13 @@ public final class SignalListenerStore {
             }
         }
         return value;
+    }
+
+    private static String displayName(SignalListenerData listener) {
+        if (listener == null) {
+            return "unknown";
+        }
+        return listener.name() == null || listener.name().isBlank() ? shortId(listener.id()) : listener.name();
     }
 
     public static final class DataFile {

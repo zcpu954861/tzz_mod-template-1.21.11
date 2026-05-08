@@ -10,15 +10,17 @@
 
 当前阶段是：
 
-**7.5 WebAdmin Frontend Refactor Foundation / Step 1**
+**7.5 WebAdmin Frontend Refactor / Step 2.5 Realtime Auto Sync Integration**
 
-当前目标是建立 WebAdmin 前端基础层，并先落地 3 个代表页面：
+Step 1 已完成并通过浏览器验收。当前 Step 2 目标是在不重写基础层的前提下，复用 Step 1 的 shell、tokens、表格、筛选、分页、right rail、图标和 silent refresh，扩展第一批剩余主页面。
+
+Step 1 已落地 3 个代表页面：
 
 1. Dashboard / 总览页
 2. SignalBridge
 3. Receivers / 接收器
 
-这 3 页用于验证：
+这 3 页用于验证并沉淀：
 
 - 新登录页
 - 新 sidebar / topbar shell
@@ -34,21 +36,48 @@
 - disabled 未实现功能边界
 - non-disruptive silent refresh
 
-当前不是 18 页全量前端落地阶段。
+Step 2 第一批范围已落地：
+
+1. 信号监听器页面
+2. 动作列表
+3. 信号设备
+4. 虚拟方块设备
+5. 事件历史
+
+Step 2.5 范围：
+
+- 将当前已落地页面的数据刷新机制从页面级 5 / 8 / 10 / 15 秒高频 polling，调整为 SSE 服务器事件驱动 + route dirty + silent refresh。
+- 现有 `/api/realtime/events` 不新增 API；事件增加 `seq`，SSE 支持 `Last-Event-ID` / `lastEventId` 补发 recent buffer。
+- recent buffer 缺失时发送 `sync_required`，前端执行当前 route full silent sync，不整页 reload。
+- 前端处理 seq gap、reconnect sync、document hidden -> visible sync、offline -> online sync。
+- 当前覆盖 Dashboard、SignalBridge、Receivers、信号监听器、动作列表、信号设备、虚拟方块设备、事件历史，以及已存在的 doctor / users / settings / regions 路由映射。
+
+当前仍不是 18 页全量前端落地阶段。
 
 ## 当前最新同步
 
-截至本阶段修复，Step 1 前端落地继续保持只改 Java 内嵌前端资源，不新增后端 API：
+截至本阶段修复，前端落地继续保持只改 Java 内嵌前端资源，不新增后端 API：
 
-- CSS / JS 资源版本参数已推进到 `7.5-step1-flat-geometry-icons`，用于避免浏览器继续拿旧资源。
+- CSS / JS 资源版本参数已推进到 `7.5-step2.5-realtime-sync`，用于避免浏览器继续拿旧资源。
 - Dashboard 概览卡已按统一 `data-nav-route` 导航模式支持整卡点击、hover、键盘 Enter / Space。
 - SignalBridge 表格行已按统一 `data-nav-route` 导航模式支持整行点击到频道详情，详情按钮仍保留。
 - 接收器表格行在已有设备详情路由可用时也使用同一行导航模式，不新增接收器详情页。
 - Dashboard、SignalBridge、Receivers 和 shell 当前可见 WebAdmin 自定义图标已切换为 7.5 纯色几何 inline SVG registry，参考 Figma / 截图里的 2D 平面线性图标风格，不再使用上一轮复杂 image2 PNG、旧 SVG glyph、旧图标染色或 atlas。
 - 当前 WebAdmin HTTP 服务仍只直接服务 `/assets/app.css` 和 `/assets/app.js`；自定义 WebAdmin 图标由 JS 内嵌 SVG registry 渲染，不新增后端图片 API，也不再读取独立图标图片资源。
 - Receivers 页面不新增后端 API，已从现有设备详情 API 的 `configSummary.pulseTicks` 接入接收器脉冲时长；详情缓存用于补齐 `/api/devices` 列表缺失字段。
-- Dashboard / SignalBridge / Receivers 使用已有 SSE 事件 + 受控 `setTimeout` polling fallback 做 route-level silent refresh；接收器页轮询约 5 秒，SignalBridge 约 10 秒，Dashboard 约 15 秒，接收器 silent refresh 会刷新当前可见行的详情缓存和 pulseTicks。
-- 新增浏览器验收文档 `测试_7.5_WebAdmin前端重构第一阶段浏览器验收.md`，记录新世界 WebAdmin 用户、接收器、channel、pulseTicks 和触发测试命令。
+- Dashboard / SignalBridge / Receivers / Step 2 第一批页面不再依赖 5 / 8 / 10 / 15 秒高频 polling 追实时；统一通过 SSE 事件映射 route dirty，当前受影响 route 执行 non-disruptive silent refresh。接收器 silent refresh 仍会刷新当前可见行的详情缓存和 pulseTicks。
+- Realtime 后端当前已接入 `seq`、recent buffer replay、`sync_required`，并在 Signal history append、device / receiver / virtual block device store 变化、Signal Listener store 变化、Action execution audit、Region controller store / runtime event 变化、WebAdmin 写服务已有审计与配置事件处发布事件。
+- 已定义但不一定已有实际 publish 点的预留事件包括部分 `doctor_issues_changed`、`webadmin_settings_changed`、`webadmin_user_changed`、`action_changed`、`region_changed` 等；不要因为预留事件类型而新增业务功能。
+- Step 2 第一批新增 / 更新 `docs/test/测试_7.5_WebAdmin前端重构第二阶段第一批页面验收.md`，记录 5 个页面、现有命令、disabled 写操作、silent refresh、row click 和响应式验收。
+
+Step 2 第一批实现边界：
+
+- 信号监听器页面不新增 listener 详情页；列表数据从现有 `/api/signals/channels` 与 `/api/signals/channels/<channel>` 聚合。
+- 动作列表复用现有 `/api/actions` 与已有 `#/actions/<id>` 详情 route。
+- 信号设备复用现有 `/api/devices` 与已有 `#/devices/<id>` 详情 route。
+- 虚拟方块设备复用 `/api/devices` 过滤 `virtual_block_device`，可见行用已有 `/api/devices/<id>` 详情缓存补齐配置摘要；不使用 WebAdmin 图标伪造 Minecraft 原版材质。
+- 事件历史复用 `/api/signals/history?limit=500`；无 history 详情页时不启用整行跳坏路由。
+- 新增页面继续使用 route-level silent refresh：监听器和历史约 10 秒，动作约 15 秒，设备 / 虚拟方块设备约 8 秒。
 
 ## 当前主要修改文件
 
@@ -70,13 +99,14 @@
 
 ## 当前已完成方向
 
-当前 7.5 Step 1 已开始落地：
+当前 7.5 Step 2 第一批已开始落地：
 
 - 登录页正在迁移为 7.5 暗色品牌登录页。
 - 登录后 app shell 正在迁移为 7.5 sidebar / topbar。
-- Dashboard 已有 2 x 3 概览卡方向。
-- SignalBridge 已有全宽表格方向。
-- Receivers 已有 table + right rail 方向。
+- Dashboard 已有 2 x 3 概览卡方向，并作为 Step 1 基线保持不回退。
+- SignalBridge 已有全宽表格方向，并作为 Step 1 基线保持不回退。
+- Receivers 已有 table + right rail 方向，并作为 Step 1 基线保持不回退。
+- Step 2 第一批页面方向：信号监听器全宽列表，动作列表 / 信号设备 / 虚拟方块设备 / 事件历史使用 table + right rail 或全宽表格。
 - 当前可见 WebAdmin 自定义 UI 图标已转向 2D 平面、纯色、简单几何线条的 inline SVG registry；Minecraft 原版方块 / 物品仍使用原版材质资源。
 - 无后端支持的写入类按钮应保持 disabled / unavailable。
 - CSS/JS 资源需要使用版本参数或其它 cache-busting，避免浏览器继续加载旧资源。
@@ -148,12 +178,12 @@
 - 禁止重置滚动位置。
 - 禁止重置筛选 / 分页 / 输入状态。
 - 禁止关闭 modal。
-- 可以优先接已有 SSE。
-- 如果现有 SSE 事件不覆盖设备变化，可以使用 polling fallback。
+- 优先由 SSE realtime event 驱动 route dirty 和 silent refresh。
+- 不再用页面级 5 秒 polling 作为主刷新机制；设备变化应通过后端 publish realtime event 覆盖。
 - 如果 `/api/devices` 列表缺少接收器扩展字段，允许复用已有设备详情 API，只刷新当前页面可见接收器行并缓存结果。
 - pulseTicks 应参与静默刷新，用户把 signal_receiver 从默认 5 tick 改为 20 tick 后，列表应在 silent refresh 后显示真实值。
 - 不新增后端 API。
-- 全局 `setInterval` 可能被稳定化守卫禁止，优先使用已有 realtime 机制或受控 `setTimeout` / dirty flag。
+- 全局 `setInterval` 可能被稳定化守卫禁止；当前使用 SSE / dirty flag / reconnect-visible-online 补同步。
 
 ### 6. 测试文档缺数据准备命令
 

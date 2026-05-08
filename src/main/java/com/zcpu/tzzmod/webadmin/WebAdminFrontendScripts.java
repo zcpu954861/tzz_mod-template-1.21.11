@@ -126,7 +126,7 @@ public final class WebAdminFrontendScripts {
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
                 const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
-                appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{}};
+                appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
                 function iconKey(name){
@@ -309,7 +309,7 @@ public final class WebAdminFrontendScripts {
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
                 function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/receivers','#/signals','#/signalbridge','#/doctor','#/history','#/users','#/settings','#/regions','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/history','#/events','#/users','#/settings','#/regions','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
                 function navigateTo(targetHash){location.hash=withReturnContext(targetHash);}
                 function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), id=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
@@ -339,6 +339,7 @@ public final class WebAdminFrontendScripts {
                   const view=appView(), active=document.activeElement;
                   return {
                     scrollTop:view?view.scrollTop:0,
+                    scrollLeft:view?view.scrollLeft:0,
                     activeId:active&&active.id?active.id:'',
                     selectionStart:active&&typeof active.selectionStart==='number'?active.selectionStart:null,
                     selectionEnd:active&&typeof active.selectionEnd==='number'?active.selectionEnd:null,
@@ -352,6 +353,7 @@ public final class WebAdminFrontendScripts {
                     const view=appView();if(!view)return;
                     [...view.querySelectorAll('details')].forEach((d,i)=>{const key=detailPersistKey(d,i), saved=(state.details||[]).find(item=>item.key===key);if(saved)d.open=!!saved.open;});
                     view.scrollTop=state.scrollTop||0;
+                    view.scrollLeft=state.scrollLeft||0;
                     if(state.activeId){const active=document.getElementById(state.activeId);if(active){active.focus({preventScroll:true});if(typeof active.setSelectionRange==='function'&&state.selectionStart!==null)active.setSelectionRange(state.selectionStart,state.selectionEnd ?? state.selectionStart);}}
                   });
                 }
@@ -365,6 +367,7 @@ public final class WebAdminFrontendScripts {
                   const view=appView();if(!view)return false;
                   const snapshot=options.silent?captureViewState():null;
                   view.innerHTML=text;
+                  if(!options.silent)delete appState.realtime.dirtyRoutes[realtimeRouteKey(currentRouteHash())];
                   if(snapshot)restoreViewState(snapshot);
                   return true;
                 }
@@ -436,16 +439,19 @@ public final class WebAdminFrontendScripts {
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
                   maybeReleaseChannelMetadataEditForRoute(hash);
                   maybeReleaseSignalListenerBasicConfigEditForRoute(hash);
-                  document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', btn.dataset.route && (hash.startsWith(btn.dataset.route)||(btn.dataset.route==='#/signals'&&hash.startsWith('#/signalbridge')))));
-                  startRouteSilentPolling(hash);
+                  document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', isRouteActive(btn.dataset.route,hash)));
+                  enterRealtimeRoute(hash);
                   if(hash==='#/dashboard') return renderDashboard(options);
                   if(hash==='#/devices') return renderDevices(options);
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length),options);
+                  if(hash==='#/virtual-block-devices'||hash==='#/block-devices') return renderVirtualBlockDevices(options);
+                  if(hash==='#/listeners'||hash==='#/signal-listeners') return renderListeners(options);
                   if(hash==='#/receivers') return renderReceivers(options);
                   if(hash==='#/signals'||hash==='#/signalbridge') return renderSignals(options);
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length),options);
                   if(hash==='#/doctor') return renderDoctorPage(options);
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
+                  if(hash.startsWith('#/events')) return renderHistoryPage(hash.substring('#/events'.length),options);
                   if(hash==='#/users') return renderUsersPage(options);
                   if(hash==='#/settings') return renderSettingsPage(options);
                   if(hash==='#/regions') return renderRegionsPage(options);
@@ -454,7 +460,21 @@ public final class WebAdminFrontendScripts {
                   if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length),options);
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
+                function isRouteActive(route,hash){
+                  const r=String(route||''), h=String(hash||'#/dashboard');
+                  if(!r)return false;
+                  if(r==='#/signals')return h==='#/signals'||h==='#/signalbridge'||h.startsWith('#/signals/');
+                  if(r==='#/listeners')return h==='#/listeners'||h==='#/signal-listeners';
+                  if(r==='#/history')return h.startsWith('#/history')||h.startsWith('#/events');
+                  if(r==='#/devices')return h==='#/devices'||h.startsWith('#/devices/');
+                  if(r==='#/virtual-block-devices')return h==='#/virtual-block-devices'||h==='#/block-devices';
+                  if(r==='#/actions')return h==='#/actions'||h.startsWith('#/actions/');
+                  if(r==='#/regions')return h==='#/regions'||h.startsWith('#/regions/');
+                  return h===r||h.startsWith(r+'/')||h.startsWith(r+'?');
+                }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
+                const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
+                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','devices','virtualBlockDevices','history','doctor','regions','users','settings'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
                   if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
@@ -467,21 +487,31 @@ public final class WebAdminFrontendScripts {
                   state.textContent=`实时同步：${label}`;
                   if(last)last.textContent=`最后事件：${formatRelativeTime(appState.realtime.lastEventAt)}`;
                 }
-                function connectRealtime(){
+                function connectRealtime(force=false){
                   if(document.body.dataset.page!=='app')return;
+                  if(appState.realtime.offline){setRealtimeStatus('DISCONNECTED');return;}
+                  if(force&&appState.realtime.source){appState.realtime.source.close();appState.realtime.source=null;}
                   if(appState.realtime.source)return;
                   if(typeof EventSource==='undefined'){setRealtimeStatus('UNAVAILABLE');return;}
                   clearTimeout(appState.realtime.reconnectTimer);
                   setRealtimeStatus(appState.realtime.reconnectAttempt>0?'RECONNECTING':'RECONNECTING');
-                  const source=new EventSource('/api/realtime/events');
+                  const lastSeq=Math.max(0,Number(appState.realtime.lastSeenSeq||0));
+                  const url=lastSeq>0?`/api/realtime/events?lastEventId=${encodeURIComponent(String(lastSeq))}`:'/api/realtime/events';
+                  const source=new EventSource(url);
                   appState.realtime.source=source;
-                  source.onopen=()=>{appState.realtime.reconnectAttempt=0;setRealtimeStatus('CONNECTED');};
-                  source.onerror=()=>{if(appState.realtime.source===source){source.close();appState.realtime.source=null;scheduleRealtimeReconnect();}};
-                  ['realtime_connected','heartbeat','signal_emitted','history_appended','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','device_config_changed','channel_metadata_changed','signal_listener_config_changed','edit_lock_changed','write_audit_appended','webadmin_user_connected','webadmin_user_disconnected'].forEach(type=>{
+                  source.onopen=()=>{
+                    const shouldSync=appState.realtime.wasDisconnected||appState.realtime.missed;
+                    appState.realtime.reconnectAttempt=0;
+                    setRealtimeStatus('CONNECTED');
+                    if(shouldSync){appState.realtime.wasDisconnected=false;markRealtimeDirty(currentRouteHash(),{type:'reconnect'});flushVisibleRealtimeRefresh('reconnect');}
+                  };
+                  source.onerror=()=>{if(appState.realtime.source===source){source.close();appState.realtime.source=null;appState.realtime.wasDisconnected=true;scheduleRealtimeReconnect();}};
+                  source.addEventListener('message',event=>handleRealtimeEvent('message',event));
+                  REALTIME_EVENT_TYPES.forEach(type=>{
                     source.addEventListener(type,event=>handleRealtimeEvent(type,event));
                   });
                 }
-                function closeRealtime(){
+                function closeRealtime(status='DISCONNECTED'){
                   clearTimeout(appState.realtime.reconnectTimer);
                   appState.realtime.reconnectTimer=null;
                   if(appState.realtime.source){appState.realtime.source.close();appState.realtime.source=null;}
@@ -490,6 +520,7 @@ public final class WebAdminFrontendScripts {
                 }
                 function scheduleRealtimeReconnect(){
                   if(document.body.dataset.page!=='app')return;
+                  if(appState.realtime.offline)return;
                   if(appState.realtime.reconnectTimer)return;
                   appState.realtime.reconnectAttempt=Math.min(appState.realtime.reconnectAttempt+1,6);
                   const delay=Math.min(30000,1000*Math.pow(2,appState.realtime.reconnectAttempt-1));
@@ -500,37 +531,90 @@ public final class WebAdminFrontendScripts {
                   let data={type};
                   try{data=JSON.parse(event.data||'{}');}catch(_){data={type};}
                   data.type=data.type||type;
+                  const gap=recordRealtimeSeq(data,event);
                   setRealtimeStatus('CONNECTED',data.occurredAt);
+                  if(data.type==='sync_required'||gap){
+                    appState.realtime.missed=true;
+                    markAllRealtimeDirty(data);
+                    markRealtimeDirty(currentRouteHash(),data);
+                    flushVisibleRealtimeRefresh(data.type==='sync_required'?'sync_required':'seq_gap');
+                    return;
+                  }
                   if(data.type==='heartbeat'||data.type==='realtime_connected')return;
+                  markRealtimeRoutesForEvent(data);
                   const hash=currentRouteHash();
                   if(shouldHandleRealtimeEvent(hash,data)){
-                    if(document.hidden){markRealtimeDirty(hash,data);return;}
+                    if(document.hidden||appState.realtime.offline){markRealtimeDirty(hash,data);return;}
                     scheduleRealtimeRefresh(hash,data);
                   }
                 }
+                function recordRealtimeSeq(data,event){
+                  const seq=Number(data?.seq||event?.lastEventId||data?.id||0);
+                  if(!Number.isFinite(seq)||seq<=0)return false;
+                  const last=Number(appState.realtime.lastSeenSeq||0);
+                  const control=['heartbeat','realtime_connected'].includes(String(data?.type||''));
+                  const gap=last>0&&seq>last+1&&!control;
+                  if(seq>last){
+                    appState.realtime.lastSeenSeq=seq;
+                    appState.realtime.lastEventId=String(seq);
+                  }
+                  return gap;
+                }
                 function shouldHandleRealtimeEvent(hash,event){
-                  const type=String(event.type||''), h=String(hash||'#/dashboard');
-                  if(h==='#/dashboard')return ['signal_emitted','history_appended','doctor_changed','device_updated','device_config_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','webadmin_user_connected','webadmin_user_disconnected'].includes(type);
-                  if(h.startsWith('#/history'))return ['signal_emitted','history_appended'].includes(type);
-                  if(h==='#/signals'||h==='#/signalbridge')return ['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed','edit_lock_changed'].includes(type);
-                  if(h.startsWith('#/signals/'))return (['signal_emitted','history_appended','doctor_changed','channel_metadata_changed','signal_listener_config_changed','config_changed'].includes(type)&&event.channel===routeDetailId(h,'#/signals/'))||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
-                  if(h==='#/devices'||h==='#/receivers')return ['device_updated','device_config_changed','config_changed','history_appended','receiver_pulse'].includes(type);
-                  if(h.startsWith('#/devices/'))return event.deviceId&&event.deviceId===routeDetailId(h,'#/devices/');
-                  if(h==='#/doctor')return ['doctor_changed','device_updated','signal_emitted','history_appended'].includes(type);
-                  if(h==='#/regions')return type==='region_event';
-                  if(h.startsWith('#/regions/'))return type==='region_event'&&event.regionId===routeDetailId(h,'#/regions/');
-                  if(h==='#/actions')return type==='action_executed';
-                  if(h.startsWith('#/actions/'))return type==='action_executed'&&event.actionId===routeDetailId(h,'#/actions/');
-                  if(h==='#/users'||h==='#/settings')return ['webadmin_user_connected','webadmin_user_disconnected','config_changed'].includes(type);
+                  const key=realtimeRouteKey(hash);
+                  if(realtimeRouteKeysForEvent(event).has(key))return true;
+                  const type=String(event.type||'');
+                  if(String(hash||'').startsWith('#/signals/'))return event.channel===routeDetailId(hash,'#/signals/')||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
+                  if(String(hash||'').startsWith('#/devices/'))return !!event.deviceId&&event.deviceId===routeDetailId(hash,'#/devices/');
+                  if(String(hash||'').startsWith('#/regions/'))return !!event.regionId&&event.regionId===routeDetailId(hash,'#/regions/');
+                  if(String(hash||'').startsWith('#/actions/'))return !!event.actionId&&event.actionId===routeDetailId(hash,'#/actions/');
                   return false;
+                }
+                function markRealtimeRoutesForEvent(event){
+                  const keys=realtimeRouteKeysForEvent(event);
+                  keys.forEach(key=>markRealtimeRouteKeyDirty(key,event));
+                }
+                function realtimeRouteKeysForEvent(event){
+                  const type=String(event?.type||''), keys=new Set();
+                  const add=(...items)=>items.filter(Boolean).forEach(item=>keys.add(item));
+                  const starts=(...prefixes)=>prefixes.some(prefix=>type.startsWith(prefix));
+                  const isAny=(...items)=>items.includes(type);
+                  if(isAny('config_changed'))add(...REALTIME_KNOWN_ROUTE_KEYS);
+                  if(starts('device_')||starts('receiver_')||starts('virtual_block_device_')||isAny('device_updated','receiver_pulse','device_config_changed')){
+                    add('dashboard','devices','receivers','virtualBlockDevices','doctor');
+                    if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);
+                  }
+                  if(starts('signal_')||isAny('signal_emitted','history_appended','signal_history_appended','channel_metadata_changed','signal_listener_config_changed','signal_config_changed')){
+                    add('dashboard','signals','listeners','history','doctor');
+                    if(event?.channel)add(`signalDetail:${event.channel}`);
+                  }
+                  if(starts('action_')||isAny('action_executed','action_config_changed')){
+                    add('dashboard','actions','history');
+                    if(event?.actionId)add(`actionDetail:${event.actionId}`);
+                  }
+                  if(starts('region_')||isAny('region_event','region_config_changed')){
+                    add('dashboard','regions','history');
+                    if(event?.regionId)add(`regionDetail:${event.regionId}`);
+                  }
+                  if(starts('doctor_')||isAny('doctor_changed'))add('dashboard','doctor');
+                  if(starts('webadmin_user_')||isAny('webadmin_user_connected','webadmin_user_disconnected','user_changed'))add('dashboard','users');
+                  if(starts('webadmin_audit_')||isAny('write_audit_appended'))add('dashboard','history','settings');
+                  if(starts('webadmin_settings_')||isAny('system_settings_changed'))add('settings','dashboard');
+                  if(type==='edit_lock_changed'){
+                    const target=String(event?.payload?.targetType||'');
+                    if(target.includes('device'))add('devices');
+                    if(target.includes('channel'))add('signals');
+                    if(target.includes('listener'))add('listeners','signals');
+                  }
+                  return keys;
                 }
                 function routeDetailId(hash,prefix){const raw=String(hash||'').substring(prefix.length), q=raw.indexOf('?'), value=q>=0?raw.substring(0,q):raw;try{return decodeURIComponent(value)}catch(_){return value;}}
                 function scheduleRealtimeRefresh(hash,event){
                   const key=realtimeRouteKey(hash);
-                  if(document.hidden){markRealtimeDirty(hash,event);return;}
+                  if(document.hidden||appState.realtime.offline){markRealtimeDirty(hash,event);return;}
                   if(appState.realtime.pendingRefresh[key]){markRealtimeDirty(hash,event);return;}
                   if(appState.realtime.refreshTimers[key])return;
-                  appState.realtime.refreshTimers[key]=setTimeout(()=>runRealtimeRefresh(hash,key),700);
+                  appState.realtime.refreshTimers[key]=setTimeout(()=>runRealtimeRefresh(hash,key),250);
                 }
                 async function runRealtimeRefresh(hash,key){
                   delete appState.realtime.refreshTimers[key];
@@ -542,6 +626,8 @@ public final class WebAdminFrontendScripts {
                   appState.realtime.refreshSeq[key]=seq;
                   try{
                     await route({silent:true,expectedHash:hash,expectedSeq:seq});
+                    appState.realtime.missed=false;
+                    appState.realtime.wasDisconnected=false;
                   }catch(err){
                     toast('实时同步刷新失败，已保留当前页面。');
                   }finally{
@@ -552,9 +638,17 @@ public final class WebAdminFrontendScripts {
                 function markRealtimeDirty(hash,event){
                   appState.realtime.dirtyRoutes[realtimeRouteKey(hash)]={hash,event,at:Date.now()};
                 }
-                function flushVisibleRealtimeRefresh(){
+                function markRealtimeRouteKeyDirty(key,event){
+                  if(!key)return;
+                  appState.realtime.dirtyRoutes[key]={hash:null,event,at:Date.now()};
+                }
+                function markAllRealtimeDirty(event){
+                  REALTIME_KNOWN_ROUTE_KEYS.forEach(key=>markRealtimeRouteKeyDirty(key,event));
+                }
+                function flushVisibleRealtimeRefresh(reason='visibility'){
                   const hash=currentRouteHash(), key=realtimeRouteKey(hash);
-                  if(appState.realtime.dirtyRoutes[key])scheduleRealtimeRefresh(hash,appState.realtime.dirtyRoutes[key].event||{type:'visibility'});
+                  if(appState.realtime.offline)return;
+                  if(appState.realtime.dirtyRoutes[key]||appState.realtime.missed||appState.realtime.wasDisconnected)scheduleRealtimeRefresh(hash,appState.realtime.dirtyRoutes[key]?.event||{type:reason});
                 }
                 function realtimeRouteKey(hash){
                   const h=String(hash||'#/dashboard');
@@ -562,9 +656,11 @@ public final class WebAdminFrontendScripts {
                   if(h.startsWith('#/signals/'))return `signalDetail:${routeDetailId(h,'#/signals/')}`;
                   if(h.startsWith('#/regions/'))return `regionDetail:${routeDetailId(h,'#/regions/')}`;
                   if(h.startsWith('#/actions/'))return `actionDetail:${routeDetailId(h,'#/actions/')}`;
-                  if(h.startsWith('#/history'))return 'history';
+                  if(h.startsWith('#/history')||h.startsWith('#/events'))return 'history';
                   if(h==='#/dashboard')return 'dashboard';
                   if(h==='#/devices')return 'devices';
+                  if(h==='#/virtual-block-devices'||h==='#/block-devices')return 'virtualBlockDevices';
+                  if(h==='#/listeners'||h==='#/signal-listeners')return 'listeners';
                   if(h==='#/receivers')return 'receivers';
                   if(h==='#/signals'||h==='#/signalbridge')return 'signals';
                   if(h==='#/doctor')return 'doctor';
@@ -575,11 +671,10 @@ public final class WebAdminFrontendScripts {
                   return h;
                 }
                 function routePollInterval(hash){
-                  const h=String(hash||'#/dashboard');
-                  if(h==='#/receivers')return 5000;
-                  if(h==='#/signals'||h==='#/signalbridge')return 10000;
-                  if(h==='#/dashboard')return 15000;
                   return 0;
+                }
+                function enterRealtimeRoute(hash){
+                  startRouteSilentPolling(hash);
                 }
                 function startRouteSilentPolling(hash){
                   clearTimeout(appState.realtime.pollTimer);
@@ -597,7 +692,10 @@ public final class WebAdminFrontendScripts {
                     startRouteSilentPolling(current);
                   },delay);
                 }
-                document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh();}});
+                document.addEventListener('visibilitychange',()=>{if(!document.hidden&&document.body.dataset.page==='app'){updateRealtimeStatus();connectRealtime();flushVisibleRealtimeRefresh('visibility');}});
+                window.addEventListener('online',()=>{appState.realtime.offline=false;appState.realtime.wasDisconnected=true;connectRealtime(true);markRealtimeDirty(currentRouteHash(),{type:'online'});flushVisibleRealtimeRefresh('online');});
+                window.addEventListener('offline',()=>{appState.realtime.offline=true;appState.realtime.wasDisconnected=true;if(appState.realtime.source){appState.realtime.source.close();appState.realtime.source=null;}markRealtimeDirty(currentRouteHash(),{type:'offline'});setRealtimeStatus('DISCONNECTED');});
+                window.addEventListener('pagehide',()=>closeRealtime('DISCONNECTED'));
                 document.addEventListener('click',event=>{
                   const target=event.target;
                   const basic=appState.deviceBasicConfigEdit;
@@ -1523,6 +1621,12 @@ public final class WebAdminFrontendScripts {
                 }
                 function waEnsureState(){
                   appState.uiPages=appState.uiPages||{};
+                  appState.listenerFilters=appState.listenerFilters||{search:'',enabled:'ALL',channel:'ALL'};
+                  appState.virtualBlockFilters=appState.virtualBlockFilters||{search:'',enabled:'ALL',trigger:'ALL',world:'ALL',doctor:'ALL'};
+                  appState.virtualBlockDetailCache=appState.virtualBlockDetailCache||{};
+                  appState.deviceFilters=appState.deviceFilters||{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'};
+                  appState.historyFilters=appState.historyFilters||{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'};
+                  appState.actionFilters=appState.actionFilters||{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'};
                   appState.receiverFilters=appState.receiverFilters||{search:'',enabled:'ALL',output:'ALL',channel:'ALL'};
                   appState.receiverDetailCache=appState.receiverDetailCache||{};
                 }
@@ -1552,6 +1656,11 @@ public final class WebAdminFrontendScripts {
                   appState.uiPages[key]=Math.max(1,Number(page)||1);
                   if(key==='signalbridge')renderSignalList('');
                   if(key==='receivers')renderReceiverList('');
+                  if(key==='listeners')renderListenerList('');
+                  if(key==='devices')renderDeviceList('');
+                  if(key==='virtualBlockDevices')renderVirtualBlockList('');
+                  if(key==='actions')renderActionList('');
+                  if(key==='history')renderHistoryListPage('');
                 }
                 function waPagination(key,page){
                   if(page.total<=page.pageSize)return `<div class="wa-pagination"><span class="wa-page-meta">共 ${esc(page.total)} 条 · 每页 ${esc(page.pageSize)} 条</span></div>`;
@@ -1807,6 +1916,317 @@ public final class WebAdminFrontendScripts {
                   const buckets=[{label:'1-10 tick',value:0,total:items.length,kind:'ok'},{label:'11-20 tick',value:0,total:items.length,kind:''},{label:'21+ tick',value:0,total:items.length,kind:'warning'},{label:'加载中',value:0,total:items.length,kind:'info'},{label:'--',value:0,total:items.length,kind:'info'}];
                   items.forEach(d=>{const state=receiverPulseState(d);if(state.state==='ready'){const t=Number(state.value);if(t<=10)buckets[0].value++;else if(t<=20)buckets[1].value++;else buckets[2].value++;}else if(state.state==='loading')buckets[3].value++;else buckets[4].value++;});
                   return buckets.filter(b=>b.value>0||items.length===0);
+                }
+                """).append("""
+                function waDash(value){return isBlank(value)?'--':value;}
+                function waCount(items,predicate){return (items||[]).filter(predicate).length;}
+                function sumNumeric(items,keys){let found=false,total=0;(items||[]).forEach(item=>{for(const key of keys){const value=key.split('.').reduce((acc,part)=>acc&&acc[part],item);if(!isBlank(value)){const n=Number(value);if(Number.isFinite(n)){total+=n;found=true;}break;}}});return found?total:'--';}
+                function firstKnown(item,keys){for(const key of keys){const value=key.split('.').reduce((acc,part)=>acc&&acc[part],item);if(!isBlank(value))return value;}return '';}
+                function uniqueNonBlank(values){return [...new Set((values||[]).filter(v=>!isBlank(v)).map(v=>String(v)))].sort((a,b)=>a.localeCompare(b));}
+                function endpointEnabledText(value){return value?'启用':'停用';}
+                function deviceTypeIcon(type){return {SIGNAL_EMITTER:'signal-device',SIGNAL_RECEIVER:'signal-receiver',ACTION_RELAY:'action-relay',VIRTUAL_BLOCK_DEVICE:'virtual-block-device'}[String(type||'').toUpperCase()]||'device';}
+                function deviceTypeTone(type){return {SIGNAL_EMITTER:'',SIGNAL_RECEIVER:'',ACTION_RELAY:'warning',VIRTUAL_BLOCK_DEVICE:'ok'}[String(type||'').toUpperCase()]||'';}
+                function distributionItems(items,mapper,labeler,totalOverride){
+                  const total=Number(totalOverride??items.length), counts=countBy(items,mapper);
+                  return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([key,value])=>({label:labeler?labeler(key):key,value,total,kind:key==='ERROR'||key==='FAILED'||key==='DISABLED'?'error':(key==='WARNING'?'warning':(key==='OK'||key==='ENABLED'?'ok':''))}));
+                }
+                async function renderListeners(options={}){
+                  if(!options.silent)setView(loading('正在加载信号监听器...'));
+                  let channels=[];
+                  try{channels=await api('/api/signals/channels');}
+                  catch(err){if(options.silent){toast('信号监听器实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  const listenerChannels=(channels||[]).filter(c=>Number(c.listenerCount||0)>0).slice(0,50);
+                  const details=await Promise.allSettled(listenerChannels.map(c=>api(`/api/signals/channels/${encodeURIComponent(c.channel||'')}`)));
+                  const listeners=[];
+                  details.forEach((result,index)=>{
+                    if(result.status!=='fulfilled')return;
+                    const detail=result.value||{}, channel=detail.channel||listenerChannels[index]?.channel||'';
+                    (detail.listeners||[]).forEach(item=>listeners.push({...item,channel:item.channel||channel,sourceChannel:channel,sourceDisplayName:detail.metadata?.effectiveDisplayName||detail.channel||channel}));
+                  });
+                  appState.listenerSourceChannels=channels||[];
+                  appState.listeners=listeners;
+                  appState.listenerLoadLimited=(channels||[]).filter(c=>Number(c.listenerCount||0)>0).length>listenerChannels.length;
+                  renderListenerList('',options);
+                }
+                function renderListenerList(focusId,options={}){
+                  waEnsureState();
+                  const listeners=appState.listeners||[], channels=appState.listenerSourceChannels||[], filtered=filterListeners(listeners), page=waPageItems('listeners',filtered,10);
+                  const enabled=waCount(listeners,l=>l.enabled!==false), bound=uniqueNonBlank(listeners.map(l=>l.channel)).length, today=sumNumeric(channels,['triggerCountToday']);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('信号监听器','后台虚拟监听器用于监听 channel 并执行 actions，不等同于 signal_receiver 方块。',`${waButton('添加监听器','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('监听器总数',listeners.length,appState.listenerLoadLimited?'仅加载前 50 个有监听器频道':'来自频道详情 API','consumer-listener')}
+                      ${waMetric('启用监听器',enabled,'enabled=true','enabled','ok')}
+                      ${waMetric('停用监听器',listeners.length-enabled,'enabled=false','receiver-disabled',listeners.length-enabled?'warning':'')}
+                      ${waMetric('绑定频道总数',bound,'去重频道数量','active-channel')}
+                      ${waMetric('今日触发次数',today,'来自频道统计','today-trigger')}
+                    </section>
+                    <section class="wa-table-card">
+                      <div class="wa-filter-bar">
+                        <label class="filter-field search-control"><span>搜索</span><input class="input" id="listener-search" placeholder="搜索监听器名称 / ID / 频道..." value="${esc(appState.listenerFilters.search)}"></label>
+                        <label class="filter-field"><span>状态</span>${waSelect('listener-enabled',['ALL','ENABLED','DISABLED'],appState.listenerFilters.enabled,optionLabel)}</label>
+                        <label class="filter-field"><span>频道</span>${waSelect('listener-channel',['ALL',...uniqueNonBlank(listeners.map(l=>l.channel))],appState.listenerFilters.channel,v=>v==='ALL'?'全部频道':v)}</label>
+                        ${waButton('刷新','refresh','onclick="renderListeners()"','ghost')}
+                      </div>
+                      ${page.items.length===0?empty(listeners.length===0?'当前没有可从频道详情 API 读取到的信号监听器。':'没有匹配当前筛选条件的监听器。'):listenerTable(page.items)}
+                      ${waPagination('listeners',page)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindListenerFilters(focusId);
+                }
+                function listenerTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>监听器名称 / ID</th><th>频道</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${items.map(l=>{const title=l.name||l.id||'未命名监听器', channel=l.channel||l.sourceChannel||'', channelTarget=isBlank(channel)?'':signalHash(channel);return `<tr><td><span class="device-name"><span class="device-icon">${icon('consumer-listener')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(l.id))}</span></span></span></td><td class="truncate" title="${esc(channel)}">${channelCell(channel)}</td><td>${pill(l.enabled!==false?'OK':'WARNING')} ${esc(endpointEnabledText(l.enabled!==false))}</td><td>${esc(formatTicks(l.cooldownTicks)||'0 tick')}</td><td>${esc(l.actionCount ?? '--')}</td><td>${fmtTime(l.lastTriggeredAt)}</td><td><div class="wa-action-cell">${channelTarget?`<button class="wa-btn ghost" ${navDataAttr(channelTarget,`查看频道 ${channel}`)}>频道</button>`:`<button class="wa-btn ghost" disabled>频道</button>`}${waIconButton('编辑不可用','settings','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function filterListeners(items){
+                  const f=appState.listenerFilters||{};
+                  return (items||[]).filter(l=>{const hay=[l.id,l.name,l.channel,l.sourceDisplayName].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.enabled==='ENABLED'&&l.enabled===false)return false;if(f.enabled==='DISABLED'&&l.enabled!==false)return false;if(f.channel&&f.channel!=='ALL'&&String(l.channel||'')!==f.channel)return false;return true;});
+                }
+                function bindListenerFilters(focusId){
+                  const update=(event)=>{appState.listenerFilters.search=document.getElementById('listener-search')?.value||'';appState.listenerFilters.enabled=document.getElementById('listener-enabled')?.value||'ALL';appState.listenerFilters.channel=document.getElementById('listener-channel')?.value||'ALL';appState.uiPages.listeners=1;renderListenerList(event?.target?.id||'');};
+                  ['listener-search','listener-enabled','listener-channel'].forEach(id=>document.getElementById(id)?.addEventListener(id==='listener-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                async function renderDevices(options={}){
+                  if(!options.silent)setView(loading('正在加载信号设备...'));
+                  let devices;try{devices=await api('/api/devices')}catch(err){if(options.silent){toast('信号设备实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.devices=devices||[];
+                  renderDeviceList('',options);
+                }
+                function renderDeviceList(focusId,options={}){
+                  waEnsureState();
+                  const devices=appState.devices||[], filtered=filterDevices(devices), page=waPageItems('devices',filtered,10), worlds=uniqueNonBlank(devices.map(d=>d.world));
+                  const enabled=waCount(devices,d=>d.enabled), today=sumNumeric(devices,['triggerCountToday','todayTriggerCount']), recent=devices.filter(d=>!isBlank(d.lastTriggeredAt)).sort((a,b)=>String(b.lastTriggeredAt||'').localeCompare(String(a.lastTriggeredAt||'')))[0];
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('信号设备','统一查看 signal_emitter、signal_receiver、action_relay 与 virtual_block_device。',`${waButton('添加设备','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出设备','download','disabled','danger')}`)}
+                    <section class="wa-card-grid">
+                      ${waMetric('设备总数',devices.length,'来自 /api/devices','device-overview')}
+                      ${waMetric('启用中',enabled,'enabled=true','enabled','ok')}
+                      ${waMetric('禁用中',devices.length-enabled,'enabled=false','receiver-disabled',devices.length-enabled?'warning':'')}
+                      ${waMetric('今日触发次数',today,'API 未提供时显示 --','today-trigger')}
+                      ${waMetric('最近触发设备',recent?.displayName||'--',recent?formatRelativeTime(recent.lastTriggeredAt):'暂无','recent-event')}
+                      ${waMetric('未绑定频道',waCount(devices,d=>isBlank(d.channel)),'channel 为空','channel-orphan','warning')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="device-search" placeholder="搜索设备名称 / ID / channel / 坐标..." value="${esc(appState.deviceFilters.search)}"></label>
+                          <label class="filter-field"><span>类型</span>${waSelect('device-type',['ALL','SIGNAL_EMITTER','SIGNAL_RECEIVER','ACTION_RELAY','VIRTUAL_BLOCK_DEVICE','UNKNOWN'],appState.deviceFilters.type,optionLabel)}</label>
+                          <label class="filter-field"><span>状态</span>${waSelect('device-enabled',['ALL','ENABLED','DISABLED'],appState.deviceFilters.enabled,optionLabel)}</label>
+                          <label class="filter-field"><span>Doctor</span>${waSelect('device-doctor',['ALL','OK','INFO','WARNING','ERROR','UNKNOWN'],appState.deviceFilters.doctor,optionLabel)}</label>
+                          <label class="filter-field"><span>世界</span>${waSelect('device-world',['ALL',...worlds],appState.deviceFilters.world,v=>v==='ALL'?'全部世界':v)}</label>
+                          ${waButton('刷新','refresh','onclick="renderDevices()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(devices.length===0?'当前暂无设备数据。':'没有匹配当前筛选条件的设备。'):deviceTable(page.items)}
+                        ${waPagination('devices',page)}
+                      </div>
+                      ${deviceRightRail(devices)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindDeviceFilters(focusId);
+                }
+                function deviceTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>类型</th><th>频道</th><th>位置</th><th>状态</th><th>最近触发</th><th>Doctor</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon(deviceTypeIcon(d.type))}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td>${textPill(labelType(d.type),deviceTypeTone(d.type)||'info')}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看设备 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function filterDevices(items){const f=appState.deviceFilters||{};return (items||[]).filter(d=>{const hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),d.type,d.doctorStatus].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&String(d.type||'UNKNOWN').toUpperCase()!==f.type)return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.world!=='ALL'&&d.world!==f.world)return false;return true;});}
+                function bindDeviceFilters(focusId){
+                  const update=(event)=>{appState.deviceFilters.search=document.getElementById('device-search')?.value||'';appState.deviceFilters.type=document.getElementById('device-type')?.value||'ALL';appState.deviceFilters.enabled=document.getElementById('device-enabled')?.value||'ALL';appState.deviceFilters.doctor=document.getElementById('device-doctor')?.value||'ALL';appState.deviceFilters.world=document.getElementById('device-world')?.value||'ALL';appState.uiPages.devices=1;renderDeviceList(event?.target?.id||'');};
+                  ['device-search','device-type','device-enabled','device-doctor','device-world'].forEach(id=>document.getElementById(id)?.addEventListener(id==='device-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                function deviceRightRail(devices){
+                  const enabled=waCount(devices,d=>d.enabled), total=devices.length;
+                  return `<aside class="wa-right-rail">
+                    <article class="wa-panel"><h2>设备类型分布</h2>${progressList(distributionItems(devices,d=>String(d.type||'UNKNOWN').toUpperCase(),labelType,total))}</article>
+                    <article class="wa-panel"><h2>状态分布</h2>${progressList([{label:'启用中',value:enabled,total,kind:'ok'},{label:'禁用中',value:total-enabled,total,kind:'warning'}])}</article>
+                    <article class="wa-panel"><h2>快速筛选</h2><div class="wa-quick-grid">${['SIGNAL_EMITTER','SIGNAL_RECEIVER','ACTION_RELAY','VIRTUAL_BLOCK_DEVICE'].map(type=>`<button class="wa-btn ghost" onclick="appState.deviceFilters.type='${type}';appState.uiPages.devices=1;renderDeviceList()">${esc(labelType(type))}</button>`).join('')}<button class="wa-btn ghost" onclick="appState.deviceFilters={search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'};appState.uiPages.devices=1;renderDeviceList()">重置筛选</button></div></article>
+                    <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('批量启用','enabled','disabled','ghost')}${waButton('批量禁用','receiver-disabled','disabled','ghost')}${waButton('测试设备','signal-device','disabled','ghost')}${waButton('清空统计','channel-error','disabled','danger')}</div><p class="wa-disabled-note">写操作需要后端权限、CSRF、审计和 edit lock 支持，本轮保持禁用。</p></article>
+                  </aside>`;
+                }
+                function isVirtualBlockDevice(d){return String(d.type||'').toUpperCase()==='VIRTUAL_BLOCK_DEVICE'||String(d.subType||'').toLowerCase()==='virtual_block_device';}
+                async function renderVirtualBlockDevices(options={}){
+                  if(!options.silent)setView(loading('正在加载虚拟方块设备...'));
+                  let devices;try{devices=await api('/api/devices')}catch(err){if(options.silent){toast('虚拟方块设备实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.virtualBlockDevices=(devices||[]).filter(isVirtualBlockDevice);
+                  renderVirtualBlockList('',options);
+                }
+                function virtualDetail(d){const cache=(appState.virtualBlockDetailCache||{})[String(d?.id||'')];return cache&&cache.status==='ok'?cache.detail:null;}
+                function virtualConfig(d){return virtualDetail(d)?.configSummary||d.configSummary||{};}
+                function virtualBlockId(d){return firstKnown(virtualConfig(d),['blockId','block','minecraftBlockId','boundBlockId']);}
+                function virtualTriggerType(d){const cfg=virtualConfig(d);if(!cfg||Object.keys(cfg).length===0)return 'unknown';if(cfg.containerEnabled)return 'container';if(cfg.interactionEnabled)return 'interact';if(cfg.conditionEnabled)return 'blockstate';return firstKnown(cfg,['mode','triggerType'])||'unknown';}
+                function labelTriggerType(value){const v=String(value||'unknown').toLowerCase();return {redstone_rising:'红石上升沿',redstone_falling:'红石下降沿',redstone_both:'红石双沿',redstone:'红石触发',blockstate:'方块状态',interact:'玩家交互',container:'容器事件',unknown:'未知'}[v]||value;}
+                function virtualConditionText(d){const cfg=virtualConfig(d), parts=[];if(cfg.conditionEnabled)parts.push('条件启用');if(Number(cfg.itemConditionCount||0)>0)parts.push(`物品条件 ${cfg.itemConditionCount}`);if(cfg.interactionItem?.enabled)parts.push('交互物品匹配');if(Number(cfg.itemSubmitRequirementCount||0)>0)parts.push(`提交要求 ${cfg.itemSubmitRequirementCount}`);return parts.length?parts.join(' / '):'--';}
+                async function refreshVisibleVirtualBlockDetails(items,options={}){
+                  waEnsureState();if(document.hidden)return;
+                  const force=!!options.force, now=Date.now(), jobs=[];
+                  (items||[]).filter(d=>isVirtualBlockDevice(d)&&!isBlank(d.id)).slice(0,10).forEach(d=>{
+                    const id=String(d.id), cache=appState.virtualBlockDetailCache[id];
+                    if(cache&&cache.status==='loading')return;
+                    if(cache&&cache.status==='ok'&&!force)return;
+                    if(cache&&cache.status==='error'&&!force&&now-Number(cache.at||0)<5000)return;
+                    appState.virtualBlockDetailCache[id]=cache&&cache.status==='ok'?{...cache,refreshing:true}:{status:'loading',at:now};
+                    jobs.push((async()=>{try{const detail=await api(`/api/devices/${encodeURIComponent(id)}`);appState.virtualBlockDetailCache[id]={status:'ok',detail,at:Date.now(),refreshing:false};return true;}catch(err){const latest=appState.virtualBlockDetailCache[id];if(latest&&latest.status==='ok'){appState.virtualBlockDetailCache[id]={...latest,refreshing:false,errorAt:Date.now(),message:err.message||'详情加载失败'};return false;}appState.virtualBlockDetailCache[id]={status:'error',message:err.message||'详情加载失败',at:Date.now()};return true;}})());
+                  });
+                  if(jobs.length===0)return;
+                  const results=await Promise.all(jobs);
+                  if(results.some(Boolean)&&['#/virtual-block-devices','#/block-devices'].includes(currentRouteHash()))renderVirtualBlockList('',{silent:true,skipDetailRefresh:true});
+                }
+                function renderVirtualBlockList(focusId,options={}){
+                  waEnsureState();
+                  const devices=appState.virtualBlockDevices||[], filtered=filterVirtualBlocks(devices), page=waPageItems('virtualBlockDevices',filtered,10), worlds=uniqueNonBlank(devices.map(d=>d.world));
+                  const enabled=waCount(devices,d=>d.enabled), today=sumNumeric(devices,['triggerCountToday','todayTriggerCount']);
+                  const conditions=devices.some(d=>!isBlank(virtualConditionText(d))&&virtualConditionText(d)!=='--')?waCount(devices,d=>virtualConditionText(d)!=='--'):'--';
+                  const interact=devices.some(d=>!isBlank(virtualConfig(d).interactionEnabled))?waCount(devices,d=>!!virtualConfig(d).interactionEnabled):'--';
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('虚拟方块设备','绑定已有 Minecraft 方块作为虚拟事件源；方块材质不使用 WebAdmin 图标伪造。',`${waButton('添加虚拟设备','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','danger')}`)}
+                    <section class="wa-card-grid">
+                      ${waMetric('虚拟设备总数',devices.length,'type=virtual_block_device','virtual-block-device')}
+                      ${waMetric('启用中',enabled,'enabled=true','enabled','ok')}
+                      ${waMetric('禁用中',devices.length-enabled,'enabled=false','receiver-disabled',devices.length-enabled?'warning':'')}
+                      ${waMetric('今日触发次数',today,'API 未提供时显示 --','today-trigger')}
+                      ${waMetric('已配置条件',conditions,'来自可见详情缓存','action-binding')}
+                      ${waMetric('交互触发设备',interact,'来自可见详情缓存','pulse-duration')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="virtual-search" placeholder="搜索设备名称 / ID / 方块 / channel..." value="${esc(appState.virtualBlockFilters.search)}"></label>
+                          <label class="filter-field"><span>状态</span>${waSelect('virtual-enabled',['ALL','ENABLED','DISABLED'],appState.virtualBlockFilters.enabled,optionLabel)}</label>
+                          <label class="filter-field"><span>触发类型</span>${waSelect('virtual-trigger',['ALL','redstone','blockstate','interact','container'],appState.virtualBlockFilters.trigger,v=>v==='ALL'?'全部触发类型':labelTriggerType(v))}</label>
+                          <label class="filter-field"><span>世界</span>${waSelect('virtual-world',['ALL',...worlds],appState.virtualBlockFilters.world,v=>v==='ALL'?'全部世界':v)}</label>
+                          ${waButton('刷新','refresh','onclick="renderVirtualBlockDevices()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(devices.length===0?'当前暂无虚拟方块设备。':'没有匹配当前筛选条件的虚拟方块设备。'):virtualBlockTable(page.items)}
+                        ${waPagination('virtualBlockDevices',page)}
+                      </div>
+                      ${virtualBlockRightRail(devices)}
+                    </section>
+                  </section>`,options);
+                  if(rendered){bindVirtualBlockFilters(focusId);if(!options.skipDetailRefresh)refreshVisibleVirtualBlockDetails(page.items,{force:!!options.silent});}
+                }
+                function virtualBlockTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>绑定方块</th><th>位置</th><th>触发类型</th><th>通道</th><th>状态</th><th>条件配置</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id, block=virtualBlockId(d), trigger=virtualTriggerType(d);return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('virtual-block-device')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td><span>${esc(block||'--')}</span><span class="device-subtitle">原版材质未在列表 API 中提供时仅显示文本</span></td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${textPill(labelTriggerType(trigger),trigger==='container'?'warning':(trigger==='interact'?'ok':'info'))}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${esc(virtualConditionText(d))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function filterVirtualBlocks(items){
+                  const f=appState.virtualBlockFilters||{};
+                  return (items||[]).filter(d=>{const cfg=virtualConfig(d), trigger=virtualTriggerType(d), hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),virtualBlockId(d),trigger,virtualConditionText(d)].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.trigger!=='ALL'&&String(trigger).toLowerCase()!==String(f.trigger).toLowerCase()&&!(f.trigger==='redstone'&&String(trigger).startsWith('redstone')))return false;if(f.world!=='ALL'&&d.world!==f.world)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;return true;});
+                }
+                function bindVirtualBlockFilters(focusId){
+                  const update=(event)=>{appState.virtualBlockFilters.search=document.getElementById('virtual-search')?.value||'';appState.virtualBlockFilters.enabled=document.getElementById('virtual-enabled')?.value||'ALL';appState.virtualBlockFilters.trigger=document.getElementById('virtual-trigger')?.value||'ALL';appState.virtualBlockFilters.world=document.getElementById('virtual-world')?.value||'ALL';appState.uiPages.virtualBlockDevices=1;renderVirtualBlockList(event?.target?.id||'');};
+                  ['virtual-search','virtual-enabled','virtual-trigger','virtual-world'].forEach(id=>document.getElementById(id)?.addEventListener(id==='virtual-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                function virtualBlockRightRail(devices){
+                  const total=devices.length, triggerItems=distributionItems(devices,d=>String(virtualTriggerType(d)||'unknown').toLowerCase(),labelTriggerType,total);
+                  return `<aside class="wa-right-rail">
+                    <article class="wa-panel"><h2>触发类型分布</h2>${progressList(triggerItems)}</article>
+                    <article class="wa-panel"><h2>快速筛选</h2><div class="wa-rail-filter"><label><span>所在世界</span>${waSelect('virtual-rail-world',['ALL',...uniqueNonBlank(devices.map(d=>d.world))],appState.virtualBlockFilters.world,v=>v==='ALL'?'全部世界':v)}</label><label><span>触发类型</span>${waSelect('virtual-rail-trigger',['ALL','redstone','blockstate','interact','container'],appState.virtualBlockFilters.trigger,v=>v==='ALL'?'全部触发类型':labelTriggerType(v))}</label><div class="wa-button-row"><button class="wa-btn primary" onclick="appState.virtualBlockFilters.world=document.getElementById('virtual-rail-world').value;appState.virtualBlockFilters.trigger=document.getElementById('virtual-rail-trigger').value;appState.uiPages.virtualBlockDevices=1;renderVirtualBlockList()">应用筛选</button><button class="wa-btn ghost" onclick="appState.virtualBlockFilters={search:'',enabled:'ALL',trigger:'ALL',world:'ALL',doctor:'ALL'};appState.uiPages.virtualBlockDevices=1;renderVirtualBlockList()">重置筛选</button></div></div></article>
+                    <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('批量启用','enabled','disabled','ghost')}${waButton('批量禁用','receiver-disabled','disabled','ghost')}${waButton('测试触发','pulse-duration','disabled','ghost')}${waButton('清空触发记录','channel-error','disabled','danger')}</div><p class="wa-disabled-note">绑定、条件编辑、matcher、itemSubmit 和测试写操作需要后端写入支持，本轮不启用。</p></article>
+                  </aside>`;
+                }
+                async function renderActionsPage(options={}){
+                  if(!options.silent)setView(loading('正在加载动作列表...'));
+                  let actions;try{actions=await api('/api/actions')}catch(err){if(options.silent){toast('动作列表实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.actions=actions||[];
+                  renderActionList('',options);
+                }
+                function actionAvailable(a){return String(a.doctorStatus||'UNKNOWN').toUpperCase()==='OK';}
+                function renderActionList(focusId,options={}){
+                  waEnsureState();
+                  const actions=appState.actions||[], filtered=filterActions(actions), page=waPageItems('actions',filtered,10), ownerTypes=uniqueNonBlank(actions.map(a=>String(a.ownerType||'UNKNOWN').toUpperCase()));
+                  const ok=waCount(actions,actionAvailable), failed=waCount(actions,a=>String(a.lastResult||'').toUpperCase()==='FAILED'), today=sumNumeric(actions,['executionCountToday','todayExecutionCount']);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('动作列表','ActionEngine 动作只读展示；不包含动作模板或动作编辑器。',`${waButton('添加动作','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','danger')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('动作总数',actions.length,'来自 /api/actions','action-total')}
+                      ${waMetric('可用动作',ok,'Doctor OK','enabled','ok')}
+                      ${waMetric('需关注',actions.length-ok,'Doctor 非 OK','warning-issue',actions.length-ok?'warning':'')}
+                      ${waMetric('今日执行次数',today,'API 未提供时显示 --','today-trigger')}
+                      ${waMetric('失败次数',failed,'最近结果 FAILED','critical-issue',failed?'error':'')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="action-search" placeholder="搜索动作名称 / ID / 类型 / owner / channel..." value="${esc(appState.actionFilters.search)}"></label>
+                          <label class="filter-field"><span>类型</span>${waSelect('action-type',['ALL','COMMAND','MESSAGE','SOUND','SIGNAL','UNKNOWN'],appState.actionFilters.type,actionOptionLabel)}</label>
+                          <label class="filter-field"><span>归属</span>${waSelect('action-owner',['ALL',...ownerTypes],appState.actionFilters.owner,actionOptionLabel)}</label>
+                          <label class="filter-field"><span>结果</span>${waSelect('action-result',['ALL','SUCCESS','FAILED','UNKNOWN'],appState.actionFilters.result,actionOptionLabel)}</label>
+                          <label class="filter-field"><span>排序</span>${waSelect('action-sort',['NAME','TYPE','OWNER','RECENT'],appState.actionFilters.sort,actionOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderActionsPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(actions.length===0?'当前暂无动作数据。':'没有匹配当前筛选条件的动作。'):actionTable(page.items)}
+                        ${waPagination('actions',page)}
+                      </div>
+                      ${actionRightRail(actions)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindActionFilters(focusId);
+                }
+                function actionTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>动作名称 / ID</th><th>类型</th><th>描述</th><th>状态</th><th>标签</th><th>最近执行</th><th>操作</th></tr></thead><tbody>${items.map(a=>{const target=actionHash(a.id), title=a.name||a.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看动作 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon(actionIcon(a.type))}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(a.id))}</span></span></span></td><td>${textPill(labelActionType(a.type),actionTypeTone(a.type))}</td><td class="truncate" title="${esc(cleanActionSummary(a.summary||''))}">${esc(cleanActionSummary(a.summary||'--'))}</td><td>${pill(a.doctorStatus||'UNKNOWN')} ${esc(actionAvailable(a)?'可用':'需关注')}</td><td><span class="pill info">${esc(labelOwnerType(a.ownerType))}</span> ${isBlank(a.channel)?'<span class="muted">无频道</span>':channelCell(a.channel)}</td><td>${fmtTime(a.lastExecutedAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看动作 ${title}`)}>查看</button><button class="wa-btn ghost" disabled>编辑</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                }
+                function actionIcon(type){return {COMMAND:'settings',MESSAGE:'history',SOUND:'pulse-duration',SIGNAL:'signalbridge-main',UNKNOWN:'action'}[String(type||'UNKNOWN').toUpperCase()]||'action';}
+                function actionTypeTone(type){return {COMMAND:'ok',MESSAGE:'info',SOUND:'warning',SIGNAL:''}[String(type||'').toUpperCase()]||'info';}
+                function bindActionFilters(focusId){
+                  const update=(event)=>{appState.actionFilters.search=document.getElementById('action-search')?.value||'';appState.actionFilters.type=document.getElementById('action-type')?.value||'ALL';appState.actionFilters.owner=document.getElementById('action-owner')?.value||'ALL';appState.actionFilters.result=document.getElementById('action-result')?.value||'ALL';appState.actionFilters.sort=document.getElementById('action-sort')?.value||'NAME';appState.uiPages.actions=1;renderActionList(event?.target?.id||'');};
+                  ['action-search','action-type','action-owner','action-result','action-sort'].forEach(id=>document.getElementById(id)?.addEventListener(id==='action-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                function actionRightRail(actions){
+                  const total=actions.length, ok=waCount(actions,actionAvailable);
+                  return `<aside class="wa-right-rail">
+                    <article class="wa-panel"><h2>动作类型分布</h2>${progressList(distributionItems(actions,a=>String(a.type||'UNKNOWN').toUpperCase(),labelActionType,total))}</article>
+                    <article class="wa-panel"><h2>状态分布</h2>${progressList([{label:'可用动作',value:ok,total,kind:'ok'},{label:'需关注',value:total-ok,total,kind:'warning'}])}</article>
+                    <article class="wa-panel"><h2>快速筛选</h2><div class="wa-rail-filter"><label><span>类型</span>${waSelect('action-rail-type',['ALL','COMMAND','MESSAGE','SOUND','SIGNAL','UNKNOWN'],appState.actionFilters.type,actionOptionLabel)}</label><label><span>标签搜索</span><input class="input" id="action-rail-search" placeholder="搜索 owner / channel..." value="${esc(appState.actionFilters.search)}"></label><div class="wa-button-row"><button class="wa-btn primary" onclick="appState.actionFilters.type=document.getElementById('action-rail-type').value;appState.actionFilters.search=document.getElementById('action-rail-search').value;appState.uiPages.actions=1;renderActionList()">应用筛选</button><button class="wa-btn ghost" onclick="appState.actionFilters={search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'};appState.uiPages.actions=1;renderActionList()">重置筛选</button></div></div></article>
+                    <article class="wa-panel"><h2>动作类型说明</h2><div class="list-stack"><div class="kv-row"><span class="muted">command</span><strong>执行服务器命令</strong></div><div class="kv-row"><span class="muted">message</span><strong>发送消息</strong></div><div class="kv-row"><span class="muted">sound</span><strong>播放音效</strong></div><div class="kv-row"><span class="muted">signal</span><strong>发送下游 signal</strong></div><div class="kv-row"><span class="muted">unknown</span><strong>聚合或不可识别动作</strong></div></div></article>
+                  </aside>`;
+                }
+                async function renderHistoryPage(queryTail='',options={}){
+                  const params=parseHashParams(queryTail);if(params.channel)appState.historyFilters.channel=params.channel;
+                  if(!options.silent)setView(loading('正在加载事件历史...'));
+                  let history;try{history=await api('/api/signals/history?limit=500')}catch(err){if(options.silent){toast('事件历史实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  appState.historyItems=history||[];
+                  renderHistoryListPage('',options);
+                }
+                function renderHistoryListPage(focusId,options={}){
+                  waEnsureState();
+                  const items=appState.historyItems||[], filtered=filterHistoryItems(items), page=waPageItems('history',filtered,10), channels=uniqueNonBlank(items.map(h=>h.channel)), sourceTypes=uniqueNonBlank(items.map(h=>h.sourceType));
+                  const todayStart=new Date();todayStart.setHours(0,0,0,0);const today=items.filter(h=>{const t=parseTime(h.time);return t&&t.getTime()>=todayStart.getTime();}).length, success=waCount(items,h=>String(h.result||'').toUpperCase()==='SUCCESS'), failed=waCount(items,h=>String(h.result||'').toUpperCase()==='FAILED');
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('事件历史','统一查看当前已有 Signal history；Live 后端未完整接入时保持不可用。',waButton('刷新','refresh','onclick="renderHistoryPage()"','ghost'))}
+                    <div class="wa-tabs"><button class="wa-tab active">事件列表</button><button class="wa-tab" disabled>实时流 Live</button></div>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="history-search" placeholder="搜索频道 / 来源 / 对象 / 结果..." value="${esc(appState.historyFilters.search)}"></label>
+                          <label class="filter-field"><span>频道</span>${waSelect('history-channel',['ALL',...channels],appState.historyFilters.channel,v=>v==='ALL'?'全部频道':v)}</label>
+                          <label class="filter-field"><span>来源</span>${waSelect('history-source',['ALL',...sourceTypes],appState.historyFilters.sourceType,historyOptionLabel.bind(null,'history-source'))}</label>
+                          <label class="filter-field"><span>结果</span>${waSelect('history-result',['ALL','SUCCESS','FAILED','UNKNOWN'],appState.historyFilters.result,historyOptionLabel.bind(null,'history-result'))}</label>
+                          <label class="filter-field"><span>时间</span>${waSelect('history-range',['ALL','M10','H1','H24'],appState.historyFilters.range,historyOptionLabel.bind(null,'history-range'))}</label>
+                          ${waButton('刷新','refresh','onclick="renderHistoryPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(items.length===0?'暂无事件历史。':'没有匹配当前筛选条件的事件。'):historyTable(page.items)}
+                        ${waPagination('history',page)}
+                      </div>
+                      ${historyRightRail(items,filtered,today,success,failed)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindHistoryFilters(focusId);
+                }
+                function historyTable(items){
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>时间</th><th>频道</th><th>来源类型</th><th>来源对象</th><th>动作数</th><th>结果</th><th>操作</th></tr></thead><tbody>${items.map(h=>`<tr><td>${fmtTime(h.time)}</td><td class="truncate" title="${esc(h.channel||'')}">${channelCell(h.channel)}</td><td>${textPill(labelSourceType(h.sourceType),'info')}</td><td><span class="wa-source-object"><strong>${esc(h.sourceName||h.sourceId||'--')}</strong><span class="device-subtitle">${esc([h.world,posText(h.pos),h.playerName].filter(v=>!isBlank(v)&&v!=='-').join(' / ')||h.description||'--')}</span></span></td><td>--</td><td>${pill(h.result||'UNKNOWN')}</td><td><div class="wa-action-cell">${historyAction(h)}${waIconButton('详情不可用','more','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;
+                }
+                function bindHistoryFilters(focusId){
+                  const update=(event)=>{appState.historyFilters.search=document.getElementById('history-search')?.value||'';appState.historyFilters.channel=document.getElementById('history-channel')?.value||'ALL';appState.historyFilters.sourceType=document.getElementById('history-source')?.value||'ALL';appState.historyFilters.result=document.getElementById('history-result')?.value||'ALL';appState.historyFilters.range=document.getElementById('history-range')?.value||'ALL';appState.uiPages.history=1;renderHistoryListPage(event?.target?.id||'');};
+                  ['history-search','history-channel','history-source','history-result','history-range'].forEach(id=>document.getElementById(id)?.addEventListener(id==='history-search'?'input':'change',update));
+                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value)el.setSelectionRange(el.value.length,el.value.length);}}
+                }
+                function historyRightRail(items,filtered,today,success,failed){
+                  const total=items.length;
+                  return `<aside class="wa-right-rail">
+                    <article class="wa-panel"><h2>今日事件统计</h2><div class="summary-grid">${waMetric('今日事件数',today,'本地日期','recent-event')}${waMetric('总触发次数',total,'当前内存历史','today-trigger')}${waMetric('成功',success,'result=SUCCESS','check-pass','ok')}${waMetric('失败',failed,'result=FAILED','critical-issue',failed?'error':'')}</div></article>
+                    <article class="wa-panel"><h2>来源类型</h2>${progressList(distributionItems(filtered,h=>String(h.sourceType||'UNKNOWN').toUpperCase(),labelSourceType,Math.max(1,filtered.length)))}</article>
+                    <article class="wa-panel"><h2>操作</h2><div class="wa-quick-grid">${waButton('实时流 Live','signalbridge-main','disabled','ghost')}${waButton('导出事件记录','download','disabled','ghost')}${waButton('清空历史记录','channel-error','disabled','danger')}</div><p class="wa-disabled-note">导出、清空和完整实时流没有后端写入或流式能力，本轮保持禁用。</p></article>
+                  </aside>`;
                 }
                 function progressList(items){
                   if(!items||items.length===0)return empty('暂无数据。');

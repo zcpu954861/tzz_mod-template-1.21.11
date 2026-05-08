@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.map.MapDataStore;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -128,6 +129,7 @@ public final class RegionControllerTracker {
                 ItemStack.EMPTY
         );
         ActionEngine.executeAll(context, controller.actionsFor(triggerType));
+        WebAdminRealtimeEventBus.publishRegionRuntimeEvent(controller, triggerType, player);
     }
 
     private static final class PlayerRegionState {

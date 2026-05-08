@@ -8,6 +8,8 @@ import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +45,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = fromEmitter(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(existing == null ? WebAdminRealtimeEventType.DEVICE_REGISTERED : WebAdminRealtimeEventType.DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -60,6 +63,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = fromReceiver(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(existing == null ? WebAdminRealtimeEventType.DEVICE_REGISTERED : WebAdminRealtimeEventType.RECEIVER_CHANGED, updated);
         return updated;
     }
 
@@ -72,7 +76,13 @@ public final class SignalDeviceStore {
     }
 
     public static synchronized SignalDeviceData updatePulse(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
-        return upsertReceiver(world, pos, blockEntity);
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData updated = fromReceiver(world, pos, blockEntity, existing, false);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.RECEIVER_PULSE_CHANGED, updated);
+        return updated;
     }
 
     public static synchronized SignalDeviceData upsertActionRelay(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
@@ -81,6 +91,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = fromActionRelay(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(existing == null ? WebAdminRealtimeEventType.DEVICE_REGISTERED : WebAdminRealtimeEventType.DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -118,6 +129,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(existing == null ? WebAdminRealtimeEventType.DEVICE_REGISTERED : WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -137,6 +149,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -156,6 +169,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -169,6 +183,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withVirtualSettings(existing, existing.channel(), existing.offChannel(), existing.mode(), enabled);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -188,6 +203,7 @@ public final class SignalDeviceStore {
             updated = withVirtualSettings(existing, normalizedChannel, existing.offChannel(), existing.mode(), enabled);
             replaceOrAdd(state, updated);
             state.markDirty();
+            publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         } else {
             ServerWorld world = getDeviceWorld(server, existing);
             if (world == null) {
@@ -249,6 +265,7 @@ public final class SignalDeviceStore {
             updated = applyVirtualExtendedPatch(existing, patch);
             replaceOrAdd(state, updated);
             state.markDirty();
+            publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         } else {
             ServerWorld world = getDeviceWorld(server, existing);
             if (world == null) {
@@ -387,6 +404,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -415,6 +433,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -438,6 +457,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -461,6 +481,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -487,6 +508,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -512,6 +534,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -537,6 +560,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -562,6 +586,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -587,6 +612,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -653,6 +679,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -686,6 +713,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -719,6 +747,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -740,6 +769,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withItemConditions(existing, conditions);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -760,6 +790,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withItemConditions(existing, conditions);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -773,6 +804,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withItemConditions(existing, List.of());
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -801,6 +833,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withItemConditions(existing, conditions);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -832,6 +865,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -1016,6 +1050,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, triggered);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, triggered);
     }
 
     private static SignalDeviceData updateVirtualContainerChannels(
@@ -1059,6 +1094,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
         return updated;
     }
 
@@ -1068,6 +1104,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withName(fromEmitter(world, pos, blockEntity, existing, false), cleanUserText(name));
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_METADATA_CHANGED, updated);
         return updated;
     }
 
@@ -1077,6 +1114,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withName(fromReceiver(world, pos, blockEntity, existing, false), cleanUserText(name));
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_METADATA_CHANGED, updated);
         return updated;
     }
 
@@ -1086,6 +1124,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withName(fromActionRelay(world, pos, blockEntity, existing, false), cleanUserText(name));
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_METADATA_CHANGED, updated);
         return updated;
     }
 
@@ -1099,6 +1138,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withName(existing, cleanUserText(name));
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_METADATA_CHANGED, updated);
         return updated;
     }
 
@@ -1112,6 +1152,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withName(resolved.device(), "");
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_METADATA_CHANGED, updated);
         return ResolveResult.unique(updated);
     }
 
@@ -1129,9 +1170,14 @@ public final class SignalDeviceStore {
         }
 
         State state = getState(server);
+        SignalDeviceData removedDevice = findById(state, sourceId);
         boolean removed = state.devices.removeIf(device -> sourceId.equals(device.id()));
         if (removed) {
             state.markDirty();
+            WebAdminRealtimeEventBus.publishDeviceRemoved(
+                    sourceId,
+                    removedDevice == null ? "" : removedDevice.type()
+            );
         }
         return removed;
     }
@@ -1228,6 +1274,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordReceive(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity, ActionExecutionResult result) {
@@ -1263,6 +1310,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.RECEIVER_PULSE_CHANGED, updated);
     }
 
     public static synchronized void recordActionRelayRun(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity, ActionExecutionResult result) {
@@ -1298,6 +1346,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualPowerState(ServerWorld world, SignalDeviceData device, VirtualBlockPowerState powerState) {
@@ -1314,6 +1363,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withVirtualPower(world, existing, powerState, existing.lastResult(), false);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualBlockTrigger(
@@ -1336,6 +1386,7 @@ public final class SignalDeviceStore {
         SignalDeviceData updated = withVirtualPower(world, existing, powerState, resultMessage, true);
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualBlockManualTrigger(
@@ -1431,6 +1482,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualConditionState(
@@ -1462,6 +1514,7 @@ public final class SignalDeviceStore {
         );
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualConditionTrigger(
@@ -1569,6 +1622,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static synchronized void recordVirtualInteractionTrigger(
@@ -1680,6 +1734,7 @@ public final class SignalDeviceStore {
         ).normalized();
         replaceOrAdd(state, updated);
         state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
     }
 
     public static long getRemainingInteractionCooldownTicks(SignalDeviceData device, long currentGameTime) {
@@ -3317,6 +3372,22 @@ public final class SignalDeviceStore {
             }
         }
         state.devices.add(normalized);
+    }
+
+    private static void publishDeviceChange(WebAdminRealtimeEventType type, SignalDeviceData device) {
+        if (device == null) {
+            return;
+        }
+        SignalDeviceData normalized = device.normalized();
+        String summary = switch (type == null ? WebAdminRealtimeEventType.DEVICE_CHANGED : type) {
+            case DEVICE_REGISTERED -> "设备已注册：" + displayName(normalized);
+            case DEVICE_METADATA_CHANGED -> "设备显示信息已变化：" + displayName(normalized);
+            case RECEIVER_CHANGED -> "接收器已变化：" + displayName(normalized);
+            case RECEIVER_PULSE_CHANGED -> "接收器脉冲已变化：" + displayName(normalized);
+            case VIRTUAL_BLOCK_DEVICE_CHANGED -> "虚拟方块设备已变化：" + displayName(normalized);
+            default -> "设备已变化：" + displayName(normalized);
+        };
+        WebAdminRealtimeEventBus.publishDeviceEvent(type, normalized, summary);
     }
 
     private static SignalDeviceData findById(State state, String id) {

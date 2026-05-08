@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.action;
 
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
@@ -49,6 +50,7 @@ public final class ActionAuditLogger {
                     reason
             );
         }
+        WebAdminRealtimeEventBus.publishActionExecution(context, config, result);
     }
 
     public static void notifyOperators(ActionContext context, ActionConfig config, ActionExecutionResult result) {

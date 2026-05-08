@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "7.5-step1-flat-geometry-icons";
+    private static final String ASSET_VERSION = "7.5-step2.5-realtime-sync";
 
     private WebAdminFrontendShell() {
     }
@@ -76,6 +76,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">事件与信号</div>
                           <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signalbridge-main"></span>SignalBridge</button>
+                          <button class="nav-item" data-route="#/listeners"><span class="nav-icon" data-icon="consumer-listener"></span>信号监听器</button>
                           <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
                           <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>
                           <button class="nav-item" data-route="#/doctor"><span class="nav-icon" data-icon="doctor"></span>信号诊断</button>
@@ -87,6 +88,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">设备管理</div>
                           <button class="nav-item" data-route="#/devices"><span class="nav-icon" data-icon="device"></span>信号设备</button>
+                          <button class="nav-item" data-route="#/virtual-block-devices"><span class="nav-icon" data-icon="virtual-block-device"></span>虚拟方块设备</button>
                         </div>
                         <div class="nav-section">
                           <div class="nav-section-title">动作系统</div>
