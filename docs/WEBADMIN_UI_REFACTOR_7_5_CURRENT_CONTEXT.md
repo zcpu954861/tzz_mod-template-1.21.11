@@ -12,6 +12,27 @@
 
 **7.5 WebAdmin Frontend Refactor / Step 5.5 文档同步与 7.6 规划准备**
 
+### 2026-05-09 7.6 当前分支说明
+
+当前后续开发已进入独立分支上的 7.6 第一阶段 MVP，名称为：
+
+**WebAdmin Object Lifecycle + Client Selection Foundation**
+
+本阶段允许新增且仅新增 WebAdmin 新建 `virtual_block_device` 所需的选择模式 API、client selection payload、server-side in-memory selection session 和 WebAdmin modal 入口。范围限定为：
+
+- WebAdmin 发起 `create_virtual_block_device` 选择 session。
+- 指定目标在线玩家。
+- 目标玩家客户端显示选择模式 UI。
+- 选择模式 UI 必须兼容 Minecraft 小窗口与不同 GUI scale，文字需裁剪或自适应，不能遮挡准星或核心视野。
+- 选择模式右键任意方块完成选择，不要求空手。
+- 选择模式阻断原方块交互、物品使用、背包和其它 GUI 打开，但不影响移动和视角。
+- ESC 取消。
+- 服务端创建 `virtual_block_device`，不 setblock，不覆盖已有 VBD。
+- 创建成功只给目标玩家发送绿色聊天提示。
+- WebAdmin 通过 realtime 刷新并进入或提示新设备结果。
+
+本阶段仍不做 SignalListener 创建 / 删除、VBD 删除 / 解绑、matcher、itemSubmit、ConditionEngine、Scratch-like editor、GameController 或 Figma 修改。7.6 后续还需要单独规划 SignalListener 创建 / 删除、VBD 删除 / 解绑和更多对象生命周期入口。
+
 Step 1、Step 2、Step 2.5、Step 3 和 Step 4 已完成代码层落地。当前 Step 5 已补强 route / render / realtime 稳定化守卫；Step 5.5 只同步当前状态与 7.6 规划建议，不进入 7.6 代码实现。
 
 Step 1 已落地 3 个代表页面：

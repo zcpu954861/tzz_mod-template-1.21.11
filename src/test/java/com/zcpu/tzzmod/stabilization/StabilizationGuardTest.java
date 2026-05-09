@@ -49,6 +49,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeClient;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
@@ -58,7 +59,9 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
+import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionPurpose;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -112,6 +115,7 @@ public final class StabilizationGuardTest {
         testWebAdminReadonlyFrontendAssets();
         testWebAdminRealtimeFoundation();
         testWebAdminWriteFoundation();
+        testWebAdminSelectionFoundation();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -909,6 +913,37 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(js + css, modalMarker, "WebAdmin 7.5 modal marker present: " + modalMarker);
         }
+        for (String selectionMarker : List.of(
+                "/api/webadmin/selection/start",
+                "/api/webadmin/selection/cancel",
+                "openCreateVirtualBlockDeviceModal",
+                "startCreateVirtualBlockDeviceSelection",
+                "/api/webadmin/online-players",
+                "data-selection-player-combo=\"true\"",
+                "data-selection-channel-combo=\"true\"",
+                "handleSelectionTargetPlayerKey",
+                "handleSelectionChannelKey",
+                "selectionDeviceDetailRoute",
+                "selectionTerminalById",
+                "data-selection-wizard=\"virtual_block_device\"",
+                "等待玩家在游戏内右键方块",
+                "新建虚拟方块设备",
+                "selection_started",
+                "selection_completed",
+                "selection_cancelled",
+                "selection_failed"
+        )) {
+            requireContains(js, selectionMarker, "WebAdmin 7.6 selection UI marker present: " + selectionMarker);
+        }
+        for (String selectionStyle : List.of(
+                ".wa-selection-modal",
+                ".wa-selection-grid",
+                ".wa-selection-status",
+                ".wa-selection-status.ok",
+                ".wa-selection-status.error"
+        )) {
+            requireContains(css, selectionStyle, "WebAdmin 7.6 selection modal style present: " + selectionStyle);
+        }
         for (String modalStyle : List.of(
                 "waModalIn",
                 "waModalOut",
@@ -1080,6 +1115,10 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/device-basic-config/')) return { supported:true, enabled:true, channel:'test.channel', expectedFingerprint:'basic-fp', lockStatus:{ locked:false } };
                   if (url.startsWith('/api/webadmin/device-extended-config/')) return { supported:true, supportedFields:['pulseTicks','cooldownTicks'], fieldLabels:{ pulseTicks:'脉冲时长', cooldownTicks:'冷却时间' }, values:{ pulseTicks:20, cooldownTicks:0 }, expectedFingerprint:'extended-fp', lockStatus:{ locked:false } };
                   if (url.startsWith('/api/webadmin/channel-metadata')) return { channel:'test.channel', displayName:'Test Channel', effectiveDisplayName:'Test Channel', note:'', iconKey:'auto', expectedFingerprint:'channel-fp', lockStatus:{ locked:false } };
+                  if (url.startsWith('/api/webadmin/selection/start')) return { success:true, targetType:'OBJECT_SELECTION', targetId:'sel-1', changed:true, message:'已通知目标玩家进入选择模式。', data:{ selection:{ selectionId:'sel-1', targetPlayerName:'Owner', purpose:'create_virtual_block_device', status:'started', channel:'test.channel' } } };
+                  if (url.startsWith('/api/webadmin/selection/cancel')) return { success:true, targetType:'OBJECT_SELECTION', targetId:'sel-1', changed:true, message:'选择已取消。', data:{ selection:{ selectionId:'sel-1', targetPlayerName:'Owner', status:'cancelled', channel:'test.channel' } } };
+                  if (url.startsWith('/api/webadmin/selection/status')) return { active:true, selectionId:'sel-1', status:'active', purpose:'create_virtual_block_device', targetPlayerName:'Owner', channel:'test.channel' };
+                  if (url.startsWith('/api/webadmin/online-players')) return [{ name:'Owner', uuid:'00000000-0000-0000-0000-000000000001' }, { name:'Builder', uuid:'00000000-0000-0000-0000-000000000002' }];
                   if (url.startsWith('/api/devices/')) { const id = decodeURIComponent(url.substring('/api/devices/'.length).split('?')[0]); return { id, displayName:'Emitter', type:'SIGNAL_RECEIVER', enabled:true, channel:'test.channel', world:'world', pos:{x:1,y:64,z:2}, doctorStatus:'OK', metadata:{ displayName:'Emitter', note:'', iconKey:'auto', version:1, updatedAt:'2026-05-09T10:00:00Z', updatedBy:'Owner' }, configSummary:{pulseTicks:20, expectedFingerprint:'cfg-fp'}, debugSummary:{status:'OK'} }; }
                   if (url.startsWith('/api/devices')) return [
                     { id:'dev-1', displayName:'Emitter', type:'SIGNAL_EMITTER', enabled:true, channel:'test.channel', world:'world', pos:{x:1,y:64,z:2}, doctorStatus:'OK' },
@@ -1175,6 +1214,31 @@ public final class StabilizationGuardTest {
                     await cancelSignalListenerBasicConfigEdit('test-listener','test.channel');
                     return { before, after, stillOpen };
                   };
+                  globalThis.__smokeCreateVirtualBlockSelectionModal = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    requestedUrls.length = 0;
+                    location.hash = '#/virtual-block-devices';
+                    await route();
+                    await openCreateVirtualBlockDeviceModal();
+                    const config = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    document.getElementById('selection-target-player').value = 'Owner';
+                    document.getElementById('selection-channel').value = 'test.channel';
+                    document.getElementById('selection-display-name').value = 'Smoke VBD';
+                    document.getElementById('selection-enabled').checked = true;
+                    await startCreateVirtualBlockDeviceSelection();
+                    const waiting = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    const startedId = appState.selectionCreateVirtualBlock && appState.selectionCreateVirtualBlock.selectionId;
+                    handleSelectionRealtimeEvent({ type:'selection_completed', id:'evt-1', summary:'虚拟方块设备已创建。', deviceId:'vdev-1', payload:{ selectionId:startedId, deviceId:'vdev-1', routeTarget:'#/devices/vdev-1' } });
+                    const completedHash = String(location.hash || '');
+                    const completedModal = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    handleSelectionRealtimeEvent({ type:'selection_cancelled', id:'evt-2', summary:'选择已取消。', payload:{ selectionId:startedId } });
+                    const afterDuplicateHash = String(location.hash || '');
+                    await route();
+                    const detailHtml = String(document.getElementById('app-view').innerHTML || '');
+                    const keys = Array.from(realtimeRouteKeysForEvent({ type:'selection_completed', deviceId:'vdev-1', payload:{ selectionId:startedId, deviceId:'vdev-1' } })).join(',');
+                    await closeCreateVirtualBlockDeviceModal(false);
+                    return { config, waiting, completedHash, completedModal, afterDuplicateHash, detailHtml, urls:requestedUrls.slice(), keys };
+                  };
                   globalThis.__smokeRealtime = function(){
                     const listenerLock = { type:'edit_lock_changed', payload:{ targetType:'signal_listener_basic_config', targetId:'test-listener' } };
                     const signalEvent = { type:'channel_metadata_changed', channel:'test.channel' };
@@ -1249,7 +1313,8 @@ public final class StabilizationGuardTest {
                   '#/action-templates',
                   '#/doctor',
                   '#/history',
-                  '#/history?channel=test.channel'
+                  '#/history?channel=test.channel',
+                  '#/virtual-block-devices'
                 ]);
                 const expectedDetailApi = {
                   '#/signals/test.channel':'/api/signals/channels/test.channel',
@@ -1436,6 +1501,32 @@ public final class StabilizationGuardTest {
                     failures.push(`listener config modal: ${err.name}: ${err.message}`);
                   }
                   try {
+                    const selectionModal = await context.__smokeCreateVirtualBlockSelectionModal();
+                    if (!selectionModal.config.includes('data-selection-player-combo="true"') || !selectionModal.config.includes('data-selection-channel-combo="true"') || !selectionModal.config.includes('role="combobox"') || !selectionModal.urls.includes('/api/webadmin/online-players')) {
+                      failures.push('selection modal: missing online player or channel combobox setup');
+                    }
+                    if (!selectionModal.waiting.includes('data-selection-wizard="virtual_block_device"') || !selectionModal.waiting.includes('等待玩家在游戏内右键方块') || !selectionModal.urls.includes('/api/webadmin/selection/start')) {
+                      failures.push('selection modal: start did not render waiting state or call selection API');
+                    }
+                    if (!selectionModal.completedHash.includes('#/devices/vdev-1') || !selectionModal.completedHash.includes('returnTo=%23%2Fvirtual-block-devices')) {
+                      failures.push('selection modal: completed realtime did not navigate with VBD returnTo');
+                    }
+                    if (selectionModal.completedModal.includes('查看设备详情')) {
+                      failures.push('selection modal: completed state kept repeatable detail button');
+                    }
+                    if (selectionModal.afterDuplicateHash !== selectionModal.completedHash) {
+                      failures.push('selection modal: duplicate cancelled event changed completed route');
+                    }
+                    if (!selectionModal.detailHtml.includes('#/virtual-block-devices') || !selectionModal.detailHtml.includes('返回上一页')) {
+                      failures.push('selection detail returnTo: device detail did not preserve virtual block return target');
+                    }
+                    if (!selectionModal.keys.includes('virtualBlockDevices') || !selectionModal.keys.includes('deviceDetail:vdev-1')) {
+                      failures.push('selection realtime: route dirty mapping missing VBD list or device detail');
+                    }
+                  } catch (err) {
+                    failures.push(`selection modal: ${err.name}: ${err.message}`);
+                  }
+                  try {
                     const realtime = context.__smokeRealtime();
                     if (realtime.listenerRef !== 'test-listener' || !realtime.listenerShould || !String(realtime.listenerKeys || '').includes('listenerDetail:test-listener')) {
                       failures.push('realtime: signal listener basic config lock event does not mark listener detail dirty');
@@ -1498,6 +1589,141 @@ public final class StabilizationGuardTest {
         WebAdminRealtimeEventBus.unsubscribe(client);
         requireEquals(0, WebAdminRealtimeEventBus.clientCount(), "realtime client unsubscribed");
         WebAdminRealtimeEventBus.closeAll();
+    }
+
+    private static void testWebAdminSelectionFoundation() throws Exception {
+        requireEquals(WebAdminSelectionPurpose.CREATE_VIRTUAL_BLOCK_DEVICE, WebAdminSelectionPurpose.parse("create_virtual_block_device"),
+                "selection purpose parses create_virtual_block_device");
+        requireEquals(null, WebAdminSelectionPurpose.parse("unsupported"), "unsupported selection purpose is rejected");
+
+        WebAdminSelectionStartRequest valid = new WebAdminSelectionStartRequest();
+        valid.purpose = "create_virtual_block_device";
+        valid.targetPlayerName = "Owner";
+        valid.channel = "guard.channel";
+        valid.displayName = "Guard VBD";
+        valid.note = "";
+        valid.iconKey = "auto";
+        valid.enabled = Boolean.TRUE;
+        requireTrue(WebAdminSelectionService.validateStartRequest(valid).isEmpty(), "valid VBD selection start request is accepted");
+
+        WebAdminSelectionStartRequest missingPlayer = new WebAdminSelectionStartRequest();
+        missingPlayer.purpose = "create_virtual_block_device";
+        missingPlayer.channel = "guard.channel";
+        requireFalse(WebAdminSelectionService.validateStartRequest(missingPlayer).isEmpty(), "selection start requires target player");
+
+        WebAdminSelectionStartRequest invalidChannel = new WebAdminSelectionStartRequest();
+        invalidChannel.purpose = "create_virtual_block_device";
+        invalidChannel.targetPlayerName = "Owner";
+        invalidChannel.channel = "Bad Channel";
+        requireFalse(WebAdminSelectionService.validateStartRequest(invalidChannel).isEmpty(), "selection start rejects invalid channel");
+
+        WebAdminSelectionStartRequest invalidEnabled = new WebAdminSelectionStartRequest();
+        invalidEnabled.purpose = "create_virtual_block_device";
+        invalidEnabled.targetPlayerName = "Owner";
+        invalidEnabled.channel = "guard.channel";
+        invalidEnabled.enabled = "true";
+        requireFalse(WebAdminSelectionService.validateStartRequest(invalidEnabled).isEmpty(), "selection start rejects non-boolean enabled");
+
+        WebAdminPermissionService permissions = new WebAdminPermissionService();
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.START_OBJECT_SELECTION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.START_OBJECT_SELECTION, false);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.START_OBJECT_SELECTION, true);
+        requirePermission(permissions, WebAdminRole.OWNER, WebAdminOperationType.START_OBJECT_SELECTION, true);
+
+        for (WebAdminRealtimeEventType type : List.of(
+                WebAdminRealtimeEventType.SELECTION_STARTED,
+                WebAdminRealtimeEventType.SELECTION_COMPLETED,
+                WebAdminRealtimeEventType.SELECTION_CANCELLED,
+                WebAdminRealtimeEventType.SELECTION_FAILED
+        )) {
+            requireNotBlank(type.id(), "selection realtime event type id present");
+            requireContains(type.id(), "selection_", "selection realtime event type has selection prefix");
+        }
+
+        Path root = Path.of("").toAbsolutePath();
+        String client = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminSelectionClient.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/selection/WebAdminSelectionSessions.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSelectionService.java"), StandardCharsets.UTF_8);
+        String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String mouseMixin = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/mixin/CameraModeMouseMixin.java"), StandardCharsets.UTF_8);
+        String network = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSelectionPayloads.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSelectionC2SPayload.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSelectionS2CPayload.java"), StandardCharsets.UTF_8);
+
+        for (String marker : List.of(
+                "ClientPlayNetworking.registerGlobalReceiver",
+                "handleKey",
+                "input.isEscape()",
+                "cancelFromClient(\"esc\")",
+                "completeFromCrosshair",
+                "shouldConsumeMouseClick",
+                "shouldConsumeMouseScroll",
+                "inventoryKey",
+                "setScreen(null)",
+                "ensureGameInputCaptured",
+                "isCursorLocked",
+                "lockCursor",
+                "clearPressedInputs",
+                "getScaledWindowWidth",
+                "trimToWidth",
+                "CameraModeClient.deactivate",
+                "右键方块确认",
+                "ESC 取消"
+        )) {
+            requireContains(client, marker, "client selection mode marker present: " + marker);
+        }
+        requireTrue(countOccurrences(client, "ensureGameInputCaptured(client)") >= 2, "client selection mode captures mouse on activate and tick");
+        requireFalse(client.contains("extends Screen"), "client selection mode does not open a Screen");
+        requireFalse(client.contains("setTimeout") || client.contains("timeout"), "client selection mode has no auto timeout marker");
+
+        for (String marker : List.of(
+                "Map<String, WebAdminSelectionSession>",
+                "ACTIVE_BY_PLAYER",
+                "currentServer",
+                "cancelForDisconnect",
+                "clearAll",
+                "findVirtualBlockDevice",
+                "MAX_SELECTION_DISTANCE_SQUARED",
+                "squaredDistanceTo",
+                "playerRaycastMatches",
+                "TERMINAL_STATUS",
+                "isChunkLoaded",
+                "state.isAir()",
+                "isDedicatedSignalDevice",
+                "upsertVirtualBlock",
+                "Formatting.GREEN",
+                "SELECTION_COMPLETED",
+                "SELECTION_CANCELLED",
+                "SELECTION_FAILED"
+        )) {
+            requireContains(server, marker, "server selection lifecycle marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "START_OBJECT_SELECTION",
+                "requireValidCsrf",
+                "sameOrigin",
+                "WebAdminWriteResult",
+                "WebAdminAuditLogger.writeEvent",
+                "validateStartRequest"
+        )) {
+            requireContains(service, marker, "selection service security marker present: " + marker);
+        }
+        for (String route : List.of(
+                "/api/webadmin/selection/start",
+                "/api/webadmin/selection/cancel",
+                "/api/webadmin/selection/status",
+                "/api/webadmin/online-players"
+        )) {
+            requireContains(webServer, route, "selection API route present: " + route);
+        }
+        requireContains(mouseMixin, "WebAdminSelectionClient.shouldConsumeMouseClick(click)", "selection mouse click mixin marker present");
+        requireContains(mouseMixin, "WebAdminSelectionClient.shouldConsumeMouseScroll()", "selection mouse scroll mixin marker present");
+        requireContains(mouseMixin, "ci.cancel()", "selection mouse mixin cancels vanilla input");
+        requireContains(network, "webadmin_selection_c2s", "selection C2S payload registered");
+        requireContains(network, "webadmin_selection_s2c", "selection S2C payload registered");
+        requireContains(network, "playC2S().register", "selection C2S registry present");
+        requireContains(network, "playS2C().register", "selection S2C registry present");
     }
 
     private static void testWebAdminWriteFoundation() throws Exception {
@@ -2115,6 +2341,7 @@ public final class StabilizationGuardTest {
         requireContains(capabilitiesJson, "deviceExtendedConfigWriteEnabled", "capabilities describe extended config write stage");
         requireContains(capabilitiesJson, "channelMetadataWriteEnabled", "capabilities describe channel metadata write stage");
         requireContains(capabilitiesJson, "signalListenerBasicConfigWriteEnabled", "capabilities describe signal listener write stage");
+        requireContains(capabilitiesJson, "objectSelectionEnabled", "capabilities describe object selection write stage");
         requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
         requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
         requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
@@ -2579,6 +2806,19 @@ public final class StabilizationGuardTest {
         if (value == null || value.isBlank()) {
             throw new AssertionError(message + ": expected non-blank value");
         }
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        if (text == null || needle == null || needle.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        int index = 0;
+        while ((index = text.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 
     private static void requireContains(String value, String expectedPart, String message) {

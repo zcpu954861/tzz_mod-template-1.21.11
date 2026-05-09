@@ -13,6 +13,7 @@ import com.zcpu.tzzmod.region.RegionControllerServer;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceInteractionHandler;
 import com.zcpu.tzzmod.task.TaskServer;
+import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionServer;
 
 public final class TzzServerBootstrap {
     private TzzServerBootstrap() {
@@ -32,5 +33,6 @@ public final class TzzServerBootstrap {
         RegionControllerServer.register();
         VirtualBlockDeviceInteractionHandler.register();
         VirtualBlockDeviceContainerHandler.register();
+        WebAdminSelectionServer.register();
     }
 }

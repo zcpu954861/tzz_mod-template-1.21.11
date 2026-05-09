@@ -126,7 +126,7 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,selectionTerminalById:{},deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -198,6 +198,13 @@ public final class WebAdminFrontendScripts {
                 function findChannelOption(channel,options){const name=normalizeChannelName(channel).toLowerCase();if(!name)return null;return (options||[]).find(c=>String(c.channel||'').trim().toLowerCase()===name)||null;}
                 function channelOptionLabel(c){const parts=[`消费者：${consumerCount(c)}`];if(!isBlank(c?.lastTriggeredAt))parts.push(`最近触发：${formatDateTime(c.lastTriggeredAt)}`);if(!isBlank(c?.doctorStatus))parts.push(`诊断：${labelStatus(c.doctorStatus)}`);return parts.join(' · ');}
                 function filteredChannelOptions(options,channel){const query=normalizeChannelName(channel).toLowerCase();const list=(options||[]).filter(c=>!query||String(c.channel||'').toLowerCase().includes(query));return list.slice(0,50);}
+                async function loadOnlinePlayerOptions(force=false){
+                  if(!force&&Array.isArray(appState.onlinePlayerOptions))return appState.onlinePlayerOptions;
+                  try{appState.onlinePlayerOptions=await api('/api/webadmin/online-players');appState.onlinePlayerOptionsError=null;}
+                  catch(err){appState.onlinePlayerOptions=Array.isArray(appState.onlinePlayerOptions)?appState.onlinePlayerOptions:[];appState.onlinePlayerOptionsError=err.message||'在线玩家候选加载失败';}
+                  return appState.onlinePlayerOptions||[];
+                }
+                function filteredOnlinePlayerOptions(options,playerName){const query=String(playerName||'').trim().toLowerCase();const list=(options||[]).filter(p=>!query||String(p.name||'').toLowerCase().includes(query)||String(p.uuid||'').toLowerCase().includes(query));return list.slice(0,50);}
                 function channelComboOptionsHtml(deviceId,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
                   const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
@@ -512,7 +519,7 @@ public final class WebAdminFrontendScripts {
                   return h===r||h.startsWith(r+'/')||h.startsWith(r+'?');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
-                const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
+                const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','selection_started','selection_completed','selection_cancelled','selection_failed','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
                 const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
@@ -581,6 +588,7 @@ public final class WebAdminFrontendScripts {
                   }
                   if(data.type==='heartbeat'||data.type==='realtime_connected')return;
                   markRealtimeRoutesForEvent(data);
+                  handleSelectionRealtimeEvent(data);
                   const hash=currentRouteHash();
                   if(shouldHandleRealtimeEvent(hash,data)){
                     if(document.hidden||appState.realtime.offline){markRealtimeDirty(hash,data);return;}
@@ -626,6 +634,11 @@ public final class WebAdminFrontendScripts {
                     add('dashboard','devices','receivers','virtualBlockDevices','doctor');
                     if(isAny('device_config_changed'))add('config');
                     if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);
+                  }
+                  if(starts('selection_')){
+                    add('dashboard','devices','virtualBlockDevices','history');
+                    const deviceId=event?.deviceId||event?.payload?.deviceId;
+                    if(deviceId)add(`deviceDetail:${deviceId}`);
                   }
                   if(starts('signal_')||isAny('signal_emitted','history_appended','signal_history_appended','channel_metadata_changed','signal_listener_config_changed','signal_config_changed')){
                     add('dashboard','signals','listeners','history','doctor');
@@ -756,6 +769,12 @@ public final class WebAdminFrontendScripts {
                   if(extended&&!(target&&target.closest&&target.closest('.extended-channel-combo'))){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
                   const listener=appState.signalListenerBasicConfigEdit;
                   if(listener&&!(target&&target.closest&&target.closest('.listener-channel-combo'))){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
+                  const selection=appState.selectionCreateVirtualBlock;
+                  if(selection&&selection.step==='config'){
+                    if(!(target&&target.closest&&target.closest('.selection-player-combo'))){selection.playerComboOpen=false;}
+                    if(!(target&&target.closest&&target.closest('.selection-channel-combo'))){selection.channelComboOpen=false;}
+                    syncSelectionCombos();
+                  }
                   const nav=target&&target.closest?target.closest('[data-nav-route]'):null;
                   if(nav){
                     const interactive=target.closest('button,a,input,select,textarea,[data-no-nav]');
@@ -842,6 +861,7 @@ public final class WebAdminFrontendScripts {
                   if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
                   let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该设备详情或设备已被删除。',waButton('返回列表','device',navigationAttr('#/devices'),'ghost'))}${err.status===404?empty('设备不存在或已被删除。'):errorBlock(err.message)}</section>`);return;}
+                  if(!routeInfo.returnTo&&isVirtualBlockDevice(detail))routeInfo.fallback='#/virtual-block-devices';
                   const [debug,history,doctor,lockStatus,basicConfig,extendedConfig]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`)]);
                   detail.metadataLock=lockStatus.ok?lockStatus.data:null;
                   detail.basicConfig=basicConfig.ok?basicConfig.data:null;
@@ -913,9 +933,235 @@ public final class WebAdminFrontendScripts {
                 function canEditDeviceExtendedConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditChannelMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditSignalListenerBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function canStartObjectSelection(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function csrfToken(){return appState.capabilities?.csrf?.token || '';}
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
+                """).append("""
+                function selectionModalDefaultDraft(){
+                  return {step:'config',status:'draft',purpose:'create_virtual_block_device',targetPlayerName:'',channel:'',displayName:'',note:'',iconKey:'auto',enabled:true,selectionId:'',deviceId:'',routeTarget:'',returnTo:'#/virtual-block-devices',message:'',errors:[],saving:false,playerOptions:[],playerOptionsError:null,playerComboOpen:false,playerComboIndex:0,channelOptions:[],channelOptionsError:null,channelComboOpen:false,channelComboIndex:0,terminalStatus:'',terminalEventId:''};
+                }
+                function selectionSourceReturnTo(){
+                  const hash=currentRouteHash();
+                  if(hash==='#/virtual-block-devices'||hash==='#/block-devices'||hash==='#/devices')return hash;
+                  return '#/virtual-block-devices';
+                }
+                function selectionDeviceDetailRoute(deviceId,returnTo){
+                  if(isBlank(deviceId))return '';
+                  const safeReturn=isValidReturnHash(returnTo)?returnTo:'#/virtual-block-devices';
+                  return `#/devices/${encodeURIComponent(deviceId)}?returnTo=${encodeURIComponent(safeReturn)}`;
+                }
+                async function openCreateVirtualBlockDeviceModal(){
+                  waEnsureState();
+                  if(!canStartObjectSelection()){toast('需要 EDITOR 或 OWNER 权限才能新建虚拟方块设备。');return;}
+                  appState.selectionCreateVirtualBlock={...selectionModalDefaultDraft(),returnTo:selectionSourceReturnTo()};
+                  showCreateVirtualBlockDeviceModal();
+                  const [players,channels]=await Promise.all([loadOnlinePlayerOptions(),loadSignalChannelOptions()]);
+                  const draft=appState.selectionCreateVirtualBlock;
+                  if(draft&&draft.step==='config'){
+                    appState.selectionCreateVirtualBlock={...draft,playerOptions:players,playerOptionsError:appState.onlinePlayerOptionsError,channelOptions:channels,channelOptionsError:appState.channelOptionsError};
+                    showCreateVirtualBlockDeviceModal();
+                  }
+                }
+                function selectionDraftFromForm(){
+                  const draft={...(appState.selectionCreateVirtualBlock||selectionModalDefaultDraft())};
+                  const targetInput=document.getElementById('selection-target-player'), channelInput=document.getElementById('selection-channel');
+                  draft.targetPlayerName=targetInput?targetInput.value.trim():(draft.targetPlayerName||'');
+                  draft.channel=channelInput?channelInput.value.trim():(draft.channel||'');
+                  draft.displayName=document.getElementById('selection-display-name')?.value?.trim()||draft.displayName||'';
+                  draft.note=document.getElementById('selection-note')?.value||draft.note||'';
+                  draft.iconKey=document.getElementById('selection-icon-key')?.value||draft.iconKey||'auto';
+                  const enabled=document.getElementById('selection-enabled');
+                  draft.enabled=enabled?!!enabled.checked:draft.enabled!==false;
+                  return draft;
+                }
+                function selectionPlayerOptionsHtml(draft){
+                  if(draft.playerOptionsError||appState.onlinePlayerOptionsError)return '<div class="channel-combo-empty">在线玩家候选加载失败，仍可手动输入玩家名。</div>';
+                  const options=filteredOnlinePlayerOptions(draft.playerOptions||appState.onlinePlayerOptions||[],draft.targetPlayerName), current=String(draft.targetPlayerName||'').trim().toLowerCase(), active=Math.max(0,Number(draft.playerComboIndex||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的在线玩家，可继续手动输入。</div>';
+                  return options.map((p,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(p.name||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSelectionTargetPlayer(${jsString(p.name||'')})`)}><strong>${esc(p.name||'未命名玩家')}</strong><span>UUID：${esc(p.uuid||'-')}</span></button>`).join('');
+                }
+                function renderSelectionPlayerCombo(draft){
+                  const open=draft.playerComboOpen?' open':'';
+                  return `<div id="selection-target-player-combo" class="channel-combo selection-player-combo${open}" data-selection-player-combo="true"><div class="channel-combo-control"><input id="selection-target-player" class="input" maxlength="64" value="${esc(draft.targetPlayerName||'')}" placeholder="选择在线玩家或输入玩家名" autocomplete="off" role="combobox" aria-expanded="${draft.playerComboOpen?'true':'false'}" aria-controls="selection-target-player-menu" onfocus='openSelectionTargetPlayerMenu()' oninput='updateSelectionCombosFromForm("player")' onkeydown='handleSelectionTargetPlayerKey(event)'><button class="channel-combo-toggle" type="button" onclick='toggleSelectionTargetPlayerMenu()' aria-label="显示在线玩家">⌄</button></div><div id="selection-target-player-menu" class="channel-combo-menu" role="listbox">${selectionPlayerOptionsHtml(draft)}</div></div>`;
+                }
+                function selectionChannelOptionsHtml(draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接使用新频道。</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSelectionChannel(${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function renderSelectionChannelCombo(draft){
+                  const open=draft.channelComboOpen?' open':'';
+                  return `<div id="selection-channel-combo" class="channel-combo selection-channel-combo${open}" data-selection-channel-combo="true"><div class="channel-combo-control"><input id="selection-channel" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="selection-channel-menu" onfocus='openSelectionChannelMenu()' oninput='updateSelectionCombosFromForm("channel")' onkeydown='handleSelectionChannelKey(event)'><button class="channel-combo-toggle" type="button" onclick='toggleSelectionChannelMenu()' aria-label="显示已有频道">⌄</button></div><div id="selection-channel-menu" class="channel-combo-menu" role="listbox">${selectionChannelOptionsHtml(draft)}</div></div>`;
+                }
+                function updateSelectionCombosFromForm(openTarget=''){
+                  const draft=appState.selectionCreateVirtualBlock;if(!draft||draft.step!=='config')return;
+                  draft.targetPlayerName=document.getElementById('selection-target-player')?.value||'';
+                  draft.channel=document.getElementById('selection-channel')?.value||'';
+                  if(openTarget==='player'){draft.playerComboOpen=true;draft.playerComboIndex=0;}
+                  if(openTarget==='channel'){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  const hint=document.getElementById('selection-channel-hint');
+                  if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
+                  syncSelectionCombos();
+                }
+                function syncSelectionCombos(){
+                  const draft=appState.selectionCreateVirtualBlock;if(!draft)return;
+                  const playerCombo=document.getElementById('selection-target-player-combo'), playerMenu=document.getElementById('selection-target-player-menu'), playerInput=document.getElementById('selection-target-player');
+                  if(playerCombo)playerCombo.classList.toggle('open',!!draft.playerComboOpen);
+                  if(playerInput)playerInput.setAttribute('aria-expanded',draft.playerComboOpen?'true':'false');
+                  if(playerMenu)playerMenu.innerHTML=selectionPlayerOptionsHtml(draft);
+                  const channelCombo=document.getElementById('selection-channel-combo'), channelMenu=document.getElementById('selection-channel-menu'), channelInput=document.getElementById('selection-channel');
+                  if(channelCombo)channelCombo.classList.toggle('open',!!draft.channelComboOpen);
+                  if(channelInput)channelInput.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
+                  if(channelMenu)channelMenu.innerHTML=selectionChannelOptionsHtml(draft);
+                }
+                function openSelectionTargetPlayerMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.playerComboOpen=true;syncSelectionCombos();}
+                function toggleSelectionTargetPlayerMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.playerComboOpen=!draft.playerComboOpen;syncSelectionCombos();document.getElementById('selection-target-player')?.focus();}
+                function selectSelectionTargetPlayer(playerName){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;draft.targetPlayerName=playerName||'';draft.playerComboOpen=false;draft.playerComboIndex=0;const input=document.getElementById('selection-target-player');if(input)input.value=draft.targetPlayerName;syncSelectionCombos();}
+                function handleSelectionTargetPlayerKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredOnlinePlayerOptions(draft.playerOptions||appState.onlinePlayerOptions||[],document.getElementById('selection-target-player')?.value||draft.targetPlayerName);if(event.key==='Escape'){draft.playerComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.playerComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.playerComboIndex||0)+1:Number(draft.playerComboIndex||0)-1;draft.playerComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.playerComboOpen&&options.length>0){event.preventDefault();selectSelectionTargetPlayer(options[Math.min(options.length-1,Number(draft.playerComboIndex||0))].name);return;}}
+                function openSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=true;syncSelectionCombos();}
+                function toggleSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=!draft.channelComboOpen;syncSelectionCombos();document.getElementById('selection-channel')?.focus();}
+                function selectSelectionChannel(channel){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('selection-channel'), hint=document.getElementById('selection-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSelectionCombos();}
+                function handleSelectionChannelKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('selection-channel')?.value||draft.channel);if(event.key==='Escape'){draft.channelComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSelectionChannel(options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}}
+                function selectionErrorsHtml(draft){
+                  const errors=(draft?.errors||[]).filter(Boolean);
+                  if(!errors.length)return '';
+                  return `<ul class="validation-list">${errors.map(err=>`<li>${esc(err.field?`${err.field}：`: '')}${esc(err.message||err||'选择请求失败')}</li>`).join('')}</ul>`;
+                }
+                function selectionStatusTone(status){
+                  const value=String(status||'').toLowerCase();
+                  if(value==='completed')return 'ok';
+                  if(value==='failed')return 'error';
+                  if(value==='cancelled')return 'warning';
+                  return 'info';
+                }
+                function selectionModalBody(draft){
+                  const d=draft||selectionModalDefaultDraft(), errors=selectionErrorsHtml(d);
+                  if(d.step==='waiting'){
+                    return `<div class="wa-selection-wizard" data-selection-wizard="virtual_block_device"><div class="wa-selection-status info"><strong>等待玩家在游戏内右键方块</strong><span>目标玩家：${esc(d.targetPlayerName||'-')} · Session：${esc(d.selectionId||'-')}</span><span>客户端会显示“选择虚拟方块设备目标 / 右键方块确认 / ESC 取消”。选择模式不会影响移动和视角。</span></div>${errors}</div>`;
+                  }
+                  if(d.step==='completed'){
+                    return `<div class="wa-selection-wizard" data-selection-wizard="virtual_block_device"><div class="wa-selection-status ok"><strong>选择完成</strong><span>${esc(d.message||'虚拟方块设备已创建。')}</span>${d.deviceId?`<span>设备 ID：${esc(d.deviceId)}</span>`:''}<span>正在进入设备详情...</span></div></div>`;
+                  }
+                  if(d.step==='cancelled'||d.step==='failed'){
+                    return `<div class="wa-selection-wizard" data-selection-wizard="virtual_block_device"><div class="wa-selection-status ${selectionStatusTone(d.step)}"><strong>${d.step==='failed'?'选择失败':'选择已取消'}</strong><span>${esc(d.message||'本次选择未创建设备。')}</span></div>${errors}</div>`;
+                  }
+                  return `<form class="edit-form wa-selection-form" data-selection-wizard="virtual_block_device" ${htmlEvent('onsubmit','event.preventDefault();startCreateVirtualBlockDeviceSelection()')}>
+                    <div class="wa-selection-grid">
+                      <label>目标在线玩家${renderSelectionPlayerCombo(d)}<span class="muted">可选择当前在线玩家，也可手动输入玩家名。</span></label>
+                      <label>Channel${renderSelectionChannelCombo(d)}<span id="selection-channel-hint" class="muted">${channelHintHtml(d.channel,d.channelOptions||appState.channelOptions||[],d.channelOptionsError||appState.channelOptionsError)}</span></label>
+                      <label>显示名<input id="selection-display-name" class="input" maxlength="64" value="${esc(d.displayName||'')}" placeholder="可选，仅用于 WebAdmin 展示"></label>
+                      <label>图标<select id="selection-icon-key" class="select">${metadataIconOptions().map(k=>`<option value="${esc(k)}" ${k===(d.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(k))}</option>`).join('')}</select></label>
+                    </div>
+                    <label>备注<textarea id="selection-note" maxlength="512" placeholder="可选，仅用于 WebAdmin 展示">${esc(d.note||'')}</textarea></label>
+                    <label class="check-row"><input id="selection-enabled" type="checkbox" ${d.enabled!==false?'checked':''}><span>创建后启用设备</span></label>
+                    <p class="readonly-note">开始后目标玩家客户端进入选择模式。右键任意方块都会作为目标选择，并阻断原方块交互、手持物品使用和 GUI 打开。</p>
+                    ${errors}
+                  </form>`;
+                }
+                function selectionModalFooter(draft){
+                  const d=draft||selectionModalDefaultDraft();
+                  if(d.step==='waiting')return `${waButton('取消选择','close',d.saving?'disabled':htmlHandler('cancelCreateVirtualBlockDeviceSelection()'),'danger')}${waButton('等待玩家选择','virtual-block-device','disabled','primary')}`;
+                  if(d.step==='completed')return `${waButton('正在进入详情','eye','disabled','primary')}`;
+                  if(d.step==='cancelled'||d.step==='failed')return `${waButton('返回配置','settings',htmlHandler('resetCreateVirtualBlockDeviceModalToConfig()'),'ghost')}${waButton('关闭','close',htmlHandler('closeCreateVirtualBlockDeviceModal(false)'),'primary')}`;
+                  return `${waButton('取消','close',htmlHandler('closeCreateVirtualBlockDeviceModal(false)'),'ghost')}${waButton(d.saving?'开始中...':'开始选择','virtual-block-device',d.saving?'disabled':htmlHandler('startCreateVirtualBlockDeviceSelection()'),'primary')}`;
+                }
+                function showCreateVirtualBlockDeviceModal(){
+                  const draft=appState.selectionCreateVirtualBlock||selectionModalDefaultDraft();
+                  openWebAdminModal('新建虚拟方块设备',selectionModalBody(draft),selectionModalFooter(draft),{className:'wa-selection-modal',onClose:()=>closeCreateVirtualBlockDeviceModal(true)});
+                }
+                function writeSelectionData(result){return result?.data?.selection||result?.data||result?.selection||{};}
+                function writeResultErrors(result,fallback){return result?.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result?.message||fallback||'选择请求失败'}];}
+                function selectionTerminalStatus(type){const t=String(type||'');if(t==='selection_completed')return 'completed';if(t==='selection_cancelled')return 'cancelled';if(t==='selection_failed')return 'failed';return '';}
+                function shouldIgnoreSelectionTerminal(selectionId,status,eventId=''){
+                  if(isBlank(selectionId)||isBlank(status))return false;
+                  const existing=appState.selectionTerminalById[selectionId];
+                  if(!existing)return false;
+                  if(existing.eventId&&eventId&&existing.eventId===eventId)return true;
+                  return ['completed','cancelled','failed'].includes(existing.status);
+                }
+                function markSelectionTerminal(selectionId,status,eventId=''){
+                  if(isBlank(selectionId)||isBlank(status))return;
+                  if(!appState.selectionTerminalById[selectionId])appState.selectionTerminalById[selectionId]={status,eventId};
+                }
+                async function startCreateVirtualBlockDeviceSelection(){
+                  if(!canStartObjectSelection())return;
+                  const draft=selectionDraftFromForm();
+                  draft.saving=true;draft.errors=[];draft.message='';
+                  appState.selectionCreateVirtualBlock=draft;showCreateVirtualBlockDeviceModal();
+                  try{
+                    const result=await api('/api/webadmin/selection/start',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({purpose:'create_virtual_block_device',targetPlayerName:draft.targetPlayerName,channel:draft.channel,displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey,enabled:draft.enabled})});
+                    const selection=writeSelectionData(result);
+                    if(result.success){
+                      appState.selectionCreateVirtualBlock={...draft,...selection,step:'waiting',status:'started',saving:false,selectionId:selection.selectionId||result.targetId||draft.selectionId,message:result.message||'已通知目标玩家进入选择模式。',errors:[]};
+                      showCreateVirtualBlockDeviceModal();
+                      toast('已通知目标玩家进入选择模式。');
+                      return;
+                    }
+                    draft.saving=false;draft.errors=writeResultErrors(result,'无法开始选择。');draft.message=result.message||'无法开始选择。';appState.selectionCreateVirtualBlock=draft;showCreateVirtualBlockDeviceModal();toast(draft.message);
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'无法开始选择。'}];draft.message=err.message||'无法开始选择。';appState.selectionCreateVirtualBlock=draft;showCreateVirtualBlockDeviceModal();toast(draft.message);}
+                }
+                async function cancelCreateVirtualBlockDeviceSelection(){
+                  const draft=appState.selectionCreateVirtualBlock||selectionModalDefaultDraft();
+                  if(draft.terminalStatus||shouldIgnoreSelectionTerminal(draft.selectionId,draft.status)){return;}
+                  if(!draft.selectionId){appState.selectionCreateVirtualBlock={...draft,step:'cancelled',status:'cancelled',message:'已取消选择。'};showCreateVirtualBlockDeviceModal();return;}
+                  draft.saving=true;draft.errors=[];appState.selectionCreateVirtualBlock=draft;showCreateVirtualBlockDeviceModal();
+                  try{
+                    const result=await api('/api/webadmin/selection/cancel',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({selectionId:draft.selectionId,reason:'WebAdmin 已取消选择。'})});
+                    const selection=writeSelectionData(result);
+                    const returnedStatus=String(selection.status||'').toLowerCase(), finalStatus=result.success&&['completed','cancelled','failed'].includes(returnedStatus)?returnedStatus:(result.success?'cancelled':'failed');
+                    markSelectionTerminal(draft.selectionId,finalStatus,'cancel-api');
+                    if(finalStatus==='completed'){
+                      const deviceId=String(selection.deviceId||draft.deviceId||''), routeTarget=selectionDeviceDetailRoute(deviceId,draft.returnTo||'#/virtual-block-devices');
+                      appState.selectionCreateVirtualBlock={...draft,...selection,step:'completed',status:'completed',terminalStatus:'completed',saving:false,deviceId,routeTarget,message:selection.message||result.message||'虚拟方块设备已创建。',errors:[]};
+                      showCreateVirtualBlockDeviceModal();
+                      if(routeTarget){dismissWebAdminModal();appState.selectionCreateVirtualBlock=null;location.hash=routeTarget;}
+                      return;
+                    }
+                    appState.selectionCreateVirtualBlock={...draft,...selection,step:finalStatus,status:finalStatus,terminalStatus:finalStatus,saving:false,message:result.message||selection.message||'选择已取消。',errors:result.success?[]:writeResultErrors(result,'取消选择失败。')};
+                    showCreateVirtualBlockDeviceModal();
+                    toast(result.message||'选择已取消。');
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'取消选择失败。'}];draft.message=err.message||'取消选择失败。';appState.selectionCreateVirtualBlock=draft;showCreateVirtualBlockDeviceModal();toast(draft.message);}
+                }
+                async function closeCreateVirtualBlockDeviceModal(cancelActive){
+                  const draft=appState.selectionCreateVirtualBlock;
+                  if(cancelActive&&draft&&draft.step==='waiting'&&draft.selectionId&&!draft.terminalStatus&&!shouldIgnoreSelectionTerminal(draft.selectionId,draft.status)){
+                    try{await api('/api/webadmin/selection/cancel',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({selectionId:draft.selectionId,reason:'WebAdmin modal closed.'})});}catch(_){}
+                  }
+                  appState.selectionCreateVirtualBlock=null;
+                  await dismissWebAdminModal();
+                }
+                function resetCreateVirtualBlockDeviceModalToConfig(){
+                  const current=appState.selectionCreateVirtualBlock||selectionModalDefaultDraft();
+                  appState.selectionCreateVirtualBlock={...selectionModalDefaultDraft(),targetPlayerName:current.targetPlayerName||'',channel:current.channel||'',displayName:current.displayName||'',note:current.note||'',iconKey:current.iconKey||'auto',enabled:current.enabled!==false,returnTo:current.returnTo||selectionSourceReturnTo(),playerOptions:current.playerOptions||appState.onlinePlayerOptions||[],playerOptionsError:current.playerOptionsError||appState.onlinePlayerOptionsError,channelOptions:current.channelOptions||appState.channelOptions||[],channelOptionsError:current.channelOptionsError||appState.channelOptionsError};
+                  showCreateVirtualBlockDeviceModal();
+                }
+                function handleSelectionRealtimeEvent(event){
+                  const draft=appState.selectionCreateVirtualBlock;
+                  if(!draft||!draft.selectionId)return;
+                  const payload=event?.payload||{}, selectionId=String(event?.selectionId||payload.selectionId||'');
+                  if(selectionId&&selectionId!==draft.selectionId)return;
+                  const type=String(event?.type||'');
+                  const terminal=selectionTerminalStatus(type), eventId=String(event?.id||event?.seq||'');
+                  if(terminal&&shouldIgnoreSelectionTerminal(draft.selectionId,terminal,eventId))return;
+                  if(type==='selection_completed'){
+                    const deviceId=String(event?.deviceId||payload.deviceId||''), routeTarget=selectionDeviceDetailRoute(deviceId,draft.returnTo||'#/virtual-block-devices');
+                    markSelectionTerminal(draft.selectionId,'completed',eventId);
+                    appState.selectionCreateVirtualBlock={...draft,...payload,step:'completed',status:'completed',terminalStatus:'completed',deviceId,routeTarget,message:event?.summary||payload.message||'虚拟方块设备已创建。',errors:[],saving:false};
+                    showCreateVirtualBlockDeviceModal();
+                    toast('虚拟方块设备已创建。');
+                    if(routeTarget){dismissWebAdminModal();appState.selectionCreateVirtualBlock=null;location.hash=routeTarget;}
+                  }else if(type==='selection_cancelled'){
+                    markSelectionTerminal(draft.selectionId,'cancelled',eventId);
+                    appState.selectionCreateVirtualBlock={...draft,...payload,step:'cancelled',status:'cancelled',terminalStatus:'cancelled',message:event?.summary||payload.message||'选择已取消。',errors:[],saving:false};
+                    showCreateVirtualBlockDeviceModal();
+                  }else if(type==='selection_failed'){
+                    markSelectionTerminal(draft.selectionId,'failed',eventId);
+                    appState.selectionCreateVirtualBlock={...draft,...payload,step:'failed',status:'failed',terminalStatus:'failed',message:event?.summary||payload.message||'选择失败。',errors:[{message:event?.summary||payload.message||'选择失败。'}],saving:false};
+                    showCreateVirtualBlockDeviceModal();
+                  }
+                }
                 function deviceMetadataCard(detail){
                   const meta=detail.metadata||{}, lock=detail.metadataLock||{}, editable=canEditDeviceMetadata(), editing=appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
                   const editingAction=editing?`<button class="secondary" onclick='showDeviceMetadataEditModal(${jsString(detail.id)})'>继续编辑</button>`:'';
@@ -1983,6 +2229,7 @@ public final class WebAdminFrontendScripts {
                   appState.regionFilters=appState.regionFilters||{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};
                   appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
                   appState.advancedDetailOpen=appState.advancedDetailOpen||{};
+                  if(appState.selectionCreateVirtualBlock===undefined)appState.selectionCreateVirtualBlock=null;
                 }
                 function waMetric(label,value,sub='',iconName='dashboard',kind=''){
                   return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
@@ -2695,7 +2942,7 @@ public final class WebAdminFrontendScripts {
                   const conditions=devices.some(d=>!isBlank(virtualConditionText(d))&&virtualConditionText(d)!=='--')?waCount(devices,d=>virtualConditionText(d)!=='--'):'--';
                   const interact=devices.some(d=>!isBlank(virtualConfig(d).interactionEnabled))?waCount(devices,d=>!!virtualConfig(d).interactionEnabled):'--';
                   const rendered=setView(`<section class="wa-page">
-                    ${waPageHead('虚拟方块设备','绑定已有 Minecraft 方块作为虚拟事件源；方块材质不使用 WebAdmin 图标伪造。',`${waButton('添加虚拟设备','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','danger')}`)}
+                    ${waPageHead('虚拟方块设备','绑定已有 Minecraft 方块作为虚拟事件源；方块材质不使用 WebAdmin 图标伪造。',`${canStartObjectSelection()?waButton('新建虚拟方块设备','plus',htmlHandler('openCreateVirtualBlockDeviceModal()'),'primary'):waButton('新建虚拟方块设备','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','danger')}`)}
                     <section class="wa-card-grid">
                       ${waMetric('虚拟设备总数',devices.length,'type=virtual_block_device','virtual-block-device')}
                       ${waMetric('启用中',enabled,'enabled=true','enabled','ok')}

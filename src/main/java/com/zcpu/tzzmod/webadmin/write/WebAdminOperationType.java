@@ -10,6 +10,7 @@ public enum WebAdminOperationType {
     EDIT_DEVICE_EXTENDED_CONFIG("EDIT_DEVICE_EXTENDED_CONFIG", "编辑 WebAdmin 设备扩展配置"),
     EDIT_CHANNEL_METADATA("EDIT_CHANNEL_METADATA", "编辑 WebAdmin 频道显示信息"),
     EDIT_SIGNAL_LISTENER_BASIC_CONFIG("EDIT_SIGNAL_LISTENER_BASIC_CONFIG", "编辑 Signal Listener 基础配置"),
+    START_OBJECT_SELECTION("START_OBJECT_SELECTION", "发起 WebAdmin 对象选择"),
     EDIT_DEVICE("EDIT_DEVICE", "编辑设备配置"),
     EDIT_SIGNAL("EDIT_SIGNAL", "编辑 Signal 配置"),
     EDIT_REGION("EDIT_REGION", "编辑区域配置"),

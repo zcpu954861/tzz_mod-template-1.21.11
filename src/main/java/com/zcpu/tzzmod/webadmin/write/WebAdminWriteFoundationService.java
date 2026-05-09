@@ -24,7 +24,8 @@ public final class WebAdminWriteFoundationService {
         data.put("deviceExtendedConfigWriteEnabled", true);
         data.put("channelMetadataWriteEnabled", true);
         data.put("signalListenerBasicConfigWriteEnabled", true);
-        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、频道显示信息以及 Signal Listener 基础配置写入。");
+        data.put("objectSelectionEnabled", true);
+        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、频道显示信息、Signal Listener 基础配置写入以及对象选择创建。");
         data.put("permissions", permissionService.capabilitySummary(user == null ? null : user.roleEnum()));
         Map<String, Object> csrf = new LinkedHashMap<>();
         csrf.put("requiredForFutureWrites", true);
@@ -42,7 +43,8 @@ public final class WebAdminWriteFoundationService {
                     && operation != WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG
                     && operation != WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG
                     && operation != WebAdminOperationType.EDIT_CHANNEL_METADATA
-                    && operation != WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG);
+                    && operation != WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG
+                    && operation != WebAdminOperationType.START_OBJECT_SELECTION);
             operations.add(entry);
         }
         data.put("operations", operations);
