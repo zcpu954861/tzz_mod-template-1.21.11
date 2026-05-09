@@ -140,6 +140,13 @@ public final class SignalBridgeServer {
         SignalEventHistory.clear();
     }
 
+    public static void clearListenerRuntime(String listenerId) {
+        if (listenerId == null || listenerId.isBlank()) {
+            return;
+        }
+        LAST_TRIGGER_TICKS.remove(listenerId);
+    }
+
     public static int currentDepth() {
         return CURRENT_DEPTH.get();
     }

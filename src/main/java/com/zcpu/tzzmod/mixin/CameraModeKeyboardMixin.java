@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.mixin;
 
 import com.zcpu.tzzmod.client.photo.CameraModeClient;
+import com.zcpu.tzzmod.client.webadmin.WebAdminSelectionClient;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -17,6 +18,10 @@ public class CameraModeKeyboardMixin {
 
     @Inject(method = "onKey", at = @At("HEAD"), cancellable = true)
     private void tzz_handleCameraModeKey(long window, int action, KeyInput input, CallbackInfo ci) {
+        if (WebAdminSelectionClient.handleKey(MinecraftClient.getInstance(), action, input)) {
+            ci.cancel();
+            return;
+        }
         if (CameraModeClient.handleKey(MinecraftClient.getInstance(), action, input)) {
             ci.cancel();
         }

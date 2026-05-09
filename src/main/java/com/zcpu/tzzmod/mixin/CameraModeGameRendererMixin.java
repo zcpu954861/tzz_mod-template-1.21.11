@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.mixin;
 
 import com.zcpu.tzzmod.client.photo.CameraModeClient;
+import com.zcpu.tzzmod.client.webadmin.WebAdminSelectionClient;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.DrawContext;
@@ -28,6 +29,7 @@ public class CameraModeGameRendererMixin {
     private void tzz_renderCameraOverlayOrHud(InGameHud hud, DrawContext context, RenderTickCounter tickCounter) {
         if (!CameraModeClient.isActive()) {
             hud.render(context, tickCounter);
+            WebAdminSelectionClient.render(context);
             return;
         }
         if (!CameraModeClient.captureCurrentFrame()) {
@@ -76,7 +78,7 @@ public class CameraModeGameRendererMixin {
 
     @Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)
     private void tzz_skipHandAndHeldItemDuringCamera(float tickProgress, boolean renderBlockOutline, Matrix4f projectionMatrix, CallbackInfo ci) {
-        if (CameraModeClient.isActive()) {
+        if (CameraModeClient.isActive() || WebAdminSelectionClient.isActive()) {
             ci.cancel();
         }
     }

@@ -21,6 +21,7 @@ import com.zcpu.tzzmod.client.map.MapClient;
 import com.zcpu.tzzmod.client.map.MapHighlightRenderer;
 import com.zcpu.tzzmod.client.password.PasswordClient;
 import com.zcpu.tzzmod.client.photo.CameraModeClient;
+import com.zcpu.tzzmod.client.webadmin.WebAdminSelectionClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
 import com.zcpu.tzzmod.ModItem.ModItems;
@@ -161,6 +162,7 @@ public class Tzz_modClient implements ClientModInitializer {
         BlockingCardClient.register();
         com.zcpu.tzzmod.client.photo.GalleryClient.register();
         com.zcpu.tzzmod.client.phone.PhoneAppsClient.register();
+        WebAdminSelectionClient.register();
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, MAIN_HUD_LAYER_ID, (context, tickCounter) -> {
             // render the player's head and ID in the top-left
             com.zcpu.tzzmod.client.PlayerHeadHudOverlay.render(context);
@@ -175,6 +177,10 @@ public class Tzz_modClient implements ClientModInitializer {
         // AR headset keybind tick
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             CameraModeClient.tick(client);
+            WebAdminSelectionClient.tick(client);
+            if (WebAdminSelectionClient.isActive()) {
+                return;
+            }
             KeyBinding headsetKey = arHeadsetKey;
             if (headsetKey == null) {
                 return;

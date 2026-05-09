@@ -12,6 +12,35 @@
 
 **7.5 WebAdmin Frontend Refactor / Step 5.5 文档同步与 7.6 规划准备**
 
+### 2026-05-09 7.6 当前分支说明
+
+当前后续开发已进入独立分支上的 7.6 第一阶段 MVP，名称为：
+
+**WebAdmin Object Lifecycle + Client Selection Foundation**
+
+第一阶段已完成并通过用户手动验收，checkpoint commit 为 `eab82bb`。第一阶段允许新增且仅新增 WebAdmin 新建 `virtual_block_device` 所需的选择模式 API、client selection payload、server-side in-memory selection session 和 WebAdmin modal 入口。范围限定为：
+
+- WebAdmin 发起 `create_virtual_block_device` 选择 session。
+- 指定目标在线玩家。
+- 目标玩家客户端显示选择模式 UI。
+- 选择模式 UI 必须兼容 Minecraft 小窗口与不同 GUI scale，文字需裁剪或自适应，不能遮挡准星或核心视野。
+- 选择模式右键任意方块完成选择，不要求空手。
+- 选择模式阻断原方块交互、物品使用、背包和其它 GUI 打开，但不影响移动和视角。
+- ESC 取消。
+- 服务端创建 `virtual_block_device`，不 setblock，不覆盖已有 VBD。
+- 创建成功只给目标玩家发送绿色聊天提示。
+- WebAdmin 通过 realtime 刷新并进入或提示新设备结果。
+
+第二阶段当前范围是在同一 feature 分支上补齐最小对象生命周期：
+
+- WebAdmin 删除 / 解绑 `virtual_block_device`：只删除 `SignalDeviceStore` / WebAdmin registry 配置，不 setblock，不破坏世界方块，不删除其它 Signal 设备类型。
+- WebAdmin 新建 `SignalListener`：最小字段为 name/displayName、channel、enabled、cooldownTicks；默认 actions 为空，不创建 matcher、itemSubmit 或 ConditionEngine。
+- WebAdmin 删除 `SignalListener`：删除该 listener 内嵌 action 引用，但不删除 channel、receiver、device 或历史记录。
+- 新增 API 必须接入 EDITOR / OWNER 权限、CSRF、same-origin、`WebAdminWriteResult`、audit 和 realtime。
+- UI 必须使用 7.5 fixed modal、暗色 channel combobox、dangerous confirm modal、silent refresh 和安全 returnTo。
+
+7.6 第二阶段仍不做 interaction matcher、itemSubmit、consume / inventory / equipment、Action list 完整编辑、ConditionEngine、Scratch-like editor、GameController、phone/task/blocking/password 联动、region 编辑或 Figma 修改。
+
 Step 1、Step 2、Step 2.5、Step 3 和 Step 4 已完成代码层落地。当前 Step 5 已补强 route / render / realtime 稳定化守卫；Step 5.5 只同步当前状态与 7.6 规划建议，不进入 7.6 代码实现。
 
 Step 1 已落地 3 个代表页面：
@@ -94,6 +123,7 @@ Step 5 已补强 `stabilizationGuardTest` 对当前 7.5 route、render、disable
 - 当前已有详情子页面已重新统一到 7.5 detail shell：设备详情、频道详情、动作详情、区域详情和监听器详情均使用 `wa-detail-shell`、详情 Header、Tabs、first row（基本信息 + 状态统计）、second row（列表 / 最近事件 / 分布 / 右侧信息栈）和默认折叠的“完整详情”卡片。频道详情和监听器详情只参考 Figma 的信息架构与视觉密度，不做像素照搬；详情页不再使用顶部一整排 metrics 或旧式纵向堆叠作为主结构。
 - “完整详情”卡用于承载低频字段、runtime/debug、fingerprint/version/timestamp、configSummary 和 DTO 中不适合放进主信息卡的字段；默认折叠，展开后内部滚动，silent refresh 不应重置展开状态，也不能替代主布局。
 - 已有安全编辑能力继续保留并迁移到 7.5 modal：device metadata、device basic config、device extended config、channel metadata、signal listener basic config 仍使用原有 CSRF / edit lock / WebAdminWriteResult 链路，不新增写 API。Modal 使用固定窗口、backdrop blur、淡入淡出、body 内部滚动和固定 header/footer；无后端支持的新增、删除、复杂编辑、动作链和导入导出仍保持 disabled / unavailable。
+- 7.6 第二阶段新增的 VBD 删除 / 解绑、SignalListener 新建和 SignalListener 删除也必须走 WebAdmin 写安全链路：EDITOR / OWNER、CSRF、same-origin、`WebAdminWriteResult`、audit、realtime 和明确确认。VBD 删除只删配置不破坏方块；SignalListener 新建默认 actions 为空；SignalListener 删除不删除 channel、receiver、device 或历史记录。
 - Step 5 稳定化已将动作模板、Doctor alias、频道详情、设备详情、动作详情、区域详情、监听器详情纳入 route / render / realtime smoke guard；detail smoke 会实际执行 `#/devices/test-device`、`#/signals/test.channel`、`#/actions/test-action`、`#/regions/test-region`、`#/listeners/test-listener`、`#/signal-listeners/test-listener`，并检查 detail shell、tabs、左右结构、折叠完整详情、modal silent refresh 和 realtime listener dirty mapping。继续禁止 `setInterval` 高频 polling 和整页 reload。
 - 配置管理复用 `/api/webadmin/settings`、`/api/status`、`/api/webadmin/write/capabilities`，只读展示配置文件、服务、存储、审计和安全边界；发布、回滚、Diff、导入覆盖等真实配置版本系统仍未实现。
 - 用户与权限复用 `/api/webadmin/users`，只读展示用户、角色、在线状态和权限概览；不实现真实用户权限写入、重置密码、踢出会话或删除用户。

@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.mixin;
 
 import com.zcpu.tzzmod.client.photo.CameraModeClient;
+import com.zcpu.tzzmod.client.webadmin.WebAdminSelectionClient;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.Click;
@@ -17,13 +18,22 @@ public class CameraModeMouseMixin {
 
     @Inject(method = "onMouseButton", at = @At("HEAD"), cancellable = true)
     private void tzz_blockCameraMouseButtons(long window, MouseInput input, int action, CallbackInfo ci) {
-        if (action == 1 && CameraModeClient.shouldConsumeMouseClick(new Click(0.0D, 0.0D, input))) {
+        Click click = new Click(0.0D, 0.0D, input);
+        if (action == 1 && WebAdminSelectionClient.shouldConsumeMouseClick(click)) {
+            ci.cancel();
+            return;
+        }
+        if (action == 1 && CameraModeClient.shouldConsumeMouseClick(click)) {
             ci.cancel();
         }
     }
 
     @Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)
     private void tzz_blockCameraMouseScroll(long window, double horizontal, double vertical, CallbackInfo ci) {
+        if (WebAdminSelectionClient.shouldConsumeMouseScroll()) {
+            ci.cancel();
+            return;
+        }
         if (CameraModeClient.shouldConsumeMouseScroll()) {
             ci.cancel();
         }

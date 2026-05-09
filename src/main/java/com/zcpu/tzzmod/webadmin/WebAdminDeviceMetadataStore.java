@@ -31,6 +31,19 @@ public final class WebAdminDeviceMetadataStore {
         return JsonStoreSupport.write(path(server), safeFile, "web admin device metadata");
     }
 
+    public static synchronized boolean removeDevice(MinecraftServer server, String deviceId) {
+        String safeDeviceId = safe(deviceId);
+        if (safeDeviceId.isBlank()) {
+            return false;
+        }
+        MetadataFile file = load(server);
+        if (!file.devices.containsKey(safeDeviceId)) {
+            return false;
+        }
+        file.devices.remove(safeDeviceId);
+        return save(server, file);
+    }
+
     public static final class MetadataFile {
         public Map<String, MetadataEntry> devices = new LinkedHashMap<>();
 

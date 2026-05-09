@@ -41,13 +41,23 @@ public final class SignalListenerStore {
     }
 
     public static synchronized SignalListenerData createListener(MinecraftServer server, String channel, String name) {
+        return createListener(server, channel, name, true, SignalListenerData.DEFAULT_COOLDOWN_TICKS);
+    }
+
+    public static synchronized SignalListenerData createListener(
+            MinecraftServer server,
+            String channel,
+            String name,
+            boolean enabled,
+            int cooldownTicks
+    ) {
         State state = getState(server);
         SignalListenerData listener = new SignalListenerData(
                 UUID.randomUUID().toString(),
                 cleanUserText(name),
                 SignalChannel.normalize(channel),
-                true,
-                SignalListenerData.DEFAULT_COOLDOWN_TICKS,
+                enabled,
+                Math.max(SignalListenerData.MIN_COOLDOWN_TICKS, cooldownTicks),
                 List.of()
         ).normalized();
         state.listeners.add(listener);

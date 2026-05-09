@@ -8,7 +8,12 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionCancelRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
@@ -16,8 +21,11 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
@@ -34,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 
 public final class WebAdminServer {
     private final MinecraftServer minecraftServer;
@@ -51,7 +60,10 @@ public final class WebAdminServer {
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
+    private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -180,6 +192,14 @@ public final class WebAdminServer {
                 handleWebAdminWriteCapabilities(exchange, auth);
                 return;
             }
+            if (path.equals("/api/webadmin/online-players")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                handleOnlinePlayers(exchange, auth);
+                return;
+            }
             if (path.startsWith("/api/webadmin/edit-locks/")) {
                 handleEditLocks(exchange, auth, path, method);
                 return;
@@ -198,6 +218,18 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
                 handleChannelMetadata(exchange, auth, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/selection/")) {
+                handleSelection(exchange, auth, path, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/virtual-block-devices/")) {
+                handleVirtualBlockDeviceLifecycle(exchange, auth, path, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/signal-listeners") || path.startsWith("/api/webadmin/signal-listeners/")) {
+                handleSignalListenerLifecycle(exchange, auth, path, method);
                 return;
             }
             if (path.startsWith("/api/webadmin/signal-listener-basic-config/")) {
@@ -290,6 +322,25 @@ public final class WebAdminServer {
         data.put("server", server);
         data.put("auth", authData);
         WebAdminJsonResponse.ok(exchange, data);
+    }
+
+    private void handleOnlinePlayers(HttpExchange exchange, AuthContext auth) throws IOException {
+        WebAdminRole role = auth.user.roleEnum();
+        if (role != WebAdminRole.EDITOR && role != WebAdminRole.OWNER) {
+            WebAdminJsonResponse.error(exchange, 403, "FORBIDDEN", "权限不足：只有编辑者或所有者可以查看在线玩家候选。");
+            return;
+        }
+        List<Map<String, Object>> players = minecraftServer.getPlayerManager().getPlayerList().stream()
+                .map(WebAdminServer::onlinePlayerDto)
+                .toList();
+        WebAdminJsonResponse.ok(exchange, players);
+    }
+
+    private static Map<String, Object> onlinePlayerDto(ServerPlayerEntity player) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("name", player.getName().getString());
+        data.put("uuid", player.getUuidAsString());
+        return data;
     }
 
     private void handleWebAdminUsers(HttpExchange exchange, AuthContext auth) throws IOException {
@@ -496,6 +547,152 @@ public final class WebAdminServer {
                 auth.user,
                 auth.session,
                 sourceIp(exchange),
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleSelection(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        if (path.equals("/api/webadmin/selection/status")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            if (auth.user.roleEnum() != WebAdminRole.EDITOR && auth.user.roleEnum() != WebAdminRole.OWNER) {
+                WebAdminJsonResponse.error(exchange, 403, "FORBIDDEN", "权限不足：只有编辑者或所有者可以查看选择状态。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, selectionService.status(query.getOrDefault("selectionId", "")));
+            return;
+        }
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        if (path.equals("/api/webadmin/selection/start")) {
+            WebAdminSelectionStartRequest request = readJson(exchange, WebAdminSelectionStartRequest.class);
+            if (request == null) {
+                request = new WebAdminSelectionStartRequest();
+            }
+            WebAdminWriteResult result = selectionService.start(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if (path.equals("/api/webadmin/selection/cancel")) {
+            WebAdminSelectionCancelRequest request = readJson(exchange, WebAdminSelectionCancelRequest.class);
+            if (request == null) {
+                request = new WebAdminSelectionCancelRequest();
+            }
+            WebAdminWriteResult result = selectionService.cancel(
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "选择接口不存在。");
+    }
+
+    private void handleVirtualBlockDeviceLifecycle(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/virtual-block-devices/";
+        String suffix = "/delete";
+        if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "虚拟方块设备生命周期接口不存在。");
+            return;
+        }
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        String encodedDeviceId = path.substring(prefix.length(), path.length() - suffix.length());
+        String deviceId = decodePathSegment(encodedDeviceId);
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "虚拟方块设备 ID 不能为空。");
+            return;
+        }
+        WebAdminVirtualBlockDeviceDeleteRequest request = readJson(exchange, WebAdminVirtualBlockDeviceDeleteRequest.class);
+        if (request == null) {
+            request = new WebAdminVirtualBlockDeviceDeleteRequest();
+        }
+        request.deviceId = deviceId;
+        WebAdminWriteResult result = virtualBlockDeviceLifecycleService.delete(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                deviceId,
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleSignalListenerLifecycle(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        if (path.equals("/api/webadmin/signal-listeners")) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSignalListenerCreateRequest request = readJson(exchange, WebAdminSignalListenerCreateRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalListenerCreateRequest();
+            }
+            WebAdminWriteResult result = signalListenerLifecycleService.create(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        String prefix = "/api/webadmin/signal-listeners/";
+        String suffix = "/delete";
+        if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 生命周期接口不存在。");
+            return;
+        }
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        String encodedListenerId = path.substring(prefix.length(), path.length() - suffix.length());
+        String listenerId = decodePathSegment(encodedListenerId);
+        if (listenerId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Signal Listener ID 不能为空。");
+            return;
+        }
+        WebAdminSignalListenerDeleteRequest request = readJson(exchange, WebAdminSignalListenerDeleteRequest.class);
+        if (request == null) {
+            request = new WebAdminSignalListenerDeleteRequest();
+        }
+        request.listenerId = listenerId;
+        WebAdminWriteResult result = signalListenerLifecycleService.delete(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                listenerId,
                 request,
                 header(exchange, "X-TZZ-WebAdmin-CSRF"),
                 isWriteSameOrigin(exchange)
