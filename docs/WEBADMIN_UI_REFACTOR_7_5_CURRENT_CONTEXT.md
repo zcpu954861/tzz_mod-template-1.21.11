@@ -10,9 +10,9 @@
 
 当前阶段是：
 
-**7.5 WebAdmin Frontend Refactor / Step 3 第二批主页面开发**
+**7.5 WebAdmin Frontend Refactor / Step 5.5 文档同步与 7.6 规划准备**
 
-Step 1、Step 2 和 Step 2.5 已完成并通过浏览器验收。当前 Step 3 目标是在不重写基础层的前提下，复用 Step 1/2/2.5 的 shell、tokens、表格、筛选、分页、right rail、图标和 realtime auto sync，扩展第二批剩余主页面。
+Step 1、Step 2、Step 2.5、Step 3 和 Step 4 已完成代码层落地。当前 Step 5 已补强 route / render / realtime 稳定化守卫；Step 5.5 只同步当前状态与 7.6 规划建议，不进入 7.6 代码实现。
 
 Step 1 已落地 3 个代表页面：
 
@@ -60,7 +60,16 @@ Step 3 第二批范围已在当前工作树落地：
 4. 区域列表
 5. 区域控制器
 
-当前仍不是 18 页全量前端落地阶段。
+Step 4 剩余页面与详情范围已在当前工作树落地：
+
+1. 动作模板（`#/action-templates` / `#/templates`）
+2. 信号诊断 Doctor（`#/doctor` / `#/diagnostics` / `#/signal-doctor`）
+3. 频道详情（`#/signals/<encoded channel>`）
+4. 监听器详情（`#/listeners/<id>` / `#/signal-listeners/<id>`，找不到稳定详情数据时显示 unavailable fallback）
+
+Step 5 已补强 `stabilizationGuardTest` 对当前 7.5 route、render、disabled 写操作边界和 realtime mapping 的代码层护栏。
+
+当前仍不是 18 页全量前端落地阶段，也不是 7.6 代码实现阶段。
 
 ## 当前最新同步
 
@@ -78,6 +87,14 @@ Step 3 第二批范围已在当前工作树落地：
 - 已定义但不一定已有实际 publish 点的预留事件包括部分 `doctor_issues_changed`、`webadmin_settings_changed`、`webadmin_user_changed`、`action_changed`、`region_changed` 等；不要因为预留事件类型而新增业务功能。
 - Step 2 第一批新增 / 更新 `docs/test/测试_7.5_WebAdmin前端重构第二阶段第一批页面验收.md`，记录 5 个页面、现有命令、disabled 写操作、silent refresh、row click 和响应式验收。
 - Step 3 第二批只做前端主页面扩展，不生成新的验收 Markdown；配置管理、用户与权限、系统设置、区域列表、区域控制器均复用既有 readonly API 和 Step 2.5 realtime route dirty mapping。
+- Step 4 动作模板页面复用 `/api/actions` 只读数据派生模板候选，不新增模板 API；添加模板、使用模板、导入模板、导出配置和批量操作均保持 disabled / unavailable。
+- Step 4 Doctor 页面复用 `/api/doctor`，已接入 `#/diagnostics` / `#/signal-doctor` alias，自动修复、清空问题和导出报告均保持 disabled / unavailable。
+- Step 4 频道详情继续复用已有 `/api/signals/channels/{channel}`，SignalBridge 行点击与详情按钮仍进入安全 encode 的 `#/signals/<encoded channel>`；特殊字符 channel 只按文本显示，不执行。
+- Step 4 监听器详情不新增后端 API，复用频道详情中的 listener 数据和可选 listener basic config 只读查询；若找不到稳定 listener id / 详情数据，显示 unavailable fallback，不硬跳坏路由。
+- 当前已有详情子页面已重新统一到 7.5 detail shell：设备详情、频道详情、动作详情、区域详情和监听器详情均使用 `wa-detail-shell`、详情 Header、Tabs、first row（基本信息 + 状态统计）、second row（列表 / 最近事件 / 分布 / 右侧信息栈）和默认折叠的“完整详情”卡片。频道详情和监听器详情只参考 Figma 的信息架构与视觉密度，不做像素照搬；详情页不再使用顶部一整排 metrics 或旧式纵向堆叠作为主结构。
+- “完整详情”卡用于承载低频字段、runtime/debug、fingerprint/version/timestamp、configSummary 和 DTO 中不适合放进主信息卡的字段；默认折叠，展开后内部滚动，silent refresh 不应重置展开状态，也不能替代主布局。
+- 已有安全编辑能力继续保留并迁移到 7.5 modal：device metadata、device basic config、device extended config、channel metadata、signal listener basic config 仍使用原有 CSRF / edit lock / WebAdminWriteResult 链路，不新增写 API。Modal 使用固定窗口、backdrop blur、淡入淡出、body 内部滚动和固定 header/footer；无后端支持的新增、删除、复杂编辑、动作链和导入导出仍保持 disabled / unavailable。
+- Step 5 稳定化已将动作模板、Doctor alias、频道详情、设备详情、动作详情、区域详情、监听器详情纳入 route / render / realtime smoke guard；detail smoke 会实际执行 `#/devices/test-device`、`#/signals/test.channel`、`#/actions/test-action`、`#/regions/test-region`、`#/listeners/test-listener`、`#/signal-listeners/test-listener`，并检查 detail shell、tabs、左右结构、折叠完整详情、modal silent refresh 和 realtime listener dirty mapping。继续禁止 `setInterval` 高频 polling 和整页 reload。
 - 配置管理复用 `/api/webadmin/settings`、`/api/status`、`/api/webadmin/write/capabilities`，只读展示配置文件、服务、存储、审计和安全边界；发布、回滚、Diff、导入覆盖等真实配置版本系统仍未实现。
 - 用户与权限复用 `/api/webadmin/users`，只读展示用户、角色、在线状态和权限概览；不实现真实用户权限写入、重置密码、踢出会话或删除用户。
 - 系统设置复用 `/api/webadmin/settings`、`/api/status`、`/api/webadmin/write/capabilities`，只读展示平台信息、服务信息、功能开关和运行环境；不实现真实系统设置写入。

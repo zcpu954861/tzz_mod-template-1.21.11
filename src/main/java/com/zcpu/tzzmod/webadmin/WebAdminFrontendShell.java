@@ -94,6 +94,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">动作系统</div>
                           <button class="nav-item" data-route="#/actions"><span class="nav-icon" data-icon="action"></span>动作列表</button>
+                          <button class="nav-item" data-route="#/action-templates"><span class="nav-icon" data-icon="action-template"></span>动作模板</button>
                         </div>
                         <div class="nav-section">
                           <div class="nav-section-title">系统管理</div>

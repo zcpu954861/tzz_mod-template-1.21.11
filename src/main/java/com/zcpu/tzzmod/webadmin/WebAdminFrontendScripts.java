@@ -4,7 +4,7 @@ public final class WebAdminFrontendScripts {
     private static final String[] FLAT_ICON_KEYS = {
             "logo", "dashboard", "signalbridge-main", "receiver-main", "history", "doctor", "region", "device",
             "action", "user", "settings", "server-online", "logout", "device-overview", "doctor-overview", "signal-overview",
-            "region-overview", "action-overview", "user-overview", "signal-device", "signal-receiver", "virtual-block-device", "action-relay", "critical-issue",
+            "region-overview", "action-overview", "action-template", "user-overview", "signal-device", "signal-receiver", "virtual-block-device", "action-relay", "critical-issue",
             "warning-issue", "info-issue", "check-pass", "active-channel", "listener-receiver", "recent-event", "response-time", "region-controller",
             "active-region", "action-binding", "today-trigger", "action-total", "enabled", "success-rate", "user-total", "current-user",
             "current-role", "session", "channel-total", "channel-with-consumers", "channel-orphan", "channel-error", "consumer-listener", "consumer-receiver",
@@ -31,6 +31,7 @@ public final class WebAdminFrontendScripts {
             {"signal-overview", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"2\"/><path d=\"M8.6 14.4a4.8 4.8 0 0 1 0-6.8M15.4 7.6a4.8 4.8 0 0 1 0 6.8\"/><path d=\"M5.4 17.6a8.8 8.8 0 0 1 0-12.2M18.6 5.4a8.8 8.8 0 0 1 0 12.2\"/>"},
             {"region-overview", "<path d=\"M6 20V5\"/><path d=\"M6 6h10l-1.7 3 1.7 3H6\"/><path d=\"M4 20h16\"/><path d=\"M9 17c1.6-1 4.4-1 6 0\"/><circle class=\"fill\" cx=\"18\" cy=\"17\" r=\"1.2\"/>"},
             {"action-overview", "<path d=\"M13 3 5 14h6l-1 7 9-12h-6l1-6Z\"/><path d=\"M5 20h5M15 4h4\"/>"},
+            {"action-template", "<path d=\"M6 4h9l3 3v13H6V4Z\"/><path d=\"M15 4v4h4\"/><path d=\"M9 11h6M9 14h7M9 17h4\"/>"},
             {"user-overview", "<circle cx=\"9\" cy=\"8\" r=\"2.8\"/><circle cx=\"16\" cy=\"9\" r=\"2.3\"/><path d=\"M3.8 20a5.4 5.4 0 0 1 10.4 0\"/><path d=\"M13.5 19.7a4.7 4.7 0 0 1 6.7-3.8\"/><path d=\"M17 15l1.5 1.5L21 13\"/>"},
             {"signal-device", "<path d=\"M12 20v-7\"/><circle cx=\"12\" cy=\"11\" r=\"1.7\"/><path d=\"M8.8 14a4.5 4.5 0 0 1 0-6M15.2 8a4.5 4.5 0 0 1 0 6\"/><path d=\"M7 20h10\"/>"},
             {"signal-receiver", "<path d=\"M12 20v-6\"/><path d=\"M8 10a4 4 0 0 1 8 0M5 10a7 7 0 0 1 14 0\"/><path d=\"M9 15l3-3 3 3\"/>"},
@@ -125,7 +126,8 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                appState.modalClosePromise=null;appState.modalDismissPromise=null;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -135,7 +137,7 @@ public final class WebAdminFrontendScripts {
                   const aliases={
                     signal:'signalbridge-main',signalbridge:'signalbridge-main',channel:'active-channel',broadcast:'signal-overview',
                     receiver:'receiver-main',listener:'consumer-listener',relay:'action-relay',virtual:'virtual-block-device',auto:'device',
-                    cube:'device-overview',deviceoverview:'device-overview',doctoroverview:'doctor-overview',signaloverview:'signal-overview',regionoverview:'region-overview',actionoverview:'action-overview',useroverview:'user-overview',
+                    cube:'device-overview',deviceoverview:'device-overview',doctoroverview:'doctor-overview',signaloverview:'signal-overview',regionoverview:'region-overview',actionoverview:'action-overview',template:'action-template',templates:'action-template',actiontemplate:'action-template',useroverview:'user-overview',
                     signaldevice:'signal-device',signalemitter:'signal-device',signallistener:'consumer-listener',signalreceiver:'signal-receiver',virtualblockdevice:'virtual-block-device',actionrelay:'action-relay',regioncontroller:'region-controller',
                     critical:'critical-issue',danger:'critical-issue',error:'critical-issue',warning:'warning-issue',info:'info-issue',ok:'check-pass',pass:'check-pass',success:'check-pass',healthy:'doctor-ok',
                     active:'active-region',consumers:'listener-receiver',consumer:'listener-receiver',response:'response-time',avgresponse:'response-time',today:'today-trigger',lightning:'action-overview',pulse:'pulse-duration',
@@ -153,10 +155,12 @@ public final class WebAdminFrontendScripts {
                   const classes=`icon-img icon-geo icon-${iconClassName(name)} icon-asset-${key}`;
                   return `<svg class="${classes}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${iconSvgBody(key)}</svg>`;
                 }
-                function hydrateIcons(){
+                function hydrateIcons(root=document){
                   if(Object.keys(ICON_GEOMETRY).length===0)document.documentElement.classList.add('flat-icons-missing');
-                  document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});
+                  const scope=root&&typeof root.querySelectorAll==='function'?root:document;
+                  scope.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});
                 }
+                function renderIcons(root=document){hydrateIcons(root);}
                 function statusClass(value){const v=String(value||'').toUpperCase();if(v==='ERROR'||v==='FAILED')return'error';if(v==='WARNING')return'warning';if(v==='INFO'||v==='UNKNOWN')return'info';return'ok';}
                 function pill(value){return `<span class="pill ${statusClass(value)}">${esc(labelStatus(value))}</span>`}
                 function textPill(text, kind='info'){return `<span class="pill ${esc(kind)}">${esc(text)}</span>`}
@@ -296,26 +300,29 @@ public final class WebAdminFrontendScripts {
                   if(event.key==='Enter'&&draft.channelComboOpen[field]&&options.length>0){event.preventDefault();selectDeviceExtendedConfigChannel(deviceId,field,options[Math.min(options.length-1,Number(draft.channelComboIndex[field]||0))].channel);return;}
                 }
                 function maybeReleaseDeviceExtendedConfigEditForRoute(hash){const draft=appState.deviceExtendedConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
-                async function startDeviceExtendedConfigEdit(deviceId){if(!canEditDeviceExtendedConfig())return;try{const cfg=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`);if(cfg.supported===false||!(cfg.supportedFields||[]).length){toast(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。');return;}const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:deviceId})});if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();appState.deviceExtendedConfigEdit={deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}catch(err){toast(err.message||'无法获取编辑锁');}}
-                async function cancelDeviceExtendedConfigEdit(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceExtendedConfigLock(draft,false);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function startDeviceExtendedConfigEdit(deviceId){if(!canEditDeviceExtendedConfig())return;try{const cfg=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`);if(cfg.supported===false||!(cfg.supportedFields||[]).length){toast(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。');return;}const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:deviceId})});if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();appState.deviceExtendedConfigEdit={deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){toast(err.message||'无法获取编辑锁');}}
+                async function cancelDeviceExtendedConfigEdit(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceExtendedConfigLock(draft,false);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}await dismissWebAdminModal();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 async function reloadDeviceExtendedConfigAfterConflict(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 function scheduleDeviceExtendedConfigLockHeartbeat(){stopDeviceExtendedConfigLockHeartbeat();appState.deviceExtendedConfigLockTimer=setTimeout(async()=>{await heartbeatDeviceExtendedConfigLock();if(appState.deviceExtendedConfigEdit)scheduleDeviceExtendedConfigLockHeartbeat();},30000);}
                 function stopDeviceExtendedConfigLockHeartbeat(){if(appState.deviceExtendedConfigLockTimer){clearTimeout(appState.deviceExtendedConfigLockTimer);appState.deviceExtendedConfigLockTimer=null;}}
                 async function heartbeatDeviceExtendedConfigLock(){const draft=appState.deviceExtendedConfigEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.deviceExtendedConfigEdit=draft;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(draft.deviceId),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();}}
                 async function releaseDeviceExtendedConfigLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
                 function deviceExtendedConfigPatchBody(draft){const body={expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''};const original=draft.originalValues||{};const addChannel=(field,value,clearName,valueName)=>{if((draft.clear||{})[field]){body[clearName]=true;return;}const text=String(value??'').trim(), before=String(original[field]??'').trim();if(text||before)body[valueName]=value||'';};(draft.supportedFields||[]).forEach(field=>{const value=(draft.values||{})[field];if(field==='interactChannel')addChannel(field,value,'clearInteractChannel','interactChannel');else if(field==='successChannel')addChannel(field,value,'clearSuccessChannel','successChannel');else if(field==='failChannel')addChannel(field,value,'clearFailChannel','failChannel');else if(field==='interactionCooldownTicks')body.interactionCooldownTicks=Number(value);else if(field==='pulseTicks')body.pulseTicks=Number(value);else if(field==='cooldownTicks')body.cooldownTicks=Number(value);});return body;}
-                async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}}
+                async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}}
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
+                function listenerHash(id){return `#/listeners/${encodeURIComponent(id||'')}`;}
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
-                function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/listeners/')||h.startsWith('#/signal-listeners/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
                 function navigateTo(targetHash){location.hash=withReturnContext(targetHash);}
-                function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), id=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
+                function safeDecodeRoutePart(value){try{return decodeURIComponent(String(value||''));}catch(_){return String(value||'');}}
+                function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), encodedId=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', id=safeDecodeRoutePart(encodedId), params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
                 function goBackOrFallback(returnTo,fallback){location.hash=isValidReturnHash(returnTo)?returnTo:fallback;}
                 function jsString(value){return JSON.stringify(String(value||''));}
-                function htmlHandler(script){return `onclick="${esc(script)}"`;}
+                function htmlEvent(name,script){return `${esc(name)}="${esc(script)}"`;}
+                function htmlHandler(script){return htmlEvent('onclick',script);}
                 function navigationAttr(target,stop=true){return htmlHandler(`${stop?'event.stopPropagation();':''}navigateTo(${jsString(target)})`);}
                 function navDataAttr(target,label='打开详情'){if(isBlank(target))return 'aria-disabled="true"';return `data-nav-route="${esc(target)}" role="link" tabindex="0" aria-label="${esc(label)}"`;}
                 function activateNavRoute(el){const target=el&&el.dataset?el.dataset.navRoute:'';if(!target)return;navigateTo(target);}
@@ -434,10 +441,20 @@ public final class WebAdminFrontendScripts {
                 function startTopbarClock(){if(appState.topbarClockTimer)clearTimeout(appState.topbarClockTimer);const tick=()=>{updateTopbarClock();appState.topbarClockTimer=setTimeout(tick,1000);};tick();}
                 function updateTopbarClock(){const el=document.getElementById('topbar-clock');if(!el)return;const d=new Date();el.textContent=`${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}
                 function route(options={}){
-                  const hash=decodeURIComponent(location.hash || '#/dashboard');
+                  let hash=location.hash || '#/dashboard';
+                  try{
+                    const result=routeUnsafe(hash,options);
+                    if(result&&typeof result.catch==='function')return result.catch(err=>handleRouteRenderError(hash,err,options));
+                    return result;
+                  }catch(err){
+                    return handleRouteRenderError(hash,err,options);
+                  }
+                }
+                function routeUnsafe(hash,options={}){
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
+                  maybeReleaseDeviceConfigEditForRoute(hash);
                   maybeReleaseChannelMetadataEditForRoute(hash);
                   maybeReleaseSignalListenerBasicConfigEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', isRouteActive(btn.dataset.route,hash)));
@@ -447,10 +464,12 @@ public final class WebAdminFrontendScripts {
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length),options);
                   if(hash==='#/virtual-block-devices'||hash==='#/block-devices') return renderVirtualBlockDevices(options);
                   if(hash==='#/listeners'||hash==='#/signal-listeners') return renderListeners(options);
+                  if(hash.startsWith('#/listeners/')) return renderSignalListenerDetail(hash.substring('#/listeners/'.length),options);
+                  if(hash.startsWith('#/signal-listeners/')) return renderSignalListenerDetail(hash.substring('#/signal-listeners/'.length),options);
                   if(hash==='#/receivers') return renderReceivers(options);
                   if(hash==='#/signals'||hash==='#/signalbridge') return renderSignals(options);
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length),options);
-                  if(hash==='#/doctor') return renderDoctorPage(options);
+                  if(hash==='#/doctor'||hash==='#/diagnostics'||hash==='#/signal-doctor') return renderDoctorPage(options);
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
                   if(hash.startsWith('#/events')) return renderHistoryPage(hash.substring('#/events'.length),options);
                   if(hash==='#/config'||hash==='#/config-management'||hash==='#/settings/config') return renderConfigPage(options);
@@ -460,8 +479,20 @@ public final class WebAdminFrontendScripts {
                   if(hash==='#/region-controllers'||hash==='#/regionctl') return renderRegionControllersPage(options);
                   if(hash.startsWith('#/regions/')) return renderRegionDetail(hash.substring('#/regions/'.length),options);
                   if(hash==='#/actions') return renderActionsPage(options);
+                  if(hash==='#/action-templates'||hash==='#/templates') return renderActionTemplatesPage(options);
                   if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length),options);
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
+                }
+                function handleRouteRenderError(hash,err,options={}){
+                  const message=err&&err.message?err.message:'页面渲染失败';
+                  const key=`${hash}|${err&&err.name?err.name:'Error'}|${message}`;
+                  if(appState.realtime.lastRenderError!==key){
+                    appState.realtime.lastRenderError=key;
+                    console.error('WebAdmin route render failed',hash,err);
+                  }
+                  if(options.silent){toast('实时同步刷新失败，已保留当前页面。');return false;}
+                  setView(`<section class="wa-page">${waPageHead('页面渲染失败','当前路由渲染时发生错误，请检查 Console 或刷新重试。',waButton('重试','refresh','onclick="route()"','ghost'))}${errorBlock(message)}</section>`);
+                  return false;
                 }
                 function isRouteActive(route,hash){
                   const r=String(route||''), h=String(hash||'#/dashboard');
@@ -471,17 +502,18 @@ public final class WebAdminFrontendScripts {
                   if(r==='#/history')return h.startsWith('#/history')||h.startsWith('#/events');
                   if(r==='#/devices')return h==='#/devices'||h.startsWith('#/devices/');
                   if(r==='#/virtual-block-devices')return h==='#/virtual-block-devices'||h==='#/block-devices';
-                  if(r==='#/actions')return h==='#/actions'||h.startsWith('#/actions/');
+                  if(r==='#/actions')return h==='#/actions'||h.startsWith('#/actions/')||h==='#/action-templates'||h==='#/templates';
                   if(r==='#/regions')return h==='#/regions'||h==='#/region-list'||h.startsWith('#/regions/');
                   if(r==='#/region-controllers')return h==='#/region-controllers'||h==='#/regionctl';
                   if(r==='#/users')return h==='#/users'||h==='#/permissions'||h==='#/users-permissions';
                   if(r==='#/settings')return h==='#/settings'||h==='#/system-settings';
                   if(r==='#/config')return h==='#/config'||h==='#/config-management'||h==='#/settings/config';
+                  if(r==='#/doctor')return h==='#/doctor'||h==='#/diagnostics'||h==='#/signal-doctor';
                   return h===r||h.startsWith(r+'/')||h.startsWith(r+'?');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
                 const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
-                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
+                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
                   if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
@@ -572,11 +604,14 @@ public final class WebAdminFrontendScripts {
                   if(realtimeRouteKeysForEvent(event).has(key))return true;
                   const type=String(event.type||'');
                   if(String(hash||'').startsWith('#/signals/'))return event.channel===routeDetailId(hash,'#/signals/')||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
+                  if(String(hash||'').startsWith('#/listeners/')){const id=routeDetailId(hash,'#/listeners/');return listenerEventRef(event)===id||event.channel&&!isBlank(id);}
+                  if(String(hash||'').startsWith('#/signal-listeners/')){const id=routeDetailId(hash,'#/signal-listeners/');return listenerEventRef(event)===id||event.channel&&!isBlank(id);}
                   if(String(hash||'').startsWith('#/devices/'))return !!event.deviceId&&event.deviceId===routeDetailId(hash,'#/devices/');
                   if(String(hash||'').startsWith('#/regions/'))return !!event.regionId&&event.regionId===routeDetailId(hash,'#/regions/');
                   if(String(hash||'').startsWith('#/actions/'))return !!event.actionId&&event.actionId===routeDetailId(hash,'#/actions/');
                   return false;
                 }
+                function listenerEventRef(event){return String(event?.listenerId||event?.payload?.listenerId||event?.payload?.listenerRef||event?.payload?.targetId||event?.payload?.id||'');}
                 function markRealtimeRoutesForEvent(event){
                   const keys=realtimeRouteKeysForEvent(event);
                   keys.forEach(key=>markRealtimeRouteKeyDirty(key,event));
@@ -596,9 +631,10 @@ public final class WebAdminFrontendScripts {
                     add('dashboard','signals','listeners','history','doctor');
                     if(isAny('signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','signal_listener_config_changed','signal_config_changed'))add('config');
                     if(event?.channel)add(`signalDetail:${event.channel}`);
+                    if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);
                   }
                   if(starts('action_')||isAny('action_executed','action_config_changed')){
-                    add('dashboard','actions','history');
+                    add('dashboard','actions','actionTemplates','history');
                     if(isAny('action_changed','action_config_changed'))add('config','regionControllers');
                     if(event?.actionId)add(`actionDetail:${event.actionId}`);
                   }
@@ -615,7 +651,7 @@ public final class WebAdminFrontendScripts {
                     const target=String(event?.payload?.targetType||'');
                     if(target.includes('device'))add('devices');
                     if(target.includes('channel'))add('signals');
-                    if(target.includes('listener'))add('listeners','signals');
+                    if(target.includes('listener')){add('listeners','signals');if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);}
                   }
                   return keys;
                 }
@@ -665,6 +701,8 @@ public final class WebAdminFrontendScripts {
                   const h=String(hash||'#/dashboard');
                   if(h.startsWith('#/devices/'))return `deviceDetail:${routeDetailId(h,'#/devices/')}`;
                   if(h.startsWith('#/signals/'))return `signalDetail:${routeDetailId(h,'#/signals/')}`;
+                  if(h.startsWith('#/listeners/'))return `listenerDetail:${routeDetailId(h,'#/listeners/')}`;
+                  if(h.startsWith('#/signal-listeners/'))return `listenerDetail:${routeDetailId(h,'#/signal-listeners/')}`;
                   if(h.startsWith('#/regions/'))return `regionDetail:${routeDetailId(h,'#/regions/')}`;
                   if(h.startsWith('#/actions/'))return `actionDetail:${routeDetailId(h,'#/actions/')}`;
                   if(h.startsWith('#/history')||h.startsWith('#/events'))return 'history';
@@ -674,10 +712,11 @@ public final class WebAdminFrontendScripts {
                   if(h==='#/listeners'||h==='#/signal-listeners')return 'listeners';
                   if(h==='#/receivers')return 'receivers';
                   if(h==='#/signals'||h==='#/signalbridge')return 'signals';
-                  if(h==='#/doctor')return 'doctor';
+                  if(h==='#/doctor'||h==='#/diagnostics'||h==='#/signal-doctor')return 'doctor';
                   if(h==='#/regions'||h==='#/region-list')return 'regions';
                   if(h==='#/region-controllers'||h==='#/regionctl')return 'regionControllers';
                   if(h==='#/actions')return 'actions';
+                  if(h==='#/action-templates'||h==='#/templates')return 'actionTemplates';
                   if(h==='#/users'||h==='#/permissions'||h==='#/users-permissions')return 'users';
                   if(h==='#/settings'||h==='#/system-settings')return 'settings';
                   if(h==='#/config'||h==='#/config-management'||h==='#/settings/config')return 'config';
@@ -802,36 +841,72 @@ public final class WebAdminFrontendScripts {
                 async function renderDeviceDetail(id,options={}){
                   if(!options.silent)setView(loading('正在加载设备详情...'));
                   const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
-                  let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${err.status===404?errorBlock('设备不存在或已被删除。'):errorBlock(err.message)}`);return;}
+                  let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该设备详情或设备已被删除。',waButton('返回列表','device',navigationAttr('#/devices'),'ghost'))}${err.status===404?empty('设备不存在或已被删除。'):errorBlock(err.message)}</section>`);return;}
                   const [debug,history,doctor,lockStatus,basicConfig,extendedConfig]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`)]);
                   detail.metadataLock=lockStatus.ok?lockStatus.data:null;
                   detail.basicConfig=basicConfig.ok?basicConfig.data:null;
                   detail.basicConfigError=basicConfig.ok?null:basicConfig.error;
                   detail.extendedConfig=extendedConfig.ok?extendedConfig.data:null;
                   detail.extendedConfigError=extendedConfig.ok?null:extendedConfig.error;
+                  appState.currentDeviceDetail=detail;
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
-                  setView(`
-                    <div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>
-                    <div class="page-head"><div><h1>${esc(detail.displayName)}</h1><p>世界/维度：${esc(detail.world||'暂无')} · 坐标：${esc(posText(detail.pos))} · 主频道：${esc(labelChannel(detail.channel))}</p></div><div class="overview-inline"><span class="pill">${esc(labelType(detail.type))}</span>${pill(detail.enabled?'OK':'WARNING')} ${pill(detail.doctorStatus||detail.debugSummary?.status||'UNKNOWN')}</div></div>
-                    <section class="device-detail-layout">
-                      <div class="device-detail-main">
-                        <article class="panel-card"><h2>设备基础信息</h2><div class="identity-grid">${row('名称',esc(detail.displayName))}${row('类型',esc(labelType(detail.type)))}${row('启用状态',esc(labelBool(detail.enabled)))}${row('最近触发',fmtTime(detail.lastTriggeredAt))}</div></article>
-                        <article class="panel-card"><h2>设备基础配置</h2>${deviceBasicConfigCard(detail)}</article>
-                        <article class="panel-card"><h2>设备扩展配置</h2>${deviceExtendedConfigCard(detail)}</article>
-                        <article class="panel-card"><h2>Debug 检查</h2>${debug.ok?debugChecks(debug.data):errorBlock(debug.error.message)}</article>
-                        <article class="panel-card"><h2>最近事件</h2>${history.ok?historyList(history.data):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p></article>
-                        <article class="panel-card"><h2>配置摘要</h2>${configSummary(detail)}</article>
-                      </div>
-                      <aside class="device-detail-side">
-                        <article class="panel-card metadata-card"><h2>WebAdmin 显示信息</h2>${deviceMetadataCard(detail)}</article>
-                        <article class="panel-card side-card"><h2>Doctor 状态摘要</h2>${deviceDoctorSideCard(detail,uniqueIssues(relatedDoctor))}</article>
-                        <article class="panel-card side-card"><h2>关联频道摘要</h2>${deviceChannelSideCard(detail)}</article>
-                        <article class="panel-card side-card"><h2>设备标识 / 快捷信息</h2>${deviceIdentitySideCard(detail)}</article>
-                        <article class="panel-card side-card"><h2>快捷跳转</h2>${deviceQuickLinksCard(detail,routeInfo)}</article>
-                        <article class="panel-card side-card"><h2>最近状态</h2>${deviceRecentStatusCard(detail,history.ok?history.data:[])}</article>
-                      </aside>
-                    </section>`,options);
+                  const canEditConfig=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig();
+                  const configAction=canEditConfig?waButton('编辑设备配置','settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),'primary'):waButton('编辑设备配置','settings','disabled','ghost');
+                  const statusValue=detail.enabled?'启用':'停用';
+                  const doctorStatus=detail.doctorStatus||detail.debugSummary?.status||'UNKNOWN';
+                  const recentEvents=history.ok?(history.data||[]):[];
+                  const advancedRows=[
+                    ['device.id',detail.id],
+                    ['device.type',detail.type],
+                    ['device.world',detail.world],
+                    ['device.pos',posText(detail.pos)],
+                    ['device.channel',detail.channel],
+                    ['device.enabled',statusValue],
+                    ['device.lastTriggeredAt',formatDateTime(detail.lastTriggeredAt)],
+                    ['doctor.status',doctorStatus]
+                  ];
+                  setView(`<section class="wa-page wa-detail-shell" data-detail-kind="device">
+                    ${detailHeader({back:backButton(routeInfo,'返回设备管理'),kicker:'设备详情',iconName:deviceTypeIcon(detail.type),title:detail.displayName||detail.id,subtitle:`${detail.world||'暂无世界'} · ${posText(detail.pos)} · ${labelChannel(detail.channel)}`,copyValue:detail.id,badges:[`<span class="pill">${esc(labelType(detail.type))}</span>`,pill(detail.enabled?'OK':'WARNING'),pill(doctorStatus)],actions:[configAction,waButton('导出设备配置','download','disabled','ghost'),waButton('更多','more','disabled','ghost')]})}
+                    ${detailTabs(['基本信息','配置','最近事件','关联对象','Doctor'])}
+                    <section class="wa-detail-first-row">
+                      ${detailCard('基本信息',detailInfoGrid([
+                        ['设备名称',detail.displayName||detail.id],
+                        ['设备 ID',detail.id],
+                        ['类型',labelType(detail.type)],
+                        ['状态',safeHtml(pill(detail.enabled?'OK':'WARNING')+' '+esc(labelBool(detail.enabled)))],
+                        ['世界/维度',detail.world||'暂无'],
+                        ['坐标',posText(detail.pos)],
+                        ['主频道',safeHtml(channelCell(detail.channel))],
+                        ['最近触发',safeHtml(fmtTime(detail.lastTriggeredAt))]
+                      ]),configAction)}
+                      ${detailCard('状态与统计',`${detailStatGrid([
+                        {label:'启用状态',value:statusValue,sub:'基础配置',icon:'enabled',kind:detail.enabled?'ok':'warning'},
+                        {label:'最近触发',value:formatDateTime(detail.lastTriggeredAt),sub:'运行状态',icon:'recent-event'},
+                        {label:'Doctor',value:labelStatus(doctorStatus),sub:'诊断摘要',icon:'doctor-overview',kind:String(doctorStatus).toUpperCase()==='OK'?'ok':'warning'},
+                        {label:'历史事件',value:recentEvents.length,sub:'当前频道缓存',icon:'history'}
+                      ])}${detailConsumerGrid([
+                        {label:'关联频道',value:labelChannel(detail.channel),icon:'active-channel',target:detail.channel?signalHash(detail.channel):''},
+                        {label:'Doctor 诊断',value:uniqueIssues(relatedDoctor).length,icon:'doctor-overview',target:'#/doctor'},
+                        {label:'历史记录',value:recentEvents.length,icon:'history',target:detail.channel?historyHash(detail.channel):''},
+                        {label:'设备列表',value:'返回',icon:'device',target:'#/devices'}
+                      ])}`)}
+                    </section>
+                    ${detailFixedLayout([
+                      detailCard('配置摘要',deviceConfigOverview(detail),'','detail-card-stretchable'),
+                      detailCard('最近事件',`${history.ok?compactEventList(recentEvents,'当前设备暂无关联频道历史。'):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p>`)
+                    ],[
+                      detailCard('关联对象 / Doctor',`${deviceChannelSideCard(detail)}${deviceDoctorSideCard(detail,uniqueIssues(relatedDoctor))}`,'','detail-card-stretchable'),
+                      detailCard('快捷操作',`<div class="wa-quick-grid">${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${waButton('删除设备','channel-error','disabled','danger')}</div><p class="wa-disabled-note">仅设备显示信息、基础配置和安全扩展配置可写；删除、导出和其它写操作没有完整后端支持，保持禁用。</p>`)
+                    ],[
+                      advancedDetailCard('devices',detail.id,advancedRows,[
+                      {title:'配置摘要完整字段',rows:advancedRowsFromObject(detail.configSummary||{},'configSummary')},
+                      {title:'基础配置',rows:advancedRowsFromObject(detail.basicConfig||{},'basicConfig')},
+                      {title:'扩展配置',rows:advancedRowsFromObject(detail.extendedConfig||{},'extendedConfig')},
+                      {title:'运行与调试',rows:advancedRowsFromObject({metadata:detail.metadata,debug:debug.ok?debug.data:null,debugSummary:detail.debugSummary,doctorIssues:uniqueIssues(relatedDoctor),lastResult:detail.lastResult},'runtime')}
+                    ])
+                    ])}
+                  </section>`,options);
                 }
                 function canEditDeviceMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditDeviceBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
@@ -843,11 +918,11 @@ public final class WebAdminFrontendScripts {
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
                 function deviceMetadataCard(detail){
                   const meta=detail.metadata||{}, lock=detail.metadataLock||{}, editable=canEditDeviceMetadata(), editing=appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
-                  if(editing)return deviceMetadataForm(detail,appState.deviceMetadataEdit);
+                  const editingAction=editing?`<button class="secondary" onclick='showDeviceMetadataEditModal(${jsString(detail.id)})'>继续编辑</button>`:'';
                   const note=isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note);
                   const updated=isBlank(meta.updatedAt)?'暂无':`${formatDateTime(meta.updatedAt)} · ${esc(meta.updatedBy||'未知用户')}`, version=Number(meta.version||0);
                   const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
-                  const action=editable&&!lockedByOther?`<button class="secondary" onclick='startDeviceMetadataEdit(${jsString(detail.id)},${jsString(meta.displayName||'')},${jsString(meta.note||'')},${jsString(meta.iconKey||'auto')},${version})'>编辑显示信息</button>`:(editable?lockHint:`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑 WebAdmin 显示信息。</div>`);
+                  const action=editing?editingAction:(editable&&!lockedByOther?`<button class="secondary" onclick='startDeviceMetadataEdit(${jsString(detail.id)},${jsString(meta.displayName||'')},${jsString(meta.note||'')},${jsString(meta.iconKey||'auto')},${version})'>编辑显示信息</button>`:(editable?lockHint:`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑 WebAdmin 显示信息。</div>`));
                   return `<div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',note)}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('版本',esc(version))}${row('最后修改',esc(updated))}</div><p class="muted">此信息仅用于 WebAdmin 展示，不改变 Minecraft 游戏逻辑、SignalBridge 行为或设备配置。</p>${action}`;
                 }
                 function deviceMetadataForm(detail,draft){
@@ -865,14 +940,158 @@ public final class WebAdminFrontendScripts {
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceMetadataEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
                 }
+                function showDeviceMetadataEditModal(deviceId){
+                  const draft=appState.deviceMetadataEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
+                  openWebAdminModal('编辑设备显示信息',deviceMetadataForm({id:deviceId,displayName:draft.displayName},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceMetadataEdit(deviceId)});
+                }
+                function deviceDisplaySummaryCard(detail){
+                  const meta=detail.metadata||{}, version=Number(meta.version||0);
+                  const note=isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note);
+                  const updated=isBlank(meta.updatedAt)?'暂无':`${formatDateTime(meta.updatedAt)} · ${esc(meta.updatedBy||'未知用户')}`;
+                  return `<div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',note)}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('版本',esc(version))}${row('最后修改',esc(updated))}</div><p class="muted">显示信息仅影响 WebAdmin，不改变游戏内设备逻辑。</p>`;
+                }
+                function deviceConfigOverview(detail){
+                  const basic=detail.basicConfig||{}, ext=detail.extendedConfig||{}, meta=detail.metadata||{};
+                  const extFields=ext.supportedFields||[], extValues=ext.values||{}, extLabels=ext.fieldLabels||{};
+                  const extRows=extFields.length?extFields.map(field=>row(extLabels[field]||field,extendedFieldDisplay(field,extValues[field]))).join(''):`<div class="readonly-note">${esc(ext.unsupportedReason||'该设备类型暂无可编辑扩展配置。')}</div>`;
+                  const canEdit=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig();
+                  const editing=appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===detail.id;
+                  const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):(canEdit?waButton('编辑设备配置','settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),'primary'):`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备配置。</div>`);
+                  const loadNotes=[detail.basicConfigError?`基础配置加载失败：${detail.basicConfigError.message||'未知错误'}`:'',detail.extendedConfigError?`扩展配置加载失败：${detail.extendedConfigError.message||'未知错误'}`:''].filter(Boolean);
+                  return `<div class="wa-config-summary">
+                    <section class="wa-config-card"><h3>显示信息</h3><div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}</div></section>
+                    <section class="wa-config-card"><h3>基础配置</h3><div class="identity-grid">${row('启用状态',esc(labelEnabledState(basic.enabled ?? detail.enabled)))}${row('主频道',channelCell(basic.channel||detail.channel))}</div></section>
+                    <section class="wa-config-card"><h3>类型专属配置</h3><div class="identity-grid">${extRows}</div></section>
+                  </div>${loadNotes.length?`<div class="readonly-note">${loadNotes.map(esc).join('<br>')}</div>`:''}<p class="muted">基础配置与扩展配置在 7.5 中使用同一个固定 Modal 编辑；没有后端支持的复杂 matcher、itemSubmit、动作链和区域配置仍保持只读。</p><div class="inline-actions">${action}</div>`;
+                }
+                function deviceFlowPanel(detail){
+                  const cfg=detail.configSummary||{}, item=cfg.interactionItem||{};
+                  const nodes=[
+                    ['设备',detail.displayName||detail.id,labelType(detail.type),'device'],
+                    ['主频道',labelChannel(detail.channel),isBlank(detail.channel)?'未设置':'SignalBridge','active-channel'],
+                    ['反馈频道',[item.successChannel,item.failChannel].filter(v=>!isBlank(v)).join(' / ')||'暂无','类型专属配置','signalbridge-main'],
+                    ['下游查看','频道详情 / History','只读导航','recent-event']
+                  ];
+                  return `<div class="wa-flow-chain">${nodes.map((n,index)=>`${index?'<div class="wa-flow-arrow">→</div>':''}<div class="wa-flow-node"><span class="wa-icon-bubble">${icon(n[3])}</span><strong>${esc(n[0])}</strong><span>${esc(n[1])}</span><small>${esc(n[2])}</small></div>`).join('')}</div>`;
+                }
+                function isDeviceConfigEditing(deviceId){return !!(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId);}
+                function stripEditFormShell(html){const text=String(html||''), start=text.indexOf('>'), end=text.lastIndexOf('</form>');if(text.trim().startsWith('<form')&&start>=0&&end>start)return text.slice(start+1,end);return text;}
+                function showDeviceConfigEditModal(deviceId){
+                  const session=appState.deviceConfigEdit||{deviceId,saving:false,errors:[]};
+                  if(session.deviceId!==deviceId)return;
+                  const detail=(appState.currentDeviceDetail&&appState.currentDeviceDetail.id===deviceId)?appState.currentDeviceDetail:{id:deviceId,displayName:deviceId};
+                  openWebAdminModal('编辑设备配置',deviceConfigForm(detail,session),editModalFooter(session.saving),{className:'wa-config-modal',onClose:()=>cancelDeviceConfigEdit(deviceId)});
+                }
+                function deviceConfigForm(detail,session){
+                  const errors=(session.errors||[]).length?`<ul class="validation-list">${session.errors.map(e=>`<li>${esc(e.message||e||'保存失败')}</li>`).join('')}</ul>`:'';
+                  const sections=[];
+                  if(appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="metadata"><header><h3>显示信息</h3><span class="pill info">WebAdmin metadata</span></header>${stripEditFormShell(deviceMetadataForm(detail,appState.deviceMetadataEdit))}</section>`);
+                  if(appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="basic"><header><h3>基础配置</h3><span class="pill warning">enabled / channel</span></header>${stripEditFormShell(deviceBasicConfigForm(detail,appState.deviceBasicConfigEdit))}</section>`);
+                  if(appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="extended"><header><h3>类型专属配置</h3><span class="pill info">extended config</span></header>${stripEditFormShell(deviceExtendedConfigForm(detail,appState.deviceExtendedConfigEdit))}</section>`);
+                  const body=sections.length?sections.join(''):'<div class="readonly-note">当前没有可编辑配置区，可能权限不足或该设备类型不支持编辑。</div>';
+                  return `<form class="edit-form wa-unified-config-form" data-unified-device-config="true" onsubmit='event.preventDefault();saveDeviceConfig(${jsString(detail.id)})'>${errors}${body}<p class="muted">保存会按已有安全写链路分别提交有变更的显示信息、基础配置和类型专属配置；不会新增 API，也不会启用 matcher / itemSubmit / 动作链编辑。</p></form>`;
+                }
+                async function acquireWebAdminEditLock(targetType,targetId){
+                  return await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType,targetId})});
+                }
+                async function startDeviceConfigEdit(deviceId){
+                  const encoded=encodeURIComponent(deviceId);
+                  const detail=(appState.currentDeviceDetail&&appState.currentDeviceDetail.id===deviceId)?appState.currentDeviceDetail:await api(`/api/devices/${encoded}`);
+                  const [basicRes,extendedRes]=await Promise.all([settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`)]);
+                  const session={deviceId,saving:false,errors:[]};let acquired=0;
+                  try{
+                    if(canEditDeviceMetadata()){
+                      const result=await acquireWebAdminEditLock('device_metadata',deviceId);
+                      if(result.success){const lock=result.data?.lock||{}, meta=detail.metadata||{};appState.deviceMetadataEdit={deviceId,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedVersion:Number(meta.version||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceMetadataLockHeartbeat();acquired++;}
+                      else session.errors.push({message:result.message||'显示信息编辑锁获取失败'});
+                    }
+                    if(canEditDeviceBasicConfig()&&basicRes.ok&&basicRes.data?.supported!==false){
+                      const result=await acquireWebAdminEditLock('device_basic_config',deviceId);
+                      if(result.success){const lock=result.data?.lock||{}, cfg=basicRes.data||{}, channelOptions=await loadSignalChannelOptions();appState.deviceBasicConfigEdit={deviceId,enabled:!!cfg.enabled,channel:cfg.channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceBasicConfigLockHeartbeat();acquired++;}
+                      else session.errors.push({message:result.message||'基础配置编辑锁获取失败'});
+                    }
+                    if(canEditDeviceExtendedConfig()&&extendedRes.ok&&extendedRes.data?.supported!==false&&(extendedRes.data?.supportedFields||[]).length){
+                      const result=await acquireWebAdminEditLock('device_extended_config',deviceId);
+                      if(result.success){const lock=result.data?.lock||{}, cfg=extendedRes.data||{}, channelOptions=await loadSignalChannelOptions();appState.deviceExtendedConfigEdit={deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceExtendedConfigLockHeartbeat();acquired++;}
+                      else session.errors.push({message:result.message||'扩展配置编辑锁获取失败'});
+                    }
+                    if(!acquired){toast(session.errors[0]?.message||'当前设备没有可编辑配置区。');return;}
+                    appState.deviceConfigEdit=session;
+                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    showDeviceConfigEditModal(deviceId);
+                  }catch(err){
+                    await releaseAllDeviceConfigLocks(deviceId,true);
+                    appState.deviceConfigEdit=null;
+                    toast(err.message||'无法打开设备配置编辑器');
+                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }
+                }
+                function applyDeviceConfigDraftsFromForm(deviceId){
+                  const meta=appState.deviceMetadataEdit;if(meta&&meta.deviceId===deviceId){meta.displayName=document.getElementById('metadata-display-name')?.value||'';meta.note=document.getElementById('metadata-note')?.value||'';meta.iconKey=document.getElementById('metadata-icon')?.value||'auto';}
+                  if(appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===deviceId)updateDeviceBasicConfigDraftFromForm(deviceId);
+                  if(appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===deviceId)updateDeviceExtendedConfigDraftFromForm(deviceId);
+                }
+                async function saveDeviceConfig(deviceId){
+                  const session=appState.deviceConfigEdit||{deviceId,errors:[]};
+                  applyDeviceConfigDraftsFromForm(deviceId);session.saving=true;session.errors=[];appState.deviceConfigEdit=session;showDeviceConfigEditModal(deviceId);
+                  let changed=false;
+                  try{
+                    const meta=appState.deviceMetadataEdit;
+                    if(meta&&meta.deviceId===deviceId){
+                      const result=await api(`/api/webadmin/device-metadata/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:meta.displayName,note:meta.note,iconKey:meta.iconKey,expectedVersion:meta.expectedVersion,lockId:meta.lockId})});
+                      if(!result.success)return deviceConfigSaveFailed(deviceId,meta,result,'metadata');
+                      changed=changed||!!result.changed;appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();
+                    }
+                    const basic=appState.deviceBasicConfigEdit;
+                    if(basic&&basic.deviceId===deviceId){
+                      const result=await api(`/api/webadmin/device-basic-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:basic.enabled,channel:basic.channel,expectedFingerprint:basic.expectedFingerprint,lockId:basic.lockId})});
+                      if(!result.success)return deviceConfigSaveFailed(deviceId,basic,result,'basic');
+                      changed=changed||!!result.changed;appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();
+                    }
+                    const ext=appState.deviceExtendedConfigEdit;
+                    if(ext&&ext.deviceId===deviceId){
+                      const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(ext))});
+                      if(!result.success)return deviceConfigSaveFailed(deviceId,ext,result,'extended');
+                      changed=changed||!!result.changed;appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();
+                    }
+                    appState.deviceConfigEdit=null;await dismissWebAdminModal();toast(changed?'设备配置已保存。':'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                  }catch(err){session.saving=false;session.errors=[{message:err.message||'保存失败'}];appState.deviceConfigEdit=session;toast(err.message||'保存失败');showDeviceConfigEditModal(deviceId);}
+                }
+                function deviceConfigSaveFailed(deviceId,draft,result,section){
+                  const session=appState.deviceConfigEdit||{deviceId,errors:[]};
+                  draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;
+                  if(section==='metadata'){appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();}
+                  if(section==='basic'){appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();}
+                  if(section==='extended'){appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();}
+                  session.saving=false;session.errors=[{message:result.message||'保存失败'}];appState.deviceConfigEdit=session;toast(result.message||'保存失败');showDeviceConfigEditModal(deviceId);return false;
+                }
+                async function releaseAllDeviceConfigLocks(deviceId,silent){
+                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit;
+                  if(meta&&meta.deviceId===deviceId)await releaseDeviceMetadataLock(meta,silent);
+                  if(basic&&basic.deviceId===deviceId)await releaseDeviceBasicConfigLock(basic,silent);
+                  if(ext&&ext.deviceId===deviceId)await releaseDeviceExtendedConfigLock(ext,silent);
+                  if(meta&&meta.deviceId===deviceId){appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}
+                  if(basic&&basic.deviceId===deviceId){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
+                  if(ext&&ext.deviceId===deviceId){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
+                }
+                async function cancelDeviceConfigEdit(deviceId){
+                  await releaseAllDeviceConfigLocks(deviceId,false);
+                  appState.deviceConfigEdit=null;await dismissWebAdminModal();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                }
+                function maybeReleaseDeviceConfigEditForRoute(hash){
+                  const session=appState.deviceConfigEdit;if(!session)return;
+                  if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===session.deviceId)return;}
+                  appState.deviceConfigEdit=null;
+                }
                 function deviceBasicConfigCard(detail){
                   if(detail.basicConfigError)return errorBlock(detail.basicConfigError.message||'设备基础配置加载失败');
                   const cfg=detail.basicConfig||{}, lock=cfg.lockStatus||{}, editable=canEditDeviceBasicConfig(), editing=appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
-                  if(editing)return deviceBasicConfigForm(detail,appState.deviceBasicConfigEdit);
                   const supported=cfg.supported!==false;
                   const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑基础配置，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
                   let action='';
                   if(!supported)action=`<div class="readonly-note">${esc(cfg.unsupportedReason||'当前设备类型暂不支持基础配置编辑。')}</div>`;
+                  else if(editing)action=`<button class="secondary" onclick='showDeviceBasicConfigEditModal(${jsString(detail.id)})'>继续编辑</button>`;
                   else if(editable&&!lockedByOther)action=`<button class="secondary" onclick='startDeviceBasicConfigEdit(${jsString(detail.id)},${cfg.enabled?'true':'false'},${jsString(cfg.channel||'')},${jsString(cfg.expectedFingerprint||'')})'>编辑基础配置</button>`;
                   else if(editable)action=lockHint;
                   else action='<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备基础配置。</div>';
@@ -896,16 +1115,21 @@ public final class WebAdminFrontendScripts {
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceBasicConfigEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
                 }
+                function showDeviceBasicConfigEditModal(deviceId){
+                  const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
+                  openWebAdminModal('编辑设备基础配置',deviceBasicConfigForm({id:deviceId},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceBasicConfigEdit(deviceId)});
+                }
                 function deviceExtendedConfigCard(detail){
                   if(detail.extendedConfigError)return errorBlock(detail.extendedConfigError.message||'设备扩展配置加载失败');
                   const cfg=detail.extendedConfig||{}, lock=cfg.lockStatus||{}, editable=canEditDeviceExtendedConfig(), editing=appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser, fields=cfg.supportedFields||[];
-                  if(editing)return deviceExtendedConfigForm(detail,appState.deviceExtendedConfigEdit);
                   if(cfg.supported===false||fields.length===0)return `<p class="muted">${esc(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。')}</p>`;
                   const values=cfg.values||{}, labels=cfg.fieldLabels||{};
                   const rows=fields.map(field=>row(labels[field]||field,extendedFieldDisplay(field,values[field]))).join('');
                   const lockHint=lockedByOther?`<div class="readonly-note">当前由 ${esc(lock.holderUsername||'其他用户')} 正在编辑扩展配置，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
                   let action='';
-                  if(editable&&!lockedByOther)action=`<button class="secondary" onclick='startDeviceExtendedConfigEdit(${jsString(detail.id)})'>编辑扩展配置</button>`;
+                  if(editing)action=`<button class="secondary" onclick='showDeviceExtendedConfigEditModal(${jsString(detail.id)})'>继续编辑</button>`;
+                  else if(editable&&!lockedByOther)action=`<button class="secondary" onclick='startDeviceExtendedConfigEdit(${jsString(detail.id)})'>编辑扩展配置</button>`;
                   else if(editable)action=lockHint;
                   else action='<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备扩展配置。</div>';
                   return `<div class="identity-grid">${rows}</div><p class="readonly-note">这些配置会影响设备交互、反馈频道或时间参数；不会编辑 itemSubmit、matcher、action、region、用户或系统设置。</p>${action}`;
@@ -938,6 +1162,11 @@ public final class WebAdminFrontendScripts {
                     <p class="muted">保存会写入真实设备扩展配置；仅限当前设备类型支持的扩展频道或基础时间参数。不会修改 itemSubmit、matcher、interactionItem 复杂条件、action、region、用户或系统设置。</p>
                     <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceExtendedConfigEdit(${jsString(detail.id)})'>取消</button></div>
                   </form>`;
+                }
+                function showDeviceExtendedConfigEditModal(deviceId){
+                  const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
+                  openWebAdminModal('编辑设备扩展配置',deviceExtendedConfigForm({id:deviceId},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceExtendedConfigEdit(deviceId)});
                 }
                 function extendedFieldForm(deviceId,field,draft){
                   const label=(draft.fieldLabels||{})[field]||field, value=(draft.values||{})[field]??'', id=extendedFieldId(field), help=extendedFieldHelp(field);
@@ -997,9 +1226,10 @@ public final class WebAdminFrontendScripts {
                     appState.deviceMetadataEdit={deviceId,displayName,note,iconKey:iconKey||'auto',expectedVersion:Number(expectedVersion||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
                     scheduleDeviceMetadataLockHeartbeat();
                     await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    showDeviceMetadataEditModal(deviceId);
                   }catch(err){toast(err.message||'无法获取编辑锁');}
                 }
-                async function cancelDeviceMetadataEdit(deviceId){const draft=appState.deviceMetadataEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceMetadataLock(draft,false);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function cancelDeviceMetadataEdit(deviceId){const draft=appState.deviceMetadataEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceMetadataLock(draft,false);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}await dismissWebAdminModal();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 async function reloadDeviceMetadataAfterConflict(deviceId){const draft=appState.deviceMetadataEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceMetadataLock(draft,true);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 function scheduleDeviceMetadataLockHeartbeat(){stopDeviceMetadataLockHeartbeat();appState.deviceMetadataLockTimer=setTimeout(async()=>{await heartbeatDeviceMetadataLock();if(appState.deviceMetadataEdit)scheduleDeviceMetadataLockHeartbeat();},30000);}
                 function stopDeviceMetadataLockHeartbeat(){if(appState.deviceMetadataLockTimer){clearTimeout(appState.deviceMetadataLockTimer);appState.deviceMetadataLockTimer=null;}}
@@ -1013,26 +1243,30 @@ public final class WebAdminFrontendScripts {
                   draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceMetadataEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   try{
                     const result=await api(`/api/webadmin/device-metadata/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey,expectedVersion:draft.expectedVersion,lockId:draft.lockId})});
-                    if(result.success){appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();toast(result.changed?(result.message||'WebAdmin 显示信息已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
-                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    if(result.success){appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'WebAdmin 显示信息已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceMetadataEditModal(deviceId);
                   }catch(err){
-                    draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceMetadataEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceMetadataEditModal(deviceId);
                   }
                 }
                 """).append("""
                 function channelMetadataCard(detail){
                   const meta=detail.metadata||{}, draft=appState.channelMetadataEdit;
-                  if(draft&&draft.channel===detail.channel)return channelMetadataForm(detail,draft);
+                  const editing=draft&&draft.channel===detail.channel;
                   const canEdit=canEditChannelMetadata(), lock=meta.lockStatus||{};
                   const lockedByOther=!!lock.locked&&!lock.heldByCurrentUser;
                   const lockHint=lockedByOther?`<p class="readonly-note">${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</p>`:'';
-                  const action=canEdit&&!lockedByOther?`<button class="secondary" onclick='startChannelMetadataEdit(${jsString(detail.channel)})'>编辑频道显示信息</button>`:(canEdit?lockHint:'<p class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑。</p>');
+                  const action=editing?`<button class="secondary" ${htmlHandler(`showChannelMetadataEditModal(${jsString(detail.channel)})`)}>继续编辑</button>`:(canEdit&&!lockedByOther?`<button class="secondary" ${htmlHandler(`startChannelMetadataEdit(${jsString(detail.channel)})`)}>编辑频道显示信息</button>`:(canEdit?lockHint:'<p class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑。</p>'));
                   return `<div class="identity-grid">${row('显示名',esc(meta.displayName||'未设置'))}${row('原始频道',esc(detail.channel))}${row('备注',esc(meta.note||'暂无'))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}${row('最后修改',fmtTime(meta.updatedAt))}${row('修改人',esc(meta.updatedBy||'暂无'))}</div><p class="muted">此信息仅用于 WebAdmin 展示，不会创建频道，也不会改变 SignalBridge 运行语义。</p>${action}`;
                 }
                 function channelMetadataForm(detail,draft){
                   const errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.field?`${e.field}：`: '')}${esc(e.message||'保存失败')}</li>`).join('')}</ul>`:'';
-                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'频道显示信息已发生冲突，请刷新后再编辑。')} <button class="link-button" onclick='reloadChannelMetadataAfterConflict(${jsString(detail.channel)})'>刷新当前信息</button></div>`:'';
-                  return `<form class="edit-form" onsubmit='event.preventDefault();saveChannelMetadata(${jsString(detail.channel)})'><label>显示名<input id="channel-metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="例如：大厅任务提交成功"></label><label>备注<textarea id="channel-metadata-note" maxlength="512" placeholder="仅用于 WebAdmin 展示">${esc(draft.note||'')}</textarea></label><label>图标<select id="channel-metadata-icon" class="select">${metadataIconOptions().map(key=>`<option value="${esc(key)}" ${key===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(key))}</option>`).join('')}</select></label><p class="readonly-note">正在编辑频道显示信息。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" onclick='cancelChannelMetadataEdit(${jsString(detail.channel)})'>取消</button></div></form>`;
+                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'频道显示信息已发生冲突，请刷新后再编辑。')} <button class="link-button" ${htmlHandler(`reloadChannelMetadataAfterConflict(${jsString(detail.channel)})`)}>刷新当前信息</button></div>`:'';
+                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveChannelMetadata(${jsString(detail.channel)})`)}><label>显示名<input id="channel-metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="例如：大厅任务提交成功"></label><label>备注<textarea id="channel-metadata-note" maxlength="512" placeholder="仅用于 WebAdmin 展示">${esc(draft.note||'')}</textarea></label><label>图标<select id="channel-metadata-icon" class="select">${metadataIconOptions().map(key=>`<option value="${esc(key)}" ${key===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(key))}</option>`).join('')}</select></label><p class="readonly-note">正在编辑频道显示信息。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler(`cancelChannelMetadataEdit(${jsString(detail.channel)})`)}>取消</button></div></form>`;
+                }
+                function showChannelMetadataEditModal(channel){
+                  const draft=appState.channelMetadataEdit;if(!draft||draft.channel!==channel)return;
+                  openWebAdminModal('编辑频道显示信息',channelMetadataForm({channel},draft),editModalFooter(draft.saving),{onClose:()=>cancelChannelMetadataEdit(channel)});
                 }
                 function maybeReleaseChannelMetadataEditForRoute(hash){const draft=appState.channelMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/signals/')){const info=detailRoute(String(hash).substring('#/signals/'.length),'#/signals');if(info.id===draft.channel)return;}releaseChannelMetadataLock(draft,true);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}
                 async function startChannelMetadataEdit(channel){
@@ -1045,9 +1279,10 @@ public final class WebAdminFrontendScripts {
                     appState.channelMetadataEdit={channel:meta.channel||channel,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedFingerprint:meta.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
                     scheduleChannelMetadataLockHeartbeat();
                     await renderSignalDetail(encodeURIComponent(channel),{silent:true});
+                    showChannelMetadataEditModal(meta.channel||channel);
                   }catch(err){toast(err.message||'无法获取编辑锁');}
                 }
-                async function cancelChannelMetadataEdit(channel){const draft=appState.channelMetadataEdit;if(draft&&draft.channel===channel){await releaseChannelMetadataLock(draft,false);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
+                async function cancelChannelMetadataEdit(channel){const draft=appState.channelMetadataEdit;if(draft&&draft.channel===channel){await releaseChannelMetadataLock(draft,false);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}await dismissWebAdminModal();await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
                 async function reloadChannelMetadataAfterConflict(channel){const draft=appState.channelMetadataEdit;if(draft&&draft.channel===channel)await releaseChannelMetadataLock(draft,true);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
                 function scheduleChannelMetadataLockHeartbeat(){stopChannelMetadataLockHeartbeat();appState.channelMetadataLockTimer=setTimeout(async()=>{await heartbeatChannelMetadataLock();if(appState.channelMetadataEdit)scheduleChannelMetadataLockHeartbeat();},30000);}
                 function stopChannelMetadataLockHeartbeat(){if(appState.channelMetadataLockTimer){clearTimeout(appState.channelMetadataLockTimer);appState.channelMetadataLockTimer=null;}}
@@ -1061,9 +1296,9 @@ public final class WebAdminFrontendScripts {
                   draft.saving=true;draft.errors=[];draft.conflict=null;appState.channelMetadataEdit=draft;renderSignalDetail(encodeURIComponent(channel),{silent:true});
                   try{
                     const result=await api(`/api/webadmin/channel-metadata?channel=${encodeURIComponent(channel)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({displayName:draft.displayName,note:draft.note,iconKey:draft.iconKey,expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
-                    if(result.success){appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();toast(result.changed?(result.message||'频道显示信息已保存。'):'没有变更。');await renderSignalDetail(encodeURIComponent(channel),{silent:true});return;}
-                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.channelMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopChannelMetadataLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});
-                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.channelMetadataEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});}
+                    if(result.success){appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'频道显示信息已保存。'):'没有变更。');await renderSignalDetail(encodeURIComponent(channel),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.channelMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopChannelMetadataLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});showChannelMetadataEditModal(channel);
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.channelMetadataEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});showChannelMetadataEditModal(channel);}
                 }
                 function maybeReleaseDeviceBasicConfigEditForRoute(hash){const draft=appState.deviceBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
                 async function startDeviceBasicConfigEdit(deviceId,enabled,channel,expectedFingerprint){
@@ -1076,9 +1311,10 @@ public final class WebAdminFrontendScripts {
                     appState.deviceBasicConfigEdit={deviceId,enabled:!!enabled,channel:channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,expectedFingerprint:expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
                     scheduleDeviceBasicConfigLockHeartbeat();
                     await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    showDeviceBasicConfigEditModal(deviceId);
                   }catch(err){toast(err.message||'无法获取编辑锁');}
                 }
-                async function cancelDeviceBasicConfigEdit(deviceId){const draft=appState.deviceBasicConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceBasicConfigLock(draft,false);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
+                async function cancelDeviceBasicConfigEdit(deviceId){const draft=appState.deviceBasicConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceBasicConfigLock(draft,false);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}await dismissWebAdminModal();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 async function reloadDeviceBasicConfigAfterConflict(deviceId){const draft=appState.deviceBasicConfigEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 function scheduleDeviceBasicConfigLockHeartbeat(){stopDeviceBasicConfigLockHeartbeat();appState.deviceBasicConfigLockTimer=setTimeout(async()=>{await heartbeatDeviceBasicConfigLock();if(appState.deviceBasicConfigEdit)scheduleDeviceBasicConfigLockHeartbeat();},30000);}
                 function stopDeviceBasicConfigLockHeartbeat(){if(appState.deviceBasicConfigLockTimer){clearTimeout(appState.deviceBasicConfigLockTimer);appState.deviceBasicConfigLockTimer=null;}}
@@ -1091,10 +1327,10 @@ public final class WebAdminFrontendScripts {
                   draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceBasicConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   try{
                     const result=await api(`/api/webadmin/device-basic-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
-                    if(result.success){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();toast(result.changed?(result.message||'设备基础配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
-                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    if(result.success){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备基础配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceBasicConfigEditModal(deviceId);
                   }catch(err){
-                    draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceBasicConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceBasicConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceBasicConfigEditModal(deviceId);
                   }
                 }
                 function chainPreview(detail){if(isBlank(detail.channel))return '<span class="muted">当前设备没有主频道。</span>';return `<div class="chain-row"><strong>${esc(detail.displayName)}</strong><span class="muted">→ 主频道：${esc(detail.channel)}</span><span class="muted">→ 可在频道详情页查看消费者与最近事件</span></div>`}
@@ -1104,21 +1340,21 @@ public final class WebAdminFrontendScripts {
                 function localizeCheckName(name){return {enabled:'设备状态',channel:'主频道',block_id:'方块 ID',blockId:'方块 ID'}[String(name||'')]||name||'检查项';}
                 function localizeCheckMessage(c){const text=String(c?.message||'');if(text==='Device is enabled.')return'当前设备处于启用状态。';if(text==='Device is disabled.')return'当前设备处于禁用状态。';if(text==='Primary channel is empty.')return'当前设备没有设置主频道。';return text.replace('Device is enabled.','当前设备处于启用状态。').replace('Primary channel is empty.','当前设备没有设置主频道。');}
                 function configSummary(detail){const obj=detail?.configSummary||{};if(!obj||Object.keys(obj).length===0)return empty('当前设备暂无配置摘要。');const cfg=obj, item=cfg.interactionItem||{};let html='';
-                  html+=configSection('基础配置',[
+                  html+=configGroup('基础配置',[
                     ['短 ID',shortId(detail.id||cfg.shortId)],
                     ['设备类型',labelType(detail.type)],
                     ['方块 ID',cfg.blockId],
                     ['工作模式',cfg.mode],
                     ['冷却时间',formatTicks(cfg.cooldownTicks)],
                     ['脉冲时间',formatTicks(cfg.pulseTicks)]
-                  ],true);
-                  html+=configSection('信号配置',[
+                  ]);
+                  html+=configGroup('信号配置',[
                     ['主频道',labelChannel(detail.channel)],
                     ['成功频道',item.successChannel],
                     ['失败频道',item.failChannel],
                     ['动作数量',cfg.actionCount]
                   ]);
-                  html+=configSection('交互配置',[
+                  html+=configGroup('交互配置',[
                     ['普通交互',cfg.interactionEnabled?'已启用':''],
                     ['物品匹配',item.enabled?'已启用':''],
                     ['物品来源',item.sourceDisplayName||labelInteractionSource(item.source)],
@@ -1127,17 +1363,17 @@ public final class WebAdminFrontendScripts {
                     ['背包消耗顺序',item.consumeEnabled?(item.inventoryConsumeOrderDisplayName||labelConsumeOrder(item.inventoryConsumeOrder)):''],
                     ['物品模板',item.templateSummary]
                   ]);
-                  html+=configSection('容器配置',[
+                  html+=configGroup('容器配置',[
                     ['容器事件',cfg.containerEnabled?'已启用':''],
                     ['物品条件数量',cfg.itemConditionCount]
                   ]);
-                  html+=configSection('物品提交',[
+                  html+=configGroup('物品提交',[
                     ['多物品提交',cfg.itemSubmitEnabled?'已启用':''],
                     ['提交条件数量',cfg.itemSubmitRequirementCount]
                   ]);
-                  const raw=flatten(obj).slice(0,32).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
-                  return `<div>${html || empty('当前设备没有可展示的关键配置。')}<details class="raw-config"><summary>高级 / 原始字段</summary><div class="list-stack">${raw}</div></details></div>`;
+                  return `<div class="wa-config-stack">${html || empty('当前设备没有可展示的关键配置。')}</div>`;
                 }
+                function configGroup(title,rows){const filtered=(rows||[]).filter(([_,v])=>isMeaningful(v));if(filtered.length===0)return '';return `<section class="wa-config-card"><h3>${esc(title)}</h3><div class="identity-grid">${filtered.map(([k,v])=>row(k,esc(v))).join('')}</div></section>`}
                 function configSection(title,rows,open=false){const filtered=(rows||[]).filter(([_,v])=>isMeaningful(v));if(filtered.length===0)return '';return `<details class="config-section" ${open?'open':''}><summary>${esc(title)}</summary><div class="list-stack">${filtered.map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('')}</div></details>`}
                 function isMeaningful(v){if(v===undefined||v===null)return false;if(typeof v==='number')return v!==0;if(typeof v==='boolean')return v;if(Array.isArray(v))return v.length>0;return String(v).trim()!==''&&String(v).trim()!=='-'&&String(v).trim()!=='未设置';}
                 function formatTicks(value){const n=Number(value||0);return n>0?`${n} tick`:'';}
@@ -1151,28 +1387,36 @@ public final class WebAdminFrontendScripts {
                   renderDoctorList('',options);
                 }
                 function renderDoctorList(focusId,options={}){
+                  waEnsureState();
                   const report=appState.doctorReport||{summary:{},issues:[]}, issues=report.issues||[], filtered=filterDoctorIssues(issues), summary=report.summary||{};
-                  const jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;
-                  if(setView(`
-                    <div class="page-head"><div><h1>Doctor 诊断</h1><p>查看设备、频道、Signal 与配置风险</p></div><span class="pill info">只读模式</span></div>
-                    <section class="card-grid">
-                      ${metric('错误数量',summary.errorCount||0,(summary.errorCount||0)>0?'error':'','doctor')}
-                      ${metric('警告数量',summary.warningCount||0,(summary.warningCount||0)>0?'warning':'','warning')}
-                      ${metric('信息数量',summary.infoCount||0,'','doctor')}
-                      ${metric('受影响设备',summary.affectedDeviceCount ?? '暂无','','device')}
-                      ${metric('受影响频道',summary.affectedChannelCount ?? '暂无','','signal')}
-                      ${metric('最近诊断',issues.length?formatDateTime(issues[0].detectedAt):'暂无','','history')}
+                  const total=issues.length, errors=summary.errorCount??issues.filter(i=>String(i.severity||'').toUpperCase()==='ERROR').length, warnings=summary.warningCount??issues.filter(i=>String(i.severity||'').toUpperCase()==='WARNING').length, infos=summary.infoCount??issues.filter(i=>String(i.severity||'').toUpperCase()==='INFO').length;
+                  const score=Math.max(0,Math.round(100-errors*28-warnings*12-infos*3));
+                  const page=waPageItems('doctor',filtered,10);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('信号诊断 / Doctor','只读查看 Signal、设备、监听器、动作和区域诊断；自动修复与清空问题均未开放。',`${waButton('自动修复','critical-issue','disabled','danger')}${waButton('清空问题','channel-error','disabled','ghost')}${waButton('导出报告','download','disabled','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('总问题',total,'来自 /api/doctor','doctor-overview',total?'warning':'ok')}
+                      ${waMetric('严重问题',errors,'severity=ERROR','critical-issue',errors?'error':'ok')}
+                      ${waMetric('警告问题',warnings,'severity=WARNING','warning-issue',warnings?'warning':'ok')}
+                      ${waMetric('信息提示',infos,'severity=INFO','info-issue')}
+                      ${waMetric('健康度评分',`${score}%`,'只读前端估算','doctor-ok',score>=80?'ok':(score>=60?'warning':'error'))}
                     </section>
-                    <div class="toolbar">
-                      <input class="input" id="doctor-search" placeholder="搜索标题 / 对象 / 频道 / 建议" value="${esc(appState.doctorFilters.search)}">
-                      ${doctorFilterSelect('严重级别','doctor-severity',['ALL','ERROR','WARNING','INFO'],appState.doctorFilters.severity)}
-                      ${doctorFilterSelect('对象类型','doctor-object',['ALL','DEVICE','CHANNEL','LISTENER','RECEIVER','ACTION_RELAY','ACTION','REGION','SYSTEM','UNKNOWN'],appState.doctorFilters.objectType)}
-                      ${doctorFilterSelect('跳转目标','doctor-jump',['ALL','HAS_TARGET','NO_TARGET'],appState.doctorFilters.jump)}
-                    </div>
-                    <section class="content-grid">
-                      <article class="panel-card">${filtered.length?doctorTable(filtered):empty(issues.length?'没有匹配当前筛选条件的诊断问题。':'当前没有诊断问题。')}</article>
-                      <aside class="panel-card"><h2>诊断摘要</h2>${doctorSummaryPanel(issues,jumpTargets)}</aside>
-                    </section>`,options))bindDoctorFilters(focusId);
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="doctor-search" placeholder="搜索标题 / 对象 / 频道 / 建议" value="${esc(appState.doctorFilters.search)}"></label>
+                          ${doctorFilterSelect('严重级别','doctor-severity',['ALL','ERROR','WARNING','INFO'],appState.doctorFilters.severity)}
+                          ${doctorFilterSelect('对象类型','doctor-object',['ALL','DEVICE','CHANNEL','LISTENER','RECEIVER','ACTION_RELAY','ACTION','REGION','SYSTEM','UNKNOWN'],appState.doctorFilters.objectType)}
+                          ${doctorFilterSelect('范围筛选','doctor-jump',['ALL','HAS_TARGET','NO_TARGET'],appState.doctorFilters.jump)}
+                          ${waButton('刷新','refresh','onclick="renderDoctorPage()"','ghost')}
+                        </div>
+                        ${page.items.length?doctorTable(page.items):empty(issues.length?'没有匹配当前筛选条件的诊断问题。':'当前没有诊断问题。')}
+                        ${waPagination('doctor',page)}
+                      </div>
+                      ${doctorSummaryPanel(issues,filtered)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindDoctorFilters(focusId);
                 }
                 function doctorFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(doctorOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function doctorOptionLabel(v){return {ALL:'全部',ERROR:'错误',WARNING:'警告',INFO:'信息',DEVICE:'设备',CHANNEL:'频道',LISTENER:'监听器',RECEIVER:'接收器',ACTION_RELAY:'动作继电器',ACTION:'动作',REGION:'区域',SYSTEM:'系统',UNKNOWN:'未知',HAS_TARGET:'有跳转目标',NO_TARGET:'无跳转目标'}[v]||v;}
@@ -1182,53 +1426,9 @@ public final class WebAdminFrontendScripts {
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterDoctorIssues(items){const f=appState.doctorFilters;return (items||[]).filter(i=>{const hay=[i.title,i.message,i.relatedObjectName,i.relatedObjectId,i.channel,i.suggestion,i.code,i.id].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.severity!=='ALL'&&String(i.severity||'').toUpperCase()!==f.severity)return false;if(f.objectType!=='ALL'&&String(i.relatedObjectType||'UNKNOWN').toUpperCase()!==f.objectType)return false;const hasTarget=!isBlank(i.navigationTarget)||!isBlank(i.channel);if(f.jump==='HAS_TARGET'&&!hasTarget)return false;if(f.jump==='NO_TARGET'&&hasTarget)return false;return true;});}
-                function doctorTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>严重级别</th><th>问题标题</th><th>关联对象</th><th>对象类型</th><th>频道</th><th>影响说明</th><th>建议操作</th><th>诊断代码</th><th>操作</th></tr></thead><tbody>${items.map(i=>`<tr><td>${pill(i.severity)}</td><td><strong>${issueTitle(i)}</strong></td><td>${esc(i.relatedObjectName||i.relatedObjectId||'暂无')}</td><td>${esc(labelObjectType(i.relatedObjectType))}</td><td>${isBlank(i.channel)?'<span class="muted">暂无</span>':channelButton(i.channel)}</td><td>${issueMessage(i)}</td><td>${issueSuggestion(i)}</td><td><span class="muted">代码：${esc(i.id||'unknown')}</span></td><td>${issueNavigation(i)}</td></tr>`).join('')}</tbody></table></div>`}
-                function doctorSummaryPanel(issues,jumpTargets){if(!issues||issues.length===0)return empty('当前没有诊断问题。');const bySeverity=countBy(issues,i=>String(i.severity||'UNKNOWN').toUpperCase()), byObject=countBy(issues,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase());const top=issues.slice(0,5).map(i=>`<div class="issue-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('');return `<div class="summary-grid">${metric('可跳转问题',jumpTargets)}${metric('无跳转目标',issues.length-jumpTargets)}${metric('频道问题',byObject.CHANNEL||0)}${metric('设备问题',byObject.DEVICE||0)}</div><h3>严重级别分布</h3><div class="list-stack"><div class="kv-row"><span class="muted">错误</span><strong>${bySeverity.ERROR||0}</strong></div><div class="kv-row"><span class="muted">警告</span><strong>${bySeverity.WARNING||0}</strong></div><div class="kv-row"><span class="muted">信息</span><strong>${bySeverity.INFO||0}</strong></div></div><h3>最近问题</h3><div class="list-stack">${top}</div><p class="muted">Doctor 页面只读展示当前可低成本诊断结果，不扫描世界、不强制加载区块。</p>`;}
-                function countBy(items,mapper){return (items||[]).reduce((acc,item)=>{const key=mapper(item)||'UNKNOWN';acc[key]=(acc[key]||0)+1;return acc;},{});}
-                async function renderHistoryPage(queryTail='',options={}){
-                  const params=parseHashParams(queryTail);appState.historyFilters.channel=params.channel||'ALL';
-                  if(!options.silent)setView(loading('正在加载历史记录...'));
-                  let history;try{history=await api('/api/signals/history?limit=500')}catch(err){if(options.silent){toast('历史记录实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
-                  appState.historyItems=history||[];
-                  renderHistoryListPage('',options);
-                }
-                function parseHashParams(tail){const raw=String(tail||'');const query=raw.startsWith('?')?raw.substring(1):(raw.includes('?')?raw.substring(raw.indexOf('?')+1):'');const params=new URLSearchParams(query);return {channel:params.get('channel')||''};}
-                function renderHistoryListPage(focusId,options={}){
-                  const items=appState.historyItems||[], filtered=filterHistoryItems(items), channels=uniqueValues(items.map(h=>h.channel).filter(v=>!isBlank(v))), sourceTypes=uniqueValues(items.map(h=>h.sourceType).filter(v=>!isBlank(v)));
-                  const success=items.filter(h=>String(h.result||'').toUpperCase()==='SUCCESS').length, failed=items.filter(h=>String(h.result||'').toUpperCase()==='FAILED').length, latest=items[0]?.time||'';
-                  if(setView(`
-                    <div class="page-head"><div><h1>历史记录</h1><p>查看 Signal 事件、设备事件与系统观测记录</p></div><span class="pill info">只读模式</span></div>
-                    <section class="card-grid">
-                      ${metric('最近记录数',items.length,'','history')}
-                      ${metric('成功事件',success,'','ok')}
-                      ${metric('失败事件',failed,failed>0?'warning':'','warning')}
-                      ${metric('涉及频道',channels.length,'','signal')}
-                      ${metric('最近事件时间',fmtTime(latest),'','history')}
-                    </section>
-                    <div class="toolbar">
-                      <input class="input" id="history-search" placeholder="搜索频道 / 来源 / 玩家 / 详情 / 结果" value="${esc(appState.historyFilters.search)}">
-                      ${historyFilterSelect('频道','history-channel',['ALL',...channels],appState.historyFilters.channel)}
-                      ${historyFilterSelect('来源类型','history-source',['ALL',...sourceTypes],appState.historyFilters.sourceType)}
-                      ${historyFilterSelect('结果','history-result',['ALL','SUCCESS','FAILED','UNKNOWN'],appState.historyFilters.result)}
-                      ${historyFilterSelect('时间范围','history-range',['ALL','M10','H1','H24'],appState.historyFilters.range)}
-                      ${historyFilterSelect('排序','history-sort',['NEWEST','OLDEST'],appState.historyFilters.sort)}
-                    </div>
-                    <section class="content-grid">
-                      <article class="panel-card">${filtered.length?historyTable(filtered):empty(items.length?'没有匹配当前筛选条件的历史事件。':'暂无历史事件。')}</article>
-                      <aside class="panel-card"><h2>时间线摘要</h2>${historySummaryPanel(filtered,items)}</aside>
-                    </section>`,options))bindHistoryFilters(focusId);
-                }
-                function historyFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(historyOptionLabel(id,o))}</option>`).join('')}</select></label>`}
-                function historyOptionLabel(id,v){if(v==='ALL')return'全部';if(id==='history-source')return labelSourceType(v);if(id==='history-result')return labelStatus(v);if(id==='history-range')return labelHistoryRange(v);if(id==='history-sort')return labelHistorySort(v);return v;}
-                function bindHistoryFilters(focusId){
-                  const update=(event)=>{appState.historyFilters.search=document.getElementById('history-search').value;appState.historyFilters.channel=document.getElementById('history-channel').value;appState.historyFilters.sourceType=document.getElementById('history-source').value;appState.historyFilters.result=document.getElementById('history-result').value;appState.historyFilters.range=document.getElementById('history-range').value;appState.historyFilters.sort=document.getElementById('history-sort').value;renderHistoryListPage(event.target.id);};
-                  ['history-search','history-channel','history-source','history-result','history-range','history-sort'].forEach(id=>document.getElementById(id).addEventListener(id==='history-search'?'input':'change',update));
-                  if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
-                }
-                function filterHistoryItems(items){const f=appState.historyFilters;const cutoff=historyCutoff(f.range);const filtered=(items||[]).filter(h=>{const hay=[h.channel,h.sourceName,h.sourceId,h.playerName,h.result,h.description,h.sourceType].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.channel!=='ALL'&&h.channel!==f.channel)return false;if(f.sourceType!=='ALL'&&h.sourceType!==f.sourceType)return false;if(f.result!=='ALL'&&String(h.result||'UNKNOWN').toUpperCase()!==f.result)return false;if(cutoff){const d=parseTime(h.time);if(!d||d.getTime()<cutoff)return false;}return true;});return filtered.sort((a,b)=>f.sort==='OLDEST'?String(a.time||'').localeCompare(String(b.time||'')):String(b.time||'').localeCompare(String(a.time||'')));}
-                function historyCutoff(range){const now=Date.now();if(range==='M10')return now-10*60*1000;if(range==='H1')return now-60*60*1000;if(range==='H24')return now-24*60*60*1000;return 0;}
-                function historyTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>事件类型</th><th>频道</th><th>来源对象</th><th>来源类型</th><th>玩家 / 用户</th><th>结果</th><th>详情</th><th>操作</th></tr></thead><tbody>${items.map(h=>`<tr><td>${fmtTime(h.time)}</td><td>Signal 事件</td><td>${channelButton(h.channel)}</td><td>${esc(h.sourceName||h.sourceId||'暂无')}</td><td>${esc(labelSourceType(h.sourceType))}</td><td>${esc(h.playerName||'无玩家上下文')}</td><td>${pill(h.result||'UNKNOWN')}</td><td>${esc(h.description||'暂无详情')}</td><td>${historyAction(h)}</td></tr>`).join('')}</tbody></table></div>`;}
-                function historySummaryPanel(filtered,allItems){if(!allItems||allItems.length===0)return empty('暂无历史事件。');const byResult=countBy(filtered,h=>String(h.result||'UNKNOWN').toUpperCase()), bySource=countBy(filtered,h=>String(h.sourceType||'UNKNOWN').toUpperCase());const recent=filtered.slice(0,5).map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} · ${esc(labelStatus(h.result))}</span><span>${esc(h.description||'暂无详情')}</span></div>`).join('');return `<div class="summary-grid">${metric('当前筛选',filtered.length)}${metric('全部记录',allItems.length)}${metric('成功',byResult.SUCCESS||0)}${metric('失败',byResult.FAILED||0)}</div><h3>来源类型</h3><div class="list-stack">${Object.entries(bySource).slice(0,6).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(labelSourceType(k))}</span><strong>${v}</strong></div>`).join('')||empty('暂无来源统计。')}</div><h3>最近事件</h3><div class="list-stack">${recent||empty('当前筛选下暂无事件。')}</div><p class="muted">History 页面只读展示已有内存历史，不删除、不导出、不重放事件。</p>`;}
+                function doctorTable(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>问题类型</th><th>对象</th><th>级别</th><th>描述</th><th>发现时间</th><th>操作</th></tr></thead><tbody>${items.map(i=>`<tr><td><span class="device-name"><span class="device-icon">${icon(doctorIssueIcon(i.severity))}</span><span><strong>${issueTitle(i)}</strong><span class="device-subtitle">${esc(i.id||i.code||'unknown')}</span></span></span></td><td><strong>${esc(i.relatedObjectName||i.relatedObjectId||'暂无')}</strong><span class="device-subtitle">${esc(labelObjectType(i.relatedObjectType))}${isBlank(i.channel)?'':` · ${esc(i.channel)}`}</span></td><td>${pill(i.severity)}</td><td><span>${issueMessage(i)}</span><span class="device-subtitle">${issueSuggestion(i)}</span></td><td>${fmtTime(i.detectedAt||i.createdAt||'')}</td><td><div class="wa-action-cell">${issueNavigation(i)}<button class="wa-btn ghost" disabled>自动修复</button>${waIconButton('导出不可用','download','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;}
+                function doctorSummaryPanel(issues,filtered){if(!issues||issues.length===0)return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${empty('当前没有诊断问题。')}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('自动修复','critical-issue','disabled','danger')}${waButton('清空问题','channel-error','disabled','ghost')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">Doctor 自动修复、清空与报告导出没有完整后端支持，本轮保持禁用。</p></article></aside>`;const current=filtered||issues, jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${progressList(distributionItems(current,i=>String(i.severity||'UNKNOWN').toUpperCase(),labelStatus,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>范围筛选</h2>${progressList(distributionItems(current,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase(),labelObjectType,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid"><button class="wa-btn ghost" onclick="appState.doctorFilters.severity='ERROR';renderDoctorList()">${icon('critical-issue')}<span>仅错误</span></button><button class="wa-btn ghost" onclick="appState.doctorFilters.jump='HAS_TARGET';renderDoctorList()">${icon('signalbridge-main')}<span>有跳转目标</span></button>${waButton('自动修复','critical-issue','disabled','danger')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">可跳转问题 ${esc(jumpTargets)} 个。自动修复、清空问题和导出报告均未接入完整后端能力，不发送写请求。</p></article><article class="wa-panel"><h2>最近问题</h2><div class="list-stack">${issues.slice(0,5).map(i=>`<div class="event-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('')}</div></article></aside>`;}
+                function doctorIssueIcon(severity){const s=String(severity||'').toUpperCase();return s==='ERROR'?'doctor-error':(s==='WARNING'?'doctor-warning':'doctor-ok');}
                 """).append("""
                 async function renderUsersPage(options={}){
                   if(!options.silent)setView(loading('正在加载用户管理...'));
@@ -1271,29 +1471,6 @@ public final class WebAdminFrontendScripts {
                 function userTable(users){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>在线状态</th><th>Session</th><th>最后登录</th><th>创建时间</th><th>创建者</th><th>说明</th></tr></thead><tbody>${users.map(u=>`<tr><td><span class="device-name"><span class="device-icon">${icon('user')}</span><span><strong>${esc(u.displayName||u.username)}</strong><span class="device-subtitle">用户名：${esc(u.username)}</span></span></span></td><td>${esc(labelRoleFull(u.role))}</td><td>${textPill(labelEnabledState(u.enabled),u.enabled?'ok':'warning')}</td><td>${textPill(labelOnline(u.online),u.online?'ok':'info')}</td><td>${esc(Number(u.sessionCount||0))}</td><td>${fmtTime(u.lastLoginAt)}</td><td>${fmtTime(u.createdAt)}</td><td>${esc(u.createdBy||'暂无')}</td><td>${u.forcePasswordChange?'<span class="pill warning">需首次改密</span>':'<span class="muted">暂无备注</span>'}</td></tr>`).join('')}</tbody></table></div>`;}
                 function roleSummary(roles){const items=(roles&&roles.length?roles:[{role:'OWNER',displayName:'所有者（OWNER）',count:0},{role:'EDITOR',displayName:'编辑者（EDITOR）',count:0},{role:'TESTER',displayName:'测试者（TESTER）',count:0},{role:'VIEWER',displayName:'查看者（VIEWER）',count:0}]);return `<div class="list-stack">${items.map(r=>`<div class="kv-row"><span class="muted">${esc(r.displayName||labelRoleFull(r.role))}</span><strong>${esc(r.count ?? 0)}</strong></div>`).join('')}</div><h3>角色说明</h3><div class="list-stack"><div class="event-row"><strong>所有者</strong><span>完整管理权限。</span></div><div class="event-row"><strong>编辑者</strong><span>未来用于编辑配置。</span></div><div class="event-row"><strong>测试者</strong><span>未来用于测试触发。</span></div><div class="event-row"><strong>查看者</strong><span>只读查看。</span></div></div>`}
                 function securityTips(){return `<h3>安全提示</h3><div class="list-stack"><div class="event-row"><span>密码不会明文保存，服务端使用 PBKDF2 哈希。</span></div><div class="event-row"><span>WebAdmin 用户按当前世界 / 存档目录隔离存储。</span></div><div class="event-row"><span>请只给可信协作者创建账号，多人访问建议配合可信网络、防火墙或反向代理。</span></div><div class="event-row"><span>6.5 页面只读展示，不提供重置密码、禁用、删除或踢出 session。</span></div></div>`}
-                async function renderSettingsPage(options={}){
-                  if(!options.silent)setView(loading('正在加载系统设置...'));
-                  let data;try{data=await api('/api/webadmin/settings')}catch(err){if(options.silent){toast('系统设置实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
-                  const service=data.service||{}, storage=data.storage||{}, security=data.security||{}, audit=data.audit||{}, system=data.system||{}, visibility=data.visibility||{};
-                  setView(`
-                    <div class="page-head"><div><h1>系统设置</h1><p>查看 WebAdmin 服务、安全、存储与运行信息</p></div><span class="pill info">只读模式</span></div>
-                    <section class="card-grid">
-                      ${metric('服务状态',service.running?'运行中':'未运行',service.running?'':'warning','settings')}
-                      ${metric('访问模式',labelAccessMode(service.accessMode),'','settings')}
-                      ${metric('当前 Session',system.sessionCount ?? '暂无','','user')}
-                      ${metric('审计日志',audit.enabled?'已启用':'已关闭',audit.enabled?'':'warning','history')}
-                      ${metric('服务器类型',labelServerType(system.serverType),'','dashboard')}
-                      ${metric('Mod 版本',system.modVersion||'暂无','','device')}
-                    </section>
-                    <section class="detail-grid" style="margin-top:16px">
-                      <article class="panel-card"><h2>服务状态</h2><div class="identity-grid">${row('WebAdmin 服务',esc(service.running?'运行中':'未运行'))}${row('监听地址',esc(service.host||'暂无'))}${row('端口',esc(service.port ?? '暂无'))}${row('访问模式',esc(labelAccessMode(service.accessMode)))}${row('当前访问 URL',esc(service.url||'暂无'))}${row('当前登录用户',esc(service.currentUser||'暂无'))}${row('当前角色',esc(labelRoleFull(service.currentRole)))}</div></article>
-                      <article class="panel-card"><h2>存储目录</h2>${storagePanel(storage,visibility)}</article>
-                      <article class="panel-card"><h2>安全配置</h2><div class="identity-grid">${row('认证方式',esc(labelAuthMode(security.authMode)))}${row('密码哈希算法',esc(security.passwordHashAlgorithm||'暂无'))}${row('Session Cookie',esc(security.sessionCookieName||'暂无'))}${row('Session 有效期',esc(formatMinutes(security.sessionTtlMinutes)))}${row('记住我有效期',esc(formatMinutes(security.rememberMeTtlMinutes)))}${row('审计日志',esc(security.auditEnabled?'已启用':'已关闭'))}${row('远程访问',esc(security.remoteAccessAllowed?'允许当前访问模式远程协作':'本机访问'))}</div></article>
-                      <article class="panel-card"><h2>审计 / History</h2><div class="identity-grid">${row('审计日志状态',esc(audit.enabled?'已启用':'已关闭'))}${row('审计文件',esc(audit.auditLogExists?'已存在':'暂无文件'))}${row('最近登录记录',esc(audit.recentLoginRecords||'暂无数据'))}${row('API 访问统计',esc(audit.apiAccessStats||'暂无数据'))}</div></article>
-                      <article class="panel-card"><h2>系统信息</h2><div class="identity-grid">${row('TZZ Mod 版本',esc(system.modVersion||'暂无数据'))}${row('Minecraft 版本',esc(system.minecraftVersion||'暂无数据'))}${row('服务器类型',esc(labelServerType(system.serverType)))}${row('当前世界 / 存档',esc(system.worldName||'暂无数据'))}</div></article>
-                      <article class="panel-card"><h2>危险操作说明</h2><p class="muted">6.5 系统设置页面只读展示。修改端口、访问模式、用户、密码等操作当前请使用 /tzz webadmin 命令或服务端配置文件；Web UI 写操作将在后续阶段谨慎开放。</p></article>
-                    </section>`,options);
-                }
                 function storagePanel(storage,visibility){const restricted=storage.restricted||visibility.sensitiveStorageHidden;const hidden='受限信息已隐藏';return `<div class="identity-grid">${row('存储作用域',esc(storage.scope||'WORLD_SAVE'))}${row('按世界隔离',esc(storage.worldScoped?'是':'否'))}${row('WebAdmin 存储目录',esc(restricted?hidden:(storage.directory||'暂无')))}${row('配置文件',esc(restricted?hidden:(storage.configPath||'暂无')))}${row('用户文件',esc(restricted?hidden:(storage.usersPath||'暂无')))}${row('审计日志',esc(restricted?hidden:(storage.auditLogPath||'暂无')))}${row('配置文件存在',esc(storage.configExists?'是':'否'))}${row('用户文件存在',esc(storage.usersExists?'是':'否'))}${row('审计日志存在',esc(storage.auditLogExists?'是':'否'))}${row('旧全局文件提示',esc(storage.legacyGlobalFilesDetected?'检测到旧 config/tzz WebAdmin 文件，但不会自动加载':'未检测到旧全局文件'))}</div><p class="muted">WebAdmin 持久化文件统一放在当前世界 / 存档目录下的 tzz/webadmin/，不再使用全局 config/tzz。</p>`}
                 function labelAuthMode(value){return {USERNAME_PASSWORD:'用户名 / 密码'}[String(value||'').toUpperCase()]||value||'暂无';}
                 function labelServerType(value){return {DEDICATED:'专用服务器（DEDICATED）',INTEGRATED:'集成服务器（INTEGRATED）'}[String(value||'').toUpperCase()]||value||'暂无';}
@@ -1303,10 +1480,11 @@ public final class WebAdminFrontendScripts {
                 function actionHash(id){return `#/actions/${encodeURIComponent(id||'')}`;}
                 function regionButton(id,label){if(isBlank(id))return '<span class="muted">暂无区域</span>';return `<button class="link-button" ${navigationAttr(regionHash(id))}>${esc(label||id)}</button>`}
                 function actionButton(id,label){if(isBlank(id))return '<span class="muted">暂无动作</span>';return `<button class="link-button" ${navigationAttr(actionHash(id))}>${esc(label||id)}</button>`}
-                function boundsText(bounds){return bounds?`${bounds.minX} ${bounds.minY} ${bounds.minZ} → ${bounds.maxX} ${bounds.maxY} ${bounds.maxZ}`:'暂无';}
-                function boundsSize(bounds){if(!bounds)return '暂无';const x=Math.abs(Number(bounds.maxX)-Number(bounds.minX))+1,y=Math.abs(Number(bounds.maxY)-Number(bounds.minY))+1,z=Math.abs(Number(bounds.maxZ)-Number(bounds.minZ))+1;return `${x} × ${y} × ${z}`;}
-                function boundsVolume(bounds){if(!bounds)return '暂无';const x=Math.abs(Number(bounds.maxX)-Number(bounds.minX))+1,y=Math.abs(Number(bounds.maxY)-Number(bounds.minY))+1,z=Math.abs(Number(bounds.maxZ)-Number(bounds.minZ))+1;return `${x*y*z}`;}
-                function boundsCenter(bounds){if(!bounds)return '暂无';return `${Math.floor((Number(bounds.minX)+Number(bounds.maxX))/2)} ${Math.floor((Number(bounds.minY)+Number(bounds.maxY))/2)} ${Math.floor((Number(bounds.minZ)+Number(bounds.maxZ))/2)}`;}
+                function normalizeBounds(bounds){if(!bounds)return null;const min=bounds.min||{}, max=bounds.max||{};const out={minX:bounds.minX??min.x,minY:bounds.minY??min.y,minZ:bounds.minZ??min.z,maxX:bounds.maxX??max.x,maxY:bounds.maxY??max.y,maxZ:bounds.maxZ??max.z};return Object.values(out).some(v=>v==null||Number.isNaN(Number(v)))?null:out;}
+                function boundsText(bounds){const b=normalizeBounds(bounds);return b?`${b.minX} ${b.minY} ${b.minZ} → ${b.maxX} ${b.maxY} ${b.maxZ}`:'暂无';}
+                function boundsSize(bounds){const b=normalizeBounds(bounds);if(!b)return '暂无';const x=Math.abs(Number(b.maxX)-Number(b.minX))+1,y=Math.abs(Number(b.maxY)-Number(b.minY))+1,z=Math.abs(Number(b.maxZ)-Number(b.minZ))+1;return `${x} × ${y} × ${z}`;}
+                function boundsVolume(bounds){const b=normalizeBounds(bounds);if(!b)return '暂无';const x=Math.abs(Number(b.maxX)-Number(b.minX))+1,y=Math.abs(Number(b.maxY)-Number(b.minY))+1,z=Math.abs(Number(b.maxZ)-Number(b.minZ))+1;return `${x*y*z}`;}
+                function boundsCenter(bounds){const b=normalizeBounds(bounds);if(!b)return '暂无';return `${Math.floor((Number(b.minX)+Number(b.maxX))/2)} ${Math.floor((Number(b.minY)+Number(b.maxY))/2)} ${Math.floor((Number(b.minZ)+Number(b.maxZ))/2)}`;}
                 function labelRegionSort(value){return {NAME:'区域名',WORLD:'世界/维度',PLAYERS:'当前玩家数',RECENT:'最近事件'}[value]||value;}
                 function labelPlayersFilter(value){return {ALL:'全部',HAS_PLAYERS:'有玩家',NO_PLAYERS:'无玩家'}[value]||value;}
                 function labelActionSort(value){return {NAME:'动作名',TYPE:'动作类型',OWNER:'归属对象',RECENT:'最近执行'}[value]||value;}
@@ -1355,21 +1533,59 @@ public final class WebAdminFrontendScripts {
                   if(!options.silent)setView(loading('正在加载区域详情...'));
                   const routeInfo=detailRoute(id,'#/regions');
                   const [detailRes,listRes]=await Promise.all([settle(`/api/regions/${encodeURIComponent(routeInfo.id)}`),settle('/api/regions')]);
-                  if(!detailRes.ok){if(options.silent){toast('区域详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回区域管理')}</div>${detailRes.error.status===404?errorBlock('区域不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
+                  if(!detailRes.ok){if(options.silent){toast('区域详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回区域列表')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该区域详情或区域已被删除。',waButton('返回列表','region',navigationAttr('#/regions'),'ghost'))}${detailRes.error.status===404?empty('区域不存在或已被删除。'):errorBlock(detailRes.error.message)}</section>`);return;}
                   const detail=detailRes.data, list=listRes.ok?listRes.data:[], entry=(list||[]).find(r=>r.id===detail.id)||{};
-                  setView(`
-                    <div class="back-row">${backButton(routeInfo,'返回区域管理')}</div>
-                    <div class="page-head"><div><h1>${esc(detail.name||detail.id)}</h1><p>区域详情 · 只读</p></div><div class="inline-actions">${pill(entry.enabled?'OK':'WARNING')}${pill(entry.doctorStatus||'UNKNOWN')}<span class="pill info">只读模式</span></div></div>
-                    <section class="detail-grid">
-                      <article class="panel-card overview-card"><h2>区域概览</h2><div class="overview-inline"><span class="device-icon">${icon('region')}</span><strong>${esc(detail.name||detail.id)}</strong><span class="muted">世界：${esc(detail.world||'暂无')}</span><span class="muted">范围：${esc(boundsText(detail.bounds))}</span><span class="muted">玩家：${esc((detail.playersInside||[]).length || entry.playersInside || 0)}</span></div></article>
-                      <article class="panel-card"><h2>基础信息</h2><div class="identity-grid">${row('区域 ID',esc(detail.id))}${row('名称',esc(detail.name||detail.id))}${row('世界/维度',esc(detail.world||'暂无'))}${row('启用状态',esc(entry.enabled?'启用':'暂无数据'))}${row('最近事件',fmtTime(entry.lastEventAt))}${row('Doctor 状态',pill(entry.doctorStatus||'UNKNOWN'))}</div></article>
-                      <article class="panel-card"><h2>边界 / Bounds</h2><div class="identity-grid">${row('X 范围',esc(detail.bounds?`${detail.bounds.minX} → ${detail.bounds.maxX}`:'暂无'))}${row('Y 范围',esc(detail.bounds?`${detail.bounds.minY} → ${detail.bounds.maxY}`:'暂无'))}${row('Z 范围',esc(detail.bounds?`${detail.bounds.minZ} → ${detail.bounds.maxZ}`:'暂无'))}${row('中心点',esc(boundsCenter(detail.bounds)))}${row('尺寸',esc(boundsSize(detail.bounds)))}${row('体积',esc(boundsVolume(detail.bounds)))}</div></article>
-                      <article class="panel-card"><h2>目标过滤</h2><div class="identity-grid">${row('目标类型',esc(labelTargetFilter(detail.targetFilter)))}${row('说明',esc(isBlank(detail.targetFilter)?'暂无目标过滤信息':'使用当前 RegionController 配置中的目标过滤。'))}</div></article>
-                      <article class="panel-card"><h2>事件动作摘要</h2>${regionActionGroups(detail.actions||{})}</article>
-                      <article class="panel-card"><h2>绑定 Channel / 逻辑链</h2>${regionChannels(detail.boundChannels||[])}</article>
-                      <article class="panel-card"><h2>当前玩家 / 最近事件</h2>${regionPlayersAndEvents(detail)}</article>
-                      <article class="panel-card"><h2>Doctor / Debug 摘要</h2>${doctorList(detail.doctorIssues||[],8)}</article>
-                    </section>`,options);
+                  const b=normalizeBounds(detail.bounds), playerCount=(detail.playersInside||[]).length || entry.playersInside || 0, actionCount=Number(entry.enterActionCount||0)+Number(entry.exitActionCount||0)+Number(entry.stayActionCount||0);
+                  const advancedRows=[
+                    ['region.id',detail.id],
+                    ['region.world',detail.world],
+                    ['region.bounds',boundsText(detail.bounds)],
+                    ['region.size',boundsSize(detail.bounds)],
+                    ['region.targetFilter',labelTargetFilter(detail.targetFilter)],
+                    ['region.lastEventAt',formatDateTime(entry.lastEventAt)],
+                    ['region.playersInside',playerCount],
+                    ['region.actionCount',actionCount]
+                  ];
+                  setView(`<section class="wa-page wa-detail-shell" data-detail-kind="region">
+                    ${detailHeader({back:backButton(routeInfo,'返回区域列表'),kicker:'区域详情',iconName:'region',title:detail.name||detail.id,subtitle:`${detail.world||'world 未提供'} · ${boundsText(detail.bounds)}`,copyValue:detail.id,badges:[pill(entry.enabled?'OK':'WARNING'),pill(entry.doctorStatus||'UNKNOWN'),`<span class="pill info">${esc(labelTargetFilter(detail.targetFilter))}</span>`],actions:[waButton('编辑区域','pencil','disabled','ghost'),waButton('定位区域','eye','disabled','ghost'),waButton('更多','more','disabled','ghost')]})}
+                    ${detailTabs(['基本信息','坐标范围','最近事件','关联对象','Doctor'])}
+                    <section class="wa-detail-first-row">
+                      ${detailCard('基本信息 / 坐标范围',detailInfoGrid([
+                        ['区域 ID',detail.id],
+                        ['名称',detail.name||detail.id],
+                        ['世界/维度',detail.world||'暂无'],
+                        ['状态',safeHtml(textPill(labelEnabledState(entry.enabled),entry.enabled?'ok':'warning'))],
+                        ['目标过滤',labelTargetFilter(detail.targetFilter)],
+                        ['最小点',b?`${b.minX}, ${b.minY}, ${b.minZ}`:'暂无'],
+                        ['最大点',b?`${b.maxX}, ${b.maxY}, ${b.maxZ}`:'暂无'],
+                        ['完整范围',safeHtml(`<span class="wa-code-line" title="${esc(boundsText(detail.bounds))}">${esc(boundsText(detail.bounds))}</span>`)]
+                      ]))}
+                      ${detailCard('状态与统计',`${detailStatGrid([
+                        {label:'区域尺寸',value:boundsSize(detail.bounds),sub:'bounds',icon:'region-controller'},
+                        {label:'当前玩家',value:playerCount,sub:'playersInside',icon:'user-total'},
+                        {label:'动作数量',value:actionCount,sub:'enter / exit / stay',icon:'action-binding'},
+                        {label:'Doctor',value:labelStatus(entry.doctorStatus||'UNKNOWN'),sub:'诊断摘要',icon:'doctor-overview',kind:String(entry.doctorStatus||'').toUpperCase()==='OK'?'ok':'warning'}
+                      ])}${detailConsumerGrid([
+                        {label:'关联控制器',value:entry.controllerCount ?? '--',icon:'region-controller'},
+                        {label:'绑定频道',value:(detail.boundChannels||[]).length,icon:'active-channel',target:(detail.boundChannels||[])[0]?signalHash((detail.boundChannels||[])[0]):''},
+                        {label:'当前玩家',value:playerCount,icon:'user-total'},
+                        {label:'Doctor',value:(detail.doctorIssues||[]).length,icon:'doctor-overview',target:'#/doctor'}
+                      ])}`)}
+                    </section>
+                    ${detailFixedLayout([
+                      detailCard('关联控制器 / 最近事件',`${regionActionGroups(detail.actions||{})}${regionPlayersAndEvents(detail)}`,'','detail-card-stretchable'),
+                      detailCard('目标过滤',detailInfoGrid([['过滤模式',labelTargetFilter(detail.targetFilter)],['绑定频道',safeHtml(regionChannels(detail.boundChannels||[]))],['最近事件',safeHtml(fmtTime(entry.lastEventAt))]]))
+                    ],[
+                      detailCard('Doctor / Debug',doctorList(detail.doctorIssues||[],8),'','detail-card-stretchable'),
+                      detailCard('快捷操作',`<div class="wa-quick-grid">${waButton('编辑区域','pencil','disabled','ghost')}${waButton('定位区域','eye','disabled','ghost')}${waButton('导出区域','download','disabled','ghost')}${waButton('删除区域','channel-error','disabled','danger')}</div><p class="wa-disabled-note">区域编辑、删除、定位和导入导出没有完整 WebAdmin 写 API，本轮保持禁用且不发送写请求。</p>`)
+                    ],[
+                      advancedDetailCard('regions',detail.id,advancedRows,[
+                      {title:'坐标与目标过滤',rows:advancedRowsFromObject({bounds:detail.bounds,targetFilter:detail.targetFilter,boundChannels:detail.boundChannels},'region')},
+                      {title:'动作与控制器引用',rows:advancedRowsFromObject({actions:detail.actions,controllerCount:entry.controllerCount},'references')},
+                      {title:'运行计数与调试',rows:advancedRowsFromObject({playersInside:detail.playersInside,recentEvents:detail.recentEvents,doctorIssues:detail.doctorIssues,entry},'runtime')}
+                    ])
+                    ])}
+                  </section>`,options);
                 }
                 function regionActionGroups(actions){const groups=[['进入动作',actions.enter||[]],['离开动作',actions.exit||[]],['停留动作',actions.stay||[]]];return `<div class="list-stack">${groups.map(([name,items])=>`<div class="event-row"><strong>${esc(name)}：${items.length}</strong>${items.length?items.map(a=>`<span>${actionButton(a.id,labelActionType(a.type))} <span class="muted">${esc(cleanActionSummary(a.summary))} / ${a.enabled?'启用':'禁用'}</span></span>`).join(''):'<span class="muted">暂无动作</span>'}</div>`).join('')}</div>`}
                 function regionChannels(channels){if(!channels||channels.length===0)return empty('未绑定频道。');return `<div class="list-stack">${channels.map(c=>`<div class="event-row"><strong>关联频道</strong>${channelButton(c)}<span class="muted">点击可查看 Signal 频道详情。</span></div>`).join('')}</div>`}
@@ -1412,25 +1628,76 @@ public final class WebAdminFrontendScripts {
                 }
                 function filterActions(items){const f=appState.actionFilters;const filtered=(items||[]).filter(a=>{const hay=[a.id,a.name,a.type,a.summary,a.ownerType,a.ownerName,a.ownerId,a.channel].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&String(a.type||'UNKNOWN').toUpperCase()!==f.type)return false;if(f.owner!=='ALL'&&String(a.ownerType||'UNKNOWN').toUpperCase()!==f.owner)return false;if(f.result!=='ALL'&&String(a.lastResult||'UNKNOWN').toUpperCase()!==f.result)return false;if(f.doctor!=='ALL'&&String(a.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='TYPE')return String(a.type||'').localeCompare(String(b.type||''))||String(a.name||'').localeCompare(String(b.name||''));if(f.sort==='OWNER')return String(a.ownerName||a.ownerId||'').localeCompare(String(b.ownerName||b.ownerId||''));if(f.sort==='RECENT')return String(b.lastExecutedAt||'').localeCompare(String(a.lastExecutedAt||''));return String(a.name||a.id||'').localeCompare(String(b.name||b.id||''));});}
                 function actionTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>动作</th><th>类型</th><th>归属对象</th><th>关联频道</th><th>引用</th><th>执行次数</th><th>最近结果</th><th>最近执行</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(a=>{const target=actionHash(a.id);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${icon('action')}</span><span><strong>${esc(a.name||a.id)}</strong><span class="device-subtitle">ID：${esc(shortId(a.id))}</span></span></span></td><td>${esc(labelActionType(a.type))}</td><td>${ownerLink(a)} <span class="muted">(${esc(labelOwnerType(a.ownerType))})</span></td><td>${channelCell(a.channel)}</td><td>${esc(a.referencedByCount ?? 0)}</td><td>${esc(a.executionCount ?? 0)}</td><td>${pill(a.lastResult||'UNKNOWN')}</td><td>${fmtTime(a.lastExecutedAt)}</td><td>${pill(a.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
+                function actionOwnerTarget(action){
+                  const type=String(action?.ownerType||action?.owner?.ownerType||'').toUpperCase(), id=action?.ownerId||action?.owner?.ownerId||'', channel=action?.channel||action?.owner?.channel||'';
+                  if(type.includes('LISTENER')&&!isBlank(id))return listenerHash(id);
+                  if(type.includes('REGION')&&!isBlank(id))return regionHash(id);
+                  if(type.includes('DEVICE')&&!isBlank(id))return '#/devices/'+encodeURIComponent(id);
+                  if(!isBlank(channel))return signalHash(channel);
+                  return '';
+                }
                 async function renderActionDetail(id,options={}){
                   if(!options.silent)setView(loading('正在加载动作详情...'));
                   const routeInfo=detailRoute(id,'#/actions');
                   const [detailRes,listRes]=await Promise.all([settle(`/api/actions/${encodeURIComponent(routeInfo.id)}`),settle('/api/actions')]);
-                  if(!detailRes.ok){if(options.silent){toast('动作详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回动作系统')}</div>${detailRes.error.status===404?errorBlock('动作不存在或已被删除。'):errorBlock(detailRes.error.message)}`);return;}
+                  if(!detailRes.ok){if(options.silent){toast('动作详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回动作列表')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该动作详情或动作已被删除。',waButton('返回列表','action',navigationAttr('#/actions'),'ghost'))}${detailRes.error.status===404?empty('动作不存在或已被删除。'):errorBlock(detailRes.error.message)}</section>`);return;}
                   const detail=detailRes.data, list=listRes.ok?listRes.data:[], entry=(list||[]).find(a=>a.id===detail.id)||{}, owner=detail.owner||{};
-                  setView(`
-                    <div class="back-row">${backButton(routeInfo,'返回动作系统')}</div>
-                    <div class="page-head"><div><h1>${esc(entry.name||detail.configSummary?.name||detail.id)}</h1><p>动作详情 · 只读</p></div><div class="inline-actions">${pill(entry.doctorStatus||'UNKNOWN')}<span class="pill info">只读模式</span></div></div>
-                    <section class="detail-grid">
-                      <article class="panel-card overview-card"><h2>动作概览</h2><div class="overview-inline"><span class="device-icon">${icon('action')}</span><strong>${esc(labelActionType(detail.type||entry.type))}</strong><span class="muted">归属：${esc(owner.ownerName||entry.ownerName||'暂无')}</span><span class="muted">最近结果：${esc(labelStatus(entry.lastResult||'UNKNOWN'))}</span><span class="muted">最近执行：${esc(formatDateTime(entry.lastExecutedAt))}</span></div></article>
-                      <article class="panel-card"><h2>基础信息</h2><div class="identity-grid">${row('Action ID',esc(detail.id))}${row('类型',esc(labelActionType(detail.type||entry.type)))}${row('归属类型',esc(labelOwnerType(owner.ownerType||entry.ownerType)))}${row('归属对象',ownerLink(entry))}${row('关联频道',channelCell(owner.channel||entry.channel))}${row('引用次数',esc(entry.referencedByCount ?? detail.configSummary?.referencedByCount ?? 0))}${row('执行次数',esc(entry.executionCount ?? detail.configSummary?.executionCount ?? 0))}${row('最近结果',pill(entry.lastResult||'UNKNOWN'))}</div></article>
-                      <article class="panel-card"><h2>配置摘要</h2>${actionConfigPanel(detail,entry)}</article>
-                      <article class="panel-card"><h2>引用来源</h2><div class="list-stack"><div class="event-row"><strong>${esc(labelOwnerType(owner.ownerType||entry.ownerType))}</strong><span>${ownerLink(entry)}</span><span class="muted">6.6 只读展示当前可从配置收集到的引用来源。</span></div></div></article>
-                      <article class="panel-card"><h2>最近执行记录</h2>${actionExecutions(detail.recentExecutions||[])}</article>
-                      <article class="panel-card"><h2>Doctor / Debug 摘要</h2>${doctorList(detail.doctorIssues||[],8)}</article>
-                    </section>`,options);
+                  const title=entry.name||detail.configSummary?.name||detail.id, type=detail.type||entry.type, ownerType=owner.ownerType||entry.ownerType;
+                  const ownerChannel=owner.channel||entry.channel;
+                  const referencedBy=entry.referencedByCount ?? detail.configSummary?.referencedByCount ?? 0;
+                  const executionCount=entry.executionCount ?? detail.configSummary?.executionCount ?? 0;
+                  const advancedRows=[
+                    ['action.id',detail.id],
+                    ['action.type',labelActionType(type)],
+                    ['action.ownerType',labelOwnerType(ownerType)],
+                    ['action.owner',owner.ownerName||entry.ownerName||owner.ownerId||entry.ownerId],
+                    ['action.channel',ownerChannel],
+                    ['action.referencedByCount',referencedBy],
+                    ['action.executionCount',executionCount],
+                    ['action.lastResult',labelStatus(entry.lastResult||'UNKNOWN')]
+                  ];
+                  setView(`<section class="wa-page wa-detail-shell" data-detail-kind="action">
+                    ${detailHeader({back:backButton(routeInfo,'返回动作列表'),kicker:'动作详情',iconName:actionIcon(type),title:title,subtitle:`${labelActionType(type)} · ${labelOwnerType(ownerType)}`,copyValue:detail.id,badges:[`<span class="pill">${esc(labelActionType(type))}</span>`,pill(entry.doctorStatus||'UNKNOWN'),pill(entry.lastResult||'UNKNOWN')],actions:[waButton('编辑动作','settings','disabled','ghost'),waButton('测试执行','play','disabled','ghost'),waButton('更多','more','disabled','ghost')]})}
+                    ${detailTabs(['基本信息','执行内容','最近执行','引用来源','Doctor'])}
+                    <section class="wa-detail-first-row">
+                      ${detailCard('基本信息',detailInfoGrid([
+                        ['Action ID',detail.id],
+                        ['名称',title],
+                        ['类型',labelActionType(type)],
+                        ['归属类型',labelOwnerType(ownerType)],
+                        ['归属对象',safeHtml(ownerLink(entry))],
+                        ['关联频道',safeHtml(channelCell(ownerChannel))],
+                        ['引用次数',referencedBy],
+                        ['最近结果',safeHtml(pill(entry.lastResult||'UNKNOWN'))]
+                      ]))}
+                      ${detailCard('执行统计',`${detailStatGrid([
+                        {label:'动作类型',value:labelActionType(type),sub:'type',icon:actionIcon(type),kind:actionTypeTone(type)},
+                        {label:'最近结果',value:labelStatus(entry.lastResult||'UNKNOWN'),sub:'last result',icon:'check-pass',kind:String(entry.lastResult||'').toUpperCase()==='FAILED'?'warning':'ok'},
+                        {label:'最近执行',value:formatDateTime(entry.lastExecutedAt),sub:'time',icon:'recent-event'},
+                        {label:'执行次数',value:executionCount,sub:'count',icon:'today-trigger'}
+                      ])}${detailConsumerGrid([
+                        {label:'归属对象',value:owner.ownerName||entry.ownerName||'--',icon:'action-binding',target:actionOwnerTarget({...entry,owner})},
+                        {label:'关联频道',value:labelChannel(ownerChannel),icon:'active-channel',target:ownerChannel?signalHash(ownerChannel):''},
+                        {label:'引用来源',value:referencedBy,icon:'consumer-listener'},
+                        {label:'Doctor',value:(detail.doctorIssues||[]).length,icon:'doctor-overview',target:'#/doctor'}
+                      ])}`)}
+                    </section>
+                    ${detailFixedLayout([
+                      detailCard('引用来源 / 执行内容摘要',`${actionConfigPanel(detail,entry)}<div class="wa-compact-list"><div class="wa-compact-row"><strong>${esc(labelOwnerType(ownerType))}</strong><span>${ownerLink(entry)}</span><small>只读展示当前可从配置收集到的引用来源。</small></div></div>`,'','detail-card-stretchable'),
+                      detailCard('最近执行',actionExecutions(detail.recentExecutions||[]))
+                    ],[
+                      detailCard('Doctor / Debug',doctorList(detail.doctorIssues||[],8),'','detail-card-stretchable'),
+                      detailCard('快捷操作',`<div class="wa-quick-grid">${waButton('编辑动作','settings','disabled','ghost')}${waButton('动作链编辑','action-binding','disabled','ghost')}${waButton('测试执行','play','disabled','ghost')}${waButton('删除动作','channel-error','disabled','danger')}</div><p class="wa-disabled-note">动作编辑、动作链、测试执行和删除没有完整 WebAdmin 写 API，本轮保持禁用且不发送写请求。</p>`)
+                    ],[
+                      advancedDetailCard('actions',detail.id,advancedRows,[
+                      {title:'动作 payload / 配置摘要',rows:advancedRowsFromObject(detail.configSummary||{},'configSummary')},
+                      {title:'引用与归属',rows:advancedRowsFromObject({owner,entry},'reference')},
+                      {title:'执行与诊断',rows:advancedRowsFromObject({recentExecutions:detail.recentExecutions,doctorIssues:detail.doctorIssues,lastResult:entry.lastResult,lastExecutedAt:entry.lastExecutedAt},'runtime')}
+                    ])
+                    ])}
+                  </section>`,options);
                 }
-                function actionConfigPanel(detail,entry){const type=String(detail.type||entry.type||'UNKNOWN').toUpperCase(), summary=cleanActionSummary(detail.summary||entry.summary);const rows=[['动作类型',labelActionType(type)],['摘要',summary],['下游频道',type==='SIGNAL'?(entry.channel||detail.owner?.channel):''],['Doctor 状态',entry.doctorStatus||detail.configSummary?.doctorStatus]];let html=configSection('关键配置',rows);if(type==='COMMAND')html+=`<p class="muted">命令动作仅只读展示摘要，不提供执行、复制执行或测试按钮。</p>`;if(type==='SIGNAL'&&!isBlank(entry.channel))html+=`<p>${channelButton(entry.channel)}</p>`;const raw=flatten(detail.configSummary||{}).slice(0,24).map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');return `${html||empty('暂无可用配置摘要。')}<details class="raw-config"><summary>高级 / 原始字段</summary><div class="list-stack">${raw||'<span class="muted">暂无原始字段。</span>'}</div></details>`}
+                function actionConfigPanel(detail,entry){const type=String(detail.type||entry.type||'UNKNOWN').toUpperCase(), summary=cleanActionSummary(detail.summary||entry.summary);const cfg=detail.configSummary||{};const rows=[['动作类型',labelActionType(type)],['摘要',summary],['归属',labelOwnerType(detail.owner?.ownerType||entry.ownerType)],['下游频道',type==='SIGNAL'?(entry.channel||detail.owner?.channel):''],['引用数量',cfg.referencedByCount],['执行次数',cfg.executionCount],['Doctor 状态',entry.doctorStatus||cfg.doctorStatus]];let html=configGroup('关键配置',rows);if(type==='COMMAND')html+=`<p class="muted">命令动作仅只读展示摘要，不提供执行、复制执行或测试按钮。</p>`;if(type==='SIGNAL'&&!isBlank(entry.channel))html+=`<p>${channelButton(entry.channel)}</p>`;return `<div class="wa-config-stack">${html||empty('暂无可用配置摘要。')}</div>`}
                 function actionExecutions(items){if(!items||items.length===0)return empty('暂无执行记录。');return `<div class="list-stack">${items.map(e=>`<div class="event-row"><strong>${fmtTime(e.time||e.executedAt)}</strong><span>${esc(e.owner||'暂无归属')} · ${esc(labelStatus(e.result||'UNKNOWN'))}</span><span class="muted">${esc(e.detail||'暂无详情')}</span></div>`).join('')}</div>`}
                 async function renderSignals(options={}){
                   if(!options.silent)setView(loading('正在加载 Signal 频道...'));
@@ -1492,49 +1759,113 @@ public final class WebAdminFrontendScripts {
                 }
                 function signalTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>频道</th><th>消费者摘要</th><th>监听器</th><th>接收器</th><th>动作继电器</th><th>最近触发</th><th>最近来源</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(c=>{const target=signalHash(c.channel);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${icon(c.iconKey||'signal')}</span><span><strong>${esc(c.displayName||c.channel)}</strong><span class="device-subtitle">${esc(c.channel||'未命名频道')}</span>${!isBlank(c.note)?`<span class="device-subtitle">${esc(c.note)}</span>`:''}</span></span></td><td>${consumerSummary(c)}</td><td>${Number(c.listenerCount||0)}</td><td>${Number(c.receiverCount||0)}</td><td>${Number(c.actionRelayCount||0)}</td><td>${fmtTime(c.lastTriggeredAt)}</td><td>${esc(c.sourceCount?`${c.sourceCount} 个来源`:'暂无')}</td><td>${pill(c.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 function consumerSummary(c){const count=consumerCount(c);if(count===0)return '<span class="muted">暂无消费者</span>';return `<span class="pill info">${count} 个消费者</span>`}
+                function channelListenerTable(listeners,detail){
+                  const rows=(listeners||[]).slice(0,5);
+                  if(rows.length===0)return empty('当前频道暂无监听器。');
+                  const more=(listeners||[]).length>rows.length?`<p class="muted">当前只在主列表显示前 ${rows.length} 个监听器；完整 listener 字段可在“完整详情”中查看。</p>`:'';
+                  return `${detailTableWrap(`<table class="wa-table wa-detail-table"><thead><tr><th>监听器名称 / ID</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${rows.map(listener=>{
+                    const id=listener.id||listener.name||'', cfg=listener.basicConfig||{}, enabled=listener.enabled ?? cfg.enabled, cooldown=listener.cooldownTicks ?? cfg.cooldownTicks, actionCount=listener.actionCount ?? (listener.actions||[]).length;
+                    return `<tr><td><span class="device-name"><span class="device-icon">${icon('listener-receiver')}</span><span><strong>${esc(listener.name||id||'未命名监听器')}</strong><span class="device-subtitle">${esc(id||'无稳定 ID')}</span></span></span></td><td>${pill(enabled!==false?'OK':'WARNING')} ${esc(enabled!==false?'启用':'停用')}</td><td>${esc(formatTicks(cooldown)||'0 tick')}</td><td>${esc(actionCount)}</td><td>${fmtTime(listener.lastTriggeredAt)}</td><td><div class="wa-action-cell">${id?waButton('查看','eye',navigationAttr(listenerHash(id)),'ghost'):waButton('查看','eye','disabled','ghost')}${id&&canEditSignalListenerBasicConfig()?waIconButton('编辑基础配置','settings',htmlHandler(`startSignalListenerBasicConfigEdit(${jsString(id)},${jsString(detail.channel)})`)):waIconButton('编辑基础配置不可用','settings','disabled')}</div></td></tr>`;
+                  }).join('')}</tbody></table>`)}${more}`;
+                }
+                function actionTypeDistributionPanel(actions){
+                  const items=actions||[];
+                  if(items.length===0)return empty('暂无动作类型分布。');
+                  const counts=countBy(items,a=>String(a.type||'UNKNOWN').toUpperCase());
+                  return `<div class="wa-distribution-grid">${Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([type,count])=>`<div class="wa-distribution-item"><span>${icon(actionIcon(type))}</span><strong>${esc(labelActionType(type))}</strong><small>${esc(count)} 个</small></div>`).join('')}</div>`;
+                }
+                function channelConsumerDetailPanel(detail){
+                  const groups=[
+                    ['关联接收器',detail.receivers||[],'consumer-receiver'],
+                    ['动作继电器',detail.actionRelays||[],'consumer-relay'],
+                    ['信号设备 / 触发源',detail.sources||[],'signal-device'],
+                    ['下游频道',detail.downstreamSignals||[],'active-channel']
+                  ];
+                  const html=groups.map(([label,items,iconName])=>{
+                    const list=(items||[]).slice(0,3);
+                    const body=list.length?list.map(item=>{
+                      const text=typeof item==='string'?item:(item.name||item.id||item.channel||'未命名');
+                      const target=typeof item==='string'?signalHash(item):(item.navigationTarget||item.target||'');
+                      return `<span>${target?navigationButton(target,text):esc(text)}</span>`;
+                    }).join(''):'<span class="muted">暂无</span>';
+                    const more=(items||[]).length>list.length?`<small>另有 ${(items||[]).length-list.length} 项在完整详情中查看</small>`:'';
+                    return `<div class="wa-compact-row"><strong>${icon(iconName)} ${esc(label)}</strong><span>${body}</span>${more}</div>`;
+                  }).join('');
+                  return `<div class="wa-compact-list">${html}</div>`;
+                }
                 async function renderSignalDetail(channel,options={}){
                   const routeInfo=detailRoute(channel,'#/signals'), decoded=routeInfo.id||'';
                   if(!options.silent)setView(loading('正在加载频道详情...'));
-                  let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){if(options.silent){toast('频道详情实时刷新失败，已保留当前页面。');return;}setView(`<div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>${err.status===404?errorBlock('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}`);return;}
+                  let detail;try{detail=await api(`/api/signals/channels/${encodeURIComponent(decoded)}`)}catch(err){if(options.silent){toast('频道详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该频道详情或频道没有可读取数据。',waButton('返回列表','signalbridge-main',navigationAttr('#/signals'),'ghost'))}${err.status===404?empty('频道不存在或当前没有可读取数据。'):errorBlock(err.message)}</section>`);return;}
                   const metadataRes=await settle(`/api/webadmin/channel-metadata?channel=${encodeURIComponent(decoded)}`);
                   if(metadataRes.ok)detail.metadata=metadataRes.data;
                   const listenerConfigResults=await Promise.all((detail.listeners||[]).map(l=>{const ref=l.id||l.name||'';return ref?settle(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`):Promise.resolve({ok:false});}));
                   (detail.listeners||[]).forEach((listener,index)=>{const result=listenerConfigResults[index];if(result&&result.ok)listener.basicConfig=result.data;});
                   const channelMeta=detail.metadata||{}, channelTitle=channelMeta.effectiveDisplayName||detail.channel;
-                  const stats=detail.stats||{}, totalConsumers=Number(stats.listenerCount||0)+Number(stats.receiverCount||0)+Number(stats.actionRelayCount||0);
-                  setView(`
-                    <div class="back-row">${backButton(routeInfo,'返回 Signal 管理')}</div>
-                    <div class="page-head"><div><h1>${esc(channelTitle)}</h1><p>${esc(detail.channel)} · 频道详情 / 横向逻辑链</p></div><div class="inline-actions">${pill((detail.doctorIssues||[]).some(i=>i.severity==='ERROR')?'ERROR':((detail.doctorIssues||[]).length?'WARNING':'OK'))}<span class="pill info">基础编辑</span></div></div>
-                    <section class="card-grid">
-                      ${metric('消费者数量',totalConsumers,'','receiver')}
-                      ${metric('监听器',Number(stats.listenerCount||0),'','signal')}
-                      ${metric('接收器',Number(stats.receiverCount||0),'','receiver')}
-                      ${metric('动作继电器',Number(stats.actionRelayCount||0),'','relay')}
-                      ${metric('关联来源',Number(stats.sourceCount||0),'','device')}
-                      ${metric('下游 Signal',Number(stats.downstreamSignalCount||0),'','signal')}
-                      ${metric('最近事件数',Number(stats.triggerCountToday||0),'','history')}
-                      ${metric('最近触发',formatDateTime(stats.lastTriggeredAt),'','history')}
+                  const stats=detail.stats||{}, regionCount=Number(stats.regionControllerCount||stats.regionCount||0), totalConsumers=Number(stats.listenerCount||0)+Number(stats.receiverCount||0)+Number(stats.actionRelayCount||0)+regionCount;
+                  const allActions=[...(detail.actions||[]),...(detail.listeners||[]).flatMap(listener=>listener.actions||[])];
+                  const status=(detail.doctorIssues||[]).some(i=>i.severity==='ERROR')?'ERROR':((detail.doctorIssues||[]).length?'WARNING':'OK');
+                  const editAction=canEditChannelMetadata()?waButton('编辑基本信息','settings',htmlHandler(`startChannelMetadataEdit(${jsString(detail.channel)})`),'primary'):waButton('编辑基本信息','settings','disabled','ghost');
+                  const advancedRows=[
+                    ['channel.raw',detail.channel],
+                    ['channel.displayName',channelTitle],
+                    ['channel.type',labelChannelType(detail.type)],
+                    ['channel.status',status],
+                    ['stats.lastTriggeredAt',formatDateTime(stats.lastTriggeredAt)],
+                    ['stats.totalConsumers',totalConsumers],
+                    ['stats.listenerCount',Number(stats.listenerCount||0)],
+                    ['stats.receiverCount',Number(stats.receiverCount||0)]
+                  ];
+                  setView(`<section class="wa-page wa-detail-shell" data-detail-kind="signal">
+                    ${detailHeader({back:backButton(routeInfo,'返回 Signal 管理'),kicker:'SignalBridge / 频道详情',iconName:channelMeta.iconKey||'active-channel',title:`频道详情：${channelTitle}`,subtitle:channelMeta.note||'频道说明未配置，当前展示运行态与消费者关系。',copyValue:detail.channel,badges:[`<span class="pill info">ID: ${esc(detail.channel)}</span>`,pill(status),`<span class="pill">${esc(labelChannelType(detail.type))}</span>`],actions:[waButton('导出频道配置','download','disabled','ghost'),waButton('诊断','doctor-overview',navigationAttr('#/doctor'),'ghost'),waButton('更多','more','disabled','ghost')]})}
+                    ${detailTabs(['基本信息','监听器列表','最近事件','触发统计','递归检查'])}
+                    <section class="wa-detail-first-row">
+                      ${detailCard('基本信息',detailInfoGrid([
+                        ['频道名称 Channel',detail.channel],
+                        ['显示名称',channelTitle],
+                        ['状态',safeHtml(pill(status))],
+                        ['创建时间',channelMeta.createdAt||'暂无'],
+                        ['最后修改',channelMeta.updatedAt?`${formatDateTime(channelMeta.updatedAt)} · ${channelMeta.updatedBy||'未知用户'}`:'暂无'],
+                        ['描述',channelMeta.note||'暂无描述']
+                      ]),editAction)}
+                      ${detailCard('状态与统计',`${detailStatGrid([
+                        {label:'今日触发次数',value:stats.triggerCountToday ?? 0,sub:'today',icon:'today-trigger'},
+                        {label:'最后触发时间',value:formatDateTime(stats.lastTriggeredAt),sub:'last triggered',icon:'recent-event'},
+                        {label:'总触发次数',value:stats.totalTriggerCount ?? stats.triggerCountTotal ?? 0,sub:'total',icon:'history'},
+                        {label:'监听器数量',value:Number(stats.listenerCount||0),sub:'listeners',icon:'consumer-listener'}
+                      ])}<h3 class="wa-detail-subhead">消费者关系</h3>${detailConsumerGrid([
+                        {label:'关联接收器',value:Number(stats.receiverCount||0),icon:'consumer-receiver',target:'#/receivers'},
+                        {label:'关联动作继电器',value:Number(stats.actionRelayCount||0),icon:'consumer-relay',target:'#/devices'},
+                        {label:'关联信号设备',value:Number(stats.sourceDeviceCount||stats.sourceCount||0),icon:'signal-device',target:'#/devices'},
+                        {label:'关联区域控制器',value:regionCount,icon:'region-controller',target:'#/regions'}
+                      ])}`)}
                     </section>
-                    <section class="detail-grid" style="margin-top:16px">
-                      <article class="panel-card overview-card"><h2>WebAdmin 频道显示信息</h2>${channelMetadataCard(detail)}</article>
-                      <article class="panel-card overview-card"><h2>频道基础信息</h2><div class="identity-grid">${row('频道名',esc(detail.channel))}${row('显示名',esc(channelTitle))}${row('备注',esc(channelMeta.note||'暂无'))}${row('频道类型',esc(labelChannelType(detail.type)))}${row('最近触发',fmtTime(stats.lastTriggeredAt))}${row('消费者',esc(`${totalConsumers} 个`))}${row('监听器',esc(Number(stats.listenerCount||0)))}${row('接收器',esc(Number(stats.receiverCount||0)))}${row('动作继电器',esc(Number(stats.actionRelayCount||0)))}</div></article>
-                      <article class="panel-card overview-card"><h2>横向逻辑链</h2>${logicChain(detail)}</article>
-                      <article class="panel-card"><h2>消费者</h2>${endpointGroups(detail)}</article>
-                      <article class="panel-card"><h2>动作 / 下游影响</h2>${actionsPanel(detail)}</article>
-                      <article class="panel-card"><h2>最近 Signal 事件</h2>${historyList(detail.recentHistory||[])}<p class="muted"><button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看该频道历史</button></p></article>
-                      <article class="panel-card"><h2>频道诊断</h2>${doctorList(detail.doctorIssues||[],8)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p></article>
-                    </section>`,options);
+                    ${detailFixedLayout([
+                      detailCard(`监听器列表（共 ${(detail.listeners||[]).length} 个）`,channelListenerTable(detail.listeners||[],detail),'','detail-card-stretchable'),
+                      detailCard('消费者关系明细',channelConsumerDetailPanel(detail))
+                    ],[
+                      detailCard('最近事件',`${compactEventList(detail.recentHistory||[],'暂无最近 Signal 事件。')}<p class="muted"><button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看该频道历史</button></p>`),
+                      detailCard('动作类型分布',actionTypeDistributionPanel(allActions)),
+                      detailCard('频道诊断',`${doctorList(detail.doctorIssues||[],6)}<p class="muted"><button class="link-button" onclick="location.hash='#/doctor'">查看全局诊断</button></p>`)
+                    ],[
+                      advancedDetailCard('signals',detail.channel,advancedRows,[
+                      {title:'metadata / raw key',rows:advancedRowsFromObject(channelMeta,'metadata')},
+                      {title:'history summary / diagnostic summary',rows:advancedRowsFromObject({stats,doctorIssues:detail.doctorIssues,recentHistory:detail.recentHistory},'runtime')},
+                      {title:'消费者与下游摘要',rows:advancedRowsFromObject({sources:detail.sources,listeners:detail.listeners,receivers:detail.receivers,actionRelays:detail.actionRelays,actions:detail.actions,downstreamSignals:detail.downstreamSignals},'relations')}
+                    ])
+                    ])}
+                  </section>`,options);
                 }
                 function logicChain(detail){
                   const sources=detail.sources||[], listeners=detail.listeners||[], receivers=detail.receivers||[], relays=detail.actionRelays||[], actions=detail.actions||[], downstream=detail.downstreamSignals||[];
-                  return `<div class="logic-chain">
-                    <div class="chain-node"><h3>触发源</h3>${endpointCompact(sources,'暂无可推断触发源')}</div>
-                    <div class="chain-arrow">→</div>
-                    <div class="chain-node"><h3>频道</h3><strong>${esc((detail.metadata&&detail.metadata.effectiveDisplayName)||detail.channel)}</strong><span class="muted">${esc(detail.channel)}</span><span class="muted">${esc(labelChannelType(detail.type))}</span>${pill((detail.doctorIssues||[]).length?'WARNING':'OK')}</div>
-                    <div class="chain-arrow">→</div>
-                    <div class="chain-node"><h3>消费者</h3>${endpointCompact([...listeners,...receivers,...relays],'暂无消费者')}</div>
-                    <div class="chain-arrow">→</div>
-                    <div class="chain-node"><h3>动作 / 下游影响</h3>${actions.length?actions.slice(0,4).map(a=>`<span>${actionButton(a.id,labelActionType(a.type))}：${esc(cleanActionSummary(a.summary||a.name||'-'))}</span>`).join(''):(downstream.length?downstream.map(c=>`<span>下游频道：${esc(c)}</span>`).join(''):'<span class="muted">暂无可用动作详情</span>')}</div>
+                  return `<div class="wa-flow-chain">
+                    <div class="wa-flow-node"><span class="wa-icon-bubble">${icon('signal-device')}</span><strong>触发源</strong>${endpointCompact(sources,'暂无可推断触发源')}</div>
+                    <div class="wa-flow-arrow">→</div>
+                    <div class="wa-flow-node"><span class="wa-icon-bubble">${icon('active-channel')}</span><strong>${esc((detail.metadata&&detail.metadata.effectiveDisplayName)||detail.channel)}</strong><span class="muted">${esc(detail.channel)}</span><small>${esc(labelChannelType(detail.type))}</small>${pill((detail.doctorIssues||[]).length?'WARNING':'OK')}</div>
+                    <div class="wa-flow-arrow">→</div>
+                    <div class="wa-flow-node"><span class="wa-icon-bubble">${icon('listener-receiver')}</span><strong>消费者</strong>${endpointCompact([...listeners,...receivers,...relays],'暂无消费者')}</div>
+                    <div class="wa-flow-arrow">→</div>
+                    <div class="wa-flow-node"><span class="wa-icon-bubble">${icon('action-overview')}</span><strong>动作 / 下游影响</strong>${actions.length?actions.slice(0,4).map(a=>`<span>${actionButton(a.id,labelActionType(a.type))}：${esc(cleanActionSummary(a.summary||a.name||'-'))}</span>`).join(''):(downstream.length?downstream.map(c=>`<span>下游频道：${esc(c)}</span>`).join(''):'<span class="muted">暂无可用动作详情</span>')}</div>
                   </div>`;
                 }
                 function endpointCompact(items,emptyText){if(!items||items.length===0)return `<span class="muted">${esc(emptyText)}</span>`;return items.slice(0,4).map(e=>`<span>${navigationButton(e.navigationTarget,e.name||e.id)} <span class="muted">(${esc(labelEndpointType(e.type))})</span></span>`).join('');}
@@ -1542,27 +1873,30 @@ public final class WebAdminFrontendScripts {
                 function signalListenerFieldId(ref){return String(ref||'').replace(/[^a-zA-Z0-9_-]/g,'_');}
                 function signalListenerBasicConfigCard(e,detail){
                   const ref=e.id||e.name||'', draft=appState.signalListenerBasicConfigEdit, isEditing=draft&&draft.listenerRef===ref;
-                  if(isEditing)return signalListenerBasicConfigForm(e,detail,draft);
                   const cfg=e.basicConfig||{}, lock=cfg.lockStatus||{}, canEdit=canEditSignalListenerBasicConfig(), lockedByOther=!!lock.locked&&!lock.heldByCurrentUser;
                   const enabled=cfg.listenerRef?cfg.enabled:e.enabled, channel=cfg.listenerRef?cfg.channel:e.channel, cooldown=cfg.listenerRef?cfg.cooldownTicks:e.cooldownTicks, actionCount=cfg.listenerRef?cfg.actionCount:e.actionCount;
                   const lockHint=lockedByOther?`<div class="readonly-note">${esc(lock.holderUsername||'其他用户')} 正在编辑，锁到期：${esc(formatDateTime(lock.expiresAt))}</div>`:'';
-                  const action=canEdit&&!lockedByOther?`<button class="secondary" type="button" onclick='startSignalListenerBasicConfigEdit(${jsString(ref)},${jsString(detail.channel)})'>编辑基础配置</button>`:(canEdit?lockHint:'<span class="muted">需要 EDITOR 或 OWNER 权限才能编辑。</span>');
+                  const action=isEditing?`<button class="secondary" type="button" ${htmlHandler(`showSignalListenerBasicConfigEditModal(${jsString(ref)},${jsString(detail.channel)})`)}>继续编辑</button>`:(canEdit&&!lockedByOther?`<button class="secondary" type="button" ${htmlHandler(`startSignalListenerBasicConfigEdit(${jsString(ref)},${jsString(detail.channel)})`)}>编辑基础配置</button>`:(canEdit?lockHint:'<span class="muted">需要 EDITOR 或 OWNER 权限才能编辑。</span>'));
                   return `<div class="readonly-note"><div class="kv-row"><span class="muted">基础配置</span><strong>${enabled?'启用':'禁用'} / ${esc(channel||detail.channel||'未设置')} / 冷却 ${esc(cooldown ?? 0)} tick</strong></div><div class="kv-row"><span class="muted">Action</span><strong>${esc(actionCount ?? 0)} 个（只读）</strong></div>${action}</div>`;
                 }
                 function listenerChannelComboOptionsHtml(ref,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
                   const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
-                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectSignalListenerBasicConfigChannel(${jsString(ref)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSignalListenerBasicConfigChannel(${jsString(ref)},${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
                 function renderSignalListenerConfigChannelCombo(ref,draft){
                   const id=signalListenerFieldId(ref), open=draft.channelComboOpen?' open':'';
-                  return `<div id="listener-channel-combo-${id}" class="channel-combo listener-channel-combo${open}"><div class="channel-combo-control"><input id="listener-channel-${id}" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="listener-channel-menu-${id}" onfocus='openSignalListenerBasicConfigChannelMenu(${jsString(ref)})' oninput='updateSignalListenerBasicConfigDraftFromForm(${jsString(ref)},true)' onkeydown='handleSignalListenerBasicConfigChannelKey(event,${jsString(ref)})'><button class="channel-combo-toggle" type="button" onclick='toggleSignalListenerBasicConfigChannelMenu(${jsString(ref)})' aria-label="显示已有频道">⌄</button></div><div id="listener-channel-menu-${id}" class="channel-combo-menu" role="listbox">${listenerChannelComboOptionsHtml(ref,draft)}</div></div>`;
+                  return `<div id="listener-channel-combo-${id}" class="channel-combo listener-channel-combo${open}"><div class="channel-combo-control"><input id="listener-channel-${id}" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="listener-channel-menu-${id}" ${htmlEvent('onfocus',`openSignalListenerBasicConfigChannelMenu(${jsString(ref)})`)} ${htmlEvent('oninput',`updateSignalListenerBasicConfigDraftFromForm(${jsString(ref)},true)`)} ${htmlEvent('onkeydown',`handleSignalListenerBasicConfigChannelKey(event,${jsString(ref)})`)}><button class="channel-combo-toggle" type="button" ${htmlHandler(`toggleSignalListenerBasicConfigChannelMenu(${jsString(ref)})`)} aria-label="显示已有频道">⌄</button></div><div id="listener-channel-menu-${id}" class="channel-combo-menu" role="listbox">${listenerChannelComboOptionsHtml(ref,draft)}</div></div>`;
                 }
                 function signalListenerBasicConfigForm(e,detail,draft){
                   const id=signalListenerFieldId(draft.listenerRef), errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(err=>`<li>${esc(err.field?`${err.field}：`: '')}${esc(err.message||'保存失败')}</li>`).join('')}</ul>`:'';
-                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'Listener 基础配置已发生冲突，请刷新后再编辑。')} <button class="link-button" onclick='reloadSignalListenerBasicConfigAfterConflict(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'>刷新当前信息</button></div>`:'';
-                  return `<form class="edit-form" onsubmit='event.preventDefault();saveSignalListenerBasicConfig(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'><label>启用状态<select id="listener-enabled-${id}" class="select"><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label><label>频道${renderSignalListenerConfigChannelCombo(draft.listenerRef,draft)}<span id="listener-channel-hint-${id}" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label>冷却时间（ticks）<input id="listener-cooldown-${id}" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">正在编辑 Signal Listener 基础配置。Action 列表保持只读，不会被修改。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" onclick='cancelSignalListenerBasicConfigEdit(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})'>取消</button></div></form>`;
+                  const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'Listener 基础配置已发生冲突，请刷新后再编辑。')} <button class="link-button" ${htmlHandler(`reloadSignalListenerBasicConfigAfterConflict(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}>刷新当前信息</button></div>`:'';
+                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveSignalListenerBasicConfig(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}><label>启用状态<select id="listener-enabled-${id}" class="select"><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label><label>频道${renderSignalListenerConfigChannelCombo(draft.listenerRef,draft)}<span id="listener-channel-hint-${id}" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label>冷却时间（ticks）<input id="listener-cooldown-${id}" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">正在编辑 Signal Listener 基础配置。Action 列表保持只读，不会被修改。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler(`cancelSignalListenerBasicConfigEdit(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}>取消</button></div></form>`;
+                }
+                function showSignalListenerBasicConfigEditModal(ref,routeChannel){
+                  const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
+                  openWebAdminModal('编辑监听器基础配置',signalListenerBasicConfigForm({id:ref}, {channel:routeChannel||draft.routeChannel||draft.channel||''}, draft),editModalFooter(draft.saving),{onClose:()=>cancelSignalListenerBasicConfigEdit(ref,routeChannel||draft.routeChannel||draft.channel||'')});
                 }
                 function updateSignalListenerBasicConfigDraftFromForm(ref,openMenu=false){
                   const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
@@ -1592,7 +1926,7 @@ public final class WebAdminFrontendScripts {
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSignalListenerBasicConfigChannelCombo(ref);return;}
                   if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSignalListenerBasicConfigChannel(ref,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
                 }
-                function maybeReleaseSignalListenerBasicConfigEditForRoute(hash){const draft=appState.signalListenerBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/signals/')){const info=detailRoute(String(hash).substring('#/signals/'.length),'#/signals');if(info.id===(draft.routeChannel||draft.channel))return;}releaseSignalListenerBasicConfigLock(draft,true);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}
+                function maybeReleaseSignalListenerBasicConfigEditForRoute(hash){const draft=appState.signalListenerBasicConfigEdit;if(!draft)return;const h=String(hash||'');if(h.startsWith('#/signals/')){const info=detailRoute(h.substring('#/signals/'.length),'#/signals');if(info.id===(draft.routeChannel||draft.channel))return;}if(h.startsWith('#/listeners/')){const info=detailRoute(h.substring('#/listeners/'.length),'#/listeners');if(info.id===draft.listenerRef||info.id===draft.listenerId)return;}if(h.startsWith('#/signal-listeners/')){const info=detailRoute(h.substring('#/signal-listeners/'.length),'#/signal-listeners');if(info.id===draft.listenerRef||info.id===draft.listenerId)return;}releaseSignalListenerBasicConfigLock(draft,true);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}
                 async function startSignalListenerBasicConfigEdit(ref,routeChannel){
                   if(!canEditSignalListenerBasicConfig())return;
                   try{
@@ -1602,10 +1936,11 @@ public final class WebAdminFrontendScripts {
                     const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();
                     appState.signalListenerBasicConfigEdit={listenerRef:cfg.listenerRef||ref,listenerId:cfg.listenerId||ref,displayName:cfg.displayName||ref,enabled:!!cfg.enabled,channel:cfg.channel||'',cooldownTicks:cfg.cooldownTicks ?? 0,actionCount:cfg.actionCount||0,actionSummaries:cfg.actionSummaries||[],expectedFingerprint:cfg.expectedFingerprint||'',routeChannel:routeChannel||cfg.channel||'',lockId:lock.lockId||'',lock,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,errors:[],saving:false,conflict:null};
                     scheduleSignalListenerBasicConfigLockHeartbeat();
-                    await renderSignalDetail(encodeURIComponent(routeChannel||cfg.channel||''),{silent:true});
+                    await route({silent:true});
+                    showSignalListenerBasicConfigEditModal(cfg.listenerRef||ref,routeChannel||cfg.channel||'');
                   }catch(err){toast(err.message||'无法获取编辑锁');}
                 }
-                async function cancelSignalListenerBasicConfigEdit(ref,routeChannel){const draft=appState.signalListenerBasicConfigEdit;if(draft&&draft.listenerRef===ref){await releaseSignalListenerBasicConfigLock(draft,false);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}await renderSignalDetail(encodeURIComponent(routeChannel||''),{silent:true});}
+                async function cancelSignalListenerBasicConfigEdit(ref,routeChannel){const draft=appState.signalListenerBasicConfigEdit;if(draft&&draft.listenerRef===ref){await releaseSignalListenerBasicConfigLock(draft,false);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();}await dismissWebAdminModal();await route({silent:true});}
                 async function reloadSignalListenerBasicConfigAfterConflict(ref,routeChannel){const draft=appState.signalListenerBasicConfigEdit;if(draft&&draft.listenerRef===ref)await releaseSignalListenerBasicConfigLock(draft,true);appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();await renderSignalDetail(encodeURIComponent(routeChannel||''),{silent:true});}
                 function scheduleSignalListenerBasicConfigLockHeartbeat(){stopSignalListenerBasicConfigLockHeartbeat();appState.signalListenerBasicConfigLockTimer=setTimeout(async()=>{await heartbeatSignalListenerBasicConfigLock();if(appState.signalListenerBasicConfigEdit)scheduleSignalListenerBasicConfigLockHeartbeat();},30000);}
                 function stopSignalListenerBasicConfigLockHeartbeat(){if(appState.signalListenerBasicConfigLockTimer){clearTimeout(appState.signalListenerBasicConfigLockTimer);appState.signalListenerBasicConfigLockTimer=null;}}
@@ -1614,12 +1949,12 @@ public final class WebAdminFrontendScripts {
                 async function saveSignalListenerBasicConfig(ref,routeChannel){
                   const draft=appState.signalListenerBasicConfigEdit||{listenerRef:ref,routeChannel};
                   updateSignalListenerBasicConfigDraftFromForm(ref,false);
-                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.signalListenerBasicConfigEdit=draft;renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});
+                  draft.saving=true;draft.errors=[];draft.conflict=null;appState.signalListenerBasicConfigEdit=draft;route({silent:true});
                   try{
                     const result=await api(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,cooldownTicks:Number(draft.cooldownTicks),expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
-                    if(result.success){appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();toast(result.changed?(result.message||'Signal Listener 基础配置已保存。'):'没有变更。');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});return;}
-                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.signalListenerBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopSignalListenerBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});
-                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.signalListenerBasicConfigEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(routeChannel||draft.routeChannel||draft.channel||''),{silent:true});}
+                    if(result.success){appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'Signal Listener 基础配置已保存。'):'没有变更。');await route({silent:true});return;}
+                    draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.signalListenerBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopSignalListenerBasicConfigLockHeartbeat();toast(result.message||'保存失败');await route({silent:true});showSignalListenerBasicConfigEditModal(ref,routeChannel||draft.routeChannel||draft.channel||'');
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.signalListenerBasicConfigEdit=draft;toast(err.message||'保存失败');await route({silent:true});showSignalListenerBasicConfigEditModal(ref,routeChannel||draft.routeChannel||draft.channel||'');}
                 }
                 """).append("""
                 function endpointGroups(detail){
@@ -1640,12 +1975,14 @@ public final class WebAdminFrontendScripts {
                   appState.deviceFilters=appState.deviceFilters||{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'};
                   appState.historyFilters=appState.historyFilters||{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'};
                   appState.actionFilters=appState.actionFilters||{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'};
+                  appState.templateFilters=appState.templateFilters||{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'};
                   appState.receiverFilters=appState.receiverFilters||{search:'',enabled:'ALL',output:'ALL',channel:'ALL'};
                   appState.receiverDetailCache=appState.receiverDetailCache||{};
                   appState.configFilters=appState.configFilters||{search:'',status:'ALL',type:'ALL'};
                   appState.userFilters=appState.userFilters||{search:'',role:'ALL',enabled:'ALL',online:'ALL'};
                   appState.regionFilters=appState.regionFilters||{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};
                   appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
+                  appState.advancedDetailOpen=appState.advancedDetailOpen||{};
                 }
                 function waMetric(label,value,sub='',iconName='dashboard',kind=''){
                   return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
@@ -1658,6 +1995,117 @@ public final class WebAdminFrontendScripts {
                 }
                 function waIconButton(label,iconName,attrs=''){
                   return `<button class="wa-icon-btn" aria-label="${esc(label)}" title="${esc(label)}" ${attrs}>${icon(iconName)}</button>`;
+                }
+                function safeHtml(value){return {__waHtml:String(value||'')};}
+                function detailValue(value){
+                  if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'__waHtml'))return value.__waHtml;
+                  if(value===null||value===undefined||value==='')return '<span class="muted">暂无</span>';
+                  return esc(value);
+                }
+                async function copyTextToClipboard(value){
+                  try{
+                    if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(String(value||''));
+                    else throw new Error('clipboard unavailable');
+                    toast('已复制。');
+                  }catch(_){
+                    toast('当前浏览器不允许直接复制，请手动选择文本复制。');
+                  }
+                }
+                function detailHeader(opts){
+                  const badges=(opts.badges||[]).filter(Boolean).join('');
+                  const actions=(opts.actions||[]).filter(Boolean).join('');
+                  const copy=opts.copyValue?waIconButton('复制 ID','copy',htmlHandler(`copyTextToClipboard(${jsString(opts.copyValue)})`)):'';
+                  return `<header class="wa-detail-head">
+                    <div class="wa-detail-title-wrap">
+                      ${opts.back?`<div class="back-row compact">${opts.back}</div>`:''}
+                      <div class="wa-detail-title-line">
+                        <span class="wa-detail-icon icon-bubble-${iconClassName(opts.iconName||'dashboard')}">${icon(opts.iconName||'dashboard')}</span>
+                        <div class="wa-detail-title-copy">
+                          <div class="wa-detail-kicker">${esc(opts.kicker||'WebAdmin 7.5')}</div>
+                          <h1>${esc(opts.title||'详情')}</h1>
+                          <p>${esc(opts.subtitle||'')}</p>
+                          <div class="wa-detail-badges">${badges}${copy}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="wa-detail-actions">${actions}</div>
+                  </header>`;
+                }
+                function detailTabs(labels,active='基本信息'){
+                  return `<nav class="wa-detail-tabs wa-tabs-scroll" data-detail-tabs="true" data-responsive-tabs="true" role="tablist" aria-label="详情页分栏">${labels.map(label=>`<button class="wa-detail-tab ${label===active?'active':''}" type="button" role="tab" aria-selected="${label===active?'true':'false'}" ${htmlHandler(`scrollDetailSection(${jsString(label)})`)}>${esc(label)}</button>`).join('')}</nav>`;
+                }
+                function scrollDetailSection(label){
+                  const view=appView();
+                  if(!view||!view.querySelectorAll)return;
+                  const key=String(label||'').replace(/列表|信息|统计|检查/g,'').trim();
+                  const cards=Array.from(view.querySelectorAll('.wa-detail-card'));
+                  const target=cards.find(card=>String(card.textContent||'').includes(label)||key&&String(card.textContent||'').includes(key));
+                  if(target&&target.scrollIntoView)target.scrollIntoView({behavior:'smooth',block:'start'});
+                }
+                function detailCard(title,body,actions='',extraClass=''){
+                  return `<article class="wa-detail-card ${esc(extraClass)}"><header class="wa-detail-card-head"><h2>${esc(title)}</h2>${actions?`<div class="wa-detail-card-actions">${actions}</div>`:''}</header><div class="wa-detail-card-body">${body}</div></article>`;
+                }
+                function detailInfoGrid(rows){
+                  const html=(rows||[]).filter(row=>row&&row.length>=2).map(([key,value])=>`<div class="k">${esc(key)}</div><div class="v">${detailValue(value)}</div>`).join('');
+                  return `<div class="identity-grid wa-detail-info">${html||'<div class="muted">暂无详情字段。</div>'}</div>`;
+                }
+                function detailStatGrid(items){
+                  return `<div class="wa-detail-stat-grid">${(items||[]).map(item=>`<div class="wa-detail-stat ${esc(item.kind||'')}"><span class="wa-detail-stat-icon">${icon(item.icon||'status')}</span><span class="wa-detail-stat-label">${esc(item.label)}</span><strong>${esc(item.value??'--')}</strong>${item.sub?`<small>${esc(item.sub)}</small>`:''}</div>`).join('')}</div>`;
+                }
+                function detailConsumerGrid(items){
+                  return `<div class="wa-detail-consumers">${(items||[]).map(item=>`<div class="wa-detail-consumer"><span class="wa-detail-consumer-icon">${icon(item.icon||'signal')}</span><span><strong>${esc(item.label)}</strong><small>${esc(item.value??0)}</small></span>${item.target?`<button class="wa-btn ghost" ${navigationAttr(item.target,false)}>查看</button>`:`<button class="wa-btn ghost" disabled>查看</button>`}</div>`).join('')}</div>`;
+                }
+                function detailSideStack(cards){return `<div class="wa-detail-side-stack" data-detail-right-rail="true">${(cards||[]).filter(Boolean).join('')}</div>`;}
+                function detailFixedLayout(leftCards=[],rightCards=[],bottomCards=[]){
+                  const left=(leftCards||[]).filter(Boolean).join('');
+                  const right=(rightCards||[]).filter(Boolean).join('');
+                  const bottom=(bottomCards||[]).filter(Boolean).join('');
+                  return `<section class="wa-detail-second-row detail-fixed-layout" data-detail-layout="fixed-two-column" data-detail-row="main" data-detail-two-column="true"><div class="detail-column detail-column-left" data-detail-column="left">${left}</div><div class="detail-column detail-column-right" data-detail-column="right">${right}</div></section>${bottom?`<section class="detail-full-width-stack" data-detail-bottom-full-width="true">${bottom}</section>`:''}`;
+                }
+                function detailTableWrap(html){return `<div class="wa-table-scroll wa-detail-table-scroll" data-table-row-stretch="false">${html}</div>`;}
+                function compactEventList(items,emptyText='暂无最近事件。'){
+                  if(!items||items.length===0)return empty(emptyText);
+                  return `<div class="wa-compact-list">${items.slice(0,5).map(e=>`<div class="wa-compact-row"><strong>${fmtTime(e.time||e.triggeredAt||e.lastTriggeredAt||e.executedAt)}</strong><span>${esc(e.channel||e.type||e.result||'事件')}</span><small>${esc(e.source||e.sourceType||e.playerName||e.detail||'')}</small></div>`).join('')}</div>`;
+                }
+                function detailToolGrid(items){
+                  return `<div class="wa-quick-grid">${(items||[]).map(item=>waButton(item.label,item.icon||'',item.attrs||'disabled',item.kind||'ghost')).join('')}</div>${items&&items.note?`<p class="wa-disabled-note">${esc(items.note)}</p>`:''}`;
+                }
+                function advancedDetailKey(kind,id){return `${kind}:${String(id||'')}`;}
+                function isAdvancedDetailOpen(kind,id){waEnsureState();return !!appState.advancedDetailOpen[advancedDetailKey(kind,id)];}
+                async function toggleAdvancedDetail(kind,id){
+                  waEnsureState();
+                  const key=advancedDetailKey(kind,id);
+                  appState.advancedDetailOpen[key]=!appState.advancedDetailOpen[key];
+                  await route({silent:true});
+                }
+                function advancedValue(value){
+                  if(value===null||value===undefined||value==='')return '暂无';
+                  if(typeof value==='object'){try{return JSON.stringify(value);}catch(_){return String(value);}}
+                  return String(value);
+                }
+                function advancedRowsFromObject(obj,prefix='',limit=48){
+                  const rows=[];
+                  const visit=(value,path,depth)=>{
+                    if(rows.length>=limit||value===null||value===undefined)return;
+                    if(typeof value==='object'&&!Array.isArray(value)&&depth<2){
+                      Object.keys(value).sort().forEach(key=>visit(value[key],path?`${path}.${key}`:key,depth+1));
+                      return;
+                    }
+                    rows.push([path,advancedValue(value)]);
+                  };
+                  visit(obj,prefix,0);
+                  return rows;
+                }
+                function advancedTable(rows){
+                  const clean=(rows||[]).filter(r=>r&&r.length>=2);
+                  if(clean.length===0)return '<div class="muted">暂无额外字段。</div>';
+                  return `<div class="wa-advanced-table">${clean.map(([key,value])=>`<div class="k">${esc(key)}</div><div class="v"><code>${esc(advancedValue(value))}</code></div>`).join('')}</div>`;
+                }
+                function advancedDetailCard(kind,id,summaryRows=[],groups=[]){
+                  const open=isAdvancedDetailOpen(kind,id), button=open?'收起详情':'显示全部详情';
+                  const preview=summaryRows.slice(0,6);
+                  const body=open?`<div class="wa-advanced-groups">${groups.map(group=>`<section class="wa-advanced-group"><h3>${esc(group.title)}</h3>${advancedTable(group.rows)}</section>`).join('')||advancedTable(summaryRows)}</div>`:advancedTable(preview);
+                  return `<article class="wa-detail-card wa-advanced-card detail-bottom-full ${open?'is-open':'is-closed'}" data-collapsible-detail="true" data-detail-bottom-card="advanced" data-detail-full-width="true" data-advanced-open="${open?'true':'false'}"><header class="wa-detail-card-head"><h2>完整详情</h2><button class="wa-btn ghost" type="button" ${htmlHandler(`toggleAdvancedDetail(${jsString(kind)},${jsString(id)})`)}>${esc(button)}</button></header><div class="wa-advanced-body">${body}</div></article>`;
                 }
                 function waSelect(id,options,value,labeler=(v)=>v){
                   return `<select class="select" id="${esc(id)}">${options.map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(labeler(o))}</option>`).join('')}</select>`;
@@ -1674,9 +2122,11 @@ public final class WebAdminFrontendScripts {
                   if(key==='signalbridge')renderSignalList('');
                   if(key==='receivers')renderReceiverList('');
                   if(key==='listeners')renderListenerList('');
+                  if(key.startsWith('listenerDetail:'))renderSignalListenerDetail(key.substring('listenerDetail:'.length),{silent:true});
                   if(key==='devices')renderDeviceList('');
                   if(key==='virtualBlockDevices')renderVirtualBlockList('');
                   if(key==='actions')renderActionList('');
+                  if(key==='actionTemplates')renderActionTemplateList('');
                   if(key==='history')renderHistoryListPage('');
                   if(key==='config')renderConfigList('');
                   if(key==='users')renderUserList('');
@@ -1691,16 +2141,49 @@ public final class WebAdminFrontendScripts {
                   const prev=Math.max(1,page.current-1), next=Math.min(page.pages,page.current+1);
                   return `<div class="wa-pagination"><div class="wa-page-buttons"><button class="wa-page-btn" onclick="setWaPage('${key}',${prev})">‹</button>${nums.map(n=>n==='…'?`<span class="wa-page-meta">…</span>`:`<button class="wa-page-btn ${n===page.current?'active':''}" onclick="setWaPage('${key}',${n})">${n}</button>`).join('')}<button class="wa-page-btn" onclick="setWaPage('${key}',${next})">›</button></div><span class="wa-page-meta">共 ${esc(page.total)} 条</span><span class="wa-page-meta">每页 ${esc(page.pageSize)} 条</span></div>`;
                 }
-                function openWebAdminModal(title,body,footer=''){
-                  closeWebAdminModal();
-                  const wrap=document.createElement('div');
+                function openWebAdminModal(title,body,footer='',options={}){
+                  const existing=document.getElementById('wa-modal-root');
+                  const existingClosing=existing&&String(existing.className||'').includes('closing');
+                  const wrap=existing&&!existingClosing?existing:document.createElement('div');
+                  if(existing&&existingClosing)existing.remove();
+                  appState.modalDismissPromise=null;
                   wrap.className='wa-modal-backdrop';
                   wrap.id='wa-modal-root';
-                  wrap.innerHTML=`<section class="wa-modal" role="dialog" aria-modal="true" aria-labelledby="wa-modal-title"><header class="wa-modal-head"><h2 id="wa-modal-title" class="wa-modal-title">${esc(title)}</h2>${waIconButton('关闭','close','onclick="closeWebAdminModal()"')}</header><div class="wa-modal-body">${body}</div><footer class="wa-modal-foot">${footer||waButton('关闭','','onclick="closeWebAdminModal()"','ghost')}</footer></section>`;
-                  wrap.addEventListener('click',event=>{if(event.target===wrap)closeWebAdminModal();});
-                  document.body.appendChild(wrap);
+                  appState.modalCloseHandler=options.onClose||null;
+                  const closeAttr=options.closeAttr||'onclick="closeWebAdminModal()"';
+                  wrap.innerHTML=`<section class="wa-modal wa-modal-viewport ${esc(options.className||'')}" role="dialog" aria-modal="true" aria-labelledby="wa-modal-title"><header class="wa-modal-head"><h2 id="wa-modal-title" class="wa-modal-title">${esc(title)}</h2>${waIconButton('关闭','close',closeAttr)}</header><div class="wa-modal-body">${body}</div><footer class="wa-modal-foot">${footer||waButton('关闭','',closeAttr,'ghost')}</footer></section>`;
+                  wrap.onclick=event=>{if(event.target===wrap)closeWebAdminModal();};
+                  if(!existing||existingClosing)document.body.appendChild(wrap);
                 }
-                function closeWebAdminModal(){document.getElementById('wa-modal-root')?.remove();}
+                function closeWebAdminModal(runHandler=true){
+                  if(appState.modalClosePromise)return appState.modalClosePromise;
+                  const handler=appState.modalCloseHandler;
+                  if(runHandler&&handler){appState.modalCloseHandler=null;appState.modalClosePromise=Promise.resolve(handler()).finally(()=>{appState.modalClosePromise=null;});return appState.modalClosePromise;}
+                  appState.modalCloseHandler=null;
+                  return dismissWebAdminModal();
+                }
+                function dismissWebAdminModal(){
+                  const root=document.getElementById('wa-modal-root');
+                  if(!root)return Promise.resolve();
+                  if(String(root.className||'').includes('closing'))return appState.modalDismissPromise||Promise.resolve();
+                  root.classList.add('closing');
+                  if(root.setAttribute)root.setAttribute('data-modal-closing','true');
+                  if(root.dataset)root.dataset.modalClosing='true';
+                  let promise;
+                  promise=new Promise(resolve=>{
+                    let done=false;
+                    const finish=()=>{if(done)return;done=true;clearTimeout(timer);root.removeEventListener('animationend',onEnd);root.removeEventListener('animationcancel',finish);if(document.getElementById('wa-modal-root')===root)root.remove();if(appState.modalDismissPromise===promise)appState.modalDismissPromise=null;resolve();};
+                    const onEnd=(event)=>{if(event.target===root||String(event.target?.className||'').includes('wa-modal'))finish();};
+                    const timer=setTimeout(finish,260);
+                    root.addEventListener('animationend',onEnd);
+                    root.addEventListener('animationcancel',finish);
+                  });
+                  appState.modalDismissPromise=promise;
+                  return promise;
+                }
+                function editModalFooter(saving=false){
+                  return `<button class="wa-btn ghost" type="button" onclick="closeWebAdminModal()">${icon('close')}<span>取消</span></button><button class="wa-btn primary" type="button" ${saving?'disabled':''} onclick="document.querySelector('#wa-modal-root form')?.requestSubmit()">${icon('check-pass')}<span>${saving?'保存中...':'保存'}</span></button>`;
+                }
                 document.addEventListener('keydown',event=>{if(event.key==='Escape')closeWebAdminModal();});
                 function unavailableFeature(title='功能暂未开放',message='当前版本没有完整后端支持，因此该操作保持不可用。'){
                   openWebAdminModal(title,`<p>${esc(message)}</p><div class="wa-disabled-note">本轮前端重构只接入只读展示和布局基础，不新增 API 或真实写能力。</div>`);
@@ -1944,6 +2427,31 @@ public final class WebAdminFrontendScripts {
                 function sumNumeric(items,keys){let found=false,total=0;(items||[]).forEach(item=>{for(const key of keys){const value=key.split('.').reduce((acc,part)=>acc&&acc[part],item);if(!isBlank(value)){const n=Number(value);if(Number.isFinite(n)){total+=n;found=true;}break;}}});return found?total:'--';}
                 function firstKnown(item,keys){for(const key of keys){const value=key.split('.').reduce((acc,part)=>acc&&acc[part],item);if(!isBlank(value))return value;}return '';}
                 function uniqueNonBlank(values){return [...new Set((values||[]).filter(v=>!isBlank(v)).map(v=>String(v)))].sort((a,b)=>a.localeCompare(b));}
+                function countBy(items,selector){
+                  const counts={};
+                  (Array.isArray(items)?items:[]).forEach(item=>{
+                    let key;
+                    if(typeof selector==='function')key=selector(item);
+                    else if(!isBlank(selector))key=String(selector).split('.').reduce((acc,part)=>acc==null?undefined:acc[part],item);
+                    else key=item;
+                    const normalized=isBlank(key)?'UNKNOWN':String(key);
+                    counts[normalized]=(counts[normalized]||0)+1;
+                  });
+                  return counts;
+                }
+                function parseHashParams(hash){
+                  const raw=String(hash||((typeof window!=='undefined'&&window.location)?window.location.hash:'')||'');
+                  const index=raw.indexOf('?');
+                  if(index<0&&!raw.startsWith('?'))return {};
+                  const query=raw.startsWith('?')?raw.slice(1):raw.slice(index+1);
+                  try{
+                    const result={};
+                    new URLSearchParams(query).forEach((value,key)=>{result[key]=value;});
+                    return result;
+                  }catch(_){
+                    return {};
+                  }
+                }
                 function endpointEnabledText(value){return value?'启用':'停用';}
                 function deviceTypeIcon(type){return {SIGNAL_EMITTER:'signal-device',SIGNAL_RECEIVER:'signal-receiver',ACTION_RELAY:'action-relay',VIRTUAL_BLOCK_DEVICE:'virtual-block-device'}[String(type||'').toUpperCase()]||'device';}
                 function deviceTypeTone(type){return {SIGNAL_EMITTER:'',SIGNAL_RECEIVER:'',ACTION_RELAY:'warning',VIRTUAL_BLOCK_DEVICE:'ok'}[String(type||'').toUpperCase()]||'';}
@@ -1951,6 +2459,95 @@ public final class WebAdminFrontendScripts {
                   const total=Number(totalOverride??items.length), counts=countBy(items,mapper);
                   return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([key,value])=>({label:labeler?labeler(key):key,value,total,kind:key==='ERROR'||key==='FAILED'||key==='DISABLED'?'error':(key==='WARNING'?'warning':(key==='OK'||key==='ENABLED'?'ok':''))}));
                 }
+
+                async function renderSignalListenerDetail(rawId,options={}){
+                  const routeInfo=detailRoute(rawId,'#/listeners'), listenerId=routeInfo.id||'';
+                  if(!options.silent)setView(loading('正在加载监听器详情...'));
+                  const result=await loadSignalListenerDetail(listenerId);
+                  if(!result.ok){
+                    if(options.silent){toast('监听器详情实时刷新失败，已保留当前页面。');return;}
+                    setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回信号监听器')}</div>${waPageHead('监听器详情不可用','当前没有稳定 listener id 或频道详情数据可定位该监听器。',`${waButton('编辑监听器','settings','disabled','ghost')}${waButton('创建动作','plus','disabled','primary')}`)}${empty(result.message||'请返回列表，通过已有频道详情确认当前监听器。')}</section>`);
+                    return;
+                  }
+                  const data=result.data, listener=data.listener||{}, detail=data.detail||{}, channel=listener.channel||data.channel||detail.channel||'', title=listener.name||listener.id||listenerId||'未命名监听器';
+                  const [history,config]=await Promise.all([channel?settle(`/api/signals/history?channel=${encodeURIComponent(channel)}&limit=8`):Promise.resolve({ok:true,data:[]}),listener.id?settle(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(listener.id)}`):Promise.resolve({ok:false})]);
+                  const actions=listener.actions||[], recent=history.ok?(history.data||[]):[], cfg=config.ok?(config.data||{}):{};
+                  const editAction=listener.id&&canEditSignalListenerBasicConfig()?waButton('编辑基本信息','settings',htmlHandler(`startSignalListenerBasicConfigEdit(${jsString(listener.id)},${jsString(channel)})`),'primary'):waButton('编辑基本信息','settings','disabled','ghost');
+                  const listenerStatus=listener.enabled!==false?'启用':'停用', actionCount=listener.actionCount??actions.length, cooldown=listener.cooldownTicks??cfg.cooldownTicks;
+                  const advancedRows=[
+                    ['listener.id',listener.id||listenerId],
+                    ['listener.name',title],
+                    ['listener.channel',channel],
+                    ['listener.enabled',listenerStatus],
+                    ['listener.cooldownTicks',cooldown],
+                    ['listener.actionCount',actionCount],
+                    ['listener.lastTriggeredAt',formatDateTime(listener.lastTriggeredAt)],
+                    ['config.fingerprint',cfg.fingerprint||cfg.expectedFingerprint]
+                  ];
+                  const rendered=setView(`<section class="wa-page wa-detail-shell" data-detail-kind="listener">
+                    ${detailHeader({back:backButton(routeInfo,'返回信号监听器'),kicker:'信号监听器 / 监听器详情',iconName:'listener-receiver',title:title,subtitle:listener.description||`监听频道：${channel||'未绑定'}`,copyValue:listener.id||listenerId,badges:[`<span class="pill info">ID: ${esc(listener.id||listenerId||'无稳定 ID')}</span>`,pill(listener.enabled!==false?'OK':'WARNING')],actions:[waButton('测试触发','play','disabled','ghost'),waButton('复制监听器','copy','disabled','ghost'),waButton('更多','more','disabled','ghost')]})}
+                    ${detailTabs(['基本信息','动作列表','最近事件','触发统计','递归检查'])}
+                    <section class="wa-detail-first-row">
+                      ${detailCard('基本信息',detailInfoGrid([
+                        ['监听器名称',title],
+                        ['ID',listener.id||listenerId||'无稳定 ID'],
+                        ['频道 Channel',safeHtml(channel?channelButton(channel):'<span class="muted">未绑定</span>')],
+                        ['状态',safeHtml(pill(listener.enabled!==false?'OK':'WARNING')+' '+esc(listenerStatus))],
+                        ['冷却时间',formatTicks(cooldown)||'0 tick'],
+                        ['描述',listener.description||cfg.note||'暂无描述'],
+                        ['创建/修改时间',cfg.updatedAt?`${formatDateTime(cfg.updatedAt)} · ${cfg.updatedBy||'未知用户'}`:'暂无']
+                      ]),editAction)}
+                      ${detailCard('状态与统计',`${detailStatGrid([
+                        {label:'动作数量',value:actionCount,sub:'只读 actions',icon:'action-total'},
+                        {label:'今日触发次数',value:listener.triggerCountToday ?? 0,sub:'today',icon:'today-trigger'},
+                        {label:'最后触发',value:formatDateTime(listener.lastTriggeredAt),sub:'last trigger',icon:'recent-event'},
+                        {label:'总触发次数',value:listener.totalTriggerCount ?? listener.triggerCountTotal ?? 0,sub:'total',icon:'history'}
+                      ])}<h3 class="wa-detail-subhead">消费者关系 / 关联对象</h3>${detailConsumerGrid([
+                        {label:'来源频道',value:labelChannel(channel),icon:'active-channel',target:channel?signalHash(channel):''},
+                        {label:'动作列表',value:actionCount,icon:'action-total'},
+                        {label:'频道消费者',value:`${(detail.listeners||[]).length} / ${(detail.receivers||[]).length}`,icon:'consumer-listener',target:channel?signalHash(channel):''},
+                        {label:'Doctor',value:labelStatus(listener.doctorStatus||detail.doctorStatus||'UNKNOWN'),icon:'doctor-overview',target:'#/doctor'}
+                      ])}`)}
+                    </section>
+                    ${detailFixedLayout([
+                      detailCard(`动作列表（共 ${actions.length} 个）`,`${listenerActionList(actions)}<p class="wa-disabled-note">当前版本仅只读展示动作列表；新增、删除和 reorder action 没有完整后端支持。</p>`,'','detail-card-stretchable'),
+                      detailCard('最近事件',listenerRecentEvents(recent,channel))
+                    ],[
+                      detailCard('冷却状态',detailInfoGrid([['启用状态',listenerStatus],['冷却时间',formatTicks(cooldown)||'0 tick'],['最后触发',safeHtml(fmtTime(listener.lastTriggeredAt))],['绑定频道',safeHtml(channel?channelButton(channel):'<span class="muted">未绑定</span>')]]),'','detail-card-stretchable'),
+                      detailCard('操作工具',`<div class="wa-quick-grid">${editAction}${waButton('新增动作','plus','disabled','primary')}${waButton('删除监听器','channel-error','disabled','danger')}${waButton('导出监听器','download','disabled','ghost')}</div><p class="wa-disabled-note">仅 enabled / channel / cooldownTicks 已有安全编辑链路；动作变更、删除和导出没有完整后端支持，保持禁用。</p>`)
+                    ],[
+                      advancedDetailCard('listeners',listener.id||listenerId,advancedRows,[
+                      {title:'listener config',rows:advancedRowsFromObject({listener,cfg},'listener')},
+                      {title:'cooldown state / debug info',rows:advancedRowsFromObject({lastTriggeredAt:listener.lastTriggeredAt,cooldownTicks:cooldown,doctorStatus:listener.doctorStatus||detail.doctorStatus,recent},'runtime')},
+                      {title:'关联频道详情',rows:advancedRowsFromObject({channel,channelDetail:{stats:detail.stats,doctorIssues:detail.doctorIssues,listeners:detail.listeners,receivers:detail.receivers}},'channel')}
+                    ])
+                    ])}
+                  </section>`,options);
+                  if(rendered)renderIcons(appView());
+                }
+                async function loadSignalListenerDetail(listenerId){
+                  if(isBlank(listenerId))return {ok:false,message:'缺少 listener id。'};
+                  const cached=(appState.listeners||[]).find(l=>listenerMatches(l,listenerId));
+                  if(cached){
+                    const channel=cached.channel||cached.sourceChannel||'';
+                    const detail=channel?await settle(`/api/signals/channels/${encodeURIComponent(channel)}`):{ok:false};
+                    return {ok:true,data:{listener:cached,channel,detail:detail.ok?detail.data:{}}};
+                  }
+                  let channels;try{channels=await api('/api/signals/channels');}catch(err){return {ok:false,message:err.message};}
+                  const candidates=(channels||[]).filter(c=>Number(c.listenerCount||0)>0);
+                  const details=await Promise.allSettled(candidates.map(c=>api(`/api/signals/channels/${encodeURIComponent(c.channel||'')}`)));
+                  for(let index=0;index<details.length;index++){
+                    const result=details[index];if(result.status!=='fulfilled')continue;
+                    const detail=result.value||{}, channel=detail.channel||candidates[index]?.channel||'';
+                    const found=(detail.listeners||[]).find(l=>listenerMatches(l,listenerId));
+                    if(found)return {ok:true,data:{listener:{...found,channel:found.channel||channel,sourceChannel:channel,sourceDisplayName:detail.metadata?.effectiveDisplayName||channel},channel,detail}};
+                  }
+                  return {ok:false,message:'未能在现有频道详情数据中找到该监听器。'};
+                }
+                function listenerMatches(listener,id){const target=String(id||'');return [listener?.id,listener?.name,listener?.ref,listener?.listenerRef].filter(v=>!isBlank(v)).some(v=>String(v)===target);}
+                function listenerInfoRows(listener,channel,cfg){const rows=[['监听器 ID',listener.id||'--'],['显示名称',listener.name||'--'],['频道',channel||'--'],['启用',listener.enabled!==false?'启用':'停用'],['冷却时间',formatTicks(listener.cooldownTicks??cfg.cooldownTicks)||'0 tick'],['来源频道',listener.sourceDisplayName||listener.sourceChannel||channel||'--'],['配置 fingerprint',cfg.fingerprint||cfg.expectedFingerprint||'--']];return rows.map(([k,v])=>`<div class="kv-row"><span class="muted">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');}
+                function listenerActionList(actions){if(!actions||actions.length===0)return empty('当前监听器没有可展示的动作。');return `<div class="wa-table-scroll" data-table-row-stretch="false"><table class="wa-table"><thead><tr><th>动作</th><th>类型</th><th>摘要</th><th>状态</th></tr></thead><tbody>${actions.map(a=>`<tr><td>${a.id?actionButton(a.id,a.name||a.id):esc(a.name||a.id||'未命名动作')}</td><td>${textPill(labelActionType(a.type),'info')}</td><td class="truncate" title="${esc(cleanActionSummary(a.summary||''))}">${esc(cleanActionSummary(a.summary||'--'))}</td><td>${pill(a.doctorStatus||'UNKNOWN')}</td></tr>`).join('')}</tbody></table></div>`;}
+                function listenerRecentEvents(items,channel){if(!items||items.length===0)return empty('暂无该频道最近事件。');return `<div class="list-stack">${items.slice(0,8).map(h=>`<div class="event-row"><strong>${esc(labelChannel(h.channel||channel))}</strong><span class="meta">${fmtTime(h.time)} · ${esc(labelSourceType(h.sourceType))} · ${esc(labelStatus(h.result))}</span><span>${esc(h.description||h.sourceName||'暂无详情')}</span></div>`).join('')}</div>`;}
                 async function renderListeners(options={}){
                   if(!options.silent)setView(loading('正在加载信号监听器...'));
                   let channels=[];
@@ -1996,7 +2593,7 @@ public final class WebAdminFrontendScripts {
                   if(rendered)bindListenerFilters(focusId);
                 }
                 function listenerTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>监听器名称 / ID</th><th>频道</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${items.map(l=>{const title=l.name||l.id||'未命名监听器', channel=l.channel||l.sourceChannel||'', channelTarget=isBlank(channel)?'':signalHash(channel);return `<tr><td><span class="device-name"><span class="device-icon">${icon('consumer-listener')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(l.id))}</span></span></span></td><td class="truncate" title="${esc(channel)}">${channelCell(channel)}</td><td>${pill(l.enabled!==false?'OK':'WARNING')} ${esc(endpointEnabledText(l.enabled!==false))}</td><td>${esc(formatTicks(l.cooldownTicks)||'0 tick')}</td><td>${esc(l.actionCount ?? '--')}</td><td>${fmtTime(l.lastTriggeredAt)}</td><td><div class="wa-action-cell">${channelTarget?`<button class="wa-btn ghost" ${navDataAttr(channelTarget,`查看频道 ${channel}`)}>频道</button>`:`<button class="wa-btn ghost" disabled>频道</button>`}${waIconButton('编辑不可用','settings','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>监听器名称 / ID</th><th>频道</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${items.map(l=>{const title=l.name||l.id||'未命名监听器', channel=l.channel||l.sourceChannel||'', channelTarget=isBlank(channel)?'':signalHash(channel), detailTarget=isBlank(l.id)?'':listenerHash(l.id);return `<tr class="${detailTarget?'wa-clickable-row':''}" ${detailTarget?navDataAttr(detailTarget,`查看监听器 ${title}`):'aria-disabled="true"'}><td><span class="device-name"><span class="device-icon">${icon('consumer-listener')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(l.id))}</span></span></span></td><td class="truncate" title="${esc(channel)}">${channelCell(channel)}</td><td>${pill(l.enabled!==false?'OK':'WARNING')} ${esc(endpointEnabledText(l.enabled!==false))}</td><td>${esc(formatTicks(l.cooldownTicks)||'0 tick')}</td><td>${esc(l.actionCount ?? '--')}</td><td>${fmtTime(l.lastTriggeredAt)}</td><td><div class="wa-action-cell">${detailTarget?`<button class="wa-btn ghost" ${navDataAttr(detailTarget,`查看监听器 ${title}`)}>详情</button>`:`<button class="wa-btn ghost" disabled>详情</button>`}${channelTarget?`<button class="wa-btn ghost" ${navDataAttr(channelTarget,`查看频道 ${channel}`)}>频道</button>`:`<button class="wa-btn ghost" disabled>频道</button>`}${waIconButton('编辑不可用','settings','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterListeners(items){
                   const f=appState.listenerFilters||{};
@@ -2144,6 +2741,53 @@ public final class WebAdminFrontendScripts {
                     <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('批量启用','enabled','disabled','ghost')}${waButton('批量禁用','receiver-disabled','disabled','ghost')}${waButton('测试触发','pulse-duration','disabled','ghost')}${waButton('清空触发记录','channel-error','disabled','danger')}</div><p class="wa-disabled-note">绑定、条件编辑、matcher、itemSubmit 和测试写操作需要后端写入支持，本轮不启用。</p></article>
                   </aside>`;
                 }
+
+                async function renderActionTemplatesPage(options={}){
+                  if(!options.silent)setView(loading('正在加载动作模板...'));
+                  let actions;try{actions=await api('/api/actions')}catch(err){if(options.silent){toast('动作模板实时刷新失败，已保留当前页面。');return;}actions=[];}
+                  appState.actions=Array.isArray(actions)?actions:[];
+                  appState.actionTemplates=deriveActionTemplates(appState.actions);
+                  renderActionTemplateList('',options);
+                }
+                function deriveActionTemplates(actions){
+                  const source=Array.isArray(actions)?actions:[];
+                  return source.map((a,index)=>{const type=String(a.type||'UNKNOWN').toUpperCase(), title=a.name||`${labelActionType(type)} 模板 ${index+1}`;return {id:`template:${a.id||index}`,name:title,type,actionCount:Math.max(1,Number(a.referencedByCount||a.actionCount||1)),description:cleanActionSummary(a.summary||`${labelActionType(type)} 动作的只读模板候选。`),favorite:Number(a.executionCount||a.executionCountToday||0)>0,status:actionAvailable(a)?'ENABLED':'DISABLED',createdAt:a.createdAt||'',updatedAt:a.updatedAt||a.lastExecutedAt||'',usageCount:Number(a.executionCount||a.executionCountToday||0),ownerType:a.ownerType||'ACTION',sourceActionId:a.id||'',channel:a.channel||'',doctorStatus:a.doctorStatus||'UNKNOWN'};});
+                }
+                function renderActionTemplateList(focusId,options={}){
+                  waEnsureState();
+                  const templates=appState.actionTemplates||[], filtered=filterActionTemplates(templates), page=waPageItems('actionTemplates',filtered,10);
+                  const enabled=templates.filter(t=>t.status==='ENABLED').length, favorites=templates.filter(t=>t.favorite).length, today=sumNumeric(templates,['usageCount']);
+                  const rendered=setView(`<section class="wa-page">
+                    ${waPageHead('动作模板','从现有 Action 只读数据派生模板候选；不创建、不编辑、不删除真实模板。',`${waButton('添加模板','plus','disabled','primary')}${waButton('导入模板','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}${waButton('批量操作','more','disabled','danger')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('模板总数',templates.length,'来自 /api/actions 只读派生','action-template')}
+                      ${waMetric('启用中',enabled,'Doctor OK / 可用动作','enabled','ok')}
+                      ${waMetric('禁用中',templates.length-enabled,'需要关注或不可用','receiver-disabled',templates.length-enabled?'warning':'')}
+                      ${waMetric('今日使用次数',today,'API 未提供时显示 --','today-trigger')}
+                      ${waMetric('收藏模板',favorites,'当前按使用记录标记','active-channel')}
+                    </section>
+                    <section class="wa-two-column">
+                      <div class="wa-table-card">
+                        <div class="wa-filter-bar">
+                          <label class="filter-field search-control"><span>搜索</span><input class="input" id="template-search" placeholder="搜索模板名称 / ID / 类型 / 描述..." value="${esc(appState.templateFilters.search)}"></label>
+                          <label class="filter-field"><span>类型</span>${waSelect('template-type',['ALL',...uniqueNonBlank(templates.map(t=>t.type))],appState.templateFilters.type,templateOptionLabel)}</label>
+                          <label class="filter-field"><span>状态</span>${waSelect('template-status',['ALL','ENABLED','DISABLED'],appState.templateFilters.status,templateOptionLabel)}</label>
+                          <label class="filter-field"><span>收藏</span>${waSelect('template-favorite',['ALL','FAVORITE','NORMAL'],appState.templateFilters.favorite,templateOptionLabel)}</label>
+                          ${waButton('刷新','refresh','onclick="renderActionTemplatesPage()"','ghost')}
+                        </div>
+                        ${page.items.length===0?empty(templates.length===0?'当前没有可从现有 Action 派生的模板候选。':'没有匹配当前筛选条件的动作模板。'):actionTemplateTable(page.items)}
+                        ${waPagination('actionTemplates',page)}
+                      </div>
+                      ${actionTemplateRightRail(templates,filtered)}
+                    </section>
+                  </section>`,options);
+                  if(rendered)bindActionTemplateFilters(focusId);
+                }
+                function actionTemplateTable(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>模板名称 / ID</th><th>类型</th><th>动作数量</th><th>描述</th><th>收藏</th><th>状态</th><th>创建时间</th><th>最后更新</th><th>操作</th></tr></thead><tbody>${items.map(t=>`<tr><td><span class="device-name"><span class="device-icon">${icon('action-template')}</span><span><strong>${esc(t.name)}</strong><span class="device-subtitle">ID: ${esc(shortId(t.id))}</span></span></span></td><td>${textPill(labelActionType(t.type),actionTypeTone(t.type))}</td><td>${esc(t.actionCount)}</td><td class="truncate" title="${esc(t.description||'')}">${esc(t.description||'--')}</td><td>${textPill(t.favorite?'已收藏':'未收藏',t.favorite?'ok':'info')}</td><td>${textPill(t.status==='ENABLED'?'启用':'禁用',t.status==='ENABLED'?'ok':'warning')} ${pill(t.doctorStatus||'UNKNOWN')}</td><td>${fmtTime(t.createdAt)}</td><td>${fmtTime(t.updatedAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" disabled>使用</button>${t.sourceActionId?`<button class="wa-btn ghost" ${navDataAttr(actionHash(t.sourceActionId),`查看来源动作 ${t.name}`)}>来源</button>`:`<button class="wa-btn ghost" disabled>来源</button>`}${waIconButton('编辑不可用','settings','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;}
+                function filterActionTemplates(items){const f=appState.templateFilters||{};const filtered=(items||[]).filter(t=>{const hay=[t.id,t.name,t.type,t.description,t.ownerType,t.channel].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type&&f.type!=='ALL'&&String(t.type)!==f.type)return false;if(f.status==='ENABLED'&&t.status!=='ENABLED')return false;if(f.status==='DISABLED'&&t.status!=='DISABLED')return false;if(f.favorite==='FAVORITE'&&!t.favorite)return false;if(f.favorite==='NORMAL'&&t.favorite)return false;return true;});return filtered.sort((a,b)=>{if(f.sort==='TYPE')return String(a.type).localeCompare(String(b.type))||String(a.name).localeCompare(String(b.name));if(f.sort==='UPDATED')return String(b.updatedAt||'').localeCompare(String(a.updatedAt||''));return String(a.name).localeCompare(String(b.name));});}
+                function bindActionTemplateFilters(focusId){const update=(event)=>{appState.templateFilters.search=document.getElementById('template-search')?.value||'';appState.templateFilters.type=document.getElementById('template-type')?.value||'ALL';appState.templateFilters.status=document.getElementById('template-status')?.value||'ALL';appState.templateFilters.favorite=document.getElementById('template-favorite')?.value||'ALL';appState.uiPages.actionTemplates=1;renderActionTemplateList(event?.target?.id||'');};['template-search','template-type','template-status','template-favorite'].forEach(id=>document.getElementById(id)?.addEventListener(id==='template-search'?'input':'change',update));restoreFocusEnd(focusId);}
+                function actionTemplateRightRail(items,filtered){const total=Math.max(1,items.length);return `<aside class="wa-right-rail"><article class="wa-panel"><h2>类型分布</h2>${progressList(distributionItems(filtered,t=>String(t.type||'UNKNOWN'),labelActionType,Math.max(1,filtered.length)))}</article><article class="wa-panel"><h2>使用频率</h2>${progressList([{label:'已有使用记录',value:items.filter(t=>Number(t.usageCount||0)>0).length,total,kind:'ok'},{label:'暂无使用记录',value:items.filter(t=>Number(t.usageCount||0)<=0).length,total,kind:'info'},{label:'需关注',value:items.filter(t=>t.status!=='ENABLED').length,total,kind:'warning'}])}</article><article class="wa-panel"><h2>快速筛选</h2><div class="wa-rail-filter"><label><span>模板类型</span>${waSelect('template-rail-type',['ALL',...uniqueNonBlank(items.map(t=>t.type))],appState.templateFilters.type,templateOptionLabel)}</label><div class="wa-button-row"><button class="wa-btn primary" onclick="appState.templateFilters.type=document.getElementById('template-rail-type').value;appState.uiPages.actionTemplates=1;renderActionTemplateList()">应用筛选</button><button class="wa-btn ghost" onclick="appState.templateFilters={search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'};appState.uiPages.actionTemplates=1;renderActionTemplateList()">重置筛选</button></div></div></article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('添加模板','plus','disabled','primary')}${waButton('使用模板','play','disabled','ghost')}${waButton('导入模板','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}</div><p class="wa-disabled-note">模板创建、使用、导入、导出和批量操作尚无完整后端写入链路，本轮保持禁用且不发送写请求。</p></article></aside>`;}
+                function templateOptionLabel(value){return {ALL:'全部',ENABLED:'启用',DISABLED:'禁用',FAVORITE:'收藏',NORMAL:'未收藏'}[String(value||'')]||labelActionType(value);}
                 async function renderActionsPage(options={}){
                   if(!options.silent)setView(loading('正在加载动作列表...'));
                   let actions;try{actions=await api('/api/actions')}catch(err){if(options.silent){toast('动作列表实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
@@ -2201,6 +2845,37 @@ public final class WebAdminFrontendScripts {
                     <article class="wa-panel"><h2>动作类型说明</h2><div class="list-stack"><div class="kv-row"><span class="muted">command</span><strong>执行服务器命令</strong></div><div class="kv-row"><span class="muted">message</span><strong>发送消息</strong></div><div class="kv-row"><span class="muted">sound</span><strong>播放音效</strong></div><div class="kv-row"><span class="muted">signal</span><strong>发送下游 signal</strong></div><div class="kv-row"><span class="muted">unknown</span><strong>聚合或不可识别动作</strong></div></div></article>
                   </aside>`;
                 }
+                function filterHistoryItems(items){
+                  const f=appState.historyFilters||{}, now=Date.now();
+                  const filtered=(Array.isArray(items)?items:[]).filter(h=>{
+                    const hay=[h.channel,h.sourceType,h.sourceName,h.sourceId,h.result,h.world,h.playerName,h.description].join(' ').toLowerCase();
+                    if(f.search&&!hay.includes(String(f.search).toLowerCase()))return false;
+                    if(f.channel&&f.channel!=='ALL'&&h.channel!==f.channel)return false;
+                    if(f.sourceType&&f.sourceType!=='ALL'&&String(h.sourceType||'UNKNOWN').toUpperCase()!==f.sourceType)return false;
+                    if(f.result&&f.result!=='ALL'&&String(h.result||'UNKNOWN').toUpperCase()!==f.result)return false;
+                    if(f.range&&f.range!=='ALL'){
+                      const t=parseTime(h.time);if(!t)return false;
+                      const age=now-t.getTime();
+                      if(f.range==='M10'&&age>10*60*1000)return false;
+                      if(f.range==='H1'&&age>60*60*1000)return false;
+                      if(f.range==='H24'&&age>24*60*60*1000)return false;
+                    }
+                    return true;
+                  });
+                  return filtered.sort((a,b)=>{
+                    const at=parseTime(a.time)?.getTime()||0, bt=parseTime(b.time)?.getTime()||0;
+                    if(f.sort==='OLDEST')return at-bt;
+                    return bt-at;
+                  });
+                }
+                function historyOptionLabel(id,value){
+                  const v=String(value||'');
+                  if(v==='ALL')return '全部';
+                  if(id==='history-source')return labelSourceType(v);
+                  if(id==='history-result')return {SUCCESS:'成功',FAILED:'失败',UNKNOWN:'未知'}[v]||labelStatus(v);
+                  if(id==='history-range')return {M10:'最近 10 分钟',H1:'最近 1 小时',H24:'最近 24 小时'}[v]||v;
+                  return v;
+                }
                 async function renderHistoryPage(queryTail='',options={}){
                   const params=parseHashParams(queryTail);if(params.channel)appState.historyFilters.channel=params.channel;
                   if(!options.silent)setView(loading('正在加载事件历史...'));
@@ -2214,7 +2889,7 @@ public final class WebAdminFrontendScripts {
                   const todayStart=new Date();todayStart.setHours(0,0,0,0);const today=items.filter(h=>{const t=parseTime(h.time);return t&&t.getTime()>=todayStart.getTime();}).length, success=waCount(items,h=>String(h.result||'').toUpperCase()==='SUCCESS'), failed=waCount(items,h=>String(h.result||'').toUpperCase()==='FAILED');
                   const rendered=setView(`<section class="wa-page">
                     ${waPageHead('事件历史','统一查看当前已有 Signal history；Live 后端未完整接入时保持不可用。',waButton('刷新','refresh','onclick="renderHistoryPage()"','ghost'))}
-                    <div class="wa-tabs"><button class="wa-tab active">事件列表</button><button class="wa-tab" disabled>实时流 Live</button></div>
+                    <div class="wa-tabs wa-tabs-scroll"><button class="wa-tab active">事件列表</button><button class="wa-tab" disabled>实时流 Live</button></div>
                     <section class="wa-two-column">
                       <div class="wa-table-card">
                         <div class="wa-filter-bar">
@@ -2271,7 +2946,7 @@ public final class WebAdminFrontendScripts {
                       ${waMetric('最近发布时间','--','当前后端未提供','clock')}
                       ${waMetric('配置警告',warning,'路径隐藏或文件缺失','warning-issue',warning?'warning':'')}
                     </section>
-                    <div class="wa-tabs"><button class="wa-tab active">配置版本列表</button><button class="wa-tab" disabled>草稿</button><button class="wa-tab" disabled>发布记录</button><button class="wa-tab" disabled>备份记录</button><button class="wa-tab" disabled>导入记录</button><button class="wa-tab" disabled>变更对比 Diff</button><button class="wa-tab" disabled>审计日志</button></div>
+                    <div class="wa-tabs wa-tabs-scroll"><button class="wa-tab active">配置版本列表</button><button class="wa-tab" disabled>草稿</button><button class="wa-tab" disabled>发布记录</button><button class="wa-tab" disabled>备份记录</button><button class="wa-tab" disabled>导入记录</button><button class="wa-tab" disabled>变更对比 Diff</button><button class="wa-tab" disabled>审计日志</button></div>
                     <section class="wa-two-column">
                       <div class="wa-table-card">
                         <div class="wa-filter-bar">
@@ -2366,26 +3041,67 @@ public final class WebAdminFrontendScripts {
                   const [settings,status,capabilities]=await Promise.all([settle('/api/webadmin/settings'),settle('/api/status'),settle('/api/webadmin/write/capabilities')]);
                   if(!settings.ok){if(options.silent){toast('系统设置实时刷新失败，已保留当前页面。');return;}setView(errorBlock(settings.error.message));return;}
                   const data=settings.data||{}, service=data.service||{}, storage=data.storage||{}, security=data.security||{}, audit=data.audit||{}, system=data.system||{}, visibility=data.visibility||{}, runtime=status.ok?status.data:{};
-                  setView(`<section class="wa-page">
-                    ${waPageHead('系统设置','只读查看 WebAdmin 服务状态、运行环境、安全设置和功能开关。',`${waButton('保存设置','settings','disabled','primary')}${waButton('重置默认','archive','disabled','ghost')}`)}
-                    <div class="wa-tabs"><button class="wa-tab active">通用设置</button><button class="wa-tab" disabled>安全设置</button><button class="wa-tab" disabled>性能设置</button><button class="wa-tab" disabled>界面设置</button><button class="wa-tab" disabled>通知设置</button><button class="wa-tab" disabled>备份与维护</button><button class="wa-tab" disabled>关于</button></div>
-                    <section class="wa-two-column">
+                  const sessionCount=runtime.webAdmin?.sessionCount ?? system.sessionCount ?? '--';
+                  const accessMode=service.accessMode||security.accessMode;
+                  setView(`<section class="wa-page wa-settings-shell" data-settings-layout="true" data-responsive-layout="true">
+                    ${settingsHeader(`${waButton('保存设置','settings','disabled','primary')}${waButton('重置为默认','archive','disabled','ghost')}`)}
+                    <div class="wa-tabs wa-tabs-scroll wa-settings-tabs" data-settings-tabs="true"><button class="wa-tab active">通用设置</button><button class="wa-tab" disabled>安全设置</button><button class="wa-tab" disabled>性能设置</button><button class="wa-tab" disabled>界面设置</button><button class="wa-tab" disabled>通知设置</button><button class="wa-tab" disabled>备份与维护</button><button class="wa-tab" disabled>关于</button></div>
+                    <section class="wa-settings-layout">
                       <div class="wa-settings-main">
-                        <article class="wa-panel"><h2>平台信息（只读）</h2><div class="identity-grid">${row('平台名称',esc('TZZ Mod WebAdmin'))}${row('平台版本',esc(system.modVersion||'unknown'))}${row('Minecraft 版本',esc(system.minecraftVersion||'--'))}${row('服务器类型',esc(labelServerType(system.serverType)))}${row('当前世界 / 存档',esc(system.worldName||'--'))}${row('访问模式',esc(labelAccessMode(service.accessMode)))}</div></article>
-                        <article class="wa-panel"><h2>服务信息（只读）</h2><div class="identity-grid">${row('服务状态',pill(service.running?'OK':'WARNING'))}${row('服务地址',esc(service.url||'--'))}${row('监听地址',esc(`${service.host||'-'}:${service.port||'-'}`))}${row('当前用户',esc(service.currentUser||'--'))}${row('当前角色',esc(labelRoleFull(service.currentRole)))}${row('Session 数量',esc(runtime.webAdmin?.sessionCount ?? system.sessionCount ?? '--'))}</div></article>
-                        <article class="wa-panel"><h2>功能开关（只读）</h2><div class="wa-setting-grid">${settingReadonlyToggle('启用 SignalBridge','信号系统由当前服务端模块提供',true)}${settingReadonlyToggle('启用事件记录','记录 signal/action 等已有历史',true)}${settingReadonlyToggle('启用审计日志','WebAdmin 写操作审计',!!audit.enabled)}${settingReadonlyToggle('启用 Web API','当前 WebAdmin API 正在服务',true)}${settingReadonlyToggle('启用自动修复','Doctor 自动修复未开放',false)}${settingReadonlyToggle('启用设置写入','系统设置写入未开放',false)}</div></article>
-                        <article class="wa-panel"><h2>运行环境信息（只读）</h2><div class="identity-grid">${row('认证方式',esc(security.authMode||'USERNAME_PASSWORD'))}${row('密码算法',esc(security.passwordHashAlgorithm||'PBKDF2'))}${row('Session Cookie',esc(security.sessionCookieName||'--'))}${row('Session 有效期',esc(formatMinutes(security.sessionTtlMinutes)))}${row('Remember Me 有效期',esc(formatMinutes(security.rememberMeTtlMinutes)))}${row('Secure Cookie',esc(security.secureCookie?'启用':'未启用'))}</div></article>
+                        <article class="wa-panel wa-settings-card"><h2>平台信息（只读）</h2>${settingsInfoGrid([
+                          {icon:'settings',label:'平台名称',value:'TZZ Mod WebAdmin'},
+                          {icon:'archive',label:'平台版本',value:system.modVersion||'unknown'},
+                          {icon:'device',label:'Minecraft 版本',value:system.minecraftVersion||'--'},
+                          {icon:'server-online',label:'服务器类型',value:labelServerType(system.serverType)},
+                          {icon:'region',label:'当前世界 / 存档',value:system.worldName||'--'},
+                          {icon:'doctor-overview',label:'访问模式',value:labelAccessMode(accessMode)}
+                        ])}</article>
+                        <article class="wa-panel wa-settings-card"><h2>服务信息（只读）</h2>${settingsInfoGrid([
+                          {icon:'enabled',label:'服务状态',value:settingsServiceStatus(service)},
+                          {icon:'active-channel',label:'服务地址',value:service.url||'--'},
+                          {icon:'signalbridge-main',label:'监听地址',value:`${service.host||'127.0.0.1'}:${service.port||'18080'}`},
+                          {icon:'current-user',label:'当前用户',value:service.currentUser||appState.me?.username||'--'},
+                          {icon:'current-role',label:'当前角色',value:labelRoleFull(service.currentRole||appState.me?.role)},
+                          {icon:'session',label:'Session 数量',value:sessionCount}
+                        ])}</article>
+                        <article class="wa-panel wa-settings-card"><h2>功能开关（只读）</h2><div class="wa-settings-switch-grid" data-settings-switch-grid="true">${settingReadonlyToggle('启用 SignalBridge','信号系统由当前服务端模块提供',true)}${settingReadonlyToggle('启用事件记录','记录 signal/action 等已有历史',true)}${settingReadonlyToggle('启用审计日志','WebAdmin 写操作审计',!!audit.enabled || !!security.auditEnabled)}${settingReadonlyToggle('启用 Web API','当前 WebAdmin API 正在服务',true)}${settingReadonlyToggle('启用自动修复','Doctor 自动修复未开放',false)}${settingReadonlyToggle('启用设置写入','系统设置写入未开放',false)}</div></article>
+                        <article class="wa-panel wa-settings-card"><h2>运行环境信息（只读）</h2><div class="wa-settings-env-grid">${settingsEnvItem('Java 版本',runtime.javaVersion||runtime.jvm?.version||system.javaVersion||'--','settings')}${settingsEnvItem('CPU 使用率',`${settingsPercent(runtime.cpu?.usagePercent ?? runtime.system?.cpuUsagePercent ?? runtime.cpuUsagePercent,0)}%`,'pulse-duration')}${settingsEnvItem('内存使用率',`${settingsPercent(runtime.memory?.usagePercent ?? runtime.jvm?.memoryUsagePercent ?? runtime.memoryUsagePercent,0)}%`,'response-time')}${settingsEnvItem('磁盘使用率',`${settingsPercent(runtime.disk?.usagePercent ?? storage.diskUsagePercent,0)}%`,'archive')}${settingsEnvItem('TPS',runtime.server?.tps ?? runtime.tps ?? system.tps ?? '--','today-trigger')}${settingsEnvItem('访问模式',labelAccessMode(accessMode),'doctor-overview')}</div></article>
+                        <div class="wa-settings-readonly-note">${icon('info')}<span>系统设置当前主要为只读信息。保存、重置、重新加载配置等全局操作缺少完整后端安全能力，本轮保持禁用且不发送写请求。</span><button class="link-button" disabled>了解系统设置</button></div>
                       </div>
                       ${settingsRightRail(data,runtime,capabilities.ok?capabilities.data:{})}
                     </section>
                   </section>`,options);
                 }
-                function settingReadonlyToggle(label,desc,enabled){return `<div class="setting-row"><span><strong>${esc(label)}</strong><small>${esc(desc)}</small></span>${textPill(enabled?'启用':'禁用',enabled?'ok':'info')}</div>`;}
-                function settingsRightRail(data,status,capabilities){const storage=data.storage||{}, security=data.security||{}, service=data.service||{}, system=data.system||{};return `<aside class="wa-right-rail">
-                  <article class="wa-panel"><h2>系统状态</h2><div class="list-stack"><div class="kv-row"><span class="muted">平台状态</span><strong>${pill(service.running?'OK':'WARNING')}</strong></div><div class="kv-row"><span class="muted">在线连接</span><strong>${esc(status.webAdmin?.sessionCount ?? system.sessionCount ?? '--')}</strong></div><div class="kv-row"><span class="muted">审计日志</span><strong>${esc(security.auditEnabled?'启用':'关闭')}</strong></div></div></article>
-                  <article class="wa-panel"><h2>环境摘要</h2><div class="list-stack"><div class="kv-row"><span class="muted">存储作用域</span><strong>${esc(storage.scope||'WORLD_SAVE')}</strong></div><div class="kv-row"><span class="muted">按世界隔离</span><strong>${esc(storage.worldScoped?'是':'否')}</strong></div><div class="kv-row"><span class="muted">敏感路径</span><strong>${esc(storage.restricted?'已隐藏':'可见')}</strong></div><div class="kv-row"><span class="muted">旧全局文件</span><strong>${esc(storage.legacyGlobalFilesDetected?'检测到':'未检测到')}</strong></div></div></article>
-                  <article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('查看系统日志','eye','disabled','ghost')}${waButton('查看审计日志','history','disabled','ghost')}${waButton('检查更新','refresh','disabled','ghost')}${waButton('导出诊断','download','disabled','ghost')}${waButton('重启 WebAdmin','critical-issue','disabled','danger')}</div><p class="wa-disabled-note">保存、重启、清理缓存和危险维护操作没有完整后端安全能力，本轮保持禁用。</p></article>
-                </aside>`;}
+                function settingsServiceStatus(service){
+                  const running=service&&service.running;
+                  const kind=running===true?'OK':running===false?'WARNING':'UNKNOWN';
+                  const text=running===true?'运行中':running===false?'未运行':'未知';
+                  return safeHtml(pill(kind)+' '+esc(text));
+                }
+                function settingsHeader(actions=''){
+                  return `<header class="wa-settings-header"><div class="wa-settings-title"><span class="wa-settings-icon">${icon('settings')}</span><div><div class="wa-detail-kicker">系统管理 / 系统设置</div><h1>系统设置</h1><p>查看 WebAdmin 服务状态、运行环境、安全边界和功能开关。</p></div></div><div class="wa-settings-notice"><strong>只读设置</strong><span>当前仅展示已有服务信息，未实现的写操作保持不可用。</span></div>${actions?`<div class="wa-actions">${actions}</div>`:''}</header>`;
+                }
+                function settingsInfoGrid(items){
+                  return `<div class="wa-settings-info-grid">${(items||[]).map(item=>`<div class="wa-settings-info-item"><span class="wa-settings-mini-icon">${icon(item.icon||'settings')}</span><span><small>${esc(item.label)}</small><strong>${detailValue(item.value)}</strong></span></div>`).join('')}</div>`;
+                }
+                function settingReadonlyToggle(label,desc,enabled){return `<div class="setting-row"><span><strong>${esc(label)}</strong><small>${esc(desc)}</small></span><span class="wa-switch ${enabled?'is-on':'is-off'}" aria-hidden="true"><i></i></span><em>${esc(enabled?'启用':'禁用')}</em></div>`;}
+                function settingsEnvItem(label,value,iconName){return `<div class="wa-settings-env-item"><span>${icon(iconName||'info')}</span><small>${esc(label)}</small><strong>${esc(value||'--')}</strong></div>`;}
+                function settingsPercent(value,fallback=0){const n=Number(value);if(!Number.isFinite(n))return fallback;const pct=n>0&&n<=1?n*100:n;return Math.max(0,Math.min(100,Math.round(pct)));}
+                function settingsProgressItem(label,value,display,kind=''){const pct=settingsPercent(value,0);return `<div class="wa-progress-item"><div><span>${esc(label)}</span><strong>${esc(display||`${pct}%`)}</strong></div><div class="wa-progress-track"><div class="wa-progress-bar ${esc(kind)}" style="width:${pct}%"></div></div></div>`;}
+                function settingsRailLine(label,value,iconName='info'){return `<div class="wa-settings-rail-line"><span class="wa-settings-mini-icon">${icon(iconName)}</span><span><small>${esc(label)}</small><strong>${detailValue(value)}</strong></span></div>`;}
+                function settingsRailAction(label,iconName,danger=false){return `<button class="wa-btn ${danger?'danger':'ghost'}" disabled>${icon(iconName)}<span>${esc(label)}</span></button>`;}
+                function settingsRightRail(data,status,capabilities){
+                  const storage=data.storage||{}, security=data.security||{}, service=data.service||{}, system=data.system||{};
+                  const cpu=settingsPercent(status.cpu?.usagePercent ?? status.system?.cpuUsagePercent ?? status.cpuUsagePercent,0);
+                  const mem=settingsPercent(status.memory?.usagePercent ?? status.jvm?.memoryUsagePercent ?? status.memoryUsagePercent,0);
+                  const disk=settingsPercent(status.disk?.usagePercent ?? storage.diskUsagePercent,0);
+                  const tps=status.server?.tps ?? status.tps ?? system.tps ?? '--';
+                  const sessionCount=status.webAdmin?.sessionCount ?? system.sessionCount ?? '--';
+                  return `<aside class="wa-settings-rail" data-settings-status-rail="true">
+                    <article class="wa-panel wa-settings-card"><h2>系统状态</h2><div class="wa-settings-status-list">${settingsRailLine('平台状态',settingsServiceStatus(service),'server-online')}${settingsRailLine('已运行时间',status.uptime||status.server?.uptime||'--','history')}${settingsRailLine('Java 版本',status.javaVersion||status.jvm?.version||system.javaVersion||'--','settings')}${settingsProgressItem('CPU 使用率',cpu,`${cpu}%`,'ok')}${settingsProgressItem('内存使用率',mem,`${mem}%`,'ok')}${settingsProgressItem('磁盘使用率',disk,`${disk}%`,'info')}${settingsRailLine('活动连接数',sessionCount,'session')}${settingsRailLine('TPS',tps,'pulse-duration')}</div></article>
+                    <article class="wa-panel wa-settings-card"><h2>环境摘要</h2><div class="wa-settings-status-list">${settingsRailLine('存储作用域',storage.scope||'WORLD_SAVE','archive')}${settingsRailLine('按世界隔离',storage.worldScoped?'是':'否','region')}${settingsRailLine('敏感路径',storage.restricted||security.sensitiveStorageHidden?'已隐藏':'可见','eye')}${settingsRailLine('旧全局文件',storage.legacyGlobalFilesDetected?'检测到':'未检测到','warning-issue')}</div></article>
+                    <article class="wa-panel wa-settings-card"><h2>快速操作</h2><div class="wa-settings-action-list">${settingsRailAction('查看系统日志','eye')}${settingsRailAction('查看审计日志','history')}${settingsRailAction('检查更新','refresh')}${settingsRailAction('导出系统信息','download')}${settingsRailAction('重新加载配置','critical-issue',true)}</div><p class="wa-disabled-note">保存、重置、导出、检查更新和重新加载配置没有完整后端安全能力，本轮保持禁用。</p></article>
+                  </aside>`;}
                 async function renderRegionsPage(options={}){
                   if(!options.silent)setView(loading('正在加载区域列表...'));
                   let regions;try{regions=await api('/api/regions?limit=500')}catch(err){if(options.silent){toast('区域列表实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
