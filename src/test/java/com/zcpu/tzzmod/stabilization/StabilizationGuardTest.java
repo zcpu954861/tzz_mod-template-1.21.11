@@ -74,13 +74,18 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 public final class StabilizationGuardTest {
@@ -726,7 +731,7 @@ public final class StabilizationGuardTest {
         requireTrue(hasDiagnosticCode(consumeDiagnostic, "consume_source_unsupported"), "armor source consume incompatibility is diagnosed");
     }
 
-    private static void testWebAdminReadonlyFrontendAssets() {
+    private static void testWebAdminReadonlyFrontendAssets() throws Exception {
         String loginHtml = WebAdminFrontendAssets.loginHtml();
         String appHtml = WebAdminFrontendAssets.appHtml();
         String css = WebAdminFrontendAssets.appCss();
@@ -757,13 +762,33 @@ public final class StabilizationGuardTest {
         for (String route : List.of(
                 "#/dashboard",
                 "#/devices",
+                "#/virtual-block-devices",
+                "#/block-devices",
                 "#/signals",
+                "#/signalbridge",
+                "#/receivers",
+                "#/listeners",
+                "#/signal-listeners",
                 "#/doctor",
+                "#/diagnostics",
+                "#/signal-doctor",
                 "#/history",
+                "#/events",
                 "#/users",
+                "#/permissions",
+                "#/users-permissions",
                 "#/settings",
+                "#/system-settings",
+                "#/config",
+                "#/config-management",
+                "#/settings/config",
                 "#/regions",
-                "#/actions"
+                "#/region-list",
+                "#/region-controllers",
+                "#/regionctl",
+                "#/actions",
+                "#/action-templates",
+                "#/templates"
         )) {
             requireContains(appHtml + js, route, "WebAdmin readonly route present: " + route);
             requireContains(js, route, "WebAdmin JS route present: " + route);
@@ -816,6 +841,48 @@ public final class StabilizationGuardTest {
             requireContains(js, helper, "WebAdmin frontend helper present: " + helper);
         }
 
+
+
+        for (String routeSmoke : List.of(
+                "renderActionTemplatesPage",
+                "renderDoctorPage",
+                "renderSignalDetail",
+                "renderSignalListenerDetail",
+                "renderDeviceDetail",
+                "renderActionDetail",
+                "renderRegionDetail",
+                "loadSignalListenerDetail",
+                "actionTemplates",
+                "listenerDetail:",
+                "listenerEventRef",
+                "signalDetail:"
+        )) {
+            requireContains(js, routeSmoke, "WebAdmin 7.5 route/render smoke marker present: " + routeSmoke);
+        }
+
+        for (String disabledBoundary : List.of(
+                "添加模板",
+                "使用模板",
+                "导入模板",
+                "自动修复",
+                "清空问题",
+                "编辑监听器",
+                "删除监听器"
+        )) {
+            requireContains(js, disabledBoundary, "WebAdmin 7.5 disabled operation marker present: " + disabledBoundary);
+        }
+
+        for (String realtimeMarker : List.of(
+                "actionTemplates",
+                "listenerDetail:",
+                "doctor_issues_changed",
+                "signal_listener_changed",
+                "signal_history_appended",
+                "sync_required"
+        )) {
+            requireContains(js, realtimeMarker, "WebAdmin 7.5 realtime mapping marker present: " + realtimeMarker);
+        }
+
         for (String saveHelper : List.of(
                 "function route",
                 "handleRealtimeEvent",
@@ -828,12 +895,56 @@ public final class StabilizationGuardTest {
             requireContains(js, saveHelper, "WebAdmin JS remains wired for: " + saveHelper);
         }
 
+        for (String modalMarker : List.of(
+                "showDeviceMetadataEditModal",
+                "showDeviceBasicConfigEditModal",
+                "showDeviceExtendedConfigEditModal",
+                "showDeviceConfigEditModal",
+                "showChannelMetadataEditModal",
+                "showSignalListenerBasicConfigEditModal",
+                "wa-modal-backdrop",
+                "wa-modal-viewport",
+                "wa-modal-body",
+                "wa-modal-foot"
+        )) {
+            requireContains(js + css, modalMarker, "WebAdmin 7.5 modal marker present: " + modalMarker);
+        }
+        for (String modalStyle : List.of(
+                "waModalIn",
+                "waModalOut",
+                "waModalBackdropIn",
+                "waModalBackdropOut",
+                "backdrop-filter:blur",
+                ".wa-modal-body .edit-form .form-actions{display:none}",
+                "@media(max-width:900px)",
+                "wa-tabs-scroll",
+                "detail-fixed-layout",
+                "detail-full-width-stack",
+                "pointer-events:none",
+                "overflow-x:auto",
+                "calc(100vh - 20px)",
+                ".wa-config-modal",
+                ".wa-edit-section",
+                ".wa-flow-chain"
+        )) {
+            requireContains(css, modalStyle, "WebAdmin 7.5 modal interaction style present: " + modalStyle);
+        }
+        requireContains(js, "modalClosing", "modal close lifecycle marks closing DOM before removal");
+        requireContains(js, "animationend", "modal close lifecycle waits for fade-out animation end");
+        requireContains(js, "data-table-row-stretch", "detail tables carry row stretch guard marker");
+        requireFalse(css.contains("grid-auto-flow:dense"), "detail layout must not use masonry/dense packing");
+        requireFalse(js.contains("data-detail-adaptive-grid=\"true\""), "detail render must not use adaptive free layout marker");
+        requireFalse(js.contains("wa-detail-adaptive-grid") || css.contains("wa-detail-adaptive-grid"), "detail render/style must not use adaptive grid class");
+
         requireContains(appHtml, "区域管理", "sidebar contains Region navigation");
         requireContains(appHtml, "动作系统", "sidebar contains Action navigation");
+        requireContains(appHtml, "动作模板", "sidebar contains Action Template navigation");
         requireContains(appHtml + js, "/api/realtime/events", "WebAdmin realtime event stream route present");
         requireContains(js, "dirtyRoutes", "realtime hidden-tab dirty route tracking present");
         requireContains(js, "pendingRefresh", "realtime pending refresh guard present");
         requireContains(js, "route({silent:true,expectedHash:hash,expectedSeq:seq})", "realtime refresh uses silent route update");
+        requireContains(js, "function routePollInterval(hash){", "route-level polling hook is present");
+        requireContains(js, "return 0;", "route-level polling interval remains disabled");
         requireContains(js, "getFullYear()", "time formatter uses local Date fields");
         requireFalse(js.contains("text.slice(0,10)") || js.contains("text.slice(11,19)"),
                 "time formatter does not display UTC ISO strings by substring slicing");
@@ -846,6 +957,510 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains(">null<"), "frontend does not render raw null marker");
         requireFalse(js.contains("location.hash='http"), "frontend does not route to external URL");
         requireFalse(js.contains("setInterval("), "frontend does not use global polling interval");
+        requireFalse(js.contains("location.reload"), "frontend does not force full page reloads during realtime refresh");
+        requireFalse(js.contains("history.go(0)"), "frontend does not use browser history reload as refresh fallback");
+        requireFalse(js.contains("location.href=location.href") || js.contains("location.href = location.href"),
+                "frontend does not self-assign location.href as a reload fallback");
+        runWebAdminRenderRouteSmoke(js);
+    }
+
+    private static void runWebAdminRenderRouteSmoke(String js) throws Exception {
+        String node = findNodeExecutable();
+        Path smokeFile = Files.createTempFile("webadmin-route-smoke-", ".js");
+        String encodedAppJs = Base64.getEncoder().encodeToString(js.getBytes(StandardCharsets.UTF_8));
+        Files.writeString(smokeFile, webAdminRenderSmokeHarness(encodedAppJs), StandardCharsets.UTF_8);
+        Process process = new ProcessBuilder(node, smokeFile.toString())
+                .redirectErrorStream(true)
+                .start();
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new AssertionError("WebAdmin render/route smoke timed out");
+        }
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        requireEquals(0, process.exitValue(), "WebAdmin render/route smoke passed. Output:\n" + output);
+    }
+
+    private static String findNodeExecutable() {
+        List<String> candidates = new ArrayList<>();
+        addNodeCandidate(candidates, System.getProperty("node.path"));
+        addNodeCandidate(candidates, System.getenv("CODEX_NODE"));
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        candidates.add(windows ? "node.exe" : "node");
+        Path home = Path.of(System.getProperty("user.home", ""));
+        candidates.add(home.resolve(".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/" + (windows ? "node.exe" : "node")).toString());
+        candidates.add(home.resolve(".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node").toString());
+        candidates.add(home.resolve(".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe").toString());
+        for (String candidate : candidates) {
+            if (isRunnableNode(candidate)) {
+                return candidate;
+            }
+        }
+        throw new AssertionError("Node.js is required for WebAdmin render/route smoke test but no runnable node executable was found");
+    }
+
+    private static void addNodeCandidate(List<String> candidates, String value) {
+        if (value != null && !value.isBlank()) {
+            candidates.add(value);
+        }
+    }
+
+    private static boolean isRunnableNode(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return false;
+        }
+        try {
+            Process process = new ProcessBuilder(candidate, "--version")
+                    .redirectErrorStream(true)
+                    .start();
+            boolean finished = process.waitFor(5, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (IOException | InterruptedException ignored) {
+            if (ignored instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return false;
+        }
+    }
+
+    private static String webAdminRenderSmokeHarness(String encodedAppJs) {
+        return """
+                const vm = require('vm');
+                const code = Buffer.from('__APP_JS_BASE64__', 'base64').toString('utf8');
+                const elements = new Map();
+                function el(id='') {
+                  if (elements.has(id)) return elements.get(id);
+                  const node = {
+                    id,
+                    dataset: {},
+                    className: '',
+                    classList: {
+                      add(...names){ node.className = Array.from(new Set(`${node.className || ''} ${names.join(' ')}`.trim().split(/\\s+/).filter(Boolean))).join(' '); },
+                      remove(...names){ const remove = new Set(names); node.className = `${node.className || ''}`.split(/\\s+/).filter(Boolean).filter(n => !remove.has(n)).join(' '); },
+                      toggle(name){ if (` ${node.className || ''} `.includes(` ${name} `)) this.remove(name); else this.add(name); },
+                    },
+                    style: {},
+                    innerHTML: '',
+                    textContent: '',
+                    hidden: true,
+                    value: '',
+                    checked: false,
+                    type: 'text',
+                    scrollTop: 0,
+                    scrollLeft: 0,
+                    querySelectorAll(){ return []; },
+                    querySelector(){ return null; },
+                    addEventListener(){},
+                    removeEventListener(){},
+                    appendChild(child){ if (child && child.id) elements.set(child.id, child); return child; },
+                    remove(){ if (node.id) elements.delete(node.id); },
+                    focus(){},
+                    setSelectionRange(){},
+                  };
+                  elements.set(id, node);
+                  return node;
+                }
+                const body = el('body');
+                body.dataset.page = 'none';
+                const view = el('app-view');
+                elements.set('view', view);
+                elements.set('app-view', view);
+                elements.set('toast', el('toast'));
+                const errors = [];
+                const requestedUrls = [];
+                function apiData(path) {
+                  const url = String(path);
+                  if (url.startsWith('/api/webadmin/edit-locks/acquire')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, holderUsername:'Owner', expiresAt:'2026-05-09T10:10:00Z' } } };
+                  if (url.startsWith('/api/webadmin/edit-locks/release') || url.startsWith('/api/webadmin/edit-locks/heartbeat')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, expiresAt:'2026-05-09T10:10:00Z' } } };
+                  if (url.startsWith('/api/webadmin/device-metadata/')) return { success:true, changed:false, message:'ok' };
+                  if (url.startsWith('/api/webadmin/device-basic-config/')) return { supported:true, enabled:true, channel:'test.channel', expectedFingerprint:'basic-fp', lockStatus:{ locked:false } };
+                  if (url.startsWith('/api/webadmin/device-extended-config/')) return { supported:true, supportedFields:['pulseTicks','cooldownTicks'], fieldLabels:{ pulseTicks:'脉冲时长', cooldownTicks:'冷却时间' }, values:{ pulseTicks:20, cooldownTicks:0 }, expectedFingerprint:'extended-fp', lockStatus:{ locked:false } };
+                  if (url.startsWith('/api/webadmin/channel-metadata')) return { channel:'test.channel', displayName:'Test Channel', effectiveDisplayName:'Test Channel', note:'', iconKey:'auto', expectedFingerprint:'channel-fp', lockStatus:{ locked:false } };
+                  if (url.startsWith('/api/devices/')) { const id = decodeURIComponent(url.substring('/api/devices/'.length).split('?')[0]); return { id, displayName:'Emitter', type:'SIGNAL_RECEIVER', enabled:true, channel:'test.channel', world:'world', pos:{x:1,y:64,z:2}, doctorStatus:'OK', metadata:{ displayName:'Emitter', note:'', iconKey:'auto', version:1, updatedAt:'2026-05-09T10:00:00Z', updatedBy:'Owner' }, configSummary:{pulseTicks:20, expectedFingerprint:'cfg-fp'}, debugSummary:{status:'OK'} }; }
+                  if (url.startsWith('/api/devices')) return [
+                    { id:'dev-1', displayName:'Emitter', type:'SIGNAL_EMITTER', enabled:true, channel:'test.channel', world:'world', pos:{x:1,y:64,z:2}, doctorStatus:'OK' },
+                    { id:'recv-1', displayName:'Receiver', type:'SIGNAL_RECEIVER', enabled:true, channel:'test.channel', world:'world', pos:{x:2,y:64,z:3}, doctorStatus:'OK', configSummary:{pulseTicks:20} },
+                    { id:'vdev-1', displayName:'Virtual', type:'VIRTUAL_BLOCK_DEVICE', enabled:true, channel:'test.channel', world:'world', pos:{x:3,y:64,z:4}, doctorStatus:'INFO', configSummary:{triggerType:'interact', blockId:'minecraft:lever'} }
+                  ];
+                  if (url.startsWith('/api/signals/channels/')) { const channel = decodeURIComponent(url.substring('/api/signals/channels/'.length).split('?')[0]); return { channel, type:'CUSTOM', metadata:{effectiveDisplayName:'Test Channel', note:'Test note', updatedAt:'2026-05-09T10:00:00Z', updatedBy:'Owner'}, stats:{listenerCount:1, receiverCount:1, actionRelayCount:0, sourceDeviceCount:1, triggerCountToday:3, totalTriggerCount:9, lastTriggeredAt:'2026-05-09T10:00:00Z'}, listeners:[{id:'test-listener', name:'Test Listener', enabled:true, cooldownTicks:0, actionCount:1, lastTriggeredAt:'2026-05-09T10:00:00Z', actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}]}], receivers:[{id:'recv-1', name:'Receiver'}], actionRelays:[], actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}], sources:[{id:'test-device', name:'Emitter'}], downstreamSignals:[], recentHistory:[{ time:'2026-05-09T10:00:00Z', channel, sourceType:'DEVICE', sourceName:'Emitter', result:'SUCCESS' }], doctorIssues:[], doctorStatus:'OK' }; }
+                  if (url.startsWith('/api/signals/channels')) return [{ channel:'test.channel', displayName:'Test Channel', listenerCount:1, receiverCount:1, actionRelayCount:0, consumerCount:2, doctorStatus:'OK' }];
+                  if (url.startsWith('/api/webadmin/signal-listener-basic-config/')) return { listenerRef:'test-listener', listenerId:'test-listener', displayName:'Test Listener', enabled:true, channel:'test.channel', cooldownTicks:0, actionCount:1, expectedFingerprint:'listener-fp', lockStatus:{ locked:false } };
+                  if (url.startsWith('/api/actions/')) { const id = decodeURIComponent(url.substring('/api/actions/'.length).split('?')[0]); return { id, type:'COMMAND', owner:{ownerType:'LISTENER', ownerId:'test-listener', ownerName:'Test Listener', channel:'test.channel'}, configSummary:{name:'Open Door', executionCount:2, referencedByCount:1, doctorStatus:'OK'}, summary:'command: say test', recentExecutions:[{time:'2026-05-09T10:00:00Z', result:'SUCCESS', owner:'Test Listener', detail:'ok'}], doctorIssues:[] }; }
+                  if (url.startsWith('/api/actions')) return [
+                    { id:'action-1', name:'Open Door', type:'COMMAND', summary:'command: say test', doctorStatus:'OK', ownerType:'LISTENER', channel:'test.channel', executionCountToday:2, lastExecutedAt:'2026-05-09T10:00:00Z' },
+                    { id:'action-2', name:'Send Signal', type:'SIGNAL', summary:'signal: next', doctorStatus:'WARNING', ownerType:'ACTION_RELAY', channel:'next.channel', executionCountToday:0 }
+                  ];
+                  if (url.startsWith('/api/doctor')) return { summary:{errorCount:1, warningCount:1, infoCount:0}, issues:[{id:'issue-1', title:'Bad device', severity:'ERROR', relatedObjectType:'DEVICE', relatedObjectId:'dev-1', message:'broken', suggestion:'check', detectedAt:'2026-05-09T10:00:00Z'}] };
+                  if (url.startsWith('/api/signals/history')) return [{ time:'2026-05-09T10:00:00Z', channel:'test.channel', sourceType:'DEVICE', sourceName:'Emitter', sourceId:'dev-1', result:'SUCCESS' }];
+                  if (url.startsWith('/api/regions/')) { const id = decodeURIComponent(url.substring('/api/regions/'.length).split('?')[0]); return { id, name:'Spawn', world:'world', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, targetFilter:'ALL', actions:{enter:[{id:'action-1', type:'COMMAND', summary:'command: say test', enabled:true}], exit:[], stay:[]}, boundChannels:['test.channel'], playersInside:['Owner'], recentEvents:[{type:'enter', time:'2026-05-09T10:00:00Z', playerName:'Owner'}], doctorIssues:[] }; }
+                  if (url.startsWith('/api/regions')) return [{ id:'region-1', name:'Spawn', world:'world', enabled:true, doctorStatus:'OK', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, controllerCount:1, enterActionCount:1, exitActionCount:0, stayActionCount:0, targetFilter:'ALL' }];
+                  if (url.startsWith('/api/webadmin/settings')) return { storage:{baseDir:'test'}, security:{accessMode:'LOCAL_ONLY'}, audit:{enabled:true} };
+                  if (url.startsWith('/api/status')) return { online:true, serverStatus:'RUNNING', version:'test' };
+                  if (url.startsWith('/api/webadmin/write/capabilities')) return { canWrite:false };
+                  if (url.startsWith('/api/webadmin/users')) return { users:[{username:'Owner', displayName:'Owner', role:'OWNER', enabled:true, online:true, sessionCount:1, lastLoginAt:'2026-05-09T10:00:00Z'}] };
+                  if (url.startsWith('/api/auth/me')) return { username:'Owner', role:'OWNER' };
+                  return {};
+                }
+                const context = {
+                  console: { log(){}, warn(){}, error(...args){ errors.push(args.map(String).join(' ')); } },
+                  setTimeout, clearTimeout, setInterval, clearInterval,
+                  requestAnimationFrame(fn){ fn(); },
+                  requestedUrls,
+                  URLSearchParams,
+                  encodeURIComponent,
+                  decodeURIComponent,
+                  location: { hash:'#/dashboard', href:'' },
+                  navigator: { onLine:true },
+                  sessionStorage: { getItem(){ return null; }, setItem(){}, removeItem(){} },
+                  document: {
+                    body,
+                    documentElement: { classList: { add(){}, remove(){}, toggle(){} } },
+                    activeElement: null,
+                    getElementById(id){ return id === 'wa-modal-root' ? (elements.get(id) || null) : el(id); },
+                    querySelectorAll(){ return []; },
+                    addEventListener(){},
+                    createElement(tag){ const node = el(`${tag}-${elements.size}`); node.tagName = String(tag || '').toUpperCase(); node.id = ''; return node; },
+                  },
+                  window: { addEventListener(){}, removeEventListener(){} },
+                  fetch: async (path) => { requestedUrls.push(String(path)); return { ok:true, status:200, json: async () => ({ ok:true, data: apiData(path) }) }; },
+                  EventSource: function(){ this.close = function(){}; },
+                };
+                context.window.location = context.location;
+                context.window.navigator = context.navigator;
+                context.globalThis = context;
+                vm.createContext(context);
+                vm.runInContext(code + "\\n;globalThis.__smokeRoute = async function(hash){ location.hash = hash; return await route(); };globalThis.__smokeModal = async function(){ openWebAdminModal('Smoke Modal','<form class=\\\"edit-form\\\"><div class=\\\"form-actions\\\">hidden</div></form>',editModalFooter(false)); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const closePromise = closeWebAdminModal(false); const className = String(modal && modal.className || ''); const closingMarker = String(modal && modal.dataset && modal.dataset.modalClosing || ''); await closePromise; return {html, className, closingMarker, removed:!document.getElementById('wa-modal-root')}; };globalThis.__smokeDeviceConfigModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/devices/test-device'; await route(); await startDeviceConfigEdit('test-device'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const className = String(modal && modal.className || ''); await cancelDeviceConfigEdit('test-device'); return {html,className}; };globalThis.__smokeChannelModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/signals/test.channel'; await route(); await startChannelMetadataEdit('test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelChannelMetadataEdit('test.channel'); return {html}; };globalThis.__smokeListenerModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/listeners/test-listener'; await route(); await startSignalListenerBasicConfigEdit('test-listener','test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelSignalListenerBasicConfigEdit('test-listener','test.channel'); return {html}; };", context, { filename:'webadmin-app.js' });
+                vm.runInContext(`
+                  globalThis.__smokeSilentRoute = async function(hash){ location.hash = hash; return await route({silent:true}); };
+                  globalThis.__smokeToggleAdvanced = async function(kind,id){ await toggleAdvancedDetail(kind,id); return String(document.getElementById('view').innerHTML || ''); };
+                  globalThis.__smokeModalSilent = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    location.hash = '#/devices/test-device';
+                    await route();
+                    await startDeviceConfigEdit('test-device');
+                    const modalBefore = document.getElementById('wa-modal-root');
+                    const before = String(modalBefore && modalBefore.innerHTML || '');
+                    await route({silent:true});
+                    const modalAfter = document.getElementById('wa-modal-root');
+                    const after = String(modalAfter && modalAfter.innerHTML || '');
+                    const stillOpen = !!modalAfter && after.includes('data-unified-device-config="true"');
+                    await cancelDeviceConfigEdit('test-device');
+                    return { before, after, stillOpen };
+                  };
+                  globalThis.__smokeChannelModalSilent = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    location.hash = '#/signals/test.channel';
+                    await route();
+                    await startChannelMetadataEdit('test.channel');
+                    const before = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    await route({silent:true});
+                    const after = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    const stillOpen = after.includes('channel-metadata-display-name');
+                    await cancelChannelMetadataEdit('test.channel');
+                    return { before, after, stillOpen };
+                  };
+                  globalThis.__smokeListenerModalSilent = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    location.hash = '#/listeners/test-listener';
+                    await route();
+                    await startSignalListenerBasicConfigEdit('test-listener','test.channel');
+                    const before = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    await route({silent:true});
+                    const after = String(document.getElementById('wa-modal-root').innerHTML || '');
+                    const stillOpen = after.includes('listener-enabled-') && after.includes('listener-cooldown-');
+                    await cancelSignalListenerBasicConfigEdit('test-listener','test.channel');
+                    return { before, after, stillOpen };
+                  };
+                  globalThis.__smokeRealtime = function(){
+                    const listenerLock = { type:'edit_lock_changed', payload:{ targetType:'signal_listener_basic_config', targetId:'test-listener' } };
+                    const signalEvent = { type:'channel_metadata_changed', channel:'test.channel' };
+                    return {
+                      listenerRef: listenerEventRef(listenerLock),
+                      listenerKeys: Array.from(realtimeRouteKeysForEvent(listenerLock)).join(','),
+                      listenerShould: shouldHandleRealtimeEvent('#/listeners/test-listener', listenerLock),
+                      signalShould: shouldHandleRealtimeEvent('#/signals/test.channel', signalEvent),
+                      signalKeys: Array.from(realtimeRouteKeysForEvent(signalEvent)).join(',')
+                    };
+                  };
+                  globalThis.__smokeRealtimeRun = async function(){
+                    requestedUrls.length = 0;
+                    location.hash = '#/listeners/test-listener';
+                    await route();
+                    requestedUrls.length = 0;
+                    const before = String(document.getElementById('view').innerHTML || '');
+                    const eventData = { type:'edit_lock_changed', seq:101, payload:{ targetType:'signal_listener_basic_config', targetId:'test-listener' } };
+                    handleRealtimeEvent('edit_lock_changed', { data: JSON.stringify(eventData), lastEventId:'101' });
+                    await new Promise(resolve => setTimeout(resolve, 320));
+                    const after = String(document.getElementById('view').innerHTML || '');
+                    return { before, after, urls: requestedUrls.slice(), pending:Object.keys(appState.realtime.pendingRefresh).length, dirty:Object.keys(appState.realtime.dirtyRoutes).join(',') };
+                  };
+                  globalThis.__smokeClearRequestedUrls = function(){ requestedUrls.length = 0; };
+                  globalThis.__smokeRequestedUrls = function(){ return requestedUrls.slice(); };
+                `, context, { filename:"webadmin-app-extra-smoke.js" });
+                const routes = [
+                  '#/dashboard',
+                  '#/signals',
+                  '#/signalbridge',
+                  '#/receivers',
+                  '#/listeners',
+                  '#/signal-listeners',
+                  '#/actions',
+                  '#/devices',
+                  '#/virtual-block-devices',
+                  '#/block-devices',
+                  '#/history',
+                  '#/history?channel=test.channel',
+                  '#/events',
+                  '#/config',
+                  '#/users',
+                  '#/settings',
+                  '#/system-settings',
+                  '#/regions',
+                  '#/region-controllers',
+                  '#/action-templates',
+                  '#/templates',
+                  '#/doctor',
+                  '#/diagnostics',
+                  '#/signal-doctor',
+                  '#/signals/test.channel',
+                  '#/devices/test-device',
+                  '#/actions/test-action',
+                  '#/regions/test-region',
+                  '#/listeners/test-listener',
+                  '#/signal-listeners/test-listener'
+                ];
+                const detailRoutes = new Set([
+                  '#/signals/test.channel',
+                  '#/devices/test-device',
+                  '#/actions/test-action',
+                  '#/regions/test-region',
+                  '#/listeners/test-listener',
+                  '#/signal-listeners/test-listener'
+                ]);
+                const settingsRoutes = new Set([
+                  '#/settings',
+                  '#/system-settings'
+                ]);
+                const responsiveListRoutes = new Set([
+                  '#/action-templates',
+                  '#/doctor',
+                  '#/history',
+                  '#/history?channel=test.channel'
+                ]);
+                const expectedDetailApi = {
+                  '#/signals/test.channel':'/api/signals/channels/test.channel',
+                  '#/devices/test-device':'/api/devices/test-device',
+                  '#/actions/test-action':'/api/actions/test-action',
+                  '#/regions/test-region':'/api/regions/test-region',
+                  '#/listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener',
+                  '#/signal-listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener'
+                };
+                (async () => {
+                  const failures = [];
+                  for (const route of routes) {
+                    errors.length = 0;
+                    view.innerHTML = '';
+                    context.__smokeClearRequestedUrls();
+                    try {
+                      await context.__smokeRoute(route);
+                    } catch (err) {
+                      failures.push(`${route}: ${err.name}: ${err.message}`);
+                      continue;
+                    }
+                    const html = String(view.innerHTML || '');
+                    const errorText = errors.join('\\n');
+                    if (/ReferenceError|countBy is not defined|parseHashParams is not defined|renderIcons is not defined|route render failed/.test(errorText)) {
+                      failures.push(`${route}: console error ${errorText}`);
+                    } else if (html.includes('error-state')) {
+                      failures.push(`${route}: rendered error-state`);
+                    } else if (html.includes('loading-state')) {
+                      failures.push(`${route}: remained in loading-state`);
+                    } else if (!html.trim()) {
+                      failures.push(`${route}: rendered empty view`);
+                    }
+                    if (settingsRoutes.has(route)) {
+                      if (!html.includes('data-settings-layout="true"') || !html.includes('data-responsive-layout="true"') || !html.includes('data-settings-tabs="true"') || !html.includes('wa-tabs-scroll') || !html.includes('data-settings-status-rail="true"') || !html.includes('data-settings-switch-grid="true"')) {
+                        failures.push(`${route}: missing 7.5 settings layout shell`);
+                      }
+                      if (!html.includes('wa-settings-info-grid') || !html.includes('wa-settings-action-list') || !html.includes('wa-progress-bar')) {
+                        failures.push(`${route}: missing settings info grid, progress rail, or quick actions`);
+                      }
+                      if (!html.includes('保存设置') || !html.includes('重置为默认') || !html.includes('disabled')) {
+                        failures.push(`${route}: settings unsupported write actions are not visibly disabled`);
+                      }
+                      if (html.includes('panel-card') || html.includes('detail-grid') || html.includes('raw-config') || html.includes('legacy')) {
+                        failures.push(`${route}: legacy settings markup leaked`);
+                      }
+                      const routeUrls = context.__smokeRequestedUrls();
+                      for (const expected of ['/api/webadmin/settings','/api/status','/api/webadmin/write/capabilities']) {
+                        if (!routeUrls.includes(expected)) failures.push(`${route}: did not execute expected settings API path ${expected}`);
+                      }
+                    }
+                    if (detailRoutes.has(route)) {
+                      if (!html.includes('wa-detail-shell') || !html.includes('data-detail-tabs="true"') || !html.includes('data-responsive-tabs="true"') || !html.includes('wa-tabs-scroll') || !html.includes('wa-detail-first-row') || !html.includes('data-detail-layout="fixed-two-column"') || !html.includes('data-detail-two-column="true"') || !html.includes('data-detail-column="left"') || !html.includes('data-detail-column="right"') || !html.includes('data-detail-bottom-full-width="true"')) {
+                        failures.push(`${route}: missing fixed two-column detail shell or bottom full-width stack`);
+                      }
+                      if (!html.includes('data-collapsible-detail="true"') || !html.includes('data-advanced-open="false"')) {
+                        failures.push(`${route}: missing collapsed advanced detail card`);
+                      }
+                      const mainIndex = html.indexOf('data-detail-row="main"');
+                      const bottomIndex = html.indexOf('data-detail-bottom-full-width="true"');
+                      const advancedIndex = html.indexOf('data-detail-bottom-card="advanced"');
+                      if (!(mainIndex >= 0 && bottomIndex > mainIndex && advancedIndex > bottomIndex)) {
+                        failures.push(`${route}: advanced detail is not in bottom full-width stack after normal columns`);
+                      }
+                      if (html.includes('wa-table') && !html.includes('data-table-row-stretch="false"')) {
+                        failures.push(`${route}: detail table missing no-row-stretch marker`);
+                      }
+                      if (html.includes('data-detail-adaptive-grid="true"') || html.includes('wa-detail-adaptive-grid') || html.includes('data-responsive-card-grid="true') || html.includes('raw-config') || html.includes('logic-chain') || html.includes('detail-grid') || html.includes('config-section') || html.includes('panel-card') || html.includes('legacy') || html.includes('wa-card-grid wa-metrics-5') || html.includes('wa-table-card')) {
+                        failures.push(`${route}: legacy detail markup leaked`);
+                      }
+                      const routeUrls = context.__smokeRequestedUrls();
+                      if (!routeUrls.includes(expectedDetailApi[route])) {
+                        failures.push(`${route}: did not execute expected detail API path ${expectedDetailApi[route]}`);
+                      }
+                    }
+                    if (responsiveListRoutes.has(route)) {
+                      if (!html.includes('wa-table-scroll') && !html.includes('table-wrap')) {
+                        failures.push(`${route}: missing responsive table overflow wrapper`);
+                      }
+                      if (route.startsWith('#/history') && !html.includes('wa-tabs-scroll')) {
+                        failures.push(`${route}: missing horizontally scrollable tabs`);
+                      }
+                    }
+                  }
+                  try {
+                    await context.__smokeRoute('#/signals/test.channel');
+                    const collapsed = String(view.innerHTML || '');
+                    if (!collapsed.includes('data-advanced-open="false"')) failures.push('advanced detail: default state is not collapsed');
+                    const expanded = await context.__smokeToggleAdvanced('signals','test.channel');
+                    if (!expanded.includes('data-advanced-open="true"') || !expanded.includes('wa-advanced-group')) failures.push('advanced detail: expand did not render additional grouped fields');
+                    await context.__smokeSilentRoute('#/signals/test.channel');
+                    const refreshed = String(view.innerHTML || '');
+                    if (!refreshed.includes('data-advanced-open="true"')) failures.push('advanced detail: silent refresh reset expanded state');
+                    const closed = await context.__smokeToggleAdvanced('signals','test.channel');
+                    if (!closed.includes('data-advanced-open="false"')) failures.push('advanced detail: collapse did not restore compact state');
+                  } catch (err) {
+                    failures.push(`advanced detail: ${err.name}: ${err.message}`);
+                  }
+                  for (const advancedCase of [
+                    ['#/devices/test-device','devices','test-device'],
+                    ['#/actions/test-action','actions','test-action'],
+                    ['#/regions/test-region','regions','test-region'],
+                    ['#/listeners/test-listener','listeners','test-listener'],
+                    ['#/signal-listeners/test-listener','listeners','test-listener']
+                  ]) {
+                    try {
+                      const [hash, kind, id] = advancedCase;
+                      await context.__smokeRoute(hash);
+                      let html = String(view.innerHTML || '');
+                      if (!html.includes('data-advanced-open="false"')) failures.push(`advanced detail ${hash}: default state is not collapsed`);
+                      html = await context.__smokeToggleAdvanced(kind,id);
+                      if (!html.includes('data-advanced-open="true"')) failures.push(`advanced detail ${hash}: expand failed`);
+                      await context.__smokeSilentRoute(hash);
+                      html = String(view.innerHTML || '');
+                      if (!html.includes('data-advanced-open="true"')) failures.push(`advanced detail ${hash}: silent refresh reset expanded state`);
+                      html = await context.__smokeToggleAdvanced(kind,id);
+                      if (!html.includes('data-advanced-open="false"')) failures.push(`advanced detail ${hash}: collapse failed`);
+                    } catch (err) {
+                      failures.push(`advanced detail ${advancedCase[0]}: ${err.name}: ${err.message}`);
+                    }
+                  }
+                  try {
+                    const modal = await context.__smokeModal();
+                    if (!modal || !modal.html.includes('wa-modal') || !modal.html.includes('wa-modal-viewport') || !modal.html.includes('wa-modal-body') || !modal.html.includes('wa-modal-foot')) {
+                      failures.push('modal: missing 7.5 modal markup');
+                    }
+                    if (!String(modal.className || '').includes('closing') || modal.closingMarker !== 'true') {
+                      failures.push('modal: close did not apply fade-out closing class and marker before removal');
+                    }
+                    if (!modal.removed) {
+                      failures.push('modal: close lifecycle did not remove modal after fade-out');
+                    }
+                  } catch (err) {
+                    failures.push(`modal: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const deviceModal = await context.__smokeDeviceConfigModal();
+                    if (!deviceModal.html.includes('data-unified-device-config="true"') || !deviceModal.html.includes('data-edit-section="metadata"') || !deviceModal.html.includes('data-edit-section="basic"') || !deviceModal.html.includes('data-edit-section="extended"')) {
+                      failures.push('device config modal: missing unified metadata/basic/extended sections');
+                    }
+                    if (!deviceModal.html.includes('wa-edit-section') || !deviceModal.html.includes('wa-modal-body') || deviceModal.html.includes('raw-config')) {
+                      failures.push('device config modal: missing 7.5 modal section markup or leaked raw config');
+                    }
+                  } catch (err) {
+                    failures.push(`device config modal: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const modalSilent = await context.__smokeModalSilent();
+                    if (!modalSilent.stillOpen || !modalSilent.before.includes('data-unified-device-config="true"') || !modalSilent.after.includes('data-unified-device-config="true"')) {
+                      failures.push('device config modal: silent refresh closed modal or dropped unified sections');
+                    }
+                  } catch (err) {
+                    failures.push(`device config modal silent refresh: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const channelSilent = await context.__smokeChannelModalSilent();
+                    if (!channelSilent.stillOpen || !channelSilent.before.includes('channel-metadata-display-name') || !channelSilent.after.includes('channel-metadata-display-name')) {
+                      failures.push('channel metadata modal: silent refresh closed modal or dropped fields');
+                    }
+                  } catch (err) {
+                    failures.push(`channel metadata modal silent refresh: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const listenerSilent = await context.__smokeListenerModalSilent();
+                    if (!listenerSilent.stillOpen || !listenerSilent.before.includes('listener-enabled-') || !listenerSilent.after.includes('listener-cooldown-')) {
+                      failures.push('listener config modal: silent refresh closed modal or dropped fields');
+                    }
+                  } catch (err) {
+                    failures.push(`listener config modal silent refresh: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const channelModal = await context.__smokeChannelModal();
+                    if (!channelModal.html.includes('channel-metadata-display-name') || !channelModal.html.includes('wa-modal-body')) {
+                      failures.push('channel metadata modal: missing real edit fields or modal shell');
+                    }
+                  } catch (err) {
+                    failures.push(`channel metadata modal: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const listenerModal = await context.__smokeListenerModal();
+                    if (!listenerModal.html.includes('listener-enabled-') || !listenerModal.html.includes('listener-cooldown-') || !listenerModal.html.includes('wa-modal-body')) {
+                      failures.push('listener config modal: missing real edit fields or modal shell');
+                    }
+                  } catch (err) {
+                    failures.push(`listener config modal: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const realtime = context.__smokeRealtime();
+                    if (realtime.listenerRef !== 'test-listener' || !realtime.listenerShould || !String(realtime.listenerKeys || '').includes('listenerDetail:test-listener')) {
+                      failures.push('realtime: signal listener basic config lock event does not mark listener detail dirty');
+                    }
+                    if (!realtime.signalShould || !String(realtime.signalKeys || '').includes('signalDetail:test.channel')) {
+                      failures.push('realtime: channel metadata event does not mark signal detail dirty');
+                    }
+                  } catch (err) {
+                    failures.push(`realtime route smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const realtimeRun = await context.__smokeRealtimeRun();
+                    if (!realtimeRun.after.includes('wa-detail-shell') || !realtimeRun.urls.includes('/api/webadmin/signal-listener-basic-config/test-listener') || realtimeRun.pending !== 0) {
+                      failures.push('realtime: handleRealtimeEvent did not complete listener detail silent refresh path');
+                    }
+                  } catch (err) {
+                    failures.push(`realtime run smoke: ${err.name}: ${err.message}`);
+                  }
+                  if (failures.length) {
+                    console.log(failures.join('\\n'));
+                    process.exit(1);
+                  }
+                  console.log(`render smoke ok: ${routes.length} routes`);
+                })();
+                """.replace("__APP_JS_BASE64__", encodedAppJs);
     }
 
     private static void testWebAdminRealtimeFoundation() throws Exception {
@@ -1546,13 +2161,13 @@ public final class StabilizationGuardTest {
         requireContains(js, "edit_lock_changed", "frontend listens for edit lock realtime events");
         requireContains(js, "saveDeviceBasicConfig", "frontend contains scoped basic config save handler");
         requireContains(js, "saveChannelMetadata", "frontend contains scoped channel metadata save handler");
-        requireContains(js, "onsubmit='event.preventDefault();saveChannelMetadata(", "channel metadata save form uses safe single-quoted submit handler");
-        requireFalse(js.contains("onsubmit=\"event.preventDefault();saveChannelMetadata("), "channel metadata save handler is not truncated by nested double quotes");
+        requireContains(js, "htmlEvent('onsubmit',`event.preventDefault();saveChannelMetadata(", "channel metadata save form uses escaped submit handler");
+        requireFalse(js.contains("onsubmit='event.preventDefault();saveChannelMetadata("), "channel metadata save handler does not use unsafe single-quoted attribute");
         requireFalse(js.contains("lockedByOther?'disabled':''"), "channel metadata and listener locks hide edit buttons instead of showing disabled ambiguous buttons");
-        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" onclick='startChannelMetadataEdit", "channel metadata hides edit action while another user holds lock");
+        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" ${htmlHandler(`startChannelMetadataEdit", "channel metadata hides edit action while another user holds lock");
         requireContains(js, "saveSignalListenerBasicConfig", "frontend contains scoped signal listener save handler");
         requireContains(js, "listener.basicConfig=result.data", "signal detail loads listener lock status for readonly lock hint");
-        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" type=\"button\" onclick='startSignalListenerBasicConfigEdit", "signal listener basic config hides edit action while another user holds lock");
+        requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" type=\"button\" ${htmlHandler(`startSignalListenerBasicConfigEdit", "signal listener basic config hides edit action while another user holds lock");
         requireContains(js, "channel_metadata_changed", "frontend listens for channel metadata realtime events");
         requireContains(js, "signal_listener_config_changed", "frontend listens for signal listener realtime events");
         requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
