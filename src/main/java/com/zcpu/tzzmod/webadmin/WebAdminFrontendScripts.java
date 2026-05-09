@@ -126,7 +126,7 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,selectionTerminalById:{},deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -873,6 +873,8 @@ public final class WebAdminFrontendScripts {
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
                   const canEditConfig=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig();
                   const configAction=canEditConfig?waButton('编辑设备配置','settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),'primary'):waButton('编辑设备配置','settings','disabled','ghost');
+                  const deleteAction=isVirtualBlockDevice(detail)&&canDeleteVirtualBlockDevice()?waButton('删除 / 解绑','channel-error',htmlHandler(`openVirtualBlockDeviceDeleteModal(${jsString(detail.id)})`),'danger'):waButton(isVirtualBlockDevice(detail)?'删除 / 解绑':'删除设备','channel-error','disabled','danger');
+                  const quickNote=isVirtualBlockDevice(detail)?'删除 / 解绑只移除 virtual_block_device 配置，不破坏世界方块；导出和其它写操作仍保持禁用。':'仅设备显示信息、基础配置和安全扩展配置可写；删除、导出和其它写操作没有完整后端支持，保持禁用。';
                   const statusValue=detail.enabled?'启用':'停用';
                   const doctorStatus=detail.doctorStatus||detail.debugSummary?.status||'UNKNOWN';
                   const recentEvents=history.ok?(history.data||[]):[];
@@ -917,7 +919,7 @@ public final class WebAdminFrontendScripts {
                       detailCard('最近事件',`${history.ok?compactEventList(recentEvents,'当前设备暂无关联频道历史。'):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p>`)
                     ],[
                       detailCard('关联对象 / Doctor',`${deviceChannelSideCard(detail)}${deviceDoctorSideCard(detail,uniqueIssues(relatedDoctor))}`,'','detail-card-stretchable'),
-                      detailCard('快捷操作',`<div class="wa-quick-grid">${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${waButton('删除设备','channel-error','disabled','danger')}</div><p class="wa-disabled-note">仅设备显示信息、基础配置和安全扩展配置可写；删除、导出和其它写操作没有完整后端支持，保持禁用。</p>`)
+                      detailCard('快捷操作',`<div class="wa-quick-grid">${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${deleteAction}</div><p class="wa-disabled-note">${esc(quickNote)}</p>`)
                     ],[
                       advancedDetailCard('devices',detail.id,advancedRows,[
                       {title:'配置摘要完整字段',rows:advancedRowsFromObject(detail.configSummary||{},'configSummary')},
@@ -934,6 +936,12 @@ public final class WebAdminFrontendScripts {
                 function canEditChannelMetadata(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canEditSignalListenerBasicConfig(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
                 function canStartObjectSelection(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function roleCanWriteLifecycle(){const role=String(appState.me?.role||'').toUpperCase();return role==='EDITOR'||role==='OWNER';}
+                function operationAllowed(operation){const found=(appState.capabilities?.operations||[]).find(entry=>String(entry.operation||'')===operation);return found?!!found.allowed:roleCanWriteLifecycle();}
+                function canDeleteVirtualBlockDevice(){const flag=appState.capabilities?.virtualBlockDeviceLifecycleEnabled;return flag!==false&&operationAllowed('DELETE_VIRTUAL_BLOCK_DEVICE');}
+                function canWriteSignalListenerLifecycle(){const flag=appState.capabilities?.signalListenerLifecycleWriteEnabled;return flag!==false&&(operationAllowed('CREATE_SIGNAL_LISTENER')||operationAllowed('DELETE_SIGNAL_LISTENER'));}
+                function canCreateSignalListener(){const flag=appState.capabilities?.signalListenerLifecycleWriteEnabled;return flag!==false&&operationAllowed('CREATE_SIGNAL_LISTENER');}
+                function canDeleteSignalListener(){const flag=appState.capabilities?.signalListenerLifecycleWriteEnabled;return flag!==false&&operationAllowed('DELETE_SIGNAL_LISTENER');}
                 function csrfToken(){return appState.capabilities?.csrf?.token || '';}
                 function metadataIconOptions(){return ['auto','signal_emitter','signal_receiver','action_relay','virtual_block_device','region','action','warning','key','chest','door','signal','custom_1'];}
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
@@ -1161,6 +1169,185 @@ public final class WebAdminFrontendScripts {
                     appState.selectionCreateVirtualBlock={...draft,...payload,step:'failed',status:'failed',terminalStatus:'failed',message:event?.summary||payload.message||'选择失败。',errors:[{message:event?.summary||payload.message||'选择失败。'}],saving:false};
                     showCreateVirtualBlockDeviceModal();
                   }
+                }
+                """).append("""
+                function lifecycleErrorsHtml(draft,fallback='操作失败'){
+                  const errors=(draft?.errors||[]).filter(Boolean);
+                  if(!errors.length)return '';
+                  return `<ul class="validation-list">${errors.map(err=>`<li>${esc(err.field?`${err.field}：`: '')}${esc(err.message||err||fallback)}</li>`).join('')}</ul>`;
+                }
+                function dangerousModalFooter(saving=false,label='确认删除'){
+                  return `<button class="wa-btn ghost" type="button" onclick="closeWebAdminModal()">${icon('close')}<span>取消</span></button><button class="wa-btn danger" type="button" ${saving?'disabled':''} onclick="document.querySelector('#wa-modal-root form')?.requestSubmit()">${icon('critical-issue')}<span>${saving?'处理中...':esc(label)}</span></button>`;
+                }
+                function lifecycleRouteWithReturn(targetHash,returnTo){
+                  const safeReturn=isValidReturnHash(returnTo)?returnTo:'#/listeners';
+                  return `${targetHash}${targetHash.includes('?')?'&':'?'}returnTo=${encodeURIComponent(safeReturn)}`;
+                }
+                function listenerCreateDefaultDraft(){
+                  return {name:'',channel:'',enabled:true,cooldownTicks:0,channelOptions:appState.channelOptions||[],channelOptionsError:appState.channelOptionsError||null,channelComboOpen:false,channelComboIndex:0,saving:false,errors:[]};
+                }
+                function listenerCreateChannelOptionsHtml(draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接使用新频道。</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSignalListenerCreateChannel(${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function renderSignalListenerCreateChannelCombo(draft){
+                  const open=draft.channelComboOpen?' open':'';
+                  return `<div id="listener-create-channel-combo" class="channel-combo listener-create-channel-combo${open}" data-listener-create-channel-combo="true"><div class="channel-combo-control"><input id="listener-create-channel" class="input" maxlength="128" value="${esc(draft.channel||'')}" placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${draft.channelComboOpen?'true':'false'}" aria-controls="listener-create-channel-menu" onfocus='openSignalListenerCreateChannelMenu()' oninput='updateSignalListenerCreateDraftFromForm(true)' onkeydown='handleSignalListenerCreateChannelKey(event)'><button class="channel-combo-toggle" type="button" onclick='toggleSignalListenerCreateChannelMenu()' aria-label="显示已有频道">⌄</button></div><div id="listener-create-channel-menu" class="channel-combo-menu" role="listbox">${listenerCreateChannelOptionsHtml(draft)}</div></div>`;
+                }
+                function updateSignalListenerCreateDraftFromForm(openMenu=false){
+                  const draft=appState.signalListenerCreate;if(!draft)return;
+                  draft.name=document.getElementById('listener-create-name')?.value?.trim()||draft.name||'';
+                  draft.channel=document.getElementById('listener-create-channel')?.value||draft.channel||'';
+                  draft.enabled=!!document.getElementById('listener-create-enabled')?.checked;
+                  draft.cooldownTicks=document.getElementById('listener-create-cooldown')?.value||draft.cooldownTicks||0;
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  const hint=document.getElementById('listener-create-channel-hint');
+                  if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
+                  syncSignalListenerCreateChannelCombo();
+                }
+                function syncSignalListenerCreateChannelCombo(){
+                  const draft=appState.signalListenerCreate;if(!draft)return;
+                  const combo=document.getElementById('listener-create-channel-combo'), menu=document.getElementById('listener-create-channel-menu'), input=document.getElementById('listener-create-channel');
+                  if(combo)combo.classList.toggle('open',!!draft.channelComboOpen);
+                  if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
+                  if(menu)menu.innerHTML=listenerCreateChannelOptionsHtml(draft);
+                }
+                function openSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=true;syncSignalListenerCreateChannelCombo();}
+                function toggleSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=!draft.channelComboOpen;syncSignalListenerCreateChannelCombo();document.getElementById('listener-create-channel')?.focus();}
+                function selectSignalListenerCreateChannel(channel){const draft=appState.signalListenerCreate;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('listener-create-channel'), hint=document.getElementById('listener-create-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerCreateChannelCombo();}
+                function handleSignalListenerCreateChannelKey(event){
+                  const draft=appState.signalListenerCreate;if(!draft)return;
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('listener-create-channel')?.value||draft.channel);
+                  if(event.key==='Escape'){draft.channelComboOpen=false;syncSignalListenerCreateChannelCombo();return;}
+                  if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSignalListenerCreateChannelCombo();return;}
+                  if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSignalListenerCreateChannel(options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
+                }
+                function signalListenerCreateModalBody(draft){
+                  const errors=lifecycleErrorsHtml(draft,'创建监听器失败');
+                  return `<form class="edit-form" data-listener-create-modal="true" ${htmlEvent('onsubmit','event.preventDefault();saveSignalListenerCreateModal()')}><label>监听器名称<input id="listener-create-name" class="input" maxlength="64" value="${esc(draft.name||'')}" placeholder="例如：spawn_entry_listener"></label><label>监听频道${renderSignalListenerCreateChannelCombo(draft)}<span id="listener-create-channel-hint" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label class="switch-row"><span>启用监听器</span><input id="listener-create-enabled" type="checkbox" ${draft.enabled!==false?'checked':''}></label><label>冷却时间（ticks）<input id="listener-create-cooldown" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">新建 Signal Listener 默认 actions 为空；本阶段不会创建 matcher、itemSubmit、ConditionEngine 或动作列表编辑。</p>${errors}</form>`;
+                }
+                function showSignalListenerCreateModal(){
+                  const draft=appState.signalListenerCreate||listenerCreateDefaultDraft();
+                  openWebAdminModal('新建 Signal Listener',signalListenerCreateModalBody(draft),editModalFooter(draft.saving),{className:'wa-config-modal',onClose:()=>{appState.signalListenerCreate=null;return dismissWebAdminModal();}});
+                }
+                async function openSignalListenerCreateModal(){
+                  waEnsureState();
+                  if(!canCreateSignalListener()){toast('需要 EDITOR 或 OWNER 权限才能新建 Signal Listener。');return;}
+                  appState.signalListenerCreate=listenerCreateDefaultDraft();
+                  showSignalListenerCreateModal();
+                  const channels=await loadSignalChannelOptions();
+                  const draft=appState.signalListenerCreate;
+                  if(draft){appState.signalListenerCreate={...draft,channelOptions:channels,channelOptionsError:appState.channelOptionsError};showSignalListenerCreateModal();}
+                }
+                async function saveSignalListenerCreateModal(){
+                  const draft=appState.signalListenerCreate||listenerCreateDefaultDraft();
+                  updateSignalListenerCreateDraftFromForm(false);
+                  draft.saving=true;draft.errors=[];appState.signalListenerCreate=draft;showSignalListenerCreateModal();
+                  try{
+                    const result=await api('/api/webadmin/signal-listeners',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({name:draft.name,displayName:draft.name,channel:String(draft.channel||'').trim(),enabled:draft.enabled!==false,cooldownTicks:Number(draft.cooldownTicks||0)})});
+                    if(result.success){
+                      const routeTarget=result.data?.routeTarget||lifecycleRouteWithReturn(listenerHash(result.data?.listenerId||result.targetId||''),'#/listeners');
+                      appState.signalListenerCreate=null;
+                      await dismissWebAdminModal();
+                      toast(result.message||'Signal Listener 已创建。');
+                      if(routeTarget)location.hash=routeTarget;else await renderListeners({silent:true});
+                      return;
+                    }
+                    draft.saving=false;draft.errors=writeResultErrors(result,'创建 Signal Listener 失败。');appState.signalListenerCreate=draft;showSignalListenerCreateModal();toast(result.message||'创建 Signal Listener 失败。');
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'创建 Signal Listener 失败。'}];appState.signalListenerCreate=draft;showSignalListenerCreateModal();toast(err.message||'创建 Signal Listener 失败。');}
+                }
+                """).append("""
+                function signalListenerDeleteDraft(listener,channel=''){
+                  return {listener:{...(listener||{}),channel:listener?.channel||channel||''},confirmationText:'',confirmed:false,reason:'',saving:false,errors:[]};
+                }
+                function listenerDeleteModalBody(draft){
+                  const l=draft.listener||{}, actionCount=Number(l.actionCount ?? (l.actions||[]).length ?? 0), title=l.name||l.id||'未命名监听器';
+                  const errors=lifecycleErrorsHtml(draft,'删除监听器失败');
+                  return `<form class="edit-form" data-listener-delete-modal="true" data-danger-confirm-modal="true" ${htmlEvent('onsubmit','event.preventDefault();deleteSignalListenerFromModal()')}><div class="readonly-note danger"><strong>删除 Signal Listener</strong><span>会删除该 listener 内的 ${esc(actionCount)} 个 action 引用；不会删除 channel、receiver、device 或历史记录。</span></div><div class="identity-grid">${row('名称',esc(title))}${row('ID',esc(l.id||'-'))}${row('频道',l.channel?channelButton(l.channel):'<span class="muted">未绑定</span>')}${row('Action 数量',esc(actionCount))}</div><label class="switch-row"><span>我确认删除该 Signal Listener</span><input id="listener-delete-confirmed" type="checkbox" ${draft.confirmed?'checked':''}></label><label>输入 Listener ID 或名称确认<input id="listener-delete-confirmation" class="input" value="${esc(draft.confirmationText||'')}" placeholder="${esc(l.id||title)}"></label><label>原因（可选）<textarea id="listener-delete-reason" maxlength="200" placeholder="仅写入 WebAdmin audit，不影响业务逻辑。">${esc(draft.reason||'')}</textarea></label>${errors}</form>`;
+                }
+                function showSignalListenerDeleteModal(){
+                  const draft=appState.signalListenerDelete;if(!draft)return;
+                  openWebAdminModal('删除 Signal Listener',listenerDeleteModalBody(draft),dangerousModalFooter(draft.saving,'确认删除'),{className:'wa-config-modal',onClose:()=>{appState.signalListenerDelete=null;return dismissWebAdminModal();}});
+                }
+                async function openSignalListenerDeleteModal(listenerId,routeChannel=''){
+                  if(!canDeleteSignalListener()){toast('需要 EDITOR 或 OWNER 权限才能删除 Signal Listener。');return;}
+                  let listener=(appState.listeners||[]).find(item=>listenerMatches(item,listenerId));
+                  if(!listener){
+                    const result=await loadSignalListenerDetail(listenerId);
+                    if(!result.ok){toast(result.message||'无法读取 Signal Listener。');return;}
+                    listener={...(result.data.listener||{}),channel:result.data.channel||routeChannel};
+                  }
+                  appState.signalListenerDelete=signalListenerDeleteDraft(listener,routeChannel);
+                  showSignalListenerDeleteModal();
+                }
+                async function deleteSignalListenerFromModal(){
+                  const draft=appState.signalListenerDelete;if(!draft)return;
+                  const l=draft.listener||{}, listenerId=l.id||'';
+                  draft.confirmed=!!document.getElementById('listener-delete-confirmed')?.checked;
+                  draft.confirmationText=document.getElementById('listener-delete-confirmation')?.value?.trim()||'';
+                  draft.reason=document.getElementById('listener-delete-reason')?.value||'';
+                  draft.saving=true;draft.errors=[];appState.signalListenerDelete=draft;showSignalListenerDeleteModal();
+                  try{
+                    const result=await api(`/api/webadmin/signal-listeners/${encodeURIComponent(listenerId)}/delete`,{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({listenerId,confirmationText:draft.confirmationText,confirmed:draft.confirmed,reason:draft.reason})});
+                    if(result.success){
+                      appState.signalListenerDelete=null;
+                      appState.listeners=(appState.listeners||[]).filter(item=>!listenerMatches(item,listenerId));
+                      await dismissWebAdminModal();
+                      toast(result.message||'Signal Listener 已删除。');
+                      const h=currentRouteHash();
+                      if((h.startsWith('#/listeners/')&&routeDetailId(h,'#/listeners/')===listenerId)||(h.startsWith('#/signal-listeners/')&&routeDetailId(h,'#/signal-listeners/')===listenerId))location.hash=result.data?.routeTarget||'#/listeners';
+                      else await route({silent:true});
+                      return;
+                    }
+                    draft.saving=false;draft.errors=writeResultErrors(result,'删除 Signal Listener 失败。');appState.signalListenerDelete=draft;showSignalListenerDeleteModal();toast(result.message||'删除 Signal Listener 失败。');
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'删除 Signal Listener 失败。'}];appState.signalListenerDelete=draft;showSignalListenerDeleteModal();toast(err.message||'删除 Signal Listener 失败。');}
+                }
+                """).append("""
+                function virtualBlockDeleteDraft(detail){
+                  return {device:{...(detail||{})},confirmationText:'',confirmed:false,reason:'',saving:false,errors:[]};
+                }
+                function vbdDeleteModalBody(draft){
+                  const d=draft.device||{}, cfg=d.configSummary||{}, block=firstKnown(cfg,['blockId','block','minecraftBlockId','boundBlockId'])||'--', title=d.displayName||d.id||'虚拟方块设备';
+                  const errors=lifecycleErrorsHtml(draft,'删除 / 解绑虚拟方块设备失败');
+                  return `<form class="edit-form" data-vbd-delete-modal="true" data-danger-confirm-modal="true" ${htmlEvent('onsubmit','event.preventDefault();deleteVirtualBlockDeviceFromModal()')}><div class="readonly-note danger"><strong>删除 / 解绑虚拟方块设备</strong><span>仅删除 SignalDeviceStore / WebAdmin registry 配置，不 setblock、不破坏世界方块，也不会删除其它类型 signal device。</span></div><div class="identity-grid">${row('显示名称',esc(title))}${row('设备 ID',esc(d.id||'-'))}${row('世界 / 坐标',esc(`${d.world||'-'} ${posText(d.pos)}`))}${row('方块 ID',esc(block))}${row('频道',d.channel?channelButton(d.channel):'<span class="muted">未绑定</span>')}</div><label class="switch-row"><span>我确认只解绑该虚拟方块设备</span><input id="vbd-delete-confirmed" type="checkbox" ${draft.confirmed?'checked':''}></label><label>输入设备 ID 或显示名称确认<input id="vbd-delete-confirmation" class="input" value="${esc(draft.confirmationText||'')}" placeholder="${esc(d.id||title)}"></label><label>原因（可选）<textarea id="vbd-delete-reason" maxlength="200" placeholder="仅写入 WebAdmin audit，不影响世界方块。">${esc(draft.reason||'')}</textarea></label>${errors}</form>`;
+                }
+                function showVirtualBlockDeviceDeleteModal(){
+                  const draft=appState.virtualBlockDelete;if(!draft)return;
+                  openWebAdminModal('删除 / 解绑虚拟方块设备',vbdDeleteModalBody(draft),dangerousModalFooter(draft.saving,'确认解绑'),{className:'wa-config-modal',onClose:()=>{appState.virtualBlockDelete=null;return dismissWebAdminModal();}});
+                }
+                async function openVirtualBlockDeviceDeleteModal(deviceId){
+                  if(!canDeleteVirtualBlockDevice()){toast('需要 EDITOR 或 OWNER 权限才能删除 / 解绑虚拟方块设备。');return;}
+                  let detail=(appState.currentDeviceDetail&&appState.currentDeviceDetail.id===deviceId)?appState.currentDeviceDetail:null;
+                  if(!detail){try{detail=await api(`/api/devices/${encodeURIComponent(deviceId)}`);}catch(err){toast(err.message||'无法读取虚拟方块设备。');return;}}
+                  if(!isVirtualBlockDevice(detail)){toast('只能删除 / 解绑 virtual_block_device。');return;}
+                  appState.virtualBlockDelete=virtualBlockDeleteDraft(detail);
+                  showVirtualBlockDeviceDeleteModal();
+                }
+                async function deleteVirtualBlockDeviceFromModal(){
+                  const draft=appState.virtualBlockDelete;if(!draft)return;
+                  const d=draft.device||{}, deviceId=d.id||'';
+                  draft.confirmed=!!document.getElementById('vbd-delete-confirmed')?.checked;
+                  draft.confirmationText=document.getElementById('vbd-delete-confirmation')?.value?.trim()||'';
+                  draft.reason=document.getElementById('vbd-delete-reason')?.value||'';
+                  draft.saving=true;draft.errors=[];appState.virtualBlockDelete=draft;showVirtualBlockDeviceDeleteModal();
+                  try{
+                    const result=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(deviceId)}/delete`,{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({deviceId,confirmationText:draft.confirmationText,confirmed:draft.confirmed,reason:draft.reason})});
+                    if(result.success){
+                      appState.virtualBlockDelete=null;
+                      appState.currentDeviceDetail=appState.currentDeviceDetail?.id===deviceId?null:appState.currentDeviceDetail;
+                      appState.virtualBlockDevices=(appState.virtualBlockDevices||[]).filter(item=>String(item.id)!==deviceId);
+                      if(appState.virtualBlockDetailCache)delete appState.virtualBlockDetailCache[deviceId];
+                      await dismissWebAdminModal();
+                      toast(result.message||'虚拟方块设备已删除 / 解绑。');
+                      const h=currentRouteHash();
+                      if(h.startsWith('#/devices/')&&routeDetailId(h,'#/devices/')===deviceId)location.hash=result.data?.routeTarget||'#/virtual-block-devices';
+                      else await route({silent:true});
+                      return;
+                    }
+                    draft.saving=false;draft.errors=writeResultErrors(result,'删除 / 解绑虚拟方块设备失败。');appState.virtualBlockDelete=draft;showVirtualBlockDeviceDeleteModal();toast(result.message||'删除 / 解绑失败。');
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'删除 / 解绑虚拟方块设备失败。'}];appState.virtualBlockDelete=draft;showVirtualBlockDeviceDeleteModal();toast(err.message||'删除 / 解绑失败。');}
                 }
                 function deviceMetadataCard(detail){
                   const meta=detail.metadata||{}, lock=detail.metadataLock||{}, editable=canEditDeviceMetadata(), editing=appState.deviceMetadataEdit&&appState.deviceMetadataEdit.deviceId===detail.id, lockedByOther=lock.locked&&!lock.heldByCurrentUser;
@@ -2230,6 +2417,9 @@ public final class WebAdminFrontendScripts {
                   appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
                   appState.advancedDetailOpen=appState.advancedDetailOpen||{};
                   if(appState.selectionCreateVirtualBlock===undefined)appState.selectionCreateVirtualBlock=null;
+                  if(appState.virtualBlockDelete===undefined)appState.virtualBlockDelete=null;
+                  if(appState.signalListenerCreate===undefined)appState.signalListenerCreate=null;
+                  if(appState.signalListenerDelete===undefined)appState.signalListenerDelete=null;
                 }
                 function waMetric(label,value,sub='',iconName='dashboard',kind=''){
                   return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
@@ -2720,6 +2910,7 @@ public final class WebAdminFrontendScripts {
                   const [history,config]=await Promise.all([channel?settle(`/api/signals/history?channel=${encodeURIComponent(channel)}&limit=8`):Promise.resolve({ok:true,data:[]}),listener.id?settle(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(listener.id)}`):Promise.resolve({ok:false})]);
                   const actions=listener.actions||[], recent=history.ok?(history.data||[]):[], cfg=config.ok?(config.data||{}):{};
                   const editAction=listener.id&&canEditSignalListenerBasicConfig()?waButton('编辑基本信息','settings',htmlHandler(`startSignalListenerBasicConfigEdit(${jsString(listener.id)},${jsString(channel)})`),'primary'):waButton('编辑基本信息','settings','disabled','ghost');
+                  const deleteAction=listener.id&&canDeleteSignalListener()?waButton('删除监听器','channel-error',htmlHandler(`openSignalListenerDeleteModal(${jsString(listener.id)},${jsString(channel)})`),'danger'):waButton('删除监听器','channel-error','disabled','danger');
                   const listenerStatus=listener.enabled!==false?'启用':'停用', actionCount=listener.actionCount??actions.length, cooldown=listener.cooldownTicks??cfg.cooldownTicks;
                   const advancedRows=[
                     ['listener.id',listener.id||listenerId],
@@ -2761,7 +2952,7 @@ public final class WebAdminFrontendScripts {
                       detailCard('最近事件',listenerRecentEvents(recent,channel))
                     ],[
                       detailCard('冷却状态',detailInfoGrid([['启用状态',listenerStatus],['冷却时间',formatTicks(cooldown)||'0 tick'],['最后触发',safeHtml(fmtTime(listener.lastTriggeredAt))],['绑定频道',safeHtml(channel?channelButton(channel):'<span class="muted">未绑定</span>')]]),'','detail-card-stretchable'),
-                      detailCard('操作工具',`<div class="wa-quick-grid">${editAction}${waButton('新增动作','plus','disabled','primary')}${waButton('删除监听器','channel-error','disabled','danger')}${waButton('导出监听器','download','disabled','ghost')}</div><p class="wa-disabled-note">仅 enabled / channel / cooldownTicks 已有安全编辑链路；动作变更、删除和导出没有完整后端支持，保持禁用。</p>`)
+                      detailCard('操作工具',`<div class="wa-quick-grid">${editAction}${waButton('新增动作','plus','disabled','primary')}${deleteAction}${waButton('导出监听器','download','disabled','ghost')}</div><p class="wa-disabled-note">Signal Listener 删除使用危险确认 modal；Action 列表编辑、导出和 matcher / itemSubmit / ConditionEngine 仍保持禁用。</p>`)
                     ],[
                       advancedDetailCard('listeners',listener.id||listenerId,advancedRows,[
                       {title:'listener config',rows:advancedRowsFromObject({listener,cfg},'listener')},
@@ -2818,7 +3009,7 @@ public final class WebAdminFrontendScripts {
                   const listeners=appState.listeners||[], channels=appState.listenerSourceChannels||[], filtered=filterListeners(listeners), page=waPageItems('listeners',filtered,10);
                   const enabled=waCount(listeners,l=>l.enabled!==false), bound=uniqueNonBlank(listeners.map(l=>l.channel)).length, today=sumNumeric(channels,['triggerCountToday']);
                   const rendered=setView(`<section class="wa-page">
-                    ${waPageHead('信号监听器','后台虚拟监听器用于监听 channel 并执行 actions，不等同于 signal_receiver 方块。',`${waButton('添加监听器','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}`)}
+                    ${waPageHead('信号监听器','后台虚拟监听器用于监听 channel 并执行 actions，不等同于 signal_receiver 方块。',`${canCreateSignalListener()?waButton('新建监听器','plus',htmlHandler('openSignalListenerCreateModal()'),'primary'):waButton('新建监听器','plus','disabled','primary')}${waButton('批量导入','upload','disabled','ghost')}${waButton('导出配置','download','disabled','ghost')}`)}
                     <section class="wa-card-grid wa-metrics-5">
                       ${waMetric('监听器总数',listeners.length,appState.listenerLoadLimited?'仅加载前 50 个有监听器频道':'来自频道详情 API','consumer-listener')}
                       ${waMetric('启用监听器',enabled,'enabled=true','enabled','ok')}
@@ -2840,7 +3031,7 @@ public final class WebAdminFrontendScripts {
                   if(rendered)bindListenerFilters(focusId);
                 }
                 function listenerTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>监听器名称 / ID</th><th>频道</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${items.map(l=>{const title=l.name||l.id||'未命名监听器', channel=l.channel||l.sourceChannel||'', channelTarget=isBlank(channel)?'':signalHash(channel), detailTarget=isBlank(l.id)?'':listenerHash(l.id);return `<tr class="${detailTarget?'wa-clickable-row':''}" ${detailTarget?navDataAttr(detailTarget,`查看监听器 ${title}`):'aria-disabled="true"'}><td><span class="device-name"><span class="device-icon">${icon('consumer-listener')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(l.id))}</span></span></span></td><td class="truncate" title="${esc(channel)}">${channelCell(channel)}</td><td>${pill(l.enabled!==false?'OK':'WARNING')} ${esc(endpointEnabledText(l.enabled!==false))}</td><td>${esc(formatTicks(l.cooldownTicks)||'0 tick')}</td><td>${esc(l.actionCount ?? '--')}</td><td>${fmtTime(l.lastTriggeredAt)}</td><td><div class="wa-action-cell">${detailTarget?`<button class="wa-btn ghost" ${navDataAttr(detailTarget,`查看监听器 ${title}`)}>详情</button>`:`<button class="wa-btn ghost" disabled>详情</button>`}${channelTarget?`<button class="wa-btn ghost" ${navDataAttr(channelTarget,`查看频道 ${channel}`)}>频道</button>`:`<button class="wa-btn ghost" disabled>频道</button>`}${waIconButton('编辑不可用','settings','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>监听器名称 / ID</th><th>频道</th><th>状态</th><th>冷却时间</th><th>动作数量</th><th>最后触发</th><th>操作</th></tr></thead><tbody>${items.map(l=>{const title=l.name||l.id||'未命名监听器', channel=l.channel||l.sourceChannel||'', channelTarget=isBlank(channel)?'':signalHash(channel), detailTarget=isBlank(l.id)?'':listenerHash(l.id), deleteAttrs=l.id&&canDeleteSignalListener()?htmlHandler(`event.stopPropagation();openSignalListenerDeleteModal(${jsString(l.id)},${jsString(channel)})`):'disabled';return `<tr class="${detailTarget?'wa-clickable-row':''}" ${detailTarget?navDataAttr(detailTarget,`查看监听器 ${title}`):'aria-disabled="true"'}><td><span class="device-name"><span class="device-icon">${icon('consumer-listener')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(l.id))}</span></span></span></td><td class="truncate" title="${esc(channel)}">${channelCell(channel)}</td><td>${pill(l.enabled!==false?'OK':'WARNING')} ${esc(endpointEnabledText(l.enabled!==false))}</td><td>${esc(formatTicks(l.cooldownTicks)||'0 tick')}</td><td>${esc(l.actionCount ?? '--')}</td><td>${fmtTime(l.lastTriggeredAt)}</td><td><div class="wa-action-cell">${detailTarget?`<button class="wa-btn ghost" ${navDataAttr(detailTarget,`查看监听器 ${title}`)}>详情</button>`:`<button class="wa-btn ghost" disabled>详情</button>`}${channelTarget?`<button class="wa-btn ghost" ${navDataAttr(channelTarget,`查看频道 ${channel}`)}>频道</button>`:`<button class="wa-btn ghost" disabled>频道</button>`}<button class="wa-btn danger" ${deleteAttrs}>删除</button></div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterListeners(items){
                   const f=appState.listenerFilters||{};
@@ -2969,7 +3160,7 @@ public final class WebAdminFrontendScripts {
                   if(rendered){bindVirtualBlockFilters(focusId);if(!options.skipDetailRefresh)refreshVisibleVirtualBlockDetails(page.items,{force:!!options.silent});}
                 }
                 function virtualBlockTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>绑定方块</th><th>位置</th><th>触发类型</th><th>通道</th><th>状态</th><th>条件配置</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id, block=virtualBlockId(d), trigger=virtualTriggerType(d);return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('virtual-block-device')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td><span>${esc(block||'--')}</span><span class="device-subtitle">原版材质未在列表 API 中提供时仅显示文本</span></td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${textPill(labelTriggerType(trigger),trigger==='container'?'warning':(trigger==='interact'?'ok':'info'))}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${esc(virtualConditionText(d))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>绑定方块</th><th>位置</th><th>触发类型</th><th>通道</th><th>状态</th><th>条件配置</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id, block=virtualBlockId(d), trigger=virtualTriggerType(d), deleteAttrs=canDeleteVirtualBlockDevice()?htmlHandler(`event.stopPropagation();openVirtualBlockDeviceDeleteModal(${jsString(d.id)})`):'disabled';return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('virtual-block-device')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td><span>${esc(block||'--')}</span><span class="device-subtitle">原版材质未在列表 API 中提供时仅显示文本</span></td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${textPill(labelTriggerType(trigger),trigger==='container'?'warning':(trigger==='interact'?'ok':'info'))}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${esc(virtualConditionText(d))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}>查看</button><button class="wa-btn danger" ${deleteAttrs}>解绑</button></div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterVirtualBlocks(items){
                   const f=appState.virtualBlockFilters||{};

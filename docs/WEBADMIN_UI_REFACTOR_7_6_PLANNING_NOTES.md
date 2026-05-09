@@ -23,25 +23,37 @@
 - 客户端退出选择模式。
 - WebAdmin 通过 realtime 刷新并进入或提示新设备详情。
 
-## 3. 本阶段 API
+## 3. 第二阶段 MVP
+
+第二阶段在同一 feature 分支上补齐最小 WebAdmin 对象生命周期入口：
+
+- `virtual_block_device` 删除 / 解绑：只删除 `SignalDeviceStore` / registry 配置，不 setblock，不破坏世界方块，不删除其它 Signal 设备类型。
+- `SignalListener` 新建：最小字段为 name/displayName、channel、enabled、cooldownTicks；默认 actions 为空。
+- `SignalListener` 删除：删除该 listener 内嵌 actions，但不删除 channel、receiver、device 或历史记录。
+- WebUI 使用 7.5 fixed modal、暗色 channel combobox、dangerous confirm modal、silent refresh 和安全 returnTo。
+- 创建 listener 成功后进入 `#/listeners/<id>?returnTo=%23%2Flisteners`。
+- 删除当前详情对象后返回对应列表页。
+
+## 4. API
 
 - `POST /api/webadmin/selection/start`
 - `POST /api/webadmin/selection/cancel`
 - `GET /api/webadmin/selection/status`
+- `POST /api/webadmin/virtual-block-devices/{deviceId}/delete`
+- `POST /api/webadmin/signal-listeners`
+- `POST /api/webadmin/signal-listeners/{listenerId}/delete`
 
 这些 API 必须接入现有 WebAdmin 写安全链路：EDITOR / OWNER 权限、CSRF、same-origin、`WebAdminWriteResult`、audit、validation 和 realtime。
 
-## 4. 本阶段网络与客户端
+## 5. 第一阶段网络与客户端
 
 - S2C：开始选择、取消、失败、完成确认。
 - C2S：完成选择、ESC 取消。
 - 客户端模式参考 Camera APP 的非 Screen 模式：HUD overlay + keyboard/mouse mixin 阻断交互。
 - 选择模式不设自动 timeout，只由 ESC、服务端取消、选择完成、断线或服务器停止结束。
 
-## 5. 本阶段不做
+## 6. 当前仍不做
 
-- 不做 SignalListener / 虚拟监听器新建或删除。
-- 不做 VBD 删除 / 解绑。
 - 不做 interaction item matcher。
 - 不做 itemSubmit。
 - 不做 consume / inventory / equipment。
@@ -53,13 +65,13 @@
 - 不修改 Figma。
 - 不做 WebAdmin 全量对象生命周期。
 
-## 6. 后续方向
+## 7. 后续方向
 
 7.6 后续仍需要单独规划：
 
-- SignalListener 创建 / 删除。
-- VBD 删除 / 解绑。
 - 更多对象生命周期入口。
+- SignalListener action 新增 / 删除 / reorder。
+- VBD 重新绑定、批量操作或其它 device 生命周期。
 - 更通用的游戏内 / 客户端对象选择器。
 - region、entity、container 等选择类型。
 - interaction matcher、itemSubmit、ConditionEngine 与 Scratch-like editor。
