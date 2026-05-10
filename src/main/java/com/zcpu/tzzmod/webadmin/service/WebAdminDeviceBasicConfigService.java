@@ -103,10 +103,11 @@ public final class WebAdminDeviceBasicConfigService {
     ) {
         String deviceId = request == null ? "" : safe(request.deviceId);
         SignalDeviceData device = findDevice(server, deviceId);
+        String canonicalDeviceId = device == null ? deviceId : device.id();
         WebAdminWriteTarget target = new WebAdminWriteTarget(
                 "DEVICE_BASIC_CONFIG",
-                deviceId,
-                device == null ? deviceId : WebAdminReadonlySupport.deviceDisplayName(device)
+                canonicalDeviceId,
+                device == null ? canonicalDeviceId : WebAdminReadonlySupport.deviceDisplayName(device)
         );
         WebAdminWriteContext writeContext = WebAdminWriteContext.of(
                 user,
@@ -124,6 +125,9 @@ public final class WebAdminDeviceBasicConfigService {
             );
             audit(writeContext, result, Map.of(), Map.of());
             return result;
+        }
+        if (request != null) {
+            request.deviceId = device.id();
         }
 
         WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG);

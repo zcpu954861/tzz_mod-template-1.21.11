@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.webadmin.service;
 
+import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.signal.SignalChannel;
@@ -35,6 +36,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
@@ -123,10 +125,11 @@ public final class WebAdminDeviceExtendedConfigService {
     ) {
         String deviceId = request == null ? "" : safe(request.deviceId);
         SignalDeviceData device = findDevice(server, deviceId);
+        String canonicalDeviceId = device == null ? deviceId : device.id();
         WebAdminWriteTarget target = new WebAdminWriteTarget(
                 "DEVICE_EXTENDED_CONFIG",
-                deviceId,
-                device == null ? deviceId : WebAdminReadonlySupport.deviceDisplayName(device)
+                canonicalDeviceId,
+                device == null ? canonicalDeviceId : WebAdminReadonlySupport.deviceDisplayName(device)
         );
         WebAdminWriteContext writeContext = WebAdminWriteContext.of(
                 user,
@@ -144,6 +147,9 @@ public final class WebAdminDeviceExtendedConfigService {
             );
             audit(writeContext, result, Map.of(), Map.of());
             return result;
+        }
+        if (request != null) {
+            request.deviceId = device.id();
         }
 
         WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG);
@@ -493,33 +499,97 @@ public final class WebAdminDeviceExtendedConfigService {
                     "该 " + label + " 所在区块未加载。WebAdmin 不会强制加载区块；请让玩家靠近该方块后重试。"
             );
         }
+        BlockState blockState = world.getBlockState(pos);
+        String blockId = Registries.BLOCK.getId(blockState.getBlock()).toString();
+        String expectedBlockId = expectedBlockId(label);
         BlockEntity blockEntity = world.getBlockEntity(pos);
-        String blockId = Registries.BLOCK.getId(world.getBlockState(pos).getBlock()).toString();
-        if (blockEntity == null) {
+        String blockEntityType = blockEntity == null ? "" : blockEntity.getClass().getSimpleName();
+        String runtimeState = classifyPhysicalRuntimeState(
+                true,
+                true,
+                blockId,
+                expectedBlockId,
+                blockEntity != null,
+                blockEntity != null && expectedType.isInstance(blockEntity)
+        );
+        if (!"ready".equals(runtimeState)) {
             return Support.runtimeUnavailable(
                     fields,
-                    "block_entity_missing",
+                    runtimeState,
                     true,
                     true,
-                    false,
-                    "",
+                    blockEntity != null,
+                    blockEntityType,
                     blockId,
-                    "区块已加载，但当前位置未找到 " + label + " 方块实体。请确认方块未被破坏、坐标和维度仍匹配。"
+                    runtimeReason(runtimeState, label, expectedBlockId, blockId, blockEntityType, expectedType.getSimpleName())
             );
         }
-        if (!expectedType.isInstance(blockEntity)) {
-            return Support.runtimeUnavailable(
-                    fields,
-                    "block_entity_type_mismatch",
-                    true,
-                    true,
-                    true,
-                    blockEntity.getClass().getSimpleName(),
-                    blockId,
-                    "区块已加载，但当前位置的方块实体不是 " + label + "（当前：" + blockEntity.getClass().getSimpleName() + "）。"
-            );
+        return Support.editable(fields, blockId, blockEntityType);
+    }
+
+    public static String classifyPhysicalRuntimeState(
+            boolean worldAvailable,
+            boolean chunkLoaded,
+            String actualBlockId,
+            String expectedBlockId,
+            boolean blockEntityLoaded,
+            boolean blockEntityMatches
+    ) {
+        if (!worldAvailable) {
+            return "world_unavailable";
         }
-        return Support.editable(fields, blockId, blockEntity.getClass().getSimpleName());
+        if (!chunkLoaded) {
+            return "chunk_unloaded";
+        }
+        String actual = safe(actualBlockId);
+        String expected = safe(expectedBlockId);
+        if (actual.isBlank() || "minecraft:air".equals(actual)) {
+            return "block_missing";
+        }
+        if (!expected.isBlank() && !expected.equals(actual)) {
+            return "physical_block_mismatch";
+        }
+        if (!blockEntityLoaded) {
+            return "block_entity_missing";
+        }
+        if (!blockEntityMatches) {
+            return "block_entity_type_mismatch";
+        }
+        return "ready";
+    }
+
+    private static String expectedBlockId(String label) {
+        if ("signal_receiver".equals(label)) {
+            return Registries.BLOCK.getId(ModBlocks.SIGNAL_RECEIVER).toString();
+        }
+        if ("action_relay".equals(label)) {
+            return Registries.BLOCK.getId(ModBlocks.ACTION_RELAY).toString();
+        }
+        if ("signal_emitter".equals(label)) {
+            return Registries.BLOCK.getId(ModBlocks.SIGNAL_EMITTER).toString();
+        }
+        return "";
+    }
+
+    private static String runtimeReason(
+            String runtimeState,
+            String label,
+            String expectedBlockId,
+            String actualBlockId,
+            String blockEntityType,
+            String expectedBlockEntityType
+    ) {
+        return switch (runtimeState) {
+            case "block_missing" -> "区块已加载，但该位置是空气或没有可用方块。预期方块：" + expectedBlockId + "。";
+            case "physical_block_mismatch" -> "区块已加载，但当前位置不是 " + label + " 方块。预期方块：" + expectedBlockId + "。";
+            case "block_entity_missing" -> "当前方块是 " + (isBlank(actualBlockId) ? expectedBlockId : actualBlockId)
+                    + "，但区块内缺少 " + expectedBlockEntityType
+                    + "。这通常表示方块状态与 BlockEntity 数据不一致、旧存档/外部编辑留下了坏数据，或方块实体未随区块正常恢复；请重新放置该方块或先运行诊断清理。";
+            case "block_entity_type_mismatch" -> "区块已加载，但当前位置的方块实体不是 " + label + "（当前："
+                    + (isBlank(blockEntityType) ? "未知" : blockEntityType)
+                    + "，预期：" + expectedBlockEntityType + "）。";
+            default -> "设备当前运行状态不可写。";
+        };
     }
 
     private static Map<String, Object> values(SignalDeviceData device, List<String> fields) {

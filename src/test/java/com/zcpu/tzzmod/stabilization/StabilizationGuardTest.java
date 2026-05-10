@@ -916,7 +916,16 @@ public final class StabilizationGuardTest {
                 "wa-modal-backdrop",
                 "wa-modal-viewport",
                 "wa-modal-body",
-                "wa-modal-foot"
+                "wa-modal-foot",
+                "modalDirtyChecker",
+                "modalSyncBeforeClose",
+                "modalDraftDirty",
+                "markModalInitialSnapshot",
+                "syncModalDraftBeforeClose",
+                "data-discard-confirm-modal",
+                "cancelDiscardModalClose",
+                "confirmDiscardModalClose",
+                "closeWebAdminModal(true,true)"
         )) {
             requireContains(js + css, modalMarker, "WebAdmin 7.5 modal marker present: " + modalMarker);
         }
@@ -983,6 +992,8 @@ public final class StabilizationGuardTest {
                 "calc(100vh - 20px)",
                 ".wa-config-modal",
                 ".wa-edit-section",
+                ".wa-discard-confirm-layer",
+                ".wa-discard-confirm-dialog",
                 ".wa-flow-chain",
                 ".readonly-note.danger",
                 ".switch-row"
@@ -1359,6 +1370,8 @@ public final class StabilizationGuardTest {
                   '#/signal-doctor',
                   '#/signals/test.channel',
                   '#/devices/test-device',
+                  '#/devices/minecraft%3Aoverworld%409%2C-60%2C13',
+                  '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action',
                   '#/regions/test-region',
                   '#/listeners/test-listener',
@@ -1367,6 +1380,8 @@ public final class StabilizationGuardTest {
                 const detailRoutes = new Set([
                   '#/signals/test.channel',
                   '#/devices/test-device',
+                  '#/devices/minecraft%3Aoverworld%409%2C-60%2C13',
+                  '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action',
                   '#/regions/test-region',
                   '#/listeners/test-listener',
@@ -1386,6 +1401,8 @@ public final class StabilizationGuardTest {
                 const expectedDetailApi = {
                   '#/signals/test.channel':'/api/signals/channels/test.channel',
                   '#/devices/test-device':'/api/devices/test-device',
+                  '#/devices/minecraft%3Aoverworld%409%2C-60%2C13':'/api/devices/minecraft%3Aoverworld%409%2C-60%2C13',
+                  '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10':'/api/devices/minecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action':'/api/actions/test-action',
                   '#/regions/test-region':'/api/regions/test-region',
                   '#/listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener',
@@ -1974,6 +1991,9 @@ public final class StabilizationGuardTest {
                 "advancement grant PlayerName only minecraft:story/root",
                 "attribute PlayerName minecraft:generic.max_health get",
                 "data get entity PlayerName",
+                "say ban kick op stop whitelist",
+                "tellraw PlayerName {\"text\":\"op stop whitelist\"}",
+                "execute as PlayerName run op Someone",
                 "save-off",
                 "save-on",
                 "save-all",
@@ -1998,6 +2018,24 @@ public final class StabilizationGuardTest {
             requireFalse(WebAdminActionRelayActionsService.validateActionEntries(List.of(actionEntry("command", blockedCommand))).isEmpty(),
                     "7.7 action relay rejects server management command action: " + blockedCommand);
         }
+        requireEquals("world_unavailable", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(false, false, "", "tzz_mod:signal_receiver", false, false),
+                "physical runtime state distinguishes unavailable world");
+        requireEquals("chunk_unloaded", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, false, "", "tzz_mod:signal_receiver", false, false),
+                "physical runtime state distinguishes unloaded chunk");
+        requireEquals("block_missing", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "minecraft:air", "tzz_mod:signal_receiver", false, false),
+                "physical runtime state distinguishes missing/air block");
+        requireEquals("physical_block_mismatch", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "minecraft:stone", "tzz_mod:signal_receiver", false, false),
+                "physical runtime state checks expected physical block before block entity");
+        requireEquals("block_entity_missing", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "tzz_mod:signal_receiver", "tzz_mod:signal_receiver", false, false),
+                "signal_receiver block with missing block entity is classified precisely");
+        requireEquals("block_entity_type_mismatch", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "tzz_mod:signal_receiver", "tzz_mod:signal_receiver", true, false),
+                "signal_receiver block with wrong block entity is classified as type mismatch");
+        requireEquals("ready", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "tzz_mod:signal_receiver", "tzz_mod:signal_receiver", true, true),
+                "signal_receiver block with matching block entity is ready for pulseTicks edits");
+        requireEquals("ready", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "tzz_mod:signal_emitter", "tzz_mod:signal_emitter", true, true),
+                "signal_emitter block with matching block entity is ready for physical status reporting");
+        requireEquals("ready", WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(true, true, "tzz_mod:action_relay", "tzz_mod:action_relay", true, true),
+                "action_relay block with matching block entity is ready for action list edits");
         SignalDeviceData fingerprintDevice = fullDevice();
         String baseFingerprint = WebAdminActionRelayActionsService.fingerprintFor(fingerprintDevice, List.of(
                 new ActionConfig(ActionType.COMMAND, "say guard", true, false, 0, false)
@@ -2043,8 +2081,11 @@ public final class StabilizationGuardTest {
         String basicConfigService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDeviceBasicConfigService.java"), StandardCharsets.UTF_8);
         String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
         String signalDeviceStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceStore.java"), StandardCharsets.UTF_8);
+        String deviceMetadataStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminDeviceMetadataStore.java"), StandardCharsets.UTF_8);
+        String deviceMetadataService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDeviceMetadataService.java"), StandardCharsets.UTF_8);
         String readonlyRoutes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/route/WebAdminReadonlyRoutes.java"), StandardCharsets.UTF_8);
         String js = WebAdminFrontendAssets.appJs();
+        String styles = WebAdminFrontendStyles.appCss();
 
         requireContains(webServer, "/api/webadmin/action-relay-actions/", "7.7 action relay action API route exists");
         for (String marker : List.of(
@@ -2061,6 +2102,7 @@ public final class StabilizationGuardTest {
                 "actionsEditable",
                 "snapshotActionCount",
                 "blockId",
+                "expectedBlockId",
                 "DEVICE_CONFIG_CHANGED",
                 "replaceActions",
                 "ActionType.COMMAND",
@@ -2079,7 +2121,10 @@ public final class StabilizationGuardTest {
                 "editableFields",
                 "fieldDisabledReasons",
                 "runtimeState",
+                "block_missing",
+                "physical_block_mismatch",
                 "block_entity_missing",
+                "当前方块是",
                 "data-physical-tick-field",
                 "pulseTicks",
                 "cooldownTicks"
@@ -2102,9 +2147,48 @@ public final class StabilizationGuardTest {
             requireContains(basicConfigService, marker, "7.7 physical device basic config remains editable without action-list loaded gating: " + marker);
         }
         requireContains(editLockService, "action_relay_actions", "7.7 edit lock target exists for action relay actions");
-        for (String marker : List.of("parseSourcePositionRef", "findBySourcePosition", "lastIndexOf('@')", "split(\",\", -1)")) {
+        for (String marker : List.of(
+                "runOnServerThread(() -> handleDeviceBasicConfig",
+                "runOnServerThread(() -> handleDeviceExtendedConfig",
+                "runOnServerThread(() -> handleActionRelayActions",
+                "runOnServerThread(() -> handleEditLocks",
+                "runOnServerThread(() -> readonlyHandled[0] = readonlyRoutes.handle",
+                "minecraftServer.execute"
+        )) {
+            requireContains(webServer, marker, "7.7 physical device WebAdmin world access runs on server thread: " + marker);
+        }
+        for (String marker : List.of(
+                "canonicalizeEditLockTargetId",
+                "SignalDeviceStore.resolveDevice(minecraftServer, safeTargetId)",
+                "WebAdminEditLockService.TARGET_DEVICE_METADATA",
+                "WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG",
+                "WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG",
+                "WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS"
+        )) {
+            requireContains(webServer, marker, "7.7 typed device refs canonicalize edit-lock targets before status/acquire/release: " + marker);
+        }
+        for (String marker : List.of(
+                "parseSourcePositionRef",
+                "findBySourcePosition",
+                "hasDeviceTypePrefix",
+                "stripDeviceTypePrefix",
+                "lastIndexOf('@')",
+                "split(\",\", -1)",
+                "expectedType",
+                "SignalDeviceData.TYPE_SIGNAL_RECEIVER,",
+                "SignalDeviceData.TYPE_SIGNAL_EMITTER",
+                "SignalDeviceData.TYPE_ACTION_RELAY",
+                "replaceOrAdd(state, normalized)"
+        )) {
             requireContains(signalDeviceStore, marker, "7.7 physical device id lookup supports dimension@x,y,z marker: " + marker);
         }
+        requireContains(js, "function deviceRouteRef", "frontend builds typed physical device route refs");
+        requireContains(js, "function deviceHash(idOrDevice,type='')", "frontend centralizes device detail hash encoding");
+        requireContains(js, "function deviceApiRef(id){return stripDeviceTypeRef(id);}", "typed device routes use canonical raw id for detail/config API calls");
+        requireContains(js, "const canonicalEncoded=encodeURIComponent(detail.id||lookupId)", "device detail follow-up APIs use canonical raw id after typed route lookup");
+        requireContains(js, "deviceHash(d,'signal_receiver')", "receiver list routes use typed signal_receiver refs");
+        requireContains(js, "function currentRouteHash(){return location.hash||'#/dashboard';}", "frontend keeps hash raw and decodes only route segments");
+        requireFalse(js.contains("decodeURIComponent(location.hash"), "frontend must not decode the entire hash before route parsing");
         for (String marker : List.of(
                 "isPhysicalSignalDeviceType",
                 "withBasicConfigForWebAdmin(existing, enabled, normalizedChannel)",
@@ -2141,6 +2225,8 @@ public final class StabilizationGuardTest {
                 "actionRelayRuntimeStatusHtml",
                 "data-action-relay-loaded-state",
                 "data-device-runtime-state",
+                "extendedReadonlyReason",
+                "当前类型专属配置以只读快照显示",
                 "data-physical-device-delete-disabled",
                 "channel-combo action-relay-channel-combo",
                 "closeDeviceMoreMenu",
@@ -2152,10 +2238,95 @@ public final class StabilizationGuardTest {
                 "7.7 config/action realtime marks only related routes for action relay actions");
         requireContains(js, "if(target==='action_relay_actions'){add('dashboard','history','signals','devices','actions','actionTemplates')",
                 "7.7 write audit realtime maps action relay action changes to related routes");
+        for (String marker : List.of(
+                "data-floating-popover=\"device-more\"",
+                "data-table-popover-portal=\"true\"",
+                "ensurePopoverRoot",
+                "positionDeviceMorePopover",
+                "closeDeviceMoreMenu(false)",
+                "data-action-list-preserve-scroll=\"true\"",
+                "captureActionRelayEditorUiState",
+                "restoreActionRelayEditorUiState",
+                "draft.conflict=result.code==='conflict_detected'",
+                "actionRelayLockHeldByOther",
+                "lockHeldByOther",
+                "deviceEditLocks:{}",
+                "rememberDeviceEditLockEvent(data)",
+                "cachedDeviceConfigLocks",
+                "actionRelayLockForDevice",
+                "deviceConfigLockMessage",
+                "data-device-config-lock-disabled=\"true\"",
+                "data-device-config-lock-badge=\"true\"",
+                "openActionRelayActionsReadonlyModal",
+                "data-action-relay-lock-held=\"true\"",
+                "if(type==='edit_lock_changed')return",
+                "eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`))",
+                "addDeviceDetailRouteKeys(add,event.deviceId",
+                "sameDeviceRef(event.deviceId,routeDetailId"
+        )) {
+            requireContains(js, marker, "7.7 Step 2 repair frontend marker present: " + marker);
+        }
+        requireContains(styles, ".wa-device-more-popover{display:grid;gap:4px;position:fixed",
+                "7.7 more menu uses fixed floating popover instead of table-row expansion");
+        requireContains(styles, ".wa-action-value-field{display:grid;gap:6px;min-width:0}",
+                "7.7 action cards use stable no-overlap value field layout");
+        for (String marker : List.of(
+                "removeDeviceAliases",
+                "metadataKey(String deviceId, String deviceType)",
+                "metadataKeys(String deviceId, String deviceType)",
+                "stripKnownTypePrefix"
+        )) {
+            requireContains(deviceMetadataStore, marker, "7.7 physical device metadata cleanup/type-aware key marker present: " + marker);
+        }
+        requireContains(deviceMetadataService, "metadataEntry(file, device)",
+                "7.7 device metadata lookup reads type-aware primary key plus legacy raw aliases");
+        requireContains(deviceMetadataService, "file.devices.remove(alias)",
+                "7.7 device metadata save migrates legacy raw aliases to the type-aware primary key");
+        for (String marker : List.of(
+                "cleanupIfTypeChanged",
+                "existingOfType(rawExisting, SignalDeviceData.TYPE_SIGNAL_RECEIVER)",
+                "existing = existingOfType(existing, SignalDeviceData.TYPE_ACTION_RELAY)",
+                "cleanupWebAdminMetadata(server, device.id(), device.type())",
+                "WebAdminRealtimeEventBus.publishDeviceRemoved(device.id(), device.type())"
+        )) {
+            requireContains(signalDeviceStore, marker, "7.7 physical device replacement cleanup marker present: " + marker);
+        }
+        requireContains(actionService, "Validation validation = validateRequest(server, request);",
+                "7.7 action relay validates request before stale fingerprint conflict classification");
+        requireContains(actionService, "affectedSignalChannels(device, beforeActions, afterActions)",
+                "7.7 action relay realtime includes affected signal action channels");
         requireContains(js, "event?.payload?.previousChannel", "device basic config route mapping refreshes previous channel detail");
+        requireContains(deviceMetadataService, "request.deviceId = device.id();",
+                "7.7 metadata save canonicalizes typed refs before lock release and audit target handling");
+        requireContains(basicConfigService, "request.deviceId = device.id();",
+                "7.7 basic config save canonicalizes typed refs before lock release and channel save");
+        requireContains(extendedConfigService, "request.deviceId = device.id();",
+                "7.7 extended config save canonicalizes typed refs before lock release and tick save");
+        requireContains(js, "body:JSON.stringify({displayName:meta.displayName,note:meta.note,iconKey:meta.iconKey,expectedVersion:meta.expectedVersion,lockId:meta.lockId})",
+                "7.7 unified device config save sends displayName/note/iconKey with edit lock");
+        requireContains(js, "body:JSON.stringify({enabled:basic.enabled,channel:basic.channel,expectedFingerprint:basic.expectedFingerprint,lockId:basic.lockId})",
+                "7.7 unified device config save sends enabled/channel with edit lock");
         requireContains(js, "applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(deviceId)",
                 "action relay action editor rerender preserves other unified config draft inputs");
+        for (String dirtyCloseMarker : List.of(
+                "data-discard-confirm-modal",
+                "modalDirtyChecker",
+                "modalSyncBeforeClose",
+                "syncBeforeClose:()=>syncModalDraftBeforeClose('device_config'",
+                "dirtyCheck:()=>isDeviceConfigModalDirty(deviceId)",
+                "dirtyCheck:()=>!!appState.actionRelayActionsEdit?.lockId&&modalDraftDirty('action_relay_actions'",
+                "dirtyCheck:()=>modalDraftDirty('signal_listener_create'",
+                "closeWebAdminModal(true,true)",
+                "event.key==='Escape'){if(appState.modalDiscardConfirmOpen)",
+                "normalizeActionRelayEditableAction",
+                "actionRelayActionsEditableJson",
+                "actionRelayActionsDirty(draft)"
+        )) {
+            requireContains(js, dirtyCloseMarker, "7.7 dirty edit modal close guard marker present: " + dirtyCloseMarker);
+        }
         requireFalse(js.contains("openPhysicalDeviceDeleteModal"), "frontend does not expose physical signal device delete modal");
+        requireFalse(js.contains("session.errors.push({message:cfg.unsupportedReason"),
+                "runtime readonly physical device state is shown once in the extended status card, not duplicated as a modal error");
         requireFalse(js.contains("data-signal-receiver-action-list") || js.contains("receiverOutputTarget"),
                 "signal_receiver remains redstone pulse only and does not expose action list or arbitrary output target");
         requireFalse(js.contains("saveItemSubmit") || js.contains("saveMatcher") || js.contains("saveConditionEngine") || js.contains("conditionEngineEditor"),
@@ -2840,6 +3011,19 @@ public final class StabilizationGuardTest {
         requireContains(js, "renderSignalListenerConfigChannelCombo", "signal listener channel field reuses dark combobox helper");
         requireContains(js, "renderSignalListenerCreateChannelCombo", "signal listener create channel field uses dark combobox helper");
         requireContains(js, "channelOptionLabel", "basic config channel candidates include display helper");
+        requireContains(js, "channelComboQuery", "channel combobox keeps typed value separate from search query so opening menu shows existing channels");
+        requireContains(js, "setChannelComboQuery", "channel combobox only filters after the user types a search query");
+        requireContains(js, "resetChannelComboQuery", "channel combobox resets search query when opening from a prefilled value");
+        requireContains(js, "markChannelOptionsDirty(data)", "realtime channel/device changes invalidate the channel option cache");
+        requireContains(js, "appState.channelOptionsDirty=true", "channel option cache marks dirty after related realtime events");
+        requireContains(js, "if(!force&&!appState.channelOptionsDirty&&Array.isArray(appState.channelOptions))return appState.channelOptions;",
+                "channel options reload after dirty realtime events but remain cached otherwise");
+        requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft))",
+                "basic/listener/selection channel comboboxes use independent query instead of current saved channel value");
+        requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,field))",
+                "extended channel combobox uses independent per-field query");
+        requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,index))",
+                "action relay signal action channel combobox uses independent per-action query");
         requireFalse(js.contains("<datalist"), "basic config channel picker does not use native datalist menu");
         requireContains(js, "该频道当前未在系统中发现", "basic config channel input warns about unseen channels");
         requireContains(js, "不会自动创建监听器", "basic config channel input explains manual channel behavior");

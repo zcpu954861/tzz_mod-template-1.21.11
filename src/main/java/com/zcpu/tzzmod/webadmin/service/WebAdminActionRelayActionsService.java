@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.webadmin.service;
 
+import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
@@ -33,10 +34,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
@@ -81,6 +84,7 @@ public final class WebAdminActionRelayActionsService {
             data.put("blockEntityLoaded", false);
             data.put("blockEntityType", "");
             data.put("blockId", "");
+            data.put("expectedBlockId", "");
             return data;
         }
         boolean typeSupported = SignalDeviceData.TYPE_ACTION_RELAY.equals(relayTarget.device().type());
@@ -98,6 +102,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("blockEntityLoaded", relayTarget.blockEntityLoaded());
         data.put("blockEntityType", relayTarget.blockEntityType());
         data.put("blockId", relayTarget.blockId());
+        data.put("expectedBlockId", relayTarget.expectedBlockId());
         data.put("dimension", relayTarget.device().dimension());
         data.put("position", Map.of("x", relayTarget.device().x(), "y", relayTarget.device().y(), "z", relayTarget.device().z()));
         return data;
@@ -199,6 +204,13 @@ public final class WebAdminActionRelayActionsService {
             }
         }
 
+        Validation validation = validateRequest(server, request);
+        if (!validation.errors().isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), requestSummary(validation.actions()));
+            return result;
+        }
+
         if (request == null || isBlank(request.expectedFingerprint)) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
                     "expectedFingerprint",
@@ -212,13 +224,6 @@ public final class WebAdminActionRelayActionsService {
         if (!fingerprintMatches(relayTarget.device(), relayTarget.relay().actions(), request.expectedFingerprint)) {
             WebAdminWriteResult result = conflictDetected(target, relayTarget.device(), relayTarget.relay().actions(), request.expectedFingerprint);
             audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "fingerprint_conflict"));
-            return result;
-        }
-
-        Validation validation = validateRequest(server, request);
-        if (!validation.errors().isEmpty()) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
-            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), requestSummary(validation.actions()));
             return result;
         }
 
@@ -255,7 +260,7 @@ public final class WebAdminActionRelayActionsService {
                 data
         );
         WebAdminAuditEvent auditEvent = audit(writeContext, result, currentSummary(relayTarget.device(), beforeActions), currentSummary(updated == null ? relayTarget.device() : updated, afterActions));
-        publishRealtime(updated == null ? relayTarget.device() : updated, auditEvent, user);
+        publishRealtime(updated == null ? relayTarget.device() : updated, auditEvent, user, beforeActions, afterActions);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
     }
@@ -565,6 +570,7 @@ public final class WebAdminActionRelayActionsService {
         boolean chunkLoaded = false;
         BlockEntity blockEntity = null;
         String blockId = "";
+        String expectedBlockId = Registries.BLOCK.getId(ModBlocks.ACTION_RELAY).toString();
         if (world != null) {
             chunkLoaded = world.isChunkLoaded(pos);
             if (chunkLoaded) {
@@ -582,7 +588,8 @@ public final class WebAdminActionRelayActionsService {
                 chunkLoaded,
                 blockEntity != null,
                 blockEntity == null ? "" : blockEntity.getClass().getSimpleName(),
-                blockId
+                blockId,
+                expectedBlockId
         );
     }
 
@@ -602,9 +609,16 @@ public final class WebAdminActionRelayActionsService {
         return auditEvent;
     }
 
-    private void publishRealtime(SignalDeviceData device, WebAdminAuditEvent auditEvent, WebAdminUser user) {
+    private void publishRealtime(
+            SignalDeviceData device,
+            WebAdminAuditEvent auditEvent,
+            WebAdminUser user,
+            List<ActionConfig> beforeActions,
+            List<ActionConfig> afterActions
+    ) {
         String deviceId = device.id();
         String routeTarget = "#/devices/" + encode(deviceId);
+        List<String> affectedChannels = affectedSignalChannels(device, beforeActions, afterActions);
         WebAdminRealtimeEvent configEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
                 .deviceId(deviceId)
                 .channel(device.channel())
@@ -613,6 +627,7 @@ public final class WebAdminActionRelayActionsService {
                 .summary("Action Relay 动作列表已更新。")
                 .routeTarget(routeTarget)
                 .payload("targetType", "action_relay_actions")
+                .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent actionConfigEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED)
                 .deviceId(deviceId)
@@ -625,6 +640,7 @@ public final class WebAdminActionRelayActionsService {
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
                 .payload("actionCount", device.actionCount())
+                .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent actionEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_CHANGED)
                 .deviceId(deviceId)
@@ -635,7 +651,8 @@ public final class WebAdminActionRelayActionsService {
                 .summary("Action Relay 动作已变化。")
                 .routeTarget("#/actions")
                 .payload("targetType", "action_relay_actions")
-                .payload("deviceId", deviceId));
+                .payload("deviceId", deviceId)
+                .payload("affectedChannels", affectedChannels));
         WebAdminRealtimeEvent deviceConfigEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
                 .deviceId(deviceId)
                 .channel(device.channel())
@@ -646,6 +663,7 @@ public final class WebAdminActionRelayActionsService {
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
                 .payload("actionCount", device.actionCount())
+                .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .deviceId(deviceId)
@@ -656,11 +674,38 @@ public final class WebAdminActionRelayActionsService {
                 .routeTarget(routeTarget)
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
+                .payload("affectedChannels", affectedChannels)
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("actionConfigEventId", actionConfigEvent == null ? "" : actionConfigEvent.id())
                 .payload("actionEventId", actionEvent == null ? "" : actionEvent.id())
                 .payload("deviceConfigEventId", deviceConfigEvent == null ? "" : deviceConfigEvent.id()));
+    }
+
+    private static List<String> affectedSignalChannels(
+            SignalDeviceData device,
+            List<ActionConfig> beforeActions,
+            List<ActionConfig> afterActions
+    ) {
+        Set<String> channels = new LinkedHashSet<>();
+        if (device != null && !isBlank(device.channel())) {
+            channels.add(SignalChannel.normalize(device.channel()));
+        }
+        collectSignalActionChannels(channels, beforeActions);
+        collectSignalActionChannels(channels, afterActions);
+        channels.removeIf(WebAdminActionRelayActionsService::isBlank);
+        return List.copyOf(channels);
+    }
+
+    private static void collectSignalActionChannels(Set<String> channels, List<ActionConfig> actions) {
+        if (channels == null || actions == null) {
+            return;
+        }
+        for (ActionConfig action : actions) {
+            if (action != null && action.type() == ActionType.SIGNAL && !isBlank(action.value())) {
+                channels.add(SignalChannel.normalize(action.value()));
+            }
+        }
     }
 
     private void releaseLockAfterWrite(
@@ -870,14 +915,15 @@ public final class WebAdminActionRelayActionsService {
             boolean chunkLoaded,
             boolean blockEntityLoaded,
             String blockEntityType,
-            String blockId
+            String blockId,
+            String expectedBlockId
     ) {
         static ActionRelayTarget missing() {
-            return new ActionRelayTarget(null, null, null, null, false, false, false, "", "");
+            return new ActionRelayTarget(null, null, null, null, false, false, false, "", "", "");
         }
 
         static ActionRelayTarget unsupportedType(SignalDeviceData device) {
-            return new ActionRelayTarget(device, null, null, null, false, false, false, "", "");
+            return new ActionRelayTarget(device, null, null, null, false, false, false, "", "", "");
         }
 
         boolean actionsReadable() {
@@ -889,27 +935,26 @@ public final class WebAdminActionRelayActionsService {
         }
 
         String loadedState() {
-            if (!worldAvailable) {
-                return "world_unavailable";
-            }
-            if (!chunkLoaded) {
-                return "chunk_unloaded";
-            }
-            if (!blockEntityLoaded) {
-                return "block_entity_missing";
-            }
-            if (relay == null) {
-                return "block_entity_type_mismatch";
-            }
-            return "ready";
+            return WebAdminDeviceExtendedConfigService.classifyPhysicalRuntimeState(
+                    worldAvailable,
+                    chunkLoaded,
+                    blockId,
+                    expectedBlockId,
+                    blockEntityLoaded,
+                    relay != null
+            );
         }
 
         String unsupportedReason() {
             return switch (loadedState()) {
                 case "world_unavailable" -> "设备维度不可用或世界未加载。";
                 case "chunk_unloaded" -> "该 action_relay 所在区块未加载。WebAdmin 不会强制加载区块；请让玩家靠近该方块后重试。";
-                case "block_entity_missing" -> "区块已加载，但当前位置未找到 action_relay 方块实体。当前方块：" + (isBlank(blockId) ? "未知" : blockId) + "。请确认方块未被破坏、坐标和维度仍匹配。";
-                case "block_entity_type_mismatch" -> "区块已加载，但当前位置的方块实体不是 action_relay（当前：" + blockEntityType + "，方块：" + (isBlank(blockId) ? "未知" : blockId) + "）。";
+                case "block_missing" -> "区块已加载，但该位置是空气或没有可用方块。预期方块：" + expectedBlockId + "。";
+                case "physical_block_mismatch" -> "区块已加载，但当前位置不是 action_relay 方块。预期方块：" + expectedBlockId + "。";
+                case "block_entity_missing" -> "当前方块是 " + (isBlank(blockId) ? expectedBlockId : blockId)
+                        + "，但区块内缺少 ActionRelayBlockEntity。可能是旧存档、外部编辑或方块实体数据未随区块正常恢复。";
+                case "block_entity_type_mismatch" -> "区块已加载，但当前位置的方块实体不是 action_relay（当前："
+                        + (isBlank(blockEntityType) ? "未知" : blockEntityType) + "，预期：ActionRelayBlockEntity）。";
                 default -> "";
             };
         }

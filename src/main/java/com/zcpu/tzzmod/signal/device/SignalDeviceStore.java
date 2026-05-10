@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
+import com.zcpu.tzzmod.webadmin.WebAdminDeviceMetadataStore;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import java.nio.file.Path;
@@ -41,7 +42,9 @@ public final class SignalDeviceStore {
 
     public static synchronized SignalDeviceData upsertEmitter(ServerWorld world, BlockPos pos, SignalEmitterBlockEntity blockEntity) {
         State state = getState(world.getServer());
-        SignalDeviceData existing = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
+        SignalDeviceData rawExisting = findById(state, SignalEmitterBlockEntity.sourceId(world, pos));
+        cleanupIfTypeChanged(world.getServer(), rawExisting, SignalDeviceData.TYPE_SIGNAL_EMITTER);
+        SignalDeviceData existing = existingOfType(rawExisting, SignalDeviceData.TYPE_SIGNAL_EMITTER);
         SignalDeviceData updated = fromEmitter(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -59,7 +62,9 @@ public final class SignalDeviceStore {
 
     public static synchronized SignalDeviceData upsertReceiver(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
         State state = getState(world.getServer());
-        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData rawExisting = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        cleanupIfTypeChanged(world.getServer(), rawExisting, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
+        SignalDeviceData existing = existingOfType(rawExisting, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         SignalDeviceData updated = fromReceiver(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -77,7 +82,9 @@ public final class SignalDeviceStore {
 
     public static synchronized SignalDeviceData updatePulse(ServerWorld world, BlockPos pos, SignalReceiverBlockEntity blockEntity) {
         State state = getState(world.getServer());
-        SignalDeviceData existing = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        SignalDeviceData rawExisting = findById(state, SignalReceiverBlockEntity.sourceId(world, pos));
+        cleanupIfTypeChanged(world.getServer(), rawExisting, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
+        SignalDeviceData existing = existingOfType(rawExisting, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         SignalDeviceData updated = fromReceiver(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -87,7 +94,9 @@ public final class SignalDeviceStore {
 
     public static synchronized SignalDeviceData upsertActionRelay(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
         State state = getState(world.getServer());
-        SignalDeviceData existing = findById(state, ActionRelayBlockEntity.sourceId(world, pos));
+        SignalDeviceData rawExisting = findById(state, ActionRelayBlockEntity.sourceId(world, pos));
+        cleanupIfTypeChanged(world.getServer(), rawExisting, SignalDeviceData.TYPE_ACTION_RELAY);
+        SignalDeviceData existing = existingOfType(rawExisting, SignalDeviceData.TYPE_ACTION_RELAY);
         SignalDeviceData updated = fromActionRelay(world, pos, blockEntity, existing, false);
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -1185,6 +1194,7 @@ public final class SignalDeviceStore {
         boolean removed = state.devices.removeIf(device -> sourceId.equals(device.id()));
         if (removed) {
             state.markDirty();
+            cleanupWebAdminMetadata(server, sourceId, removedDevice == null ? "" : removedDevice.type());
             WebAdminRealtimeEventBus.publishDeviceRemoved(
                     sourceId,
                     removedDevice == null ? "" : removedDevice.type()
@@ -1211,6 +1221,8 @@ public final class SignalDeviceStore {
                 BlockState blockState = world.getBlockState(pos);
                 if (blockState.isAir() && state.devices.removeIf(candidate -> candidate.id().equals(device.id()))) {
                     removed++;
+                    cleanupWebAdminMetadata(server, device.id(), device.type());
+                    WebAdminRealtimeEventBus.publishDeviceRemoved(device.id(), device.type());
                 }
                 continue;
             }
@@ -1225,6 +1237,8 @@ public final class SignalDeviceStore {
 
             if (state.devices.removeIf(candidate -> candidate.id().equals(device.id()))) {
                 removed++;
+                cleanupWebAdminMetadata(server, device.id(), device.type());
+                WebAdminRealtimeEventBus.publishDeviceRemoved(device.id(), device.type());
             }
         }
         if (removed > 0) {
@@ -2116,6 +2130,22 @@ public final class SignalDeviceStore {
         State state = getState(server);
         refreshLoadedDevices(server, state);
         String query = cleanUserText(deviceRef);
+        if (hasDeviceTypePrefix(query)) {
+            List<SignalDeviceData> typedPositionMatches = findBySourcePosition(state, query);
+            if (!typedPositionMatches.isEmpty()) {
+                return typedPositionMatches.size() == 1
+                        ? ResolveResult.unique(typedPositionMatches.getFirst())
+                        : ResolveResult.ambiguous(typedPositionMatches);
+            }
+            SourcePositionRef typedRef = parseSourcePositionRef(query);
+            String untypedQuery = stripDeviceTypePrefix(query);
+            if (typedRef != null && !untypedQuery.equals(query)) {
+                SignalDeviceData exact = findById(state, untypedQuery);
+                if (exact != null && exact.normalized().type().equals(typedRef.expectedType())) {
+                    return ResolveResult.unique(exact.normalized());
+                }
+            }
+        }
         for (SignalDeviceData device : state.devices) {
             if (device.id().equals(query)) {
                 return ResolveResult.unique(device);
@@ -2335,6 +2365,27 @@ public final class SignalDeviceStore {
                 && world.getBlockEntity(pos) instanceof SignalEmitterBlockEntity;
     }
 
+    private static SignalDeviceData existingOfType(SignalDeviceData existing, String expectedType) {
+        SignalDeviceData normalized = existing == null ? null : existing.normalized();
+        return normalized != null && normalized.type().equals(expectedType) ? normalized : null;
+    }
+
+    private static void cleanupIfTypeChanged(MinecraftServer server, SignalDeviceData existing, String expectedType) {
+        SignalDeviceData normalized = existing == null ? null : existing.normalized();
+        if (normalized == null || normalized.type().equals(expectedType)) {
+            return;
+        }
+        cleanupWebAdminMetadata(server, normalized.id(), normalized.type());
+        WebAdminRealtimeEventBus.publishDeviceRemoved(normalized.id(), normalized.type());
+    }
+
+    private static void cleanupWebAdminMetadata(MinecraftServer server, String deviceId, String deviceType) {
+        if (server == null || deviceId == null || deviceId.isBlank()) {
+            return;
+        }
+        WebAdminDeviceMetadataStore.removeDeviceAliases(server, deviceId, deviceType);
+    }
+
     private static SignalDeviceData fromEmitter(
             ServerWorld world,
             BlockPos pos,
@@ -2342,6 +2393,7 @@ public final class SignalDeviceStore {
             SignalDeviceData existing,
             boolean preserveUpdatedTime
     ) {
+        existing = existingOfType(existing, SignalDeviceData.TYPE_SIGNAL_EMITTER);
         long now = System.currentTimeMillis();
         long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
         long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
@@ -2379,6 +2431,7 @@ public final class SignalDeviceStore {
             SignalDeviceData existing,
             boolean preserveUpdatedTime
     ) {
+        existing = existingOfType(existing, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         long now = System.currentTimeMillis();
         long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
         long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
@@ -2416,6 +2469,7 @@ public final class SignalDeviceStore {
             SignalDeviceData existing,
             boolean preserveUpdatedTime
     ) {
+        existing = existingOfType(existing, SignalDeviceData.TYPE_ACTION_RELAY);
         long now = System.currentTimeMillis();
         long created = existing == null || existing.createdWallTimeMillis() <= 0 ? now : existing.createdWallTimeMillis();
         long updated = preserveUpdatedTime && existing != null ? existing.updatedWallTimeMillis() : now;
@@ -3425,6 +3479,9 @@ public final class SignalDeviceStore {
         List<SignalDeviceData> matches = new ArrayList<>();
         for (SignalDeviceData device : state.devices) {
             SignalDeviceData normalized = device.normalized();
+            if (!ref.expectedType().isBlank() && !normalized.type().equals(ref.expectedType())) {
+                continue;
+            }
             if (normalized.dimension().equals(ref.dimension())
                     && normalized.x() == ref.x()
                     && normalized.y() == ref.y()
@@ -3435,10 +3492,52 @@ public final class SignalDeviceStore {
         return List.copyOf(matches);
     }
 
+    private static boolean hasDeviceTypePrefix(String value) {
+        String clean = cleanUserText(value);
+        for (String type : List.of(
+                SignalDeviceData.TYPE_SIGNAL_EMITTER,
+                SignalDeviceData.TYPE_SIGNAL_RECEIVER,
+                SignalDeviceData.TYPE_ACTION_RELAY,
+                SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE
+        )) {
+            if (clean.startsWith(type + ":")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String stripDeviceTypePrefix(String value) {
+        String clean = cleanUserText(value);
+        for (String type : List.of(
+                SignalDeviceData.TYPE_SIGNAL_EMITTER,
+                SignalDeviceData.TYPE_SIGNAL_RECEIVER,
+                SignalDeviceData.TYPE_ACTION_RELAY,
+                SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE
+        )) {
+            String prefix = type + ":";
+            if (clean.startsWith(prefix)) {
+                return clean.substring(prefix.length());
+            }
+        }
+        return clean;
+    }
+
     private static SourcePositionRef parseSourcePositionRef(String deviceRef) {
         String value = cleanUserText(deviceRef);
-        if (value.startsWith(SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE + ":")) {
-            value = value.substring((SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE + ":").length());
+        String expectedType = "";
+        for (String type : List.of(
+                SignalDeviceData.TYPE_SIGNAL_EMITTER,
+                SignalDeviceData.TYPE_SIGNAL_RECEIVER,
+                SignalDeviceData.TYPE_ACTION_RELAY,
+                SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE
+        )) {
+            String prefix = type + ":";
+            if (value.startsWith(prefix)) {
+                expectedType = type;
+                value = value.substring(prefix.length());
+                break;
+            }
         }
         int at = value.lastIndexOf('@');
         if (at <= 0 || at + 1 >= value.length()) {
@@ -3454,7 +3553,8 @@ public final class SignalDeviceStore {
                     dimension,
                     Integer.parseInt(parts[0].trim()),
                     Integer.parseInt(parts[1].trim()),
-                    Integer.parseInt(parts[2].trim())
+                    Integer.parseInt(parts[2].trim()),
+                    expectedType
             );
         } catch (NumberFormatException ignored) {
             return null;
@@ -3478,7 +3578,7 @@ public final class SignalDeviceStore {
                 }
                 SignalDeviceData normalized = device.normalized();
                 if (!normalized.id().isBlank() && !normalized.dimension().isBlank()) {
-                    state.devices.add(normalized);
+                    replaceOrAdd(state, normalized);
                 }
             }
         }
@@ -3539,7 +3639,7 @@ public final class SignalDeviceStore {
         }
     }
 
-    private record SourcePositionRef(String dimension, int x, int y, int z) {
+    private record SourcePositionRef(String dimension, int x, int y, int z, String expectedType) {
     }
 
     private static final class State {

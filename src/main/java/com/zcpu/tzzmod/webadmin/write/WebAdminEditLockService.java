@@ -444,7 +444,7 @@ public final class WebAdminEditLockService {
                 .deviceId(isDeviceLockTarget(lock.targetType()) ? lock.targetId() : "")
                 .channel(TARGET_CHANNEL_METADATA.equals(lock.targetType()) ? lock.targetId() : "")
                 .severity(locked ? "INFO" : "OK")
-                .summary(locked ? "设备显示信息编辑锁已获取。" : "设备显示信息编辑锁已释放。")
+                .summary(locked ? lockLabel(lock.targetType()) + "编辑锁已获取。" : lockLabel(lock.targetType()) + "编辑锁已释放。")
                 .routeTarget(routeTarget(lock))
                 .payload("targetType", lock.targetType())
                 .payload("targetId", lock.targetId())
@@ -482,6 +482,29 @@ public final class WebAdminEditLockService {
 
     private static WebAdminWriteTarget lockTarget(String targetType, String targetId) {
         return new WebAdminWriteTarget("EDIT_LOCK", normalizeTargetType(targetType) + ":" + safe(targetId), "WebAdmin 编辑锁");
+    }
+
+    private static String lockLabel(String targetType) {
+        String safeTargetType = normalizeTargetType(targetType);
+        if (TARGET_DEVICE_METADATA.equals(safeTargetType)) {
+            return "设备显示信息";
+        }
+        if (TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)) {
+            return "设备基础配置";
+        }
+        if (TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)) {
+            return "设备类型专属配置";
+        }
+        if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
+            return "Action Relay Action 列表";
+        }
+        if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
+            return "频道显示信息";
+        }
+        if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
+            return "Signal Listener 基础配置";
+        }
+        return "WebAdmin";
     }
 
     private static String key(String targetType, String targetId) {

@@ -126,8 +126,8 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},openDeviceMoreMenuId:'',deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
-                appState.modalClosePromise=null;appState.modalDismissPromise=null;
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                appState.modalClosePromise=null;appState.modalDismissPromise=null;appState.modalCloseHandler=null;appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalDiscardConfirmOpen=false;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
                 function isBlank(value){return value===undefined||value===null||String(value).trim()==='';}
@@ -189,15 +189,40 @@ public final class WebAdminFrontendScripts {
                 function labelHistorySort(value){return {NEWEST:'最新优先',OLDEST:'最旧优先'}[value]||value;}
                 function consumerCount(c){return Number(c?.listenerCount||0)+Number(c?.receiverCount||0)+Number(c?.actionRelayCount||0);}
                 async function loadSignalChannelOptions(force=false){
-                  if(!force&&Array.isArray(appState.channelOptions))return appState.channelOptions;
-                  try{appState.channelOptions=await api('/api/signals/channels');appState.channelOptionsError=null;}
+                  if(!force&&!appState.channelOptionsDirty&&Array.isArray(appState.channelOptions))return appState.channelOptions;
+                  try{appState.channelOptions=await api('/api/signals/channels');appState.channelOptionsError=null;appState.channelOptionsDirty=false;}
                   catch(err){appState.channelOptions=Array.isArray(appState.channelOptions)?appState.channelOptions:[];appState.channelOptionsError=err.message||'频道候选加载失败';}
                   return appState.channelOptions||[];
+                }
+                function markChannelOptionsDirty(event){
+                  const type=String(event?.type||''), target=String(event?.payload?.targetType||''), source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
+                  if(type==='signal_channel_changed'||type==='channel_metadata_changed'||type==='signal_listener_changed'||type==='signal_listener_config_changed'||target.includes('channel')||target==='device_basic_config'||target==='action_relay_actions'||source==='signal_receiver'||source==='action_relay'||source==='signal_emitter')appState.channelOptionsDirty=true;
                 }
                 function normalizeChannelName(value){return String(value||'').trim();}
                 function findChannelOption(channel,options){const name=normalizeChannelName(channel).toLowerCase();if(!name)return null;return (options||[]).find(c=>String(c.channel||'').trim().toLowerCase()===name)||null;}
                 function channelOptionLabel(c){const parts=[`消费者：${consumerCount(c)}`];if(!isBlank(c?.lastTriggeredAt))parts.push(`最近触发：${formatDateTime(c.lastTriggeredAt)}`);if(!isBlank(c?.doctorStatus))parts.push(`诊断：${labelStatus(c.doctorStatus)}`);return parts.join(' · ');}
                 function filteredChannelOptions(options,channel){const query=normalizeChannelName(channel).toLowerCase();const list=(options||[]).filter(c=>!query||String(c.channel||'').toLowerCase().includes(query));return list.slice(0,50);}
+                function channelComboQuery(draft,key=''){
+                  if(!draft)return '';
+                  if(key!==''&&key!==null&&key!==undefined){
+                    const active=(draft.channelComboSearchActive||{})[key], query=(draft.channelComboQuery||{})[key];
+                    return active?query||'':'';
+                  }
+                  return draft.channelComboSearchActive?draft.channelComboQuery||'':'';
+                }
+                function setChannelComboQuery(draft,query='',key=''){
+                  if(!draft)return;
+                  if(key!==''&&key!==null&&key!==undefined){
+                    draft.channelComboSearchActive=draft.channelComboSearchActive||{};
+                    draft.channelComboQuery=draft.channelComboQuery||{};
+                    draft.channelComboSearchActive[key]=!isBlank(query);
+                    draft.channelComboQuery[key]=query||'';
+                    return;
+                  }
+                  draft.channelComboSearchActive=!isBlank(query);
+                  draft.channelComboQuery=query||'';
+                }
+                function resetChannelComboQuery(draft,key=''){setChannelComboQuery(draft,'',key);}
                 async function loadOnlinePlayerOptions(force=false){
                   if(!force&&Array.isArray(appState.onlinePlayerOptions))return appState.onlinePlayerOptions;
                   try{appState.onlinePlayerOptions=await api('/api/webadmin/online-players');appState.onlinePlayerOptionsError=null;}
@@ -207,7 +232,7 @@ public final class WebAdminFrontendScripts {
                 function filteredOnlinePlayerOptions(options,playerName){const query=String(playerName||'').trim().toLowerCase();const list=(options||[]).filter(p=>!query||String(p.name||'').toLowerCase().includes(query)||String(p.uuid||'').toLowerCase().includes(query));return list.slice(0,50);}
                 function channelComboOptionsHtml(deviceId,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft)), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
                   return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectDeviceBasicConfigChannel(${jsString(deviceId)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
@@ -232,7 +257,7 @@ public final class WebAdminFrontendScripts {
                   if(!draft||draft.deviceId!==deviceId)return;
                   draft.enabled=(document.getElementById('basic-enabled')?.value||'false')==='true';
                   draft.channel=document.getElementById('basic-channel')?.value||'';
-                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;setChannelComboQuery(draft,draft.channel);}
                   const hint=document.getElementById('basic-channel-hint');
                   if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
                   syncDeviceBasicConfigChannelCombo(deviceId);
@@ -244,14 +269,14 @@ public final class WebAdminFrontendScripts {
                   if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
                   if(menu)menu.innerHTML=channelComboOptionsHtml(deviceId,draft);
                 }
-                function openDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=true;syncDeviceBasicConfigChannelCombo(deviceId);}
+                function openDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=true;resetChannelComboQuery(draft);syncDeviceBasicConfigChannelCombo(deviceId);}
                 function closeDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(deviceId);}
-                function toggleDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=!draft.channelComboOpen;syncDeviceBasicConfigChannelCombo(deviceId);document.getElementById('basic-channel')?.focus();}
-                function selectDeviceBasicConfigChannel(deviceId,channel){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('basic-channel');if(input)input.value=draft.channel;const hint=document.getElementById('basic-channel-hint');if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceBasicConfigChannelCombo(deviceId);}
+                function toggleDeviceBasicConfigChannelMenu(deviceId){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceBasicConfigDraftFromForm(deviceId,false);draft.channelComboOpen=!draft.channelComboOpen;if(draft.channelComboOpen)resetChannelComboQuery(draft);syncDeviceBasicConfigChannelCombo(deviceId);document.getElementById('basic-channel')?.focus();}
+                function selectDeviceBasicConfigChannel(deviceId,channel){const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;resetChannelComboQuery(draft);const input=document.getElementById('basic-channel');if(input)input.value=draft.channel;const hint=document.getElementById('basic-channel-hint');if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceBasicConfigChannelCombo(deviceId);}
                 function handleDeviceBasicConfigChannelKey(event,deviceId){
                   const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('basic-channel')?.value||draft.channel);
-                  if(event.key==='Escape'){draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(deviceId);return;}
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft));
+                  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(deviceId);return;}
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncDeviceBasicConfigChannelCombo(deviceId);return;}
                   if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectDeviceBasicConfigChannel(deviceId,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
                 }
@@ -262,16 +287,18 @@ public final class WebAdminFrontendScripts {
                 function extendedFieldEditable(draft,field){return !!(draft&&draft.lockId&&extendedEditableFields(draft).includes(field));}
                 function deviceExtendedRuntimeNote(cfg){
                   if(!cfg)return '';
-                  const state=String(cfg.runtimeState||''), reason=cfg.unsupportedReason||'', block=cfg.blockId?`当前方块：${cfg.blockId}`:'', be=cfg.blockEntityType?`方块实体：${cfg.blockEntityType}`:'';
+                  const state=String(cfg.runtimeState||''), reason=cfg.unsupportedReason||'', block=(cfg.blockId&&!String(reason).includes('当前方块'))?`当前方块：${cfg.blockId}`:'', be=cfg.blockEntityType?`方块实体：${cfg.blockEntityType}`:'';
                   if(!state||state==='ready'||state==='unsupported')return reason?`<div class="readonly-note">${esc(reason)}</div>`:'';
                   return `<div class="readonly-note danger" data-device-runtime-state="${esc(state)}">${esc([reason,block,be].filter(Boolean).join(' · '))}</div>`;
                 }
                 function makeDeviceExtendedConfigDraft(deviceId,cfg,lock,channelOptions){
-                  return {deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],editableFields:[...(cfg.editableFields||cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},fieldDisabledReasons:{...(cfg.fieldDisabledReasons||{})},runtimeState:cfg.runtimeState||'',worldAvailable:cfg.worldAvailable,chunkLoaded:cfg.chunkLoaded,blockEntityLoaded:cfg.blockEntityLoaded,blockEntityType:cfg.blockEntityType||'',blockId:cfg.blockId||'',unsupportedReason:cfg.unsupportedReason||'',clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock?.lockId||'',lock:lock||null,errors:[],saving:false,conflict:null};
+                  const draft={deviceId,values:{...(cfg.values||{})},originalValues:{...(cfg.values||{})},supportedFields:[...(cfg.supportedFields||[])],editableFields:[...(cfg.editableFields||cfg.supportedFields||[])],fieldLabels:{...(cfg.fieldLabels||{})},clearableFields:{...(cfg.clearableFields||{})},fieldDisabledReasons:{...(cfg.fieldDisabledReasons||{})},runtimeState:cfg.runtimeState||'',worldAvailable:cfg.worldAvailable,chunkLoaded:cfg.chunkLoaded,blockEntityLoaded:cfg.blockEntityLoaded,blockEntityType:cfg.blockEntityType||'',blockId:cfg.blockId||'',unsupportedReason:cfg.unsupportedReason||'',clear:{},channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},channelComboQuery:{},channelComboSearchActive:{},expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock?.lockId||'',lock:lock||null,errors:[],saving:false,conflict:null};
+                  markModalInitialSnapshot('device_extended_config',draft);
+                  return draft;
                 }
                 function extendedChannelComboOptionsHtml(deviceId,field,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const value=(draft.values||{})[field]||'', options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],value), current=normalizeChannelName(value).toLowerCase(), indexes=draft.channelComboIndex||{}, active=Math.max(0,Number(indexes[field]||0));
+                  const value=(draft.values||{})[field]||'', options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,field)), current=normalizeChannelName(value).toLowerCase(), indexes=draft.channelComboIndex||{}, active=Math.max(0,Number(indexes[field]||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
                   return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectDeviceExtendedConfigChannel(${jsString(deviceId)},${jsString(field)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
@@ -292,7 +319,7 @@ public final class WebAdminFrontendScripts {
                       draft.values[field]=document.getElementById(`extended-${id}`)?.value||'';
                     }
                   });
-                  if(openField){draft.channelComboOpen[openField]=true;draft.channelComboIndex[openField]=0;}
+                  if(openField){draft.channelComboOpen[openField]=true;draft.channelComboIndex[openField]=0;setChannelComboQuery(draft,(draft.values||{})[openField]||'',openField);}
                   (draft.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>{
                     const id=extendedFieldId(field), hint=document.getElementById(`extended-${id}-hint`);
                     if(hint)hint.innerHTML=channelHintHtml((draft.values||{})[field],draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
@@ -306,19 +333,19 @@ public final class WebAdminFrontendScripts {
                   if(input)input.setAttribute('aria-expanded',(draft.channelComboOpen||{})[field]?'true':'false');
                   if(menu)menu.innerHTML=extendedChannelComboOptionsHtml(deviceId,field,draft);
                 }
-                function openDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=true;syncDeviceExtendedConfigChannelCombo(deviceId,field);}
+                function openDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=true;resetChannelComboQuery(draft,field);syncDeviceExtendedConfigChannelCombo(deviceId,field);}
                 function closeDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=false;syncDeviceExtendedConfigChannelCombo(deviceId,field);}
-                function toggleDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=!draft.channelComboOpen[field];syncDeviceExtendedConfigChannelCombo(deviceId,field);document.getElementById(`extended-${extendedFieldId(field)}`)?.focus();}
-                function selectDeviceExtendedConfigChannel(deviceId,field,channel){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.values=draft.values||{};draft.clear=draft.clear||{};draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.values[field]=channel||'';draft.clear[field]=false;draft.channelComboOpen[field]=false;draft.channelComboIndex[field]=0;const id=extendedFieldId(field), input=document.getElementById(`extended-${id}`), clear=document.getElementById(`extended-clear-${id}`);if(input)input.value=draft.values[field];if(clear)clear.checked=false;const hint=document.getElementById(`extended-${id}-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.values[field],draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceExtendedConfigChannelCombo(deviceId,field);}
+                function toggleDeviceExtendedConfigChannelMenu(deviceId,field){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;updateDeviceExtendedConfigDraftFromForm(deviceId,'');draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[field]=!draft.channelComboOpen[field];if(draft.channelComboOpen[field])resetChannelComboQuery(draft,field);syncDeviceExtendedConfigChannelCombo(deviceId,field);document.getElementById(`extended-${extendedFieldId(field)}`)?.focus();}
+                function selectDeviceExtendedConfigChannel(deviceId,field,channel){const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;draft.values=draft.values||{};draft.clear=draft.clear||{};draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.values[field]=channel||'';draft.clear[field]=false;draft.channelComboOpen[field]=false;draft.channelComboIndex[field]=0;resetChannelComboQuery(draft,field);const id=extendedFieldId(field), input=document.getElementById(`extended-${id}`), clear=document.getElementById(`extended-clear-${id}`);if(input)input.value=draft.values[field];if(clear)clear.checked=false;const hint=document.getElementById(`extended-${id}-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.values[field],draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncDeviceExtendedConfigChannelCombo(deviceId,field);}
                 function handleDeviceExtendedConfigChannelKey(event,deviceId,field){
                   const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById(`extended-${extendedFieldId(field)}`)?.value||(draft.values||{})[field]);
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,field));
                   draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};
-                  if(event.key==='Escape'){draft.channelComboOpen[field]=false;syncDeviceExtendedConfigChannelCombo(deviceId,field);return;}
+                  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen[field]=false;syncDeviceExtendedConfigChannelCombo(deviceId,field);return;}
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen[field]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex[field]||0)+1:Number(draft.channelComboIndex[field]||0)-1;draft.channelComboIndex[field]=Math.min(max,Math.max(0,next));syncDeviceExtendedConfigChannelCombo(deviceId,field);return;}
                   if(event.key==='Enter'&&draft.channelComboOpen[field]&&options.length>0){event.preventDefault();selectDeviceExtendedConfigChannel(deviceId,field,options[Math.min(options.length-1,Number(draft.channelComboIndex[field]||0))].channel);return;}
                 }
-                function maybeReleaseDeviceExtendedConfigEditForRoute(hash){const draft=appState.deviceExtendedConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
+                function maybeReleaseDeviceExtendedConfigEditForRoute(hash){const draft=appState.deviceExtendedConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(sameDeviceRef(info.id,draft.deviceId))return;}releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
                 async function startDeviceExtendedConfigEdit(deviceId){if(!canEditDeviceExtendedConfig())return;try{const cfg=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`), fields=cfg.supportedFields||[], editable=cfg.editableFields||fields;if(cfg.supported===false||!fields.length){toast(cfg.unsupportedReason||'该设备类型暂无可编辑扩展配置。');return;}let lock={};if(editable.length){const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:deviceId})});if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}lock=result.data?.lock||{};}else{toast(cfg.unsupportedReason||'当前运行状态下只能查看类型专属配置快照。');}const channelOptions=await loadSignalChannelOptions();appState.deviceExtendedConfigEdit=makeDeviceExtendedConfigDraft(deviceId,cfg,lock,channelOptions);if(appState.deviceExtendedConfigEdit.lockId)scheduleDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){toast(err.message||'无法获取编辑锁');}}
                 async function cancelDeviceExtendedConfigEdit(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId){await releaseDeviceExtendedConfigLock(draft,false);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}await dismissWebAdminModal();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
                 async function reloadDeviceExtendedConfigAfterConflict(deviceId){const draft=appState.deviceExtendedConfigEdit;if(draft&&draft.deviceId===deviceId)await releaseDeviceExtendedConfigLock(draft,true);appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});}
@@ -330,8 +357,63 @@ public final class WebAdminFrontendScripts {
                 async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};if(!draft.lockId){toast(draft.unsupportedReason||'当前运行状态下类型专属配置只读。');showDeviceExtendedConfigEditModal(deviceId);return;}updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}}
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
                 function listenerHash(id){return `#/listeners/${encodeURIComponent(id||'')}`;}
+                function deviceRouteRef(id,type=''){
+                  const clean=String(id||''), normalizedType=String(type||'').toLowerCase();
+                  if(['signal_emitter','signal_receiver','action_relay'].includes(normalizedType)&&!clean.startsWith(`${normalizedType}:`))return `${normalizedType}:${clean}`;
+                  return clean;
+                }
+                function deviceHash(idOrDevice,type=''){const ref=idOrDevice&&typeof idOrDevice==='object'?deviceRouteRef(idOrDevice.id,idOrDevice.type):deviceRouteRef(idOrDevice,type);return `#/devices/${encodeURIComponent(ref)}`;}
+                function deviceTypeRefPrefix(id){const value=String(id||'');for(const type of ['signal_emitter','signal_receiver','action_relay','virtual_block_device']){if(value.startsWith(`${type}:`))return type;}return '';}
+                function stripDeviceTypeRef(id){let value=String(id||'');['signal_emitter','signal_receiver','action_relay','virtual_block_device'].forEach(type=>{const prefix=`${type}:`;if(value.startsWith(prefix))value=value.substring(prefix.length);});return value;}
+                function deviceApiRef(id){return stripDeviceTypeRef(id);}
+                function sameDeviceRef(a,b){return stripDeviceTypeRef(a)===stripDeviceTypeRef(b);}
+                function deviceDetailRouteKeys(id,type=''){const clean=String(id||''), keys=new Set();if(!clean)return keys;keys.add(`deviceDetail:${clean}`);const ref=deviceRouteRef(clean,type);keys.add(`deviceDetail:${ref}`);return keys;}
+                function addDeviceDetailRouteKeys(add,id,type=''){deviceDetailRouteKeys(id,type).forEach(key=>add(key));}
+                function eventAffectedChannels(event){const raw=event?.payload?.affectedChannels;if(Array.isArray(raw))return raw.map(v=>String(v||'')).filter(v=>!isBlank(v));return [];}
+                function lockHeldByOther(lock){return !!(lock&&lock.locked&&!lock.heldByCurrentUser);}
+                function lockMessage(lock,label='配置'){return `${label}正在由 ${lock?.holderUsername||'其他用户'} 编辑，锁到期：${formatDateTime(lock?.expiresAt)}`;}
+                const DEVICE_EDIT_LOCK_TYPES=['device_metadata','device_basic_config','device_extended_config','action_relay_actions'];
+                function isDeviceConfigLockType(targetType){return DEVICE_EDIT_LOCK_TYPES.includes(String(targetType||''));}
+                function deviceConfigLockLabel(targetType){const type=String(targetType||'');if(type==='device_metadata')return '显示信息';if(type==='device_basic_config')return '基础配置';if(type==='device_extended_config')return '类型专属配置';if(type==='action_relay_actions')return 'Action 列表';return '配置';}
+                function editLockCacheKey(targetType,targetId){return `${String(targetType||'')}\n${stripDeviceTypeRef(targetId)}`;}
+                function rememberDeviceEditLockEvent(event){
+                  if(String(event?.type||'')!=='edit_lock_changed')return;
+                  const payload=event.payload||{}, targetType=String(payload.targetType||''), targetId=String(payload.targetId||event.deviceId||'');
+                  if(!isDeviceConfigLockType(targetType)||isBlank(targetId))return;
+                  const key=editLockCacheKey(targetType,targetId);
+                  if(payload.locked===false){delete appState.deviceEditLocks[key];return;}
+                  appState.deviceEditLocks[key]={locked:true,heldByCurrentUser:false,targetType,targetId:stripDeviceTypeRef(targetId),holderUsername:payload.holderUsername||payload.actor||'',holderRole:payload.holderRole||'',expiresAt:payload.expiresAt||''};
+                }
+                function cachedDeviceConfigLocks(deviceId){
+                  const raw=stripDeviceTypeRef(deviceId);
+                  if(isBlank(raw))return [];
+                  return DEVICE_EDIT_LOCK_TYPES.map(targetType=>({label:deviceConfigLockLabel(targetType),lock:appState.deviceEditLocks[editLockCacheKey(targetType,raw)]})).filter(item=>item.lock);
+                }
+                function actionRelayLockForDevice(detail){return detail?.actionRelayActions?.lockStatus||appState.deviceEditLocks[editLockCacheKey('action_relay_actions',detail?.id||'')]||null;}
+                function actionRelayLockHeldByOther(lock){return lockHeldByOther(lock);}
+                function actionRelayLockMessage(lock){return lockMessage(lock,'Action 列表');}
+                function deviceConfigLocks(detail){
+                  const locks=[];
+                  if(detail?.metadataLock)locks.push({label:'显示信息',lock:detail.metadataLock});
+                  if(detail?.basicConfig?.lockStatus)locks.push({label:'基础配置',lock:detail.basicConfig.lockStatus});
+                  if(detail?.extendedConfig?.lockStatus)locks.push({label:'类型专属配置',lock:detail.extendedConfig.lockStatus});
+                  if(isActionRelay(detail)){const actionLock=actionRelayLockForDevice(detail);if(actionLock)locks.push({label:'Action 列表',lock:actionLock});}
+                  const seen=new Set(locks.map(item=>String(item.lock?.targetType||'')));
+                  cachedDeviceConfigLocks(detail?.id||'').forEach(item=>{if(!seen.has(String(item.lock?.targetType||''))){locks.push(item);seen.add(String(item.lock?.targetType||''));}});
+                  return locks;
+                }
+                function deviceConfigLockBlocker(detail){return deviceConfigLocks(detail).find(item=>lockHeldByOther(item.lock))||null;}
+                function deviceConfigLockMessage(detail){const blocker=deviceConfigLockBlocker(detail);return blocker?lockMessage(blocker.lock,blocker.label):'';}
+                function canEditDeviceConfig(detail){return canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig()||(isActionRelay(detail)&&canEditActionRelayActions());}
+                function deviceConfigEditButton(detail,label='编辑设备配置',kind='primary'){
+                  const canEdit=canEditDeviceConfig(detail);
+                  if(!canEdit)return waButton(label,'settings','disabled title="需要 EDITOR 或 OWNER 权限才能编辑设备配置。"','ghost');
+                  const message=deviceConfigLockMessage(detail);
+                  if(message)return `${waButton(label,'settings',`disabled title="${esc(message)}" data-device-config-lock-disabled="true"`,'ghost is-locked')}<span class="wa-lock-badge" data-device-config-lock-badge="true">${esc(message)}</span>`;
+                  return waButton(label,'settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),kind);
+                }
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
-                function currentRouteHash(){return decodeURIComponent(location.hash||'#/dashboard');}
+                function currentRouteHash(){return location.hash||'#/dashboard';}
                 function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/listeners/')||h.startsWith('#/signal-listeners/')||h.startsWith('#/regions/')||h.startsWith('#/actions/');}
                 function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
@@ -347,7 +429,7 @@ public final class WebAdminFrontendScripts {
                 function activateNavRoute(el){const target=el&&el.dataset?el.dataset.navRoute:'';if(!target)return;navigateTo(target);}
                 function backButton(route,fallbackLabel){const label=route.returnTo?'返回上一页':fallbackLabel;return `<button class="secondary" ${htmlHandler(`goBackOrFallback(${jsString(route.returnTo)},${jsString(route.fallback)})`)}>${esc(label)}</button>`}
                 function channelButton(channel){if(isBlank(channel))return '<span class="muted">未设置</span>';return `<button class="link-button" ${navigationAttr(signalHash(channel))}>${esc(channel)}</button>`}
-                function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" ${navigationAttr('#/devices/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" ${navigationAttr(signalHash(String(target).substring(8)))}>${esc(label)}</button>`;if(String(target).startsWith('region:'))return `<button class="link-button" ${navigationAttr('#/regions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('action:'))return `<button class="link-button" ${navigationAttr('#/actions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;return esc(label||target);}
+                function navigationButton(target,label){if(isBlank(target))return esc(label||'-');if(String(target).startsWith('device:'))return `<button class="link-button" ${navigationAttr(deviceHash(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('channel:'))return `<button class="link-button" ${navigationAttr(signalHash(String(target).substring(8)))}>${esc(label)}</button>`;if(String(target).startsWith('region:'))return `<button class="link-button" ${navigationAttr('#/regions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;if(String(target).startsWith('action:'))return `<button class="link-button" ${navigationAttr('#/actions/'+encodeURIComponent(String(target).substring(7)))}>${esc(label)}</button>`;return esc(label||target);}
                 function labelInteractionSource(value){return {main_hand:'主手',off_hand:'副手',inventory_contains:'背包/热键栏',armor_head:'头盔槽',armor_chest:'胸甲槽',armor_legs:'护腿槽',armor_feet:'靴子槽',armor_any:'任意盔甲槽'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeSource(value){return {matched_source:'匹配来源',main_hand:'主手',off_hand:'副手',inventory:'背包/热键栏'}[String(value||'').toLowerCase()]||value;}
                 function labelConsumeOrder(value){return {hotbar_first:'优先热键栏',main_inventory_first:'优先主背包'}[String(value||'').toLowerCase()]||value;}
@@ -470,6 +552,7 @@ public final class WebAdminFrontendScripts {
                   }
                 }
                 function routeUnsafe(hash,options={}){
+                  closeDeviceMoreMenu(false);
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
@@ -599,6 +682,8 @@ public final class WebAdminFrontendScripts {
                     return;
                   }
                   if(data.type==='heartbeat'||data.type==='realtime_connected')return;
+                  markChannelOptionsDirty(data);
+                  rememberDeviceEditLockEvent(data);
                   markRealtimeRoutesForEvent(data);
                   handleSelectionRealtimeEvent(data);
                   handleActionRelayActionsRealtimeEvent(data);
@@ -624,10 +709,10 @@ public final class WebAdminFrontendScripts {
                   const key=realtimeRouteKey(hash);
                   if(realtimeRouteKeysForEvent(event).has(key))return true;
                   const type=String(event.type||'');
-                  if(String(hash||'').startsWith('#/signals/'))return event.channel===routeDetailId(hash,'#/signals/')||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));
+                  if(String(hash||'').startsWith('#/signals/')){const id=routeDetailId(hash,'#/signals/');return event.channel===id||eventAffectedChannels(event).includes(id)||(type==='edit_lock_changed'&&['channel_metadata','signal_listener_basic_config'].includes(String(event.payload?.targetType||'')));}
                   if(String(hash||'').startsWith('#/listeners/')){const id=routeDetailId(hash,'#/listeners/');return listenerEventRef(event)===id||(event.channel&&!isBlank(id)&&String(event.type||'').startsWith('signal_listener_'));}
                   if(String(hash||'').startsWith('#/signal-listeners/')){const id=routeDetailId(hash,'#/signal-listeners/');return listenerEventRef(event)===id||(event.channel&&!isBlank(id)&&String(event.type||'').startsWith('signal_listener_'));}
-                  if(String(hash||'').startsWith('#/devices/'))return !!event.deviceId&&event.deviceId===routeDetailId(hash,'#/devices/');
+                  if(String(hash||'').startsWith('#/devices/'))return !!event.deviceId&&sameDeviceRef(event.deviceId,routeDetailId(hash,'#/devices/'));
                   if(String(hash||'').startsWith('#/regions/'))return !!event.regionId&&event.regionId===routeDetailId(hash,'#/regions/');
                   if(String(hash||'').startsWith('#/actions/'))return !!event.actionId&&event.actionId===routeDetailId(hash,'#/actions/');
                   return false;
@@ -638,8 +723,9 @@ public final class WebAdminFrontendScripts {
                   const target=String(event?.payload?.targetType||'');
                   const type=String(event?.type||''), source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
                   const eventDevice=String(event?.deviceId||event?.payload?.deviceId||'');
+                  if(type==='edit_lock_changed')return;
                   const actionRelayChange=target==='action_relay_actions'||(type==='action_config_changed'&&source==='action_relay');
-                  if(!actionRelayChange||!eventDevice||eventDevice!==draft.deviceId)return;
+                  if(!actionRelayChange||!eventDevice||!sameDeviceRef(eventDevice,draft.deviceId))return;
                   syncActionRelayActionsDraftFromForm(draft.deviceId);
                   const current=appState.actionRelayActionsEdit;
                   if(!current||current.deviceId!==draft.deviceId)return;
@@ -660,8 +746,8 @@ public final class WebAdminFrontendScripts {
                   const isAny=(...items)=>items.includes(type);
                   if(isAny('config_changed')){
                     const target=String(event?.payload?.targetType||'');
-                    if(target==='action_relay_actions'){add('dashboard','signals','devices','actions','actionTemplates','doctor');if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);if(event?.channel)add(`signalDetail:${event.channel}`);}
-                    else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','devices','doctor');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');else if(!source)add('receivers','virtualBlockDevices','actions','actionTemplates');if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);}
+                    if(target==='action_relay_actions'){add('dashboard','signals','devices','actions','actionTemplates','doctor');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'action_relay');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
+                    else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','devices','doctor');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');else if(!source)add('receivers','virtualBlockDevices','actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);}
                     else if(target.includes('listener')){add('dashboard','signals','listeners','doctor');if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);}
                     else if(target.includes('channel')){add('dashboard','signals','doctor');if(event?.channel)add(`signalDetail:${event.channel}`);}
                     else add('dashboard','config');
@@ -675,12 +761,12 @@ public final class WebAdminFrontendScripts {
                     if(source==='virtual_block_device'||starts('virtual_block_device_'))add('virtualBlockDevices');
                     if(source==='action_relay')add('actions','actionTemplates');
                     if(isAny('device_config_changed')&&!source)add('config');
-                    if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);
+                    if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);
                   }
                   if(starts('selection_')){
                     add('dashboard','devices','virtualBlockDevices','history');
                     const deviceId=event?.deviceId||event?.payload?.deviceId;
-                    if(deviceId)add(`deviceDetail:${deviceId}`);
+                    if(deviceId)addDeviceDetailRouteKeys(add,deviceId,event?.sourceType||event?.payload?.deviceType||'virtual_block_device');
                   }
                   if(starts('signal_')||isAny('signal_emitted','history_appended','signal_history_appended','channel_metadata_changed','signal_listener_config_changed','signal_config_changed')){
                     add('dashboard','signals','listeners','history','doctor');
@@ -691,8 +777,8 @@ public final class WebAdminFrontendScripts {
                   if(starts('action_')||isAny('action_executed','action_config_changed')){
                     const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
                     add('dashboard','actions','actionTemplates','history');
-                    if(source==='action_relay'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);}
-                    if(isAny('action_changed','action_config_changed')){add('devices','doctor');if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);}
+                    if(source==='action_relay'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
+                    if(isAny('action_changed','action_config_changed')){add('devices','doctor');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);}
                     if(event?.actionId)add(`actionDetail:${event.actionId}`);
                   }
                   if(starts('region_')||isAny('region_event','region_config_changed')){
@@ -704,14 +790,14 @@ public final class WebAdminFrontendScripts {
                   if(starts('webadmin_user_')||isAny('webadmin_user_connected','webadmin_user_disconnected','user_changed'))add('dashboard','users');
                   if(starts('webadmin_audit_')||isAny('write_audit_appended')){
                     const target=String(event?.payload?.targetType||'');
-                    if(target==='action_relay_actions'){add('dashboard','history','signals','devices','actions','actionTemplates');if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);}
-                    else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','history','devices');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');if(event?.deviceId)add(`deviceDetail:${event.deviceId}`);}
+                    if(target==='action_relay_actions'){add('dashboard','history','signals','devices','actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'action_relay');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
+                    else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','history','devices');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);}
                     else add('dashboard','history','settings','config','users');
                   }
                   if(starts('webadmin_settings_')||isAny('system_settings_changed'))add('settings','config','dashboard');
                   if(type==='edit_lock_changed'){
                     const target=String(event?.payload?.targetType||'');
-                    if(target.includes('device')||target==='action_relay_actions'){add('devices');if(event?.payload?.targetId)add(`deviceDetail:${event.payload.targetId}`);}
+                    if(target.includes('device')||target==='action_relay_actions'){add('devices');if(event?.payload?.targetId)addDeviceDetailRouteKeys(add,event.payload.targetId,target==='action_relay_actions'?'action_relay':'');}
                     if(target.includes('channel'))add('signals');
                     if(target.includes('listener')){add('listeners','signals');if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);}
                   }
@@ -820,7 +906,7 @@ public final class WebAdminFrontendScripts {
                   if(listener&&!(target&&target.closest&&target.closest('.listener-channel-combo'))){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
                   const actionRelay=appState.actionRelayActionsEdit;
                   if(actionRelay&&!(target&&target.closest&&target.closest('.action-relay-channel-combo'))){Object.keys(actionRelay.channelComboOpen||{}).forEach(index=>actionRelay.channelComboOpen[index]=false);(actionRelay.actions||[]).forEach((_,index)=>syncActionRelayChannelCombo(actionRelay.deviceId,index));}
-                  if(appState.openDeviceMoreMenuId&&!(target&&target.closest&&target.closest('.wa-menu-wrap')))closeDeviceMoreMenu();
+                  if(appState.openDeviceMoreMenuId&&!(target&&target.closest&&target.closest('.wa-device-more-popover,.wa-menu-wrap,[data-device-more-trigger]')))closeDeviceMoreMenu(false);
                   const selection=appState.selectionCreateVirtualBlock;
                   if(selection&&selection.step==='config'){
                     if(!(target&&target.closest&&target.closest('.selection-player-combo'))){selection.playerComboOpen=false;}
@@ -834,6 +920,7 @@ public final class WebAdminFrontendScripts {
                   }
                 });
                 document.addEventListener('keydown',event=>{
+                  if(event.key==='Escape'&&appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return;}
                   if(event.key!=='Enter'&&event.key!==' ')return;
                   const nav=event.target&&event.target.closest?event.target.closest('[data-nav-route]'):null;
                   if(!nav||event.target!==nav||nav.tagName==='BUTTON'||nav.tagName==='A')return;
@@ -906,15 +993,16 @@ public final class WebAdminFrontendScripts {
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterDevices(items){const f=appState.deviceFilters;return items.filter(d=>{const hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),d.type].join(' ').toLowerCase();if(f.search&& !hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&d.type!==f.type)return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.world!=='ALL'&&d.world!==f.world)return false;return true;});}
-                function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${deviceMetadataIcon(d)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
+                function deviceTable(items){return `<div class="table-wrap"><table class="data-table"><thead><tr><th>设备</th><th>类型</th><th>世界/维度</th><th>坐标</th><th>主频道</th><th>状态</th><th>最近触发</th><th>诊断</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target=deviceHash(d);return `<tr ${navigationAttr(target,false)}><td><span class="device-name"><span class="device-icon">${deviceMetadataIcon(d)}</span><span><strong>${esc(d.displayName)}</strong>${deviceSubtitle(d)}</span></span></td><td>${esc(labelType(d.type))}</td><td>${esc(d.world||'-')}</td><td>${esc(posText(d.pos))}</td><td>${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><button class="text-button" ${navigationAttr(target)}>查看详情</button></td></tr>`;}).join('')}</tbody></table></div>`}
                 function deviceSubtitle(d){const id=shortId(d.id);if(!isBlank(id)&&!String(id).toLowerCase().startsWith('minecraf'))return `<span class="device-subtitle">ID：${esc(id)}</span>`;if(!isBlank(d.world))return `<span class="device-subtitle">维度：${esc(d.world)}</span>`;return '';}
                 function channelCell(channel){return channelButton(channel);}
                 async function renderDeviceDetail(id,options={}){
                   if(!options.silent)setView(loading('正在加载设备详情...'));
-                  const routeInfo=detailRoute(id,'#/devices'), encoded=encodeURIComponent(routeInfo.id);
-                  let detail;try{detail=await api(`/api/devices/${encoded}`)}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该设备详情或设备已被删除。',waButton('返回列表','device',navigationAttr('#/devices'),'ghost'))}${err.status===404?empty('设备不存在或已被删除。'):errorBlock(err.message)}</section>`);return;}
+                  const routeInfo=detailRoute(id,'#/devices'), lookupId=deviceApiRef(routeInfo.id), encoded=encodeURIComponent(lookupId);
+                  let detail;try{detail=await api(`/api/devices/${encoded}`);const expectedType=deviceTypeRefPrefix(routeInfo.id);if(expectedType&&String(detail.type||'').toLowerCase()!==expectedType){const mismatch=new Error('该位置当前设备类型已变化，目标类型不存在。');mismatch.status=404;throw mismatch;}}catch(err){if(options.silent){toast('设备详情实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page"><div class="back-row">${backButton(routeInfo,'返回设备管理')}</div>${waPageHead('详情暂不可用','当前只读接口尚未提供该设备详情或设备已被删除。',waButton('返回列表','device',navigationAttr('#/devices'),'ghost'))}${err.status===404?empty('设备不存在或已被删除。'):errorBlock(err.message)}</section>`);return;}
                   if(!routeInfo.returnTo&&isVirtualBlockDevice(detail))routeInfo.fallback='#/virtual-block-devices';
-                  const [debug,history,doctor,lockStatus,basicConfig,extendedConfig,actionRelayActions]=await Promise.all([settle(`/api/devices/${encoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${encoded}`),settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`),isActionRelay(detail)?settle(`/api/webadmin/action-relay-actions/${encoded}`):Promise.resolve({ok:true,data:null})]);
+                  const canonicalEncoded=encodeURIComponent(detail.id||lookupId);
+                  const [debug,history,doctor,lockStatus,basicConfig,extendedConfig,actionRelayActions]=await Promise.all([settle(`/api/devices/${canonicalEncoded}/debug`),detail.channel?settle(`/api/signals/history?channel=${encodeURIComponent(detail.channel)}&limit=10`):Promise.resolve({ok:true,data:[]}),settle('/api/doctor'),settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${canonicalEncoded}`),settle(`/api/webadmin/device-basic-config/${canonicalEncoded}`),settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`),isActionRelay(detail)?settle(`/api/webadmin/action-relay-actions/${canonicalEncoded}`):Promise.resolve({ok:true,data:null})]);
                   detail.metadataLock=lockStatus.ok?lockStatus.data:null;
                   detail.basicConfig=basicConfig.ok?basicConfig.data:null;
                   detail.basicConfigError=basicConfig.ok?null:basicConfig.error;
@@ -925,9 +1013,9 @@ public final class WebAdminFrontendScripts {
                   appState.currentDeviceDetail=detail;
                   const relatedDoctor=[...(detail.doctorIssues||[])];
                   if(doctor.ok){relatedDoctor.push(...(doctor.data.issues||[]).filter(i=>i.relatedObjectId===detail.id||(!isBlank(detail.channel)&&i.channel===detail.channel)));}
-                  const canEditConfig=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig()||(isActionRelay(detail)&&canEditActionRelayActions());
-                  const configAction=canEditConfig?waButton('编辑设备配置','settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),'primary'):waButton('编辑设备配置','settings','disabled','ghost');
-                  const actionListAction=isActionRelay(detail)?waButton((detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false)?'查看 Action 状态':(canEditActionRelayActions()?'编辑 Action 列表':'查看 Action 列表'),'action-relay',htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`),(canEditActionRelayActions()&&!(detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false))?'primary':'ghost'):'';
+                  const configAction=deviceConfigEditButton(detail,'编辑设备配置','primary');
+                  const actionLock=detail.actionRelayActions?.lockStatus||null, actionLockedByOther=actionRelayLockHeldByOther(actionLock);
+                  const actionListAction=isActionRelay(detail)?waButton(actionLockedByOther?'只读查看 Action 列表':((detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false)?'查看 Action 状态':(canEditActionRelayActions()?'编辑 Action 列表':'查看 Action 列表')),'action-relay',actionLockedByOther?htmlHandler(`openActionRelayActionsReadonlyModal(${jsString(detail.id)})`):htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`),(canEditActionRelayActions()&&!actionLockedByOther&&!(detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false))?'primary':'ghost'):'';
                   const deleteAction=isVirtualBlockDevice(detail)?(canDeleteVirtualBlockDevice()?waButton('删除 / 解绑','channel-error',htmlHandler(`openVirtualBlockDeviceDeleteModal(${jsString(detail.id)})`),'danger'):waButton('删除 / 解绑','channel-error','disabled','danger')):'';
                   const quickNote=isVirtualBlockDevice(detail)?'删除 / 解绑只移除 virtual_block_device 配置，不破坏世界方块；导出和其它写操作仍保持禁用。':(isPhysicalSignalDevice(detail)?'这是已放置的真实方块设备。WebAdmin 只编辑安全配置，不创建、不删除、不 setblock；删除请在游戏内破坏方块。':'仅设备显示信息、基础配置和安全扩展配置可写；删除、导出和其它写操作没有完整后端支持，保持禁用。');
                   const statusValue=detail.enabled?'启用':'停用';
@@ -1006,7 +1094,7 @@ public final class WebAdminFrontendScripts {
                 function labelMetadataIcon(value){return {auto:'自动图标',signal_emitter:'信号发射器',signal_receiver:'信号接收器',action_relay:'动作继电器',virtual_block_device:'虚拟方块设备',region:'区域',action:'动作',warning:'警告',key:'钥匙',chest:'箱子',door:'门',signal:'Signal',custom_1:'自定义 1'}[String(value||'auto')]||value;}
                 """).append("""
                 function selectionModalDefaultDraft(){
-                  return {step:'config',status:'draft',purpose:'create_virtual_block_device',targetPlayerName:'',channel:'',displayName:'',note:'',iconKey:'auto',enabled:true,selectionId:'',deviceId:'',routeTarget:'',returnTo:'#/virtual-block-devices',message:'',errors:[],saving:false,playerOptions:[],playerOptionsError:null,playerComboOpen:false,playerComboIndex:0,channelOptions:[],channelOptionsError:null,channelComboOpen:false,channelComboIndex:0,terminalStatus:'',terminalEventId:''};
+                  return {step:'config',status:'draft',purpose:'create_virtual_block_device',targetPlayerName:'',channel:'',displayName:'',note:'',iconKey:'auto',enabled:true,selectionId:'',deviceId:'',routeTarget:'',returnTo:'#/virtual-block-devices',message:'',errors:[],saving:false,playerOptions:[],playerOptionsError:null,playerComboOpen:false,playerComboIndex:0,channelOptions:[],channelOptionsError:null,channelComboOpen:false,channelComboIndex:0,channelComboQuery:'',channelComboSearchActive:false,terminalStatus:'',terminalEventId:''};
                 }
                 function selectionSourceReturnTo(){
                   const hash=currentRouteHash();
@@ -1016,12 +1104,13 @@ public final class WebAdminFrontendScripts {
                 function selectionDeviceDetailRoute(deviceId,returnTo){
                   if(isBlank(deviceId))return '';
                   const safeReturn=isValidReturnHash(returnTo)?returnTo:'#/virtual-block-devices';
-                  return `#/devices/${encodeURIComponent(deviceId)}?returnTo=${encodeURIComponent(safeReturn)}`;
+                  return `${deviceHash(deviceId)}?returnTo=${encodeURIComponent(safeReturn)}`;
                 }
                 async function openCreateVirtualBlockDeviceModal(){
                   waEnsureState();
                   if(!canStartObjectSelection()){toast('需要 EDITOR 或 OWNER 权限才能新建虚拟方块设备。');return;}
                   appState.selectionCreateVirtualBlock={...selectionModalDefaultDraft(),returnTo:selectionSourceReturnTo()};
+                  markModalInitialSnapshot('selection_create_virtual_block',appState.selectionCreateVirtualBlock);
                   showCreateVirtualBlockDeviceModal();
                   const [players,channels]=await Promise.all([loadOnlinePlayerOptions(),loadSignalChannelOptions()]);
                   const draft=appState.selectionCreateVirtualBlock;
@@ -1054,7 +1143,7 @@ public final class WebAdminFrontendScripts {
                 }
                 function selectionChannelOptionsHtml(draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft)), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接使用新频道。</div>';
                   return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSelectionChannel(${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
@@ -1067,7 +1156,7 @@ public final class WebAdminFrontendScripts {
                   draft.targetPlayerName=document.getElementById('selection-target-player')?.value||'';
                   draft.channel=document.getElementById('selection-channel')?.value||'';
                   if(openTarget==='player'){draft.playerComboOpen=true;draft.playerComboIndex=0;}
-                  if(openTarget==='channel'){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  if(openTarget==='channel'){draft.channelComboOpen=true;draft.channelComboIndex=0;setChannelComboQuery(draft,draft.channel);}
                   const hint=document.getElementById('selection-channel-hint');
                   if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
                   syncSelectionCombos();
@@ -1086,11 +1175,11 @@ public final class WebAdminFrontendScripts {
                 function openSelectionTargetPlayerMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.playerComboOpen=true;syncSelectionCombos();}
                 function toggleSelectionTargetPlayerMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.playerComboOpen=!draft.playerComboOpen;syncSelectionCombos();document.getElementById('selection-target-player')?.focus();}
                 function selectSelectionTargetPlayer(playerName){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;draft.targetPlayerName=playerName||'';draft.playerComboOpen=false;draft.playerComboIndex=0;const input=document.getElementById('selection-target-player');if(input)input.value=draft.targetPlayerName;syncSelectionCombos();}
-                function handleSelectionTargetPlayerKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredOnlinePlayerOptions(draft.playerOptions||appState.onlinePlayerOptions||[],document.getElementById('selection-target-player')?.value||draft.targetPlayerName);if(event.key==='Escape'){draft.playerComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.playerComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.playerComboIndex||0)+1:Number(draft.playerComboIndex||0)-1;draft.playerComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.playerComboOpen&&options.length>0){event.preventDefault();selectSelectionTargetPlayer(options[Math.min(options.length-1,Number(draft.playerComboIndex||0))].name);return;}}
-                function openSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=true;syncSelectionCombos();}
-                function toggleSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=!draft.channelComboOpen;syncSelectionCombos();document.getElementById('selection-channel')?.focus();}
-                function selectSelectionChannel(channel){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('selection-channel'), hint=document.getElementById('selection-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSelectionCombos();}
-                function handleSelectionChannelKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('selection-channel')?.value||draft.channel);if(event.key==='Escape'){draft.channelComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSelectionChannel(options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}}
+                function handleSelectionTargetPlayerKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredOnlinePlayerOptions(draft.playerOptions||appState.onlinePlayerOptions||[],document.getElementById('selection-target-player')?.value||draft.targetPlayerName);if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.playerComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.playerComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.playerComboIndex||0)+1:Number(draft.playerComboIndex||0)-1;draft.playerComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.playerComboOpen&&options.length>0){event.preventDefault();selectSelectionTargetPlayer(options[Math.min(options.length-1,Number(draft.playerComboIndex||0))].name);return;}}
+                function openSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=true;resetChannelComboQuery(draft);syncSelectionCombos();}
+                function toggleSelectionChannelMenu(){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;updateSelectionCombosFromForm('');draft.channelComboOpen=!draft.channelComboOpen;if(draft.channelComboOpen)resetChannelComboQuery(draft);syncSelectionCombos();document.getElementById('selection-channel')?.focus();}
+                function selectSelectionChannel(channel){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;resetChannelComboQuery(draft);const input=document.getElementById('selection-channel'), hint=document.getElementById('selection-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSelectionCombos();}
+                function handleSelectionChannelKey(event){const draft=appState.selectionCreateVirtualBlock;if(!draft)return;const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft));if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen=false;syncSelectionCombos();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSelectionCombos();return;}if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSelectionChannel(options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}}
                 function selectionErrorsHtml(draft){
                   const errors=(draft?.errors||[]).filter(Boolean);
                   if(!errors.length)return '';
@@ -1131,12 +1220,13 @@ public final class WebAdminFrontendScripts {
                   const d=draft||selectionModalDefaultDraft();
                   if(d.step==='waiting')return `${waButton('取消选择','close',d.saving?'disabled':htmlHandler('cancelCreateVirtualBlockDeviceSelection()'),'danger')}${waButton('等待玩家选择','virtual-block-device','disabled','primary')}`;
                   if(d.step==='completed')return `${waButton('正在进入详情','eye','disabled','primary')}`;
-                  if(d.step==='cancelled'||d.step==='failed')return `${waButton('返回配置','settings',htmlHandler('resetCreateVirtualBlockDeviceModalToConfig()'),'ghost')}${waButton('关闭','close',htmlHandler('closeCreateVirtualBlockDeviceModal(false)'),'primary')}`;
-                  return `${waButton('取消','close',htmlHandler('closeCreateVirtualBlockDeviceModal(false)'),'ghost')}${waButton(d.saving?'开始中...':'开始选择','virtual-block-device',d.saving?'disabled':htmlHandler('startCreateVirtualBlockDeviceSelection()'),'primary')}`;
+                  if(d.step==='cancelled'||d.step==='failed')return `${waButton('返回配置','settings',htmlHandler('resetCreateVirtualBlockDeviceModalToConfig()'),'ghost')}${waButton('关闭','close',htmlHandler('closeWebAdminModal()'),'primary')}`;
+                  return `${waButton('取消','close',htmlHandler('closeWebAdminModal()'),'ghost')}${waButton(d.saving?'开始中...':'开始选择','virtual-block-device',d.saving?'disabled':htmlHandler('startCreateVirtualBlockDeviceSelection()'),'primary')}`;
                 }
                 function showCreateVirtualBlockDeviceModal(){
                   const draft=appState.selectionCreateVirtualBlock||selectionModalDefaultDraft();
-                  openWebAdminModal('新建虚拟方块设备',selectionModalBody(draft),selectionModalFooter(draft),{className:'wa-selection-modal',onClose:()=>closeCreateVirtualBlockDeviceModal(true)});
+                  if(draft.step==='config')markModalInitialSnapshot('selection_create_virtual_block',draft);
+                  openWebAdminModal('新建虚拟方块设备',selectionModalBody(draft),selectionModalFooter(draft),{className:'wa-selection-modal',onClose:()=>closeCreateVirtualBlockDeviceModal(true),syncBeforeClose:()=>syncModalDraftBeforeClose('selection_create_virtual_block'),dirtyCheck:()=>{const d=appState.selectionCreateVirtualBlock;return !!d&&d.step==='config'&&modalDraftDirty('selection_create_virtual_block',d);}});
                 }
                 function writeSelectionData(result){return result?.data?.selection||result?.data||result?.selection||{};}
                 function writeResultErrors(result,fallback){return result?.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result?.message||fallback||'选择请求失败'}];}
@@ -1243,11 +1333,13 @@ public final class WebAdminFrontendScripts {
                   return `${targetHash}${targetHash.includes('?')?'&':'?'}returnTo=${encodeURIComponent(safeReturn)}`;
                 }
                 function listenerCreateDefaultDraft(){
-                  return {name:'',channel:'',enabled:true,cooldownTicks:0,channelOptions:appState.channelOptions||[],channelOptionsError:appState.channelOptionsError||null,channelComboOpen:false,channelComboIndex:0,saving:false,errors:[]};
+                  const draft={name:'',channel:'',enabled:true,cooldownTicks:0,channelOptions:appState.channelOptions||[],channelOptionsError:appState.channelOptionsError||null,channelComboOpen:false,channelComboIndex:0,channelComboQuery:'',channelComboSearchActive:false,saving:false,errors:[]};
+                  markModalInitialSnapshot('signal_listener_create',draft);
+                  return draft;
                 }
                 function listenerCreateChannelOptionsHtml(draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft)), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接使用新频道。</div>';
                   return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSignalListenerCreateChannel(${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
@@ -1257,11 +1349,12 @@ public final class WebAdminFrontendScripts {
                 }
                 function updateSignalListenerCreateDraftFromForm(openMenu=false){
                   const draft=appState.signalListenerCreate;if(!draft)return;
-                  draft.name=document.getElementById('listener-create-name')?.value?.trim()||draft.name||'';
-                  draft.channel=document.getElementById('listener-create-channel')?.value||draft.channel||'';
+                  const nameInput=document.getElementById('listener-create-name'), channelInput=document.getElementById('listener-create-channel');
+                  draft.name=nameInput?nameInput.value.trim():(draft.name||'');
+                  draft.channel=channelInput?channelInput.value:(draft.channel||'');
                   draft.enabled=!!document.getElementById('listener-create-enabled')?.checked;
                   draft.cooldownTicks=document.getElementById('listener-create-cooldown')?.value||draft.cooldownTicks||0;
-                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;setChannelComboQuery(draft,draft.channel);}
                   const hint=document.getElementById('listener-create-channel-hint');
                   if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
                   syncSignalListenerCreateChannelCombo();
@@ -1273,13 +1366,13 @@ public final class WebAdminFrontendScripts {
                   if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
                   if(menu)menu.innerHTML=listenerCreateChannelOptionsHtml(draft);
                 }
-                function openSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=true;syncSignalListenerCreateChannelCombo();}
-                function toggleSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=!draft.channelComboOpen;syncSignalListenerCreateChannelCombo();document.getElementById('listener-create-channel')?.focus();}
-                function selectSignalListenerCreateChannel(channel){const draft=appState.signalListenerCreate;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const input=document.getElementById('listener-create-channel'), hint=document.getElementById('listener-create-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerCreateChannelCombo();}
+                function openSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=true;resetChannelComboQuery(draft);syncSignalListenerCreateChannelCombo();}
+                function toggleSignalListenerCreateChannelMenu(){const draft=appState.signalListenerCreate;if(!draft)return;updateSignalListenerCreateDraftFromForm(false);draft.channelComboOpen=!draft.channelComboOpen;if(draft.channelComboOpen)resetChannelComboQuery(draft);syncSignalListenerCreateChannelCombo();document.getElementById('listener-create-channel')?.focus();}
+                function selectSignalListenerCreateChannel(channel){const draft=appState.signalListenerCreate;if(!draft)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;resetChannelComboQuery(draft);const input=document.getElementById('listener-create-channel'), hint=document.getElementById('listener-create-channel-hint');if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerCreateChannelCombo();}
                 function handleSignalListenerCreateChannelKey(event){
                   const draft=appState.signalListenerCreate;if(!draft)return;
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById('listener-create-channel')?.value||draft.channel);
-                  if(event.key==='Escape'){draft.channelComboOpen=false;syncSignalListenerCreateChannelCombo();return;}
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft));
+                  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen=false;syncSignalListenerCreateChannelCombo();return;}
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSignalListenerCreateChannelCombo();return;}
                   if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSignalListenerCreateChannel(options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
                 }
@@ -1289,7 +1382,8 @@ public final class WebAdminFrontendScripts {
                 }
                 function showSignalListenerCreateModal(){
                   const draft=appState.signalListenerCreate||listenerCreateDefaultDraft();
-                  openWebAdminModal('新建 Signal Listener',signalListenerCreateModalBody(draft),editModalFooter(draft.saving),{className:'wa-config-modal',onClose:()=>{appState.signalListenerCreate=null;return dismissWebAdminModal();}});
+                  markModalInitialSnapshot('signal_listener_create',draft);
+                  openWebAdminModal('新建 Signal Listener',signalListenerCreateModalBody(draft),editModalFooter(draft.saving),{className:'wa-config-modal',onClose:()=>{appState.signalListenerCreate=null;return dismissWebAdminModal();},syncBeforeClose:()=>syncModalDraftBeforeClose('signal_listener_create'),dirtyCheck:()=>modalDraftDirty('signal_listener_create',appState.signalListenerCreate)});
                 }
                 async function openSignalListenerCreateModal(){
                   waEnsureState();
@@ -1429,13 +1523,14 @@ public final class WebAdminFrontendScripts {
                     ${errors}
                     ${conflict}
                     <p class="muted">保存只会写入 WebAdmin 元数据文件，不会修改 enabled、channel、itemSubmit、action 或 region 等游戏逻辑配置。</p>
-                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceMetadataEdit(${jsString(detail.id)})'>取消</button></div>
+                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='closeWebAdminModal()'>取消</button></div>
                   </form>`;
                 }
                 function showDeviceMetadataEditModal(deviceId){
                   const draft=appState.deviceMetadataEdit;if(!draft||draft.deviceId!==deviceId)return;
                   if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
-                  openWebAdminModal('编辑设备显示信息',deviceMetadataForm({id:deviceId,displayName:draft.displayName},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceMetadataEdit(deviceId)});
+                  markModalInitialSnapshot('device_metadata',draft);
+                  openWebAdminModal('编辑设备显示信息',deviceMetadataForm({id:deviceId,displayName:draft.displayName},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceMetadataEdit(deviceId),syncBeforeClose:()=>syncModalDraftBeforeClose('device_metadata',deviceId),dirtyCheck:()=>modalDraftDirty('device_metadata',appState.deviceMetadataEdit)});
                 }
                 function deviceDisplaySummaryCard(detail){
                   const meta=detail.metadata||{}, version=Number(meta.version||0);
@@ -1448,9 +1543,8 @@ public final class WebAdminFrontendScripts {
                   const extFields=ext.supportedFields||[], extValues=ext.values||{}, extLabels=ext.fieldLabels||{};
                   const extRows=extFields.length?extFields.map(field=>row(extLabels[field]||field,extendedFieldDisplay(field,extValues[field]))).join(''):`<div class="readonly-note">${esc(ext.unsupportedReason||'该设备类型暂无可编辑扩展配置。')}</div>`;
                   const extNote=deviceExtendedRuntimeNote(ext);
-                  const canEdit=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig();
                   const editing=appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===detail.id;
-                  const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):(canEdit?waButton('编辑设备配置','settings',htmlHandler(`startDeviceConfigEdit(${jsString(detail.id)})`),'primary'):`<div class="readonly-note">需要 EDITOR 或 OWNER 权限才能编辑设备配置。</div>`);
+                  const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):deviceConfigEditButton(detail,'编辑设备配置','primary');
                   const loadNotes=[detail.basicConfigError?`基础配置加载失败：${detail.basicConfigError.message||'未知错误'}`:'',detail.extendedConfigError?`扩展配置加载失败：${detail.extendedConfigError.message||'未知错误'}`:''].filter(Boolean);
                   return `<div class="wa-config-summary">
                     <section class="wa-config-card"><h3>显示信息</h3><div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}</div></section>
@@ -1474,7 +1568,7 @@ public final class WebAdminFrontendScripts {
                   const session=appState.deviceConfigEdit||{deviceId,saving:false,errors:[]};
                   if(session.deviceId!==deviceId)return;
                   const detail=(appState.currentDeviceDetail&&appState.currentDeviceDetail.id===deviceId)?appState.currentDeviceDetail:{id:deviceId,displayName:deviceId};
-                  openWebAdminModal('编辑设备配置',deviceConfigForm(detail,session),editModalFooter(session.saving),{className:'wa-config-modal',onClose:()=>cancelDeviceConfigEdit(deviceId)});
+                  openWebAdminModal('编辑设备配置',deviceConfigForm(detail,session),editModalFooter(session.saving),{className:'wa-config-modal',onClose:()=>cancelDeviceConfigEdit(deviceId),syncBeforeClose:()=>syncModalDraftBeforeClose('device_config',deviceId),dirtyCheck:()=>isDeviceConfigModalDirty(deviceId)});
                 }
                 function deviceConfigForm(detail,session){
                   const errors=(session.errors||[]).length?`<ul class="validation-list">${session.errors.map(e=>`<li>${esc(e.message||e||'保存失败')}</li>`).join('')}</ul>`:'';
@@ -1490,48 +1584,63 @@ public final class WebAdminFrontendScripts {
                   return await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType,targetId})});
                 }
                 async function startDeviceConfigEdit(deviceId){
-                  const encoded=encodeURIComponent(deviceId);
-                  const detail=(appState.currentDeviceDetail&&appState.currentDeviceDetail.id===deviceId)?appState.currentDeviceDetail:await api(`/api/devices/${encoded}`);
-                  const [basicRes,extendedRes]=await Promise.all([settle(`/api/webadmin/device-basic-config/${encoded}`),settle(`/api/webadmin/device-extended-config/${encoded}`)]);
-                  const session={deviceId,saving:false,errors:[]};let acquired=0, visibleSections=0;
+                  const lookupId=deviceApiRef(deviceId), encoded=encodeURIComponent(lookupId);
+                  const detail=(appState.currentDeviceDetail&&sameDeviceRef(appState.currentDeviceDetail.id,deviceId))?appState.currentDeviceDetail:await api(`/api/devices/${encoded}`);
+                  const expectedType=deviceTypeRefPrefix(deviceId);if(expectedType&&String(detail.type||'').toLowerCase()!==expectedType){toast('该位置当前设备类型已变化，目标类型不存在。');return;}
+                  const canonicalId=detail.id||lookupId, canonicalEncoded=encodeURIComponent(canonicalId);
+                  const [metadataLockRes,basicRes,extendedRes,actionRes]=await Promise.all([
+                    settle(`/api/webadmin/edit-locks/status?targetType=device_metadata&targetId=${canonicalEncoded}`),
+                    settle(`/api/webadmin/device-basic-config/${canonicalEncoded}`),
+                    settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`),
+                    isActionRelay(detail)?settle(`/api/webadmin/action-relay-actions/${canonicalEncoded}`):Promise.resolve({ok:true,data:null})
+                  ]);
+                  detail.metadataLock=metadataLockRes.ok?metadataLockRes.data:null;
+                  detail.basicConfig=basicRes.ok?basicRes.data:null;
+                  detail.basicConfigError=basicRes.ok?null:basicRes.error;
+                  detail.extendedConfig=extendedRes.ok?extendedRes.data:null;
+                  detail.extendedConfigError=extendedRes.ok?null:extendedRes.error;
+                  detail.actionRelayActions=actionRes.ok?actionRes.data:null;
+                  detail.actionRelayActionsError=actionRes.ok?null:actionRes.error;
+                  appState.currentDeviceDetail=detail;
+                  const lockMessageText=deviceConfigLockMessage(detail);
+                  if(lockMessageText){toast(lockMessageText);await renderDeviceDetail(currentDeviceRouteArg(canonicalId),{silent:true});return;}
+                  const session={deviceId:canonicalId,saving:false,errors:[]};let acquired=0, visibleSections=0;
                   try{
                     if(canEditDeviceMetadata()){
-                      const result=await acquireWebAdminEditLock('device_metadata',deviceId);
-                      if(result.success){const lock=result.data?.lock||{}, meta=detail.metadata||{};appState.deviceMetadataEdit={deviceId,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedVersion:Number(meta.version||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceMetadataLockHeartbeat();acquired++;}
+                      const result=await acquireWebAdminEditLock('device_metadata',canonicalId);
+                      if(result.success){const lock=result.data?.lock||{}, meta=detail.metadata||{};appState.deviceMetadataEdit={deviceId:canonicalId,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedVersion:Number(meta.version||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};markModalInitialSnapshot('device_metadata',appState.deviceMetadataEdit);scheduleDeviceMetadataLockHeartbeat();acquired++;}
                       else session.errors.push({message:result.message||'显示信息编辑锁获取失败'});
                     }
                     if(canEditDeviceBasicConfig()&&basicRes.ok&&basicRes.data?.supported!==false){
-                      const result=await acquireWebAdminEditLock('device_basic_config',deviceId);
-                      if(result.success){const lock=result.data?.lock||{}, cfg=basicRes.data||{}, channelOptions=await loadSignalChannelOptions();appState.deviceBasicConfigEdit={deviceId,enabled:!!cfg.enabled,channel:cfg.channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};scheduleDeviceBasicConfigLockHeartbeat();acquired++;}
+                      const result=await acquireWebAdminEditLock('device_basic_config',canonicalId);
+                      if(result.success){const lock=result.data?.lock||{}, cfg=basicRes.data||{}, channelOptions=await loadSignalChannelOptions();appState.deviceBasicConfigEdit={deviceId:canonicalId,enabled:!!cfg.enabled,channel:cfg.channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,channelComboQuery:'',channelComboSearchActive:false,expectedFingerprint:cfg.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};markModalInitialSnapshot('device_basic_config',appState.deviceBasicConfigEdit);scheduleDeviceBasicConfigLockHeartbeat();acquired++;}
                       else session.errors.push({message:result.message||'基础配置编辑锁获取失败'});
                     }
                     if(canEditDeviceExtendedConfig()&&extendedRes.ok&&extendedRes.data?.supported!==false&&(extendedRes.data?.supportedFields||[]).length){
                       const cfg=extendedRes.data||{}, editable=cfg.editableFields||cfg.supportedFields||[], channelOptions=await loadSignalChannelOptions();let lock={};
                       if(editable.length){
-                        const result=await acquireWebAdminEditLock('device_extended_config',deviceId);
+                        const result=await acquireWebAdminEditLock('device_extended_config',canonicalId);
                         if(result.success){lock=result.data?.lock||{};acquired++;}
                         else session.errors.push({message:result.message||'扩展配置编辑锁获取失败'});
-                      }else{
-                        session.errors.push({message:cfg.unsupportedReason||'类型专属配置当前只读，已展示快照字段和运行状态。'});
                       }
-                      appState.deviceExtendedConfigEdit=makeDeviceExtendedConfigDraft(deviceId,cfg,lock,channelOptions);
+                      appState.deviceExtendedConfigEdit=makeDeviceExtendedConfigDraft(canonicalId,cfg,lock,channelOptions);
                       if(appState.deviceExtendedConfigEdit.lockId)scheduleDeviceExtendedConfigLockHeartbeat();
                       visibleSections++;
                     }
                     if(isActionRelay(detail)&&canEditActionRelayActions()){
-                      const draft=await prepareActionRelayActionsDraft(deviceId,true);
+                      const draft=await prepareActionRelayActionsDraft(canonicalId,true);
                       if(draft.lockId)acquired++;
                       else session.errors.push({message:draft.errors[0]?.message||draft.unsupportedReason||'Action 列表编辑锁获取失败'});
                     }
-                    if(!acquired&&!visibleSections){await releaseAllDeviceConfigLocks(deviceId,true);toast(session.errors[0]?.message||'当前设备没有可编辑配置区。');return;}
+                    if(!acquired&&!visibleSections){await releaseAllDeviceConfigLocks(canonicalId,true);toast(session.errors[0]?.message||'当前设备没有可编辑配置区。');return;}
                     appState.deviceConfigEdit=session;
-                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
-                    showDeviceConfigEditModal(deviceId);
+                    await renderDeviceDetail(currentDeviceRouteArg(canonicalId),{silent:true});
+                    showDeviceConfigEditModal(canonicalId);
                   }catch(err){
-                    await releaseAllDeviceConfigLocks(deviceId,true);
+                    await releaseAllDeviceConfigLocks(canonicalId,true);
                     appState.deviceConfigEdit=null;
                     toast(err.message||'无法打开设备配置编辑器');
-                    await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
+                    await renderDeviceDetail(currentDeviceRouteArg(canonicalId),{silent:true});
                   }
                 }
                 function applyDeviceConfigDraftsFromForm(deviceId){
@@ -1581,21 +1690,23 @@ public final class WebAdminFrontendScripts {
                 }
                 function deviceConfigSaveFailed(deviceId,draft,result,section){
                   const session=appState.deviceConfigEdit||{deviceId,errors:[]};
-                  draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;
+                  draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;
                   if(section==='metadata'){appState.deviceMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceMetadataLockHeartbeat();}
                   if(section==='basic'){appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();}
                   if(section==='extended'){appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();}
                   if(section==='actionRelayActions'){appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();}
-                  session.saving=false;session.errors=[{message:result.message||'保存失败'}];appState.deviceConfigEdit=session;toast(result.message||'保存失败');showDeviceConfigEditModal(deviceId);return false;
+                  session.saving=false;session.errors=[{message:result.message||'保存失败'}];appState.deviceConfigEdit=session;toast(result.message||'保存失败');if(section==='actionRelayActions')rerenderActionRelayActionsEditor(deviceId);else showDeviceConfigEditModal(deviceId);return false;
                 }
                 """).append("""
                 function actionRelayActionListReadonlyCard(detail){
                   if(detail.actionRelayActionsError)return errorBlock(detail.actionRelayActionsError.message||'Action 列表加载失败');
                   const data=detail.actionRelayActions||{}, actions=data.actions||[];
+                  const lockedByOther=actionRelayLockHeldByOther(data.lockStatus);
                   const rows=!data.actionsReadable?`<div class="empty-state">动作详情当前不可读取；store 快照记录 ${esc(data.snapshotActionCount??data.actionCount??0)} 条动作。请根据下方运行状态检查 world / chunk / block entity。</div>`:(actions.length?actions.slice(0,6).map(a=>`<div class="wa-compact-row"><strong>#${esc(Number(a.displayIndex||a.index+1||1))} ${esc(labelActionType(a.type))}</strong><span>${esc(a.summary||a.value||'')}</span><small>${a.enabled===false?'已禁用':'已启用'}</small></div>`).join(''):'<div class="empty-state">当前 Action Relay 还没有动作。</div>');
-                  const note=data.actionsEditable===false?`<p class="readonly-note danger">${esc(data.unsupportedReason||'当前 action_relay 不可编辑。')}</p>`:`<p class="muted">Action 列表只属于已放置 action_relay 的配置；不会创建或删除世界方块。</p>`;
-                  const buttonLabel=data.actionsEditable===false?'查看 Action 状态':'编辑 Action 列表';
-                  return `<div class="wa-action-readonly-card" data-action-relay-detail-card="true">${rows}${actions.length>6?`<p class="muted">还有 ${esc(actions.length-6)} 条动作未展示。</p>`:''}${note}<div class="inline-actions">${waButton(buttonLabel,'action-relay',canEditActionRelayActions()?htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`):'disabled','primary')}</div></div>`;
+                  const note=lockedByOther?`<p class="readonly-note" data-action-relay-lock-held="true">${esc(actionRelayLockMessage(data.lockStatus))}</p>`:(data.actionsEditable===false?`<p class="readonly-note danger">${esc(data.unsupportedReason||'当前 action_relay 不可编辑。')}</p>`:`<p class="muted">Action 列表只属于已放置 action_relay 的配置；不会创建或删除世界方块。</p>`);
+                  const buttonLabel=lockedByOther?'只读查看 Action 列表':(data.actionsEditable===false?'查看 Action 状态':'编辑 Action 列表');
+                  const handler=lockedByOther?htmlHandler(`openActionRelayActionsReadonlyModal(${jsString(detail.id)})`):(canEditActionRelayActions()?htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`):'disabled');
+                  return `<div class="wa-action-readonly-card" data-action-relay-detail-card="true">${rows}${actions.length>6?`<p class="muted">还有 ${esc(actions.length-6)} 条动作未展示。</p>`:''}${note}<div class="inline-actions">${waButton(buttonLabel,'action-relay',handler,lockedByOther?'ghost':'primary')}</div></div>`;
                 }
                 function actionRelayRuntimeStatusHtml(data){
                   const state=String(data?.loadedState||''), reason=data?.unsupportedReason||'', block=data?.blockId?`当前方块：${data.blockId}`:'', be=data?.blockEntityType?`方块实体：${data.blockEntityType}`:'', count=Number(data?.snapshotActionCount??data?.actionCount??0);
@@ -1604,15 +1715,19 @@ public final class WebAdminFrontendScripts {
                 }
                 function labelActionType(type){return {command:'命令',signal:'Signal',message:'消息',sound:'音效',COMMAND:'命令',SIGNAL:'Signal',MESSAGE:'消息',SOUND:'音效'}[String(type||'')]||String(type||'未知');}
                 function actionTypeOptions(value){return ['command','signal','message','sound'].map(type=>`<option value="${type}" ${String(value||'command').toLowerCase()===type?'selected':''}>${esc(labelActionType(type))}</option>`).join('');}
-                function normalizeActionRelayDraftAction(action={}){return {type:String(action.type||'command').toLowerCase(),value:String(action.value||''),enabled:action.enabled!==false,requiresOp:!!action.requiresOp,cooldownTicks:Number(action.cooldownTicks||0),notifyOps:!!action.notifyOps,summary:String(action.summary||'')};}
+                function normalizeActionRelayEditableAction(action={}){return {type:String(action.type||'command').toLowerCase(),value:String(action.value||''),enabled:action.enabled!==false,requiresOp:!!action.requiresOp,cooldownTicks:Number(action.cooldownTicks||0),notifyOps:!!action.notifyOps};}
+                function normalizeActionRelayDraftAction(action={}){return {...normalizeActionRelayEditableAction(action),summary:String(action.summary||'')};}
+                function actionRelayActionsEditableJson(actions){return JSON.stringify((actions||[]).map(normalizeActionRelayEditableAction));}
                 function actionRelayActionsJson(actions){return JSON.stringify((actions||[]).map(normalizeActionRelayDraftAction));}
-                function actionRelayActionsDirty(draft){return !!draft&&actionRelayActionsJson(draft.actions)!==String(draft.originalActionsJson||'[]');}
+                function actionRelayActionsDirty(draft){return !!draft&&actionRelayActionsEditableJson(draft.actions)!==String(draft.originalActionsJson||'[]');}
                 async function prepareActionRelayActionsDraft(deviceId,acquireLock=false){
-                  const encoded=encodeURIComponent(deviceId), data=await api(`/api/webadmin/action-relay-actions/${encoded}`), channelOptions=await loadSignalChannelOptions();
+                  const encoded=encodeURIComponent(deviceApiRef(deviceId)), data=await api(`/api/webadmin/action-relay-actions/${encoded}`), channelOptions=await loadSignalChannelOptions();
+                  const canonicalId=data.deviceId||deviceApiRef(deviceId);
                   const actions=(data.actions||[]).map(normalizeActionRelayDraftAction);
-                  const draft={deviceId,displayName:data.displayName||deviceId,channel:data.channel||'',supported:data.supported!==false,typeSupported:data.typeSupported!==false,actionsReadable:data.actionsReadable===true,actionsEditable:data.actionsEditable===true,unsupportedReason:data.unsupportedReason||'',loadedState:data.loadedState||'',worldAvailable:data.worldAvailable,chunkLoaded:data.chunkLoaded,blockEntityLoaded:data.blockEntityLoaded,blockEntityType:data.blockEntityType||'',blockId:data.blockId||'',snapshotActionCount:data.snapshotActionCount??data.actionCount??0,actions,originalActionsJson:actionRelayActionsJson(actions),expectedFingerprint:data.expectedFingerprint||'',lockStatus:data.lockStatus||null,lockId:'',lock:null,errors:[],saving:false,conflict:null,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{}};
+                  const draft={deviceId:canonicalId,displayName:data.displayName||canonicalId,channel:data.channel||'',supported:data.supported!==false,typeSupported:data.typeSupported!==false,actionsReadable:data.actionsReadable===true,actionsEditable:data.actionsEditable===true,unsupportedReason:data.unsupportedReason||'',loadedState:data.loadedState||'',worldAvailable:data.worldAvailable,chunkLoaded:data.chunkLoaded,blockEntityLoaded:data.blockEntityLoaded,blockEntityType:data.blockEntityType||'',blockId:data.blockId||'',snapshotActionCount:data.snapshotActionCount??data.actionCount??0,actions,originalActionsJson:actionRelayActionsEditableJson(actions),expectedFingerprint:data.expectedFingerprint||'',lockStatus:data.lockStatus||null,lockId:'',lock:null,errors:[],saving:false,conflict:null,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},channelComboQuery:{},channelComboSearchActive:{},initialSnapshot:actionRelayActionsEditableJson(actions)};
                   if(acquireLock&&draft.actionsEditable&&canEditActionRelayActions()){
-                    const result=await acquireWebAdminEditLock('action_relay_actions',deviceId);
+                    if(actionRelayLockHeldByOther(draft.lockStatus)){draft.errors=[{message:actionRelayLockMessage(draft.lockStatus)}];appState.actionRelayActionsEdit=draft;return draft;}
+                    const result=await acquireWebAdminEditLock('action_relay_actions',canonicalId);
                     if(result.success){const lock=result.data?.lock||{};draft.lockId=lock.lockId||'';draft.lock=lock;scheduleActionRelayActionsLockHeartbeat();}
                     else draft.errors=[{message:result.message||'Action 列表编辑锁获取失败'}];
                   }
@@ -1622,24 +1737,28 @@ public final class WebAdminFrontendScripts {
                 async function openActionRelayActionsModal(deviceId){
                   try{
                     const draft=await prepareActionRelayActionsDraft(deviceId,true);
-                    showActionRelayActionsModal(deviceId);
+                    showActionRelayActionsModal(draft.deviceId);
                     if(!draft.actionsEditable)toast(draft.unsupportedReason||'当前 Action Relay 不可编辑。');
                     else if(draft.errors.length)toast(draft.errors[0].message||'无法进入 Action 列表编辑。');
                   }catch(err){toast(err.message||'Action 列表加载失败');}
                 }
+                async function openActionRelayActionsReadonlyModal(deviceId){
+                  try{const draft=await prepareActionRelayActionsDraft(deviceId,false);showActionRelayActionsModal(draft.deviceId);}catch(err){toast(err.message||'Action 列表加载失败');}
+                }
                 function showActionRelayActionsModal(deviceId){
                   const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;
+                  markModalInitialSnapshot('action_relay_actions',draft);
                   const footer=draft.lockId?editModalFooter(draft.saving):waButton('关闭','close','onclick="closeWebAdminModal()"','ghost');
-                  openWebAdminModal(draft.lockId?'编辑 Action 列表':'查看 Action 列表',actionRelayActionsForm({id:deviceId,displayName:draft.displayName},draft,false),footer,{className:'wa-action-relay-modal',onClose:async()=>{await cancelActionRelayActionsEdit(deviceId,true);await dismissWebAdminModal();}});
+                  openWebAdminModal(draft.lockId?'编辑 Action 列表':'查看 Action 列表',actionRelayActionsForm({id:deviceId,displayName:draft.displayName},draft,false),footer,{className:'wa-action-relay-modal',onClose:async()=>{await cancelActionRelayActionsEdit(deviceId,true);await dismissWebAdminModal();},syncBeforeClose:()=>syncModalDraftBeforeClose('action_relay_actions',deviceId),dirtyCheck:()=>!!appState.actionRelayActionsEdit?.lockId&&modalDraftDirty('action_relay_actions',appState.actionRelayActionsEdit)});
                 }
                 function actionRelayActionsForm(detail,draft,inline=false){
                   const errors=(draft.errors||[]).length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||e||'保存失败')}</li>`).join('')}</ul>`:'';
-                  const lockLine=draft.lockId?`<div class="readonly-note">正在编辑 action_relay_actions · 锁到期：${esc(formatDateTime(draft.lock?.expiresAt))}</div>`:(draft.actionsEditable?'<div class="readonly-note">当前为只读预览；需要获取编辑锁后才能保存。</div>':`<div class="readonly-note danger">${esc(draft.unsupportedReason||'当前 Action Relay 不可编辑。')}</div>`);
+                  const lockLine=draft.lockId?`<div class="readonly-note">正在编辑 action_relay_actions · 锁到期：${esc(formatDateTime(draft.lock?.expiresAt))}</div>`:(draft.actionsEditable?'<div class="readonly-note">当前为只读预览；需要获取编辑锁后才能保存。</div>':'<div class="readonly-note">当前 Action 列表以只读状态显示；运行状态见下方状态卡。</div>');
                   const conflict=draft.conflict?`<div class="readonly-note danger">Action 列表已被其他用户修改，请重新加载。<button class="link-button" type="button" onclick='reloadActionRelayActionsAfterConflict(${jsString(draft.deviceId)})'>重新加载</button></div>`:'';
                   const rows=!draft.actionsReadable?`<div class="empty-state">动作详情当前不可读取；store 快照记录 ${esc(draft.snapshotActionCount??0)} 条动作。请让玩家加载该方块并确认当前位置仍是 action_relay。</div>`:((draft.actions||[]).length?draft.actions.map((action,index)=>actionRelayActionRow(draft.deviceId,action,index,draft)).join(''):'<div class="empty-state">当前 Action Relay 还没有动作。可以从下方新增 command、signal、message 或 sound action。</div>');
                   const addDisabled=!draft.lockId||draft.saving?'disabled':'';
                   const addButtons=`<div class="inline-actions" data-action-add-controls="true">${['command','signal','message','sound'].map(type=>`<button class="wa-btn ghost" type="button" ${addDisabled} data-action-add="${type}" onclick='addActionRelayAction(${jsString(draft.deviceId)},${jsString(type)})'>${icon('plus')}<span>新增 ${esc(labelActionType(type))}</span></button>`).join('')}</div>`;
-                  const content=`${lockLine}${actionRelayRuntimeStatusHtml(draft)}${errors}${conflict}<div class="wa-action-list-editor" data-action-relay-actions-modal="true" data-action-relay-action-list="true" data-action-relay-no-raw-json="true">${rows}</div>${addButtons}<p class="muted">Action 列表按顺序执行；signal action 可选择已有频道或手动输入新频道，新频道不会自动创建消费者。此处不会打开 JSON 文本框，不会启用 matcher / itemSubmit / ConditionEngine。</p>`;
+                  const content=`${lockLine}${actionRelayRuntimeStatusHtml(draft)}${errors}${conflict}<div class="wa-action-list-editor" data-action-relay-actions-modal="true" data-action-relay-action-list="true" data-action-relay-no-raw-json="true" data-action-list-preserve-scroll="true">${rows}</div>${addButtons}<p class="muted">Action 列表按顺序执行；signal action 可选择已有频道或手动输入新频道，新频道不会自动创建消费者。此处不会打开 JSON 文本框，不会启用 matcher / itemSubmit / ConditionEngine。</p>`;
                   if(inline)return `<div class="wa-action-inline-section" data-action-relay-config-modal-section="true">${content}</div>`;
                   return `<form class="edit-form" onsubmit='event.preventDefault();saveActionRelayActions(${jsString(draft.deviceId)})'>${content}</form>`;
                 }
@@ -1655,10 +1774,10 @@ public final class WebAdminFrontendScripts {
                 function actionRelayActionValueEditor(deviceId,action,index,draft){
                   const disabled=!draft.lockId||draft.saving?'disabled':'';
                   const type=String(action.type||'command').toLowerCase(), value=action.value||'';
-                  if(type==='signal')return `<label data-signal-action-editor="true">目标频道${renderActionRelaySignalChannelCombo(deviceId,index,action,draft)}<span id="ara-${index}-channel-hint" class="readonly-note">${channelHintHtml(value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label>`;
-                  if(type==='message')return `<label data-message-action-editor="true">消息文本<textarea id="ara-${index}-value" class="input wa-action-textarea" maxlength="500" ${disabled} oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'>${esc(value)}</textarea></label>`;
-                  if(type==='sound')return `<label data-sound-action-editor="true">音效 ID<input id="ara-${index}-value" class="input" maxlength="128" value="${esc(value)}" ${disabled} placeholder="minecraft:entity.experience_orb.pickup" oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'><span class="muted">当前底层只保存 sound id；实际播放按现有 ActionEngine 能力生效。</span></label>`;
-                  return `<label data-command-action-editor="true">命令内容<input id="ara-${index}-value" class="input" maxlength="512" value="${esc(value)}" ${disabled} placeholder="say hello" oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'><span class="muted">不要输入开头的 /；setblock、fill、clone、function、schedule、execute、tp、teleport、data、gamerule 等地图控制命令允许保存。WebAdmin 只硬阻断 ban、kick、op、stop、whitelist 等服务器管理高风险命令。</span></label>`;
+                  if(type==='signal')return `<label class="wa-action-value-field" data-signal-action-editor="true">目标频道${renderActionRelaySignalChannelCombo(deviceId,index,action,draft)}<span id="ara-${index}-channel-hint" class="readonly-note">${channelHintHtml(value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label>`;
+                  if(type==='message')return `<label class="wa-action-value-field" data-message-action-editor="true">消息文本<textarea id="ara-${index}-value" class="input wa-action-textarea" maxlength="500" ${disabled} oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'>${esc(value)}</textarea></label>`;
+                  if(type==='sound')return `<label class="wa-action-value-field" data-sound-action-editor="true">音效 ID<input id="ara-${index}-value" class="input" maxlength="128" value="${esc(value)}" ${disabled} placeholder="minecraft:entity.experience_orb.pickup" oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'><span class="muted">当前底层只保存 sound id；实际播放按现有 ActionEngine 能力生效。</span></label>`;
+                  return `<label class="wa-action-value-field" data-command-action-editor="true">命令内容<input id="ara-${index}-value" class="input" maxlength="512" value="${esc(value)}" ${disabled} placeholder="say hello" oninput='syncActionRelayActionsDraftFromForm(${jsString(deviceId)})'><span class="muted">不要输入开头的 /；setblock、fill、clone、function、schedule、execute、tp、teleport、data、gamerule 等地图控制命令允许保存。WebAdmin 只硬阻断 ban、kick、op、stop、whitelist 等服务器管理高风险命令。</span></label>`;
                 }
                 function renderActionRelaySignalChannelCombo(deviceId,index,action,draft){
                   const open=(draft.channelComboOpen||{})[index]?' open':'';
@@ -1667,29 +1786,31 @@ public final class WebAdminFrontendScripts {
                 }
                 function actionRelayChannelOptionsHtml(deviceId,index,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const action=(draft.actions||[])[index]||{}, options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],action.value), current=normalizeChannelName(action.value).toLowerCase(), indexes=draft.channelComboIndex||{}, active=Math.max(0,Number(indexes[index]||0));
+                  const action=(draft.actions||[])[index]||{}, options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,index)), current=normalizeChannelName(action.value).toLowerCase(), indexes=draft.channelComboIndex||{}, active=Math.max(0,Number(indexes[index]||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
                   return options.map((c,i)=>`<button type="button" class="channel-combo-option ${i===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectActionRelayActionChannel(${jsString(deviceId)},${index},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
                 function syncActionRelayActionsDraftFromForm(deviceId,indexToOpen=null,openMenu=false){
                   const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;
                   draft.actions=(draft.actions||[]).map((action,index)=>{const type=String(document.getElementById(`ara-${index}-type`)?.value||action.type||'command').toLowerCase();return {type,value:document.getElementById(`ara-${index}-value`)?.value||'',enabled:!!document.getElementById(`ara-${index}-enabled`)?.checked,requiresOp:!!document.getElementById(`ara-${index}-requires-op`)?.checked,cooldownTicks:Number(document.getElementById(`ara-${index}-cooldown`)?.value||0),notifyOps:!!document.getElementById(`ara-${index}-notify`)?.checked};});
-                  if(openMenu&&indexToOpen!==null){draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[indexToOpen]=true;draft.channelComboIndex[indexToOpen]=0;}
+                  if(openMenu&&indexToOpen!==null){draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[indexToOpen]=true;draft.channelComboIndex[indexToOpen]=0;setChannelComboQuery(draft,(draft.actions||[])[indexToOpen]?.value||'',indexToOpen);}
                   appState.actionRelayActionsEdit=draft;syncActionRelayChannelCombo(deviceId,indexToOpen);
                 }
-                function rerenderActionRelayActionsEditor(deviceId){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(deviceId);}else showActionRelayActionsModal(deviceId);}
+                function captureActionRelayEditorUiState(){const body=document.querySelector('#wa-modal-root .wa-modal-body'), active=document.activeElement;return {scrollTop:body?body.scrollTop:0,activeId:active&&active.id?active.id:'',selectionStart:active&&typeof active.selectionStart==='number'?active.selectionStart:null,selectionEnd:active&&typeof active.selectionEnd==='number'?active.selectionEnd:null};}
+                function restoreActionRelayEditorUiState(state){requestAnimationFrame(()=>{const body=document.querySelector('#wa-modal-root .wa-modal-body');if(body&&state)body.scrollTop=state.scrollTop||0;const active=state&&state.activeId?document.getElementById(state.activeId):null;if(active&&typeof active.focus==='function'){active.focus();if(state.selectionStart!==null&&typeof active.setSelectionRange==='function')active.setSelectionRange(state.selectionStart,state.selectionEnd);}});}
+                function rerenderActionRelayActionsEditor(deviceId){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;const uiState=captureActionRelayEditorUiState();if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(deviceId);}else showActionRelayActionsModal(deviceId);restoreActionRelayEditorUiState(uiState);}
                 function changeActionRelayActionType(deviceId,index){syncActionRelayActionsDraftFromForm(deviceId);const draft=appState.actionRelayActionsEdit;if(!draft)return;const action=draft.actions[index];if(action){action.type=String(document.getElementById(`ara-${index}-type`)?.value||'command').toLowerCase();action.value=action.type==='sound'?'minecraft:entity.experience_orb.pickup':'';}rerenderActionRelayActionsEditor(deviceId);}
                 function addActionRelayAction(deviceId,type){syncActionRelayActionsDraftFromForm(deviceId);const draft=appState.actionRelayActionsEdit;if(!draft||!draft.lockId)return;draft.actions.push(normalizeActionRelayDraftAction({type,value:type==='sound'?'minecraft:entity.experience_orb.pickup':''}));rerenderActionRelayActionsEditor(deviceId);}
                 function requestDeleteActionRelayAction(deviceId,index){syncActionRelayActionsDraftFromForm(deviceId);const draft=appState.actionRelayActionsEdit;if(!draft||!draft.lockId)return;draft.pendingDeleteIndex=index;rerenderActionRelayActionsEditor(deviceId);}
                 function cancelDeleteActionRelayAction(deviceId){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;draft.pendingDeleteIndex=null;rerenderActionRelayActionsEditor(deviceId);}
                 function confirmDeleteActionRelayAction(deviceId,index){syncActionRelayActionsDraftFromForm(deviceId);const draft=appState.actionRelayActionsEdit;if(!draft||!draft.lockId)return;if(index<0||index>=draft.actions.length)return;draft.actions.splice(index,1);draft.pendingDeleteIndex=null;rerenderActionRelayActionsEditor(deviceId);}
                 function moveActionRelayAction(deviceId,index,delta){syncActionRelayActionsDraftFromForm(deviceId);const draft=appState.actionRelayActionsEdit;if(!draft||!draft.lockId)return;const next=index+delta;if(next<0||next>=draft.actions.length)return;const [item]=draft.actions.splice(index,1);draft.actions.splice(next,0,item);rerenderActionRelayActionsEditor(deviceId);}
-                function openActionRelayActionChannelMenu(deviceId,index){syncActionRelayActionsDraftFromForm(deviceId,index,true);}
-                function toggleActionRelayActionChannelMenu(deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[index]=!draft.channelComboOpen[index];syncActionRelayChannelCombo(deviceId,index);document.getElementById(`ara-${index}-value`)?.focus();}
-                function selectActionRelayActionChannel(deviceId,index,channel){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.actions[index].value=channel||'';draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[index]=false;draft.channelComboIndex[index]=0;const input=document.getElementById(`ara-${index}-value`);if(input)input.value=draft.actions[index].value;const hint=document.getElementById(`ara-${index}-channel-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.actions[index].value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncActionRelayChannelCombo(deviceId,index);}
-                function handleActionRelayActionChannelKey(event,deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById(`ara-${index}-value`)?.value||'');if(event.key==='Escape'){draft.channelComboOpen[index]=false;syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen[index]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number((draft.channelComboIndex||{})[index]||0)+1:Number((draft.channelComboIndex||{})[index]||0)-1;draft.channelComboIndex[index]=Math.min(max,Math.max(0,next));syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='Enter'&&draft.channelComboOpen[index]&&options.length>0){event.preventDefault();selectActionRelayActionChannel(deviceId,index,options[Math.min(options.length-1,Number(draft.channelComboIndex[index]||0))].channel);}}
+                function openActionRelayActionChannelMenu(deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[index]=true;draft.channelComboIndex[index]=0;resetChannelComboQuery(draft,index);syncActionRelayChannelCombo(deviceId,index);}
+                function toggleActionRelayActionChannelMenu(deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[index]=!draft.channelComboOpen[index];if(draft.channelComboOpen[index])resetChannelComboQuery(draft,index);syncActionRelayChannelCombo(deviceId,index);document.getElementById(`ara-${index}-value`)?.focus();}
+                function selectActionRelayActionChannel(deviceId,index,channel){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.actions[index].value=channel||'';draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[index]=false;draft.channelComboIndex[index]=0;resetChannelComboQuery(draft,index);const input=document.getElementById(`ara-${index}-value`);if(input)input.value=draft.actions[index].value;const hint=document.getElementById(`ara-${index}-channel-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.actions[index].value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncActionRelayChannelCombo(deviceId,index);}
+                function handleActionRelayActionChannelKey(event,deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,index));if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen[index]=false;syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen[index]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number((draft.channelComboIndex||{})[index]||0)+1:Number((draft.channelComboIndex||{})[index]||0)-1;draft.channelComboIndex[index]=Math.min(max,Math.max(0,next));syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='Enter'&&draft.channelComboOpen[index]&&options.length>0){event.preventDefault();selectActionRelayActionChannel(deviceId,index,options[Math.min(options.length-1,Number(draft.channelComboIndex[index]||0))].channel);}}
                 function syncActionRelayChannelCombo(deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId||index===null||index===undefined)return;const combo=document.getElementById(`ara-${index}-channel-combo`), menu=document.getElementById(`ara-${index}-channel-menu`), input=document.getElementById(`ara-${index}-value`);if(combo)combo.classList.toggle('open',!!(draft.channelComboOpen||{})[index]);if(input)input.setAttribute('aria-expanded',(draft.channelComboOpen||{})[index]?'true':'false');if(menu)menu.innerHTML=actionRelayChannelOptionsHtml(deviceId,index,draft);}
-                async function saveActionRelayActions(deviceId){const draft=appState.actionRelayActionsEdit||{deviceId,errors:[]};syncActionRelayActionsDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.actionRelayActionsEdit=draft;showActionRelayActionsModal(deviceId);try{const result=await patchActionRelayActionsDraft(deviceId,draft);if(result.success){appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'Action 列表已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();toast(result.message||'保存失败');showActionRelayActionsModal(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.actionRelayActionsEdit=draft;toast(err.message||'保存失败');showActionRelayActionsModal(deviceId);}}
+                async function saveActionRelayActions(deviceId){const draft=appState.actionRelayActionsEdit||{deviceId,errors:[]};syncActionRelayActionsDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.actionRelayActionsEdit=draft;rerenderActionRelayActionsEditor(deviceId);try{const result=await patchActionRelayActionsDraft(deviceId,draft);if(result.success){appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'Action 列表已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();toast(result.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];draft.conflict=null;appState.actionRelayActionsEdit=draft;toast(err.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}}
                 async function patchActionRelayActionsDraft(deviceId,draft){return await api(`/api/webadmin/action-relay-actions/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({deviceId,actions:(draft.actions||[]).map(normalizeActionRelayDraftAction),expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''})});}
                 async function reloadActionRelayActionsAfterConflict(deviceId){try{await releaseActionRelayActionsLock(appState.actionRelayActionsEdit,true);await prepareActionRelayActionsDraft(deviceId,true);rerenderActionRelayActionsEditor(deviceId);}catch(err){toast(err.message||'Action 列表重新加载失败');}}
                 function scheduleActionRelayActionsLockHeartbeat(){stopActionRelayActionsLockHeartbeat();appState.actionRelayActionsLockTimer=setTimeout(async()=>{await heartbeatActionRelayActionsLock();if(appState.actionRelayActionsEdit)scheduleActionRelayActionsLockHeartbeat();},30000);}
@@ -1746,13 +1867,14 @@ public final class WebAdminFrontendScripts {
                     ${errors}
                     ${conflict}
                     <p class="muted">保存会写入真实设备基础配置，仅限 enabled / 主频道；不会修改 itemSubmit、matcher、action、region、用户或系统设置。7.2 暂不支持清空主频道。</p>
-                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceBasicConfigEdit(${jsString(detail.id)})'>取消</button></div>
+                    <div class="form-actions"><button class="secondary" type="submit">${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='closeWebAdminModal()'>取消</button></div>
                   </form>`;
                 }
                 function showDeviceBasicConfigEditModal(deviceId){
                   const draft=appState.deviceBasicConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
                   if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
-                  openWebAdminModal('编辑设备基础配置',deviceBasicConfigForm({id:deviceId},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceBasicConfigEdit(deviceId)});
+                  markModalInitialSnapshot('device_basic_config',draft);
+                  openWebAdminModal('编辑设备基础配置',deviceBasicConfigForm({id:deviceId},draft),editModalFooter(draft.saving),{onClose:()=>cancelDeviceBasicConfigEdit(deviceId),syncBeforeClose:()=>syncModalDraftBeforeClose('device_basic_config',deviceId),dirtyCheck:()=>modalDraftDirty('device_basic_config',appState.deviceBasicConfigEdit)});
                 }
                 function deviceExtendedConfigCard(detail){
                   if(detail.extendedConfigError)return errorBlock(detail.extendedConfigError.message||'设备扩展配置加载失败');
@@ -1786,7 +1908,8 @@ public final class WebAdminFrontendScripts {
                 }
                 function deviceExtendedConfigForm(detail,draft){
                   const errors=draft.errors&&draft.errors.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||'输入未通过校验')}</li>`).join('')}</ul>`:'';
-                  const lock=draft.lock||{}, lockLine=draft.lockId?`<div class="readonly-note">正在编辑扩展配置 · 锁到期：${esc(formatDateTime(lock.expiresAt))} · 持有人：${esc(lock.holderUsername||appState.me?.username||'当前用户')}</div>`:`<div class="readonly-note danger">${esc(draft.unsupportedReason||'当前运行状态下类型专属配置只读。')}</div>`;
+                  const lock=draft.lock||{}, hasEditable=(draft.editableFields||[]).length>0;
+                  const lockLine=draft.lockId?`<div class="readonly-note">正在编辑扩展配置 · 锁到期：${esc(formatDateTime(lock.expiresAt))} · 持有人：${esc(lock.holderUsername||appState.me?.username||'当前用户')}</div>`:(hasEditable?'<div class="readonly-note danger">扩展配置编辑锁未获取，字段暂不可保存。</div>':'<div class="readonly-note">当前类型专属配置以只读快照显示；运行状态见下方状态卡。</div>');
                   const conflict=draft.conflict?`<div class="readonly-note">设备扩展配置已被其他操作修改，请刷新后再编辑。<button class="link-button" type="button" onclick='reloadDeviceExtendedConfigAfterConflict(${jsString(detail.id)})'>刷新当前配置</button></div>`:'';
                   const fields=draft.supportedFields||[], body=fields.length?fields.map(field=>extendedFieldForm(detail.id,field,draft)).join(''):'<p class="muted">该设备类型暂无可编辑扩展配置。</p>';
                   return `<form class="edit-form" onsubmit='event.preventDefault();saveDeviceExtendedConfig(${jsString(detail.id)})'>
@@ -1796,17 +1919,24 @@ public final class WebAdminFrontendScripts {
                     ${errors}
                     ${conflict}
                     <p class="muted">保存会写入真实设备扩展配置；仅限当前设备类型支持的扩展频道或基础时间参数。不会修改 itemSubmit、matcher、interactionItem 复杂条件、action、region、用户或系统设置。</p>
-                    <div class="form-actions"><button class="secondary" type="submit" ${draft.lockId?'':'disabled'}>${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='cancelDeviceExtendedConfigEdit(${jsString(detail.id)})'>取消</button></div>
+                    <div class="form-actions"><button class="secondary" type="submit" ${draft.lockId?'':'disabled'}>${draft.saving?'保存中...':'保存'}</button><button class="text-button" type="button" onclick='closeWebAdminModal()'>取消</button></div>
                   </form>`;
                 }
                 function showDeviceExtendedConfigEditModal(deviceId){
                   const draft=appState.deviceExtendedConfigEdit;if(!draft||draft.deviceId!==deviceId)return;
                   if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){showDeviceConfigEditModal(deviceId);return;}
-                  openWebAdminModal(draft.lockId?'编辑设备扩展配置':'查看设备扩展配置状态',deviceExtendedConfigForm({id:deviceId},draft),draft.lockId?editModalFooter(draft.saving):waButton('关闭','close','onclick="closeWebAdminModal()"','ghost'),{onClose:()=>cancelDeviceExtendedConfigEdit(deviceId)});
+                  markModalInitialSnapshot('device_extended_config',draft);
+                  openWebAdminModal(draft.lockId?'编辑设备扩展配置':'查看设备扩展配置状态',deviceExtendedConfigForm({id:deviceId},draft),draft.lockId?editModalFooter(draft.saving):waButton('关闭','close','onclick="closeWebAdminModal()"','ghost'),{onClose:()=>cancelDeviceExtendedConfigEdit(deviceId),syncBeforeClose:()=>syncModalDraftBeforeClose('device_extended_config',deviceId),dirtyCheck:()=>!!appState.deviceExtendedConfigEdit?.lockId&&modalDraftDirty('device_extended_config',appState.deviceExtendedConfigEdit)});
+                }
+                function extendedReadonlyReason(draft,field){
+                  const state=String(draft?.runtimeState||'');
+                  if(!draft?.lockId&&state&&state!=='ready'&&state!=='unsupported')return '当前运行状态只读；请查看上方状态卡。';
+                  if(!draft?.lockId)return '当前未获取编辑锁，字段暂不可保存。';
+                  return (draft.fieldDisabledReasons||{})[field]||draft.unsupportedReason||'当前运行状态下此字段只读。';
                 }
                 function extendedFieldForm(deviceId,field,draft){
                   const label=(draft.fieldLabels||{})[field]||field, value=(draft.values||{})[field]??'', id=extendedFieldId(field), help=extendedFieldHelp(field);
-                  const disabled=extendedFieldEditable(draft,field)?'':'disabled', disabledReason=(draft.fieldDisabledReasons||{})[field]||draft.unsupportedReason||'当前运行状态下此字段只读。';
+                  const disabled=extendedFieldEditable(draft,field)?'':'disabled', disabledReason=extendedReadonlyReason(draft,field);
                   if(isExtendedChannelField(field)){
                     const combo=renderDeviceExtendedConfigChannelCombo(deviceId,field,draft), hint=channelHintHtml(value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError), clearable=(draft.clearableFields||{})[field]===true, checked=(draft.clear||{})[field]?'checked':'';
                     return `<label>${esc(label)}${combo}</label>${clearable?`<label class="readonly-note"><input id="extended-clear-${id}" type="checkbox" ${checked} ${disabled} onchange='updateDeviceExtendedConfigDraftFromForm(${jsString(deviceId)})'> 设为未设置</label>`:''}<p id="extended-${id}-hint" class="readonly-note">${hint}</p>${disabled?`<p class="readonly-note danger">${esc(disabledReason)}</p>`:''}<p class="muted">${esc(help)}</p>`;
@@ -1853,7 +1983,8 @@ public final class WebAdminFrontendScripts {
                   return `<div class="identity-grid">${rows.map(([k,v])=>row(k,v)).join('')}</div>`;
                 }
                 function currentDeviceRouteArg(deviceId){const h=currentRouteHash();return h.startsWith('#/devices/')?h.substring('#/devices/'.length):deviceId;}
-                function maybeReleaseDeviceMetadataEditForRoute(hash){const draft=appState.deviceMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceMetadataLock(draft,true);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}
+                async function refreshCurrentDeviceContext(deviceId){const h=currentRouteHash();if(h.startsWith('#/devices/')){await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}if(h==='#/devices'){await renderDevices({silent:true});return;}if(h==='#/actions'){await renderActionsPage({silent:true});return;}if(h==='#/signals'||h==='#/signalbridge'){await renderSignals({silent:true});return;}if(h.startsWith('#/signals/')){await renderSignalDetail(h.substring('#/signals/'.length),{silent:true});return;}await route({silent:true});}
+                function maybeReleaseDeviceMetadataEditForRoute(hash){const draft=appState.deviceMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(sameDeviceRef(info.id,draft.deviceId))return;}releaseDeviceMetadataLock(draft,true);appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}
                 async function startDeviceMetadataEdit(deviceId,displayName,note,iconKey,expectedVersion){
                   if(!canEditDeviceMetadata())return;
                   try{
@@ -1861,6 +1992,7 @@ public final class WebAdminFrontendScripts {
                     if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
                     const lock=result.data?.lock||{};
                     appState.deviceMetadataEdit={deviceId,displayName,note,iconKey:iconKey||'auto',expectedVersion:Number(expectedVersion||0),lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    markModalInitialSnapshot('device_metadata',appState.deviceMetadataEdit);
                     scheduleDeviceMetadataLockHeartbeat();
                     await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                     showDeviceMetadataEditModal(deviceId);
@@ -1899,11 +2031,12 @@ public final class WebAdminFrontendScripts {
                 function channelMetadataForm(detail,draft){
                   const errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.field?`${e.field}：`: '')}${esc(e.message||'保存失败')}</li>`).join('')}</ul>`:'';
                   const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'频道显示信息已发生冲突，请刷新后再编辑。')} <button class="link-button" ${htmlHandler(`reloadChannelMetadataAfterConflict(${jsString(detail.channel)})`)}>刷新当前信息</button></div>`:'';
-                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveChannelMetadata(${jsString(detail.channel)})`)}><label>显示名<input id="channel-metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="例如：大厅任务提交成功"></label><label>备注<textarea id="channel-metadata-note" maxlength="512" placeholder="仅用于 WebAdmin 展示">${esc(draft.note||'')}</textarea></label><label>图标<select id="channel-metadata-icon" class="select">${metadataIconOptions().map(key=>`<option value="${esc(key)}" ${key===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(key))}</option>`).join('')}</select></label><p class="readonly-note">正在编辑频道显示信息。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler(`cancelChannelMetadataEdit(${jsString(detail.channel)})`)}>取消</button></div></form>`;
+                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveChannelMetadata(${jsString(detail.channel)})`)}><label>显示名<input id="channel-metadata-display-name" class="input" maxlength="64" value="${esc(draft.displayName||'')}" placeholder="例如：大厅任务提交成功"></label><label>备注<textarea id="channel-metadata-note" maxlength="512" placeholder="仅用于 WebAdmin 展示">${esc(draft.note||'')}</textarea></label><label>图标<select id="channel-metadata-icon" class="select">${metadataIconOptions().map(key=>`<option value="${esc(key)}" ${key===(draft.iconKey||'auto')?'selected':''}>${esc(labelMetadataIcon(key))}</option>`).join('')}</select></label><p class="readonly-note">正在编辑频道显示信息。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler('closeWebAdminModal()')}>取消</button></div></form>`;
                 }
                 function showChannelMetadataEditModal(channel){
                   const draft=appState.channelMetadataEdit;if(!draft||draft.channel!==channel)return;
-                  openWebAdminModal('编辑频道显示信息',channelMetadataForm({channel},draft),editModalFooter(draft.saving),{onClose:()=>cancelChannelMetadataEdit(channel)});
+                  markModalInitialSnapshot('channel_metadata',draft);
+                  openWebAdminModal('编辑频道显示信息',channelMetadataForm({channel},draft),editModalFooter(draft.saving),{onClose:()=>cancelChannelMetadataEdit(channel),syncBeforeClose:()=>syncModalDraftBeforeClose('channel_metadata',channel),dirtyCheck:()=>modalDraftDirty('channel_metadata',appState.channelMetadataEdit)});
                 }
                 function maybeReleaseChannelMetadataEditForRoute(hash){const draft=appState.channelMetadataEdit;if(!draft)return;if(String(hash||'').startsWith('#/signals/')){const info=detailRoute(String(hash).substring('#/signals/'.length),'#/signals');if(info.id===draft.channel)return;}releaseChannelMetadataLock(draft,true);appState.channelMetadataEdit=null;stopChannelMetadataLockHeartbeat();}
                 async function startChannelMetadataEdit(channel){
@@ -1914,6 +2047,7 @@ public final class WebAdminFrontendScripts {
                     if(!result.success){toast(result.message||'无法获取编辑锁');await renderSignalDetail(encodeURIComponent(channel),{silent:true});return;}
                     const lock=result.data?.lock||{};
                     appState.channelMetadataEdit={channel:meta.channel||channel,displayName:meta.displayName||'',note:meta.note||'',iconKey:meta.iconKey||'auto',expectedFingerprint:meta.expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    markModalInitialSnapshot('channel_metadata',appState.channelMetadataEdit);
                     scheduleChannelMetadataLockHeartbeat();
                     await renderSignalDetail(encodeURIComponent(channel),{silent:true});
                     showChannelMetadataEditModal(meta.channel||channel);
@@ -1937,7 +2071,7 @@ public final class WebAdminFrontendScripts {
                     draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.channelMetadataEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopChannelMetadataLockHeartbeat();toast(result.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});showChannelMetadataEditModal(channel);
                   }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.channelMetadataEdit=draft;toast(err.message||'保存失败');await renderSignalDetail(encodeURIComponent(channel),{silent:true});showChannelMetadataEditModal(channel);}
                 }
-                function maybeReleaseDeviceBasicConfigEditForRoute(hash){const draft=appState.deviceBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(info.id===draft.deviceId)return;}releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
+                function maybeReleaseDeviceBasicConfigEditForRoute(hash){const draft=appState.deviceBasicConfigEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices');if(sameDeviceRef(info.id,draft.deviceId))return;}releaseDeviceBasicConfigLock(draft,true);appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
                 async function startDeviceBasicConfigEdit(deviceId,enabled,channel,expectedFingerprint){
                   if(!canEditDeviceBasicConfig())return;
                   try{
@@ -1945,7 +2079,8 @@ public final class WebAdminFrontendScripts {
                     if(!result.success){toast(result.message||'无法获取编辑锁');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
                     const lock=result.data?.lock||{};
                     const channelOptions=await loadSignalChannelOptions();
-                    appState.deviceBasicConfigEdit={deviceId,enabled:!!enabled,channel:channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,expectedFingerprint:expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    appState.deviceBasicConfigEdit={deviceId,enabled:!!enabled,channel:channel||'',channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,channelComboQuery:'',channelComboSearchActive:false,expectedFingerprint:expectedFingerprint||'',lockId:lock.lockId||'',lock,errors:[],saving:false,conflict:null};
+                    markModalInitialSnapshot('device_basic_config',appState.deviceBasicConfigEdit);
                     scheduleDeviceBasicConfigLockHeartbeat();
                     await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                     showDeviceBasicConfigEditModal(deviceId);
@@ -2269,7 +2404,7 @@ public final class WebAdminFrontendScripts {
                   const type=String(action?.ownerType||action?.owner?.ownerType||'').toUpperCase(), id=action?.ownerId||action?.owner?.ownerId||'', channel=action?.channel||action?.owner?.channel||'';
                   if(type.includes('LISTENER')&&!isBlank(id))return listenerHash(id);
                   if(type.includes('REGION')&&!isBlank(id))return regionHash(id);
-                  if(type.includes('DEVICE')&&!isBlank(id))return '#/devices/'+encodeURIComponent(id);
+                  if(type.includes('DEVICE')&&!isBlank(id))return deviceHash(id);
                   if(!isBlank(channel))return signalHash(channel);
                   return '';
                 }
@@ -2518,7 +2653,7 @@ public final class WebAdminFrontendScripts {
                 }
                 function listenerChannelComboOptionsHtml(ref,draft){
                   if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],draft.channel), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft)), current=normalizeChannelName(draft.channel).toLowerCase(), active=Math.max(0,Number(draft.channelComboIndex||0));
                   if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
                   return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" ${htmlHandler(`selectSignalListenerBasicConfigChannel(${jsString(ref)},${jsString(c.channel||'')})`)}><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
                 }
@@ -2529,11 +2664,12 @@ public final class WebAdminFrontendScripts {
                 function signalListenerBasicConfigForm(e,detail,draft){
                   const id=signalListenerFieldId(draft.listenerRef), errs=draft.errors?.length?`<ul class="validation-list">${draft.errors.map(err=>`<li>${esc(err.field?`${err.field}：`: '')}${esc(err.message||'保存失败')}</li>`).join('')}</ul>`:'';
                   const conflict=draft.conflict?`<div class="readonly-note">${esc(draft.errors?.[0]?.message||'Listener 基础配置已发生冲突，请刷新后再编辑。')} <button class="link-button" ${htmlHandler(`reloadSignalListenerBasicConfigAfterConflict(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}>刷新当前信息</button></div>`:'';
-                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveSignalListenerBasicConfig(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}><label>启用状态<select id="listener-enabled-${id}" class="select"><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label><label>频道${renderSignalListenerConfigChannelCombo(draft.listenerRef,draft)}<span id="listener-channel-hint-${id}" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label>冷却时间（ticks）<input id="listener-cooldown-${id}" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">正在编辑 Signal Listener 基础配置。Action 列表保持只读，不会被修改。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler(`cancelSignalListenerBasicConfigEdit(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}>取消</button></div></form>`;
+                  return `<form class="edit-form" ${htmlEvent('onsubmit',`event.preventDefault();saveSignalListenerBasicConfig(${jsString(draft.listenerRef)},${jsString(draft.routeChannel||detail.channel)})`)}><label>启用状态<select id="listener-enabled-${id}" class="select"><option value="true" ${draft.enabled?'selected':''}>启用</option><option value="false" ${!draft.enabled?'selected':''}>禁用</option></select></label><label>频道${renderSignalListenerConfigChannelCombo(draft.listenerRef,draft)}<span id="listener-channel-hint-${id}" class="muted">${channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</span></label><label>冷却时间（ticks）<input id="listener-cooldown-${id}" class="input" type="number" min="0" max="72000" step="1" value="${esc(draft.cooldownTicks ?? 0)}"></label><p class="readonly-note">正在编辑 Signal Listener 基础配置。Action 列表保持只读，不会被修改。锁到期：${fmtTime(draft.lock?.expiresAt)}</p>${errs}${conflict}<div class="form-actions"><button class="primary" type="submit" ${draft.saving?'disabled':''}>${draft.saving?'保存中...':'保存'}</button><button class="secondary" type="button" ${htmlHandler('closeWebAdminModal()')}>取消</button></div></form>`;
                 }
                 function showSignalListenerBasicConfigEditModal(ref,routeChannel){
                   const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
-                  openWebAdminModal('编辑监听器基础配置',signalListenerBasicConfigForm({id:ref}, {channel:routeChannel||draft.routeChannel||draft.channel||''}, draft),editModalFooter(draft.saving),{onClose:()=>cancelSignalListenerBasicConfigEdit(ref,routeChannel||draft.routeChannel||draft.channel||'')});
+                  markModalInitialSnapshot('signal_listener_basic_config',draft);
+                  openWebAdminModal('编辑监听器基础配置',signalListenerBasicConfigForm({id:ref}, {channel:routeChannel||draft.routeChannel||draft.channel||''}, draft),editModalFooter(draft.saving),{onClose:()=>cancelSignalListenerBasicConfigEdit(ref,routeChannel||draft.routeChannel||draft.channel||''),syncBeforeClose:()=>syncModalDraftBeforeClose('signal_listener_basic_config',ref),dirtyCheck:()=>modalDraftDirty('signal_listener_basic_config',appState.signalListenerBasicConfigEdit)});
                 }
                 function updateSignalListenerBasicConfigDraftFromForm(ref,openMenu=false){
                   const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
@@ -2541,7 +2677,7 @@ public final class WebAdminFrontendScripts {
                   draft.enabled=(document.getElementById(`listener-enabled-${id}`)?.value||'false')==='true';
                   draft.channel=document.getElementById(`listener-channel-${id}`)?.value||'';
                   draft.cooldownTicks=document.getElementById(`listener-cooldown-${id}`)?.value||'0';
-                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;}
+                  if(openMenu){draft.channelComboOpen=true;draft.channelComboIndex=0;setChannelComboQuery(draft,draft.channel);}
                   const hint=document.getElementById(`listener-channel-hint-${id}`);
                   if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);
                   syncSignalListenerBasicConfigChannelCombo(ref);
@@ -2553,13 +2689,13 @@ public final class WebAdminFrontendScripts {
                   if(input)input.setAttribute('aria-expanded',draft.channelComboOpen?'true':'false');
                   if(menu)menu.innerHTML=listenerChannelComboOptionsHtml(ref,draft);
                 }
-                function openSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=true;syncSignalListenerBasicConfigChannelCombo(ref);}
-                function toggleSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=!draft.channelComboOpen;syncSignalListenerBasicConfigChannelCombo(ref);document.getElementById(`listener-channel-${signalListenerFieldId(ref)}`)?.focus();}
-                function selectSignalListenerBasicConfigChannel(ref,channel){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;const id=signalListenerFieldId(ref), input=document.getElementById(`listener-channel-${id}`), hint=document.getElementById(`listener-channel-hint-${id}`);if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerBasicConfigChannelCombo(ref);}
+                function openSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=true;resetChannelComboQuery(draft);syncSignalListenerBasicConfigChannelCombo(ref);}
+                function toggleSignalListenerBasicConfigChannelMenu(ref){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;updateSignalListenerBasicConfigDraftFromForm(ref,false);draft.channelComboOpen=!draft.channelComboOpen;if(draft.channelComboOpen)resetChannelComboQuery(draft);syncSignalListenerBasicConfigChannelCombo(ref);document.getElementById(`listener-channel-${signalListenerFieldId(ref)}`)?.focus();}
+                function selectSignalListenerBasicConfigChannel(ref,channel){const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;draft.channel=channel||'';draft.channelComboOpen=false;draft.channelComboIndex=0;resetChannelComboQuery(draft);const id=signalListenerFieldId(ref), input=document.getElementById(`listener-channel-${id}`), hint=document.getElementById(`listener-channel-hint-${id}`);if(input)input.value=draft.channel;if(hint)hint.innerHTML=channelHintHtml(draft.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncSignalListenerBasicConfigChannelCombo(ref);}
                 function handleSignalListenerBasicConfigChannelKey(event,ref){
                   const draft=appState.signalListenerBasicConfigEdit;if(!draft||draft.listenerRef!==ref)return;
-                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],document.getElementById(`listener-channel-${signalListenerFieldId(ref)}`)?.value||draft.channel);
-                  if(event.key==='Escape'){draft.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(ref);return;}
+                  const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft));
+                  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(ref);return;}
                   if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex||0)+1:Number(draft.channelComboIndex||0)-1;draft.channelComboIndex=Math.min(max,Math.max(0,next));syncSignalListenerBasicConfigChannelCombo(ref);return;}
                   if(event.key==='Enter'&&draft.channelComboOpen&&options.length>0){event.preventDefault();selectSignalListenerBasicConfigChannel(ref,options[Math.min(options.length-1,Number(draft.channelComboIndex||0))].channel);return;}
                 }
@@ -2571,7 +2707,8 @@ public final class WebAdminFrontendScripts {
                     const result=await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'signal_listener_basic_config',targetId:cfg.listenerId||cfg.listenerRef||ref})});
                     if(!result.success){toast(result.message||'无法获取编辑锁');await renderSignalDetail(encodeURIComponent(routeChannel||cfg.channel||''),{silent:true});return;}
                     const lock=result.data?.lock||{}, channelOptions=await loadSignalChannelOptions();
-                    appState.signalListenerBasicConfigEdit={listenerRef:cfg.listenerRef||ref,listenerId:cfg.listenerId||ref,displayName:cfg.displayName||ref,enabled:!!cfg.enabled,channel:cfg.channel||'',cooldownTicks:cfg.cooldownTicks ?? 0,actionCount:cfg.actionCount||0,actionSummaries:cfg.actionSummaries||[],expectedFingerprint:cfg.expectedFingerprint||'',routeChannel:routeChannel||cfg.channel||'',lockId:lock.lockId||'',lock,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,errors:[],saving:false,conflict:null};
+                    appState.signalListenerBasicConfigEdit={listenerRef:cfg.listenerRef||ref,listenerId:cfg.listenerId||ref,displayName:cfg.displayName||ref,enabled:!!cfg.enabled,channel:cfg.channel||'',cooldownTicks:cfg.cooldownTicks ?? 0,actionCount:cfg.actionCount||0,actionSummaries:cfg.actionSummaries||[],expectedFingerprint:cfg.expectedFingerprint||'',routeChannel:routeChannel||cfg.channel||'',lockId:lock.lockId||'',lock,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:false,channelComboIndex:0,channelComboQuery:'',channelComboSearchActive:false,errors:[],saving:false,conflict:null};
+                    markModalInitialSnapshot('signal_listener_basic_config',appState.signalListenerBasicConfigEdit);
                     scheduleSignalListenerBasicConfigLockHeartbeat();
                     await route({silent:true});
                     showSignalListenerBasicConfigEditModal(cfg.listenerRef||ref,routeChannel||cfg.channel||'');
@@ -2782,6 +2919,58 @@ public final class WebAdminFrontendScripts {
                   const prev=Math.max(1,page.current-1), next=Math.min(page.pages,page.current+1);
                   return `<div class="wa-pagination"><div class="wa-page-buttons"><button class="wa-page-btn" onclick="setWaPage('${key}',${prev})">‹</button>${nums.map(n=>n==='…'?`<span class="wa-page-meta">…</span>`:`<button class="wa-page-btn ${n===page.current?'active':''}" onclick="setWaPage('${key}',${n})">${n}</button>`).join('')}<button class="wa-page-btn" onclick="setWaPage('${key}',${next})">›</button></div><span class="wa-page-meta">共 ${esc(page.total)} 条</span><span class="wa-page-meta">每页 ${esc(page.pageSize)} 条</span></div>`;
                 }
+                function modalSnapshot(kind,draft){
+                  const k=String(kind||'');
+                  if(!draft)return '';
+                  if(k==='device_metadata')return JSON.stringify({displayName:String(draft.displayName||''),note:String(draft.note||''),iconKey:String(draft.iconKey||'auto')});
+                  if(k==='device_basic_config')return JSON.stringify({enabled:!!draft.enabled,channel:normalizeChannelName(draft.channel)});
+                  if(k==='device_extended_config'){const values={}, clear={};(draft.supportedFields||Object.keys(draft.values||{})).forEach(field=>{const value=(draft.values||{})[field];values[field]=isExtendedTickField(field)?Number(value||0):(isExtendedChannelField(field)?normalizeChannelName(value):String(value??''));if((draft.clear||{})[field])clear[field]=true;});return JSON.stringify({values,clear});}
+                  if(k==='action_relay_actions')return actionRelayActionsEditableJson(draft.actions||[]);
+                  if(k==='channel_metadata')return JSON.stringify({displayName:String(draft.displayName||''),note:String(draft.note||''),iconKey:String(draft.iconKey||'auto')});
+                  if(k==='signal_listener_basic_config')return JSON.stringify({enabled:!!draft.enabled,channel:normalizeChannelName(draft.channel),cooldownTicks:Number(draft.cooldownTicks||0)});
+                  if(k==='signal_listener_create')return JSON.stringify({name:String(draft.name||''),channel:normalizeChannelName(draft.channel),enabled:draft.enabled!==false,cooldownTicks:Number(draft.cooldownTicks||0)});
+                  if(k==='selection_create_virtual_block')return JSON.stringify({targetPlayerName:String(draft.targetPlayerName||'').trim(),channel:normalizeChannelName(draft.channel),displayName:String(draft.displayName||'').trim(),note:String(draft.note||''),iconKey:String(draft.iconKey||'auto'),enabled:draft.enabled!==false});
+                  return JSON.stringify(draft);
+                }
+                function markModalInitialSnapshot(kind,draft){if(draft&&!draft.initialSnapshot)draft.initialSnapshot=modalSnapshot(kind,draft);}
+                function modalDraftDirty(kind,draft){if(!draft)return false;const current=modalSnapshot(kind,draft);if(!draft.initialSnapshot){draft.initialSnapshot=current;return false;}return current!==draft.initialSnapshot;}
+                function syncModalDraftBeforeClose(kind,id){
+                  const k=String(kind||'');
+                  if(k==='device_metadata'){const d=appState.deviceMetadataEdit;if(d){d.displayName=document.getElementById('metadata-display-name')?.value||'';d.note=document.getElementById('metadata-note')?.value||'';d.iconKey=document.getElementById('metadata-icon')?.value||'auto';}}
+                  if(k==='device_basic_config')updateDeviceBasicConfigDraftFromForm(id,false);
+                  if(k==='device_extended_config')updateDeviceExtendedConfigDraftFromForm(id);
+                  if(k==='action_relay_actions')syncActionRelayActionsDraftFromForm(id);
+                  if(k==='device_config')applyDeviceConfigDraftsFromForm(id);
+                  if(k==='channel_metadata'){const d=appState.channelMetadataEdit;if(d){d.displayName=document.getElementById('channel-metadata-display-name')?.value||'';d.note=document.getElementById('channel-metadata-note')?.value||'';d.iconKey=document.getElementById('channel-metadata-icon')?.value||'auto';}}
+                  if(k==='signal_listener_basic_config')updateSignalListenerBasicConfigDraftFromForm(id,false);
+                  if(k==='signal_listener_create')updateSignalListenerCreateDraftFromForm(false);
+                  if(k==='selection_create_virtual_block'){const d=appState.selectionCreateVirtualBlock;if(d&&d.step==='config')appState.selectionCreateVirtualBlock=selectionDraftFromForm();}
+                }
+                function isDeviceConfigModalDirty(deviceId){
+                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit,actions=appState.actionRelayActionsEdit;
+                  return !!((meta&&meta.deviceId===deviceId&&modalDraftDirty('device_metadata',meta))||(basic&&basic.deviceId===deviceId&&modalDraftDirty('device_basic_config',basic))||(ext&&ext.deviceId===deviceId&&modalDraftDirty('device_extended_config',ext))||(actions&&actions.deviceId===deviceId&&modalDraftDirty('action_relay_actions',actions)));
+                }
+                function cancelDiscardModalClose(){
+                  appState.modalDiscardConfirmOpen=false;
+                  const layer=document.getElementById('wa-discard-confirm');
+                  if(layer)layer.remove();
+                }
+                function confirmDiscardModalClose(){
+                  cancelDiscardModalClose();
+                  closeWebAdminModal(true,true);
+                }
+                function openDiscardChangesConfirm(){
+                  const root=document.getElementById('wa-modal-root');
+                  if(!root||appState.modalDiscardConfirmOpen)return;
+                  appState.modalDiscardConfirmOpen=true;
+                  const layer=document.createElement('div');
+                  layer.id='wa-discard-confirm';
+                  layer.className='wa-discard-confirm-layer';
+                  layer.setAttribute('data-discard-confirm-modal','true');
+                  layer.onclick=event=>{if(event.target===layer)cancelDiscardModalClose();};
+                  layer.innerHTML=`<section class="wa-discard-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="wa-discard-confirm-title" onclick="event.stopPropagation()"><header><h3 id="wa-discard-confirm-title">未保存的修改</h3></header><p>当前编辑内容尚未保存。关闭后这些修改会丢失。</p><footer><button class="wa-btn ghost" type="button" onclick="cancelDiscardModalClose()">继续编辑</button><button class="wa-btn danger" type="button" onclick="confirmDiscardModalClose()">放弃修改并关闭</button></footer></section>`;
+                  root.appendChild(layer);
+                }
                 function openWebAdminModal(title,body,footer='',options={}){
                   const existing=document.getElementById('wa-modal-root');
                   const existingClosing=existing&&String(existing.className||'').includes('closing');
@@ -2791,14 +2980,21 @@ public final class WebAdminFrontendScripts {
                   wrap.className='wa-modal-backdrop';
                   wrap.id='wa-modal-root';
                   appState.modalCloseHandler=options.onClose||null;
+                  appState.modalDirtyChecker=options.dirtyCheck||null;
+                  appState.modalSyncBeforeClose=options.syncBeforeClose||null;
+                  appState.modalDiscardConfirmOpen=false;
                   const closeAttr=options.closeAttr||'onclick="closeWebAdminModal()"';
                   wrap.innerHTML=`<section class="wa-modal wa-modal-viewport ${esc(options.className||'')}" role="dialog" aria-modal="true" aria-labelledby="wa-modal-title"><header class="wa-modal-head"><h2 id="wa-modal-title" class="wa-modal-title">${esc(title)}</h2>${waIconButton('关闭','close',closeAttr)}</header><div class="wa-modal-body">${body}</div><footer class="wa-modal-foot">${footer||waButton('关闭','',closeAttr,'ghost')}</footer></section>`;
                   wrap.onclick=event=>{if(event.target===wrap)closeWebAdminModal();};
                   if(!existing||existingClosing)document.body.appendChild(wrap);
                 }
-                function closeWebAdminModal(runHandler=true){
+                function closeWebAdminModal(runHandler=true,force=false){
                   if(appState.modalClosePromise)return appState.modalClosePromise;
+                  if(!force&&appState.modalDiscardConfirmOpen){cancelDiscardModalClose();return Promise.resolve(false);}
+                  if(!force&&runHandler&&typeof appState.modalSyncBeforeClose==='function')appState.modalSyncBeforeClose();
+                  if(!force&&runHandler&&typeof appState.modalDirtyChecker==='function'&&appState.modalDirtyChecker()){openDiscardChangesConfirm();return Promise.resolve(false);}
                   const handler=appState.modalCloseHandler;
+                  appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;
                   if(runHandler&&handler){appState.modalCloseHandler=null;appState.modalClosePromise=Promise.resolve(handler()).finally(()=>{appState.modalClosePromise=null;});return appState.modalClosePromise;}
                   appState.modalCloseHandler=null;
                   return dismissWebAdminModal();
@@ -2806,6 +3002,8 @@ public final class WebAdminFrontendScripts {
                 function dismissWebAdminModal(){
                   const root=document.getElementById('wa-modal-root');
                   if(!root)return Promise.resolve();
+                  appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalCloseHandler=null;appState.modalDiscardConfirmOpen=false;
+                  const discard=document.getElementById('wa-discard-confirm');if(discard)discard.remove();
                   if(String(root.className||'').includes('closing'))return appState.modalDismissPromise||Promise.resolve();
                   root.classList.add('closing');
                   if(root.setAttribute)root.setAttribute('data-modal-closing','true');
@@ -2825,7 +3023,7 @@ public final class WebAdminFrontendScripts {
                 function editModalFooter(saving=false){
                   return `<button class="wa-btn ghost" type="button" onclick="closeWebAdminModal()">${icon('close')}<span>取消</span></button><button class="wa-btn primary" type="button" ${saving?'disabled':''} onclick="document.querySelector('#wa-modal-root form')?.requestSubmit()">${icon('check-pass')}<span>${saving?'保存中...':'保存'}</span></button>`;
                 }
-                document.addEventListener('keydown',event=>{if(event.key==='Escape')closeWebAdminModal();});
+                document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(appState.modalDiscardConfirmOpen){event.preventDefault();cancelDiscardModalClose();return;}if(appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return;}closeWebAdminModal();}});
                 function unavailableFeature(title='功能暂未开放',message='当前版本没有完整后端支持，因此该操作保持不可用。'){
                   openWebAdminModal(title,`<p>${esc(message)}</p><div class="wa-disabled-note">本轮前端重构只接入只读展示和布局基础，不新增 API 或真实写能力。</div>`);
                 }
@@ -3036,7 +3234,7 @@ public final class WebAdminFrontendScripts {
                   if(rendered){bindReceiverFilters(focusId);if(!options.skipDetailRefresh)refreshVisibleReceiverDetails(page.items,{force:!!options.silent});}
                 }
                 function receiverTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>接收器名称 / ID</th><th>监听频道</th><th>位置</th><th>脉冲时长</th><th>输出状态</th><th>启用状态</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看接收器 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('receiver-row')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td class="truncate">${channelCell(d.channel)}</td><td class="truncate">${esc(posText(d.pos))}</td><td>${receiverPulseCell(d)}</td><td>${receiverOutputActive(d)?textPill('输出中','error'):textPill('空闲','info')}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(d.enabled?'启用':'禁用')}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看接收器 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>接收器名称 / ID</th><th>监听频道</th><th>位置</th><th>脉冲时长</th><th>输出状态</th><th>启用状态</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target=deviceHash(d,'signal_receiver'), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看接收器 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('receiver-row')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td class="truncate">${channelCell(d.channel)}</td><td class="truncate">${esc(posText(d.pos))}</td><td>${receiverPulseCell(d)}</td><td>${receiverOutputActive(d)?textPill('输出中','error'):textPill('空闲','info')}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(d.enabled?'启用':'禁用')}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看接收器 ${title}`)}>查看</button>${waIconButton('更多','more','disabled')}</div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterReceivers(items){
                   const f=appState.receiverFilters||{};
@@ -3285,18 +3483,25 @@ public final class WebAdminFrontendScripts {
                   if(rendered)bindDeviceFilters(focusId);
                 }
                 """).append("""
-                function toggleDeviceMoreMenu(deviceId){appState.openDeviceMoreMenuId=appState.openDeviceMoreMenuId===deviceId?'':deviceId;renderDeviceList('');}
-                function closeDeviceMoreMenu(){if(appState.openDeviceMoreMenuId){appState.openDeviceMoreMenuId='';renderDeviceList('');}}
-                function deviceMoreMenu(d){
-                  const id=String(d.id||''), target='#/devices/'+encodeURIComponent(id), open=appState.openDeviceMoreMenuId===id?' open':'';
-                  const actionRelayItem=isActionRelay(d)?`<button class="wa-menu-item" type="button" data-action-relay-more-menu-entry="true" onclick='event.stopPropagation();openActionRelayActionsModal(${jsString(id)})'>${icon('action-relay')}<span>${canEditActionRelayActions()?'查看 Action 列表/状态':'查看 Action 状态'}</span></button>`:'';
-                  const deleteItem=isVirtualBlockDevice(d)?(canDeleteVirtualBlockDevice()?`<button class="wa-menu-item danger" type="button" onclick='event.stopPropagation();openVirtualBlockDeviceDeleteModal(${jsString(id)})'>${icon('channel-error')}<span>删除 / 解绑 VBD</span></button>`:`<div class="wa-menu-note">需要 EDITOR / OWNER 权限才能删除 / 解绑 VBD。</div>`):`<div class="wa-menu-note" data-physical-device-delete-disabled="true">物理设备不提供 WebUI 删除；需要删除时请在游戏内破坏方块。</div>`;
-                  const canEditConfig=canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig()||(isActionRelay(d)&&canEditActionRelayActions());
-                  const editConfigItem=canEditConfig?`<button class="wa-menu-item" type="button" data-device-config-more-menu-entry="true" onclick='event.stopPropagation();startDeviceConfigEdit(${jsString(id)})'>${icon('settings')}<span>编辑设备配置</span></button>`:`<button class="wa-menu-item" type="button" data-device-config-more-menu-entry="true" disabled>${icon('settings')}<span>编辑设备配置</span></button><div class="wa-menu-note">需要 EDITOR / OWNER 权限才能编辑设备配置。</div>`;
-                  return `<div class="wa-menu-wrap${open}" data-device-more-menu="${esc(id)}" onclick="event.stopPropagation()"><button class="wa-icon-btn" type="button" title="更多" aria-label="更多" onclick='toggleDeviceMoreMenu(${jsString(id)})'>${icon('more')}</button><div class="wa-menu-pop" role="menu"><button class="wa-menu-item" type="button" onclick='event.stopPropagation();location.hash=${jsString(target)}'>${icon('eye')}<span>查看详情</span></button>${editConfigItem}${actionRelayItem}${d.channel?`<button class="wa-menu-item" type="button" onclick='event.stopPropagation();location.hash=${jsString(signalHash(d.channel))}'>${icon('active-channel')}<span>打开频道</span></button>`:''}<button class="wa-menu-item" type="button" onclick='event.stopPropagation();copyTextToClipboard(${jsString(id)})'>${icon('copy')}<span>复制 ID</span></button>${deleteItem}</div></div>`;
+                function ensurePopoverRoot(){let root=document.getElementById('wa-popover-root');if(!root){root=document.createElement('div');root.id='wa-popover-root';document.body.appendChild(root);}return root;}
+                function cssEscape(value){return (typeof CSS!=='undefined'&&CSS.escape)?CSS.escape(String(value)):String(value).replace(/["\\\\]/g,'\\\\$&');}
+                function deviceForMoreMenu(deviceId){return (appState.devices||[]).find(d=>String(d.id||'')===String(deviceId))||((appState.currentDeviceDetail&&String(appState.currentDeviceDetail.id||'')===String(deviceId))?appState.currentDeviceDetail:null);}
+                function toggleDeviceMoreMenu(deviceId,event){if(event){event.preventDefault();event.stopPropagation();}if(appState.openDeviceMoreMenuId===deviceId){closeDeviceMoreMenu(false);return;}openDeviceMorePopover(deviceId,event?.currentTarget||document.querySelector(`[data-device-more-trigger="${cssEscape(deviceId)}"]`));}
+                function closeDeviceMoreMenu(updateButton=true){appState.openDeviceMoreMenuId='';appState.deviceMorePopover=null;const root=document.getElementById('wa-popover-root');if(root)root.innerHTML='';document.querySelectorAll('[data-device-more-trigger]').forEach(btn=>btn.setAttribute('aria-expanded','false'));}
+                function openDeviceMorePopover(deviceId,anchor){const device=deviceForMoreMenu(deviceId);if(!device||!anchor)return;appState.openDeviceMoreMenuId=String(deviceId);appState.deviceMorePopover={deviceId:String(deviceId)};document.querySelectorAll('[data-device-more-trigger]').forEach(btn=>btn.setAttribute('aria-expanded',String(btn===anchor)));const root=ensurePopoverRoot();root.innerHTML=`<div id="wa-device-more-popover" class="wa-menu-pop wa-device-more-popover" data-floating-popover="device-more" data-table-popover-portal="true" role="menu" onclick="event.stopPropagation()">${deviceMoreMenuItems(device)}</div>`;positionDeviceMorePopover(anchor);}
+                function positionDeviceMorePopover(anchor){const pop=document.getElementById('wa-device-more-popover');if(!pop||!anchor)return;const rect=anchor.getBoundingClientRect(), margin=8, width=Math.min(280,Math.max(240,window.innerWidth-margin*2));pop.style.width=`${width}px`;pop.style.left='0px';pop.style.top='0px';const height=pop.offsetHeight||240;let left=Math.min(window.innerWidth-width-margin,Math.max(margin,rect.right-width));let top=rect.bottom+6;if(top+height>window.innerHeight-margin)top=Math.max(margin,rect.top-height-6);pop.style.left=`${left}px`;pop.style.top=`${top}px`;}
+                function deviceMoreMenuItems(d){
+                  const id=String(d.id||''), target=deviceHash(d);
+                  const actionLock=actionRelayLockForDevice(d), lockedByOther=actionRelayLockHeldByOther(actionLock);
+                  const actionRelayItem=isActionRelay(d)?(lockedByOther?`<button class="wa-menu-item" type="button" data-action-relay-more-menu-entry="true" onclick='event.stopPropagation();closeDeviceMoreMenu(false);openActionRelayActionsReadonlyModal(${jsString(id)})'>${icon('action-relay')}<span>只读查看 Action 列表</span></button><div class="wa-menu-note">${esc(actionRelayLockMessage(actionLock))}</div>`:`<button class="wa-menu-item" type="button" data-action-relay-more-menu-entry="true" onclick='event.stopPropagation();closeDeviceMoreMenu(false);openActionRelayActionsModal(${jsString(id)})'>${icon('action-relay')}<span>${canEditActionRelayActions()?'编辑 Action 列表':'查看 Action 列表'}</span></button>`):'';
+                  const deleteItem=isVirtualBlockDevice(d)?(canDeleteVirtualBlockDevice()?`<button class="wa-menu-item danger" type="button" onclick='event.stopPropagation();closeDeviceMoreMenu(false);openVirtualBlockDeviceDeleteModal(${jsString(id)})'>${icon('channel-error')}<span>删除 / 解绑 VBD</span></button>`:`<div class="wa-menu-note">需要 EDITOR / OWNER 权限才能删除 / 解绑 VBD。</div>`):`<div class="wa-menu-note" data-physical-device-delete-disabled="true">物理设备不提供 WebUI 删除；需要删除时请在游戏内破坏方块。</div>`;
+                  const canEditConfig=canEditDeviceConfig(d), configLockMessage=deviceConfigLockMessage(d);
+                  const editConfigItem=canEditConfig&&!configLockMessage?`<button class="wa-menu-item" type="button" data-device-config-more-menu-entry="true" onclick='event.stopPropagation();closeDeviceMoreMenu(false);startDeviceConfigEdit(${jsString(id)})'>${icon('settings')}<span>编辑设备配置</span></button>`:`<button class="wa-menu-item" type="button" data-device-config-more-menu-entry="true" data-device-config-lock-disabled="${configLockMessage?'true':'false'}" disabled>${icon('settings')}<span>编辑设备配置</span></button><div class="wa-menu-note">${esc(configLockMessage||'需要 EDITOR / OWNER 权限才能编辑设备配置。')}</div>`;
+                  return `<button class="wa-menu-item" type="button" onclick='event.stopPropagation();closeDeviceMoreMenu(false);location.hash=${jsString(target)}'>${icon('eye')}<span>查看详情</span></button>${editConfigItem}${actionRelayItem}${d.channel?`<button class="wa-menu-item" type="button" onclick='event.stopPropagation();closeDeviceMoreMenu(false);location.hash=${jsString(signalHash(d.channel))}'>${icon('active-channel')}<span>打开频道</span></button>`:''}<button class="wa-menu-item" type="button" onclick='event.stopPropagation();copyTextToClipboard(${jsString(id)});closeDeviceMoreMenu(false)'>${icon('copy')}<span>复制 ID</span></button>${deleteItem}`;
                 }
+                function deviceMoreMenu(d){const id=String(d.id||''), open=appState.openDeviceMoreMenuId===id;return `<div class="wa-menu-wrap" data-device-more-menu="${esc(id)}" onclick="event.stopPropagation()"><button class="wa-icon-btn" type="button" title="更多" aria-label="更多" data-device-more-trigger="${esc(id)}" aria-expanded="${open?'true':'false'}" onclick='toggleDeviceMoreMenu(${jsString(id)},event)'>${icon('more')}</button></div>`;}
                 function deviceTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>类型</th><th>频道</th><th>位置</th><th>状态</th><th>最近触发</th><th>Doctor</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon(deviceTypeIcon(d.type))}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td>${textPill(labelType(d.type),deviceTypeTone(d.type)||'info')}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看设备 ${title}`)}>查看</button>${deviceMoreMenu(d)}</div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>类型</th><th>频道</th><th>位置</th><th>状态</th><th>最近触发</th><th>Doctor</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target=deviceHash(d), title=d.displayName||d.id;return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon(deviceTypeIcon(d.type))}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td>${textPill(labelType(d.type),deviceTypeTone(d.type)||'info')}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td>${pill(d.doctorStatus)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看设备 ${title}`)}>查看</button>${deviceMoreMenu(d)}</div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterDevices(items){const f=appState.deviceFilters||{};return (items||[]).filter(d=>{const hay=[d.id,d.displayName,d.channel,d.world,posText(d.pos),d.type,d.doctorStatus].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.type!=='ALL'&&String(d.type||'UNKNOWN').toUpperCase()!==f.type)return false;if(f.enabled==='ENABLED'&&!d.enabled)return false;if(f.enabled==='DISABLED'&&d.enabled)return false;if(f.doctor!=='ALL'&&String(d.doctorStatus||'UNKNOWN').toUpperCase()!==f.doctor)return false;if(f.world!=='ALL'&&d.world!==f.world)return false;return true;});}
                 function bindDeviceFilters(focusId){
@@ -3375,7 +3580,7 @@ public final class WebAdminFrontendScripts {
                   if(rendered){bindVirtualBlockFilters(focusId);if(!options.skipDetailRefresh)refreshVisibleVirtualBlockDetails(page.items,{force:!!options.silent});}
                 }
                 function virtualBlockTable(items){
-                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>绑定方块</th><th>位置</th><th>触发类型</th><th>通道</th><th>状态</th><th>条件配置</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target='#/devices/'+encodeURIComponent(d.id), title=d.displayName||d.id, block=virtualBlockId(d), trigger=virtualTriggerType(d), deleteAttrs=canDeleteVirtualBlockDevice()?htmlHandler(`event.stopPropagation();openVirtualBlockDeviceDeleteModal(${jsString(d.id)})`):'disabled';return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('virtual-block-device')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td><span>${esc(block||'--')}</span><span class="device-subtitle">原版材质未在列表 API 中提供时仅显示文本</span></td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${textPill(labelTriggerType(trigger),trigger==='container'?'warning':(trigger==='interact'?'ok':'info'))}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${esc(virtualConditionText(d))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}>查看</button><button class="wa-btn danger" ${deleteAttrs}>解绑</button></div></td></tr>`;}).join('')}</tbody></table></div>`;
+                  return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>设备名称 / ID</th><th>绑定方块</th><th>位置</th><th>触发类型</th><th>通道</th><th>状态</th><th>条件配置</th><th>最近触发</th><th>操作</th></tr></thead><tbody>${items.map(d=>{const target=deviceHash(d), title=d.displayName||d.id, block=virtualBlockId(d), trigger=virtualTriggerType(d), deleteAttrs=canDeleteVirtualBlockDevice()?htmlHandler(`event.stopPropagation();openVirtualBlockDeviceDeleteModal(${jsString(d.id)})`):'disabled';return `<tr class="wa-clickable-row" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}><td><span class="device-name"><span class="device-icon">${icon('virtual-block-device')}</span><span><strong>${esc(title)}</strong><span class="device-subtitle">ID: ${esc(shortId(d.id))}</span></span></span></td><td><span>${esc(block||'--')}</span><span class="device-subtitle">原版材质未在列表 API 中提供时仅显示文本</span></td><td class="truncate" title="${esc((d.world||'')+' '+posText(d.pos))}">${esc(d.world||'-')} / ${esc(posText(d.pos))}</td><td>${textPill(labelTriggerType(trigger),trigger==='container'?'warning':(trigger==='interact'?'ok':'info'))}</td><td class="truncate" title="${esc(d.channel||'')}">${channelCell(d.channel)}</td><td>${pill(d.enabled?'OK':'WARNING')} ${esc(labelBool(d.enabled))}</td><td>${esc(virtualConditionText(d))}</td><td>${fmtTime(d.lastTriggeredAt)}</td><td><div class="wa-action-cell"><button class="wa-btn ghost" ${navDataAttr(target,`查看虚拟方块设备 ${title}`)}>查看</button><button class="wa-btn danger" ${deleteAttrs}>解绑</button></div></td></tr>`;}).join('')}</tbody></table></div>`;
                 }
                 function filterVirtualBlocks(items){
                   const f=appState.virtualBlockFilters||{};
