@@ -32,6 +32,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
@@ -74,6 +75,7 @@ public final class WebAdminServer {
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
+    private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService();
     private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
     private HttpServer httpServer;
     private ExecutorService executor;
@@ -241,6 +243,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/selection/")) {
                 runOnServerThread(() -> handleSelection(exchange, auth, path, method));
+                return;
+            }
+            if (path.startsWith("/api/webadmin/virtual-block-devices/") && path.endsWith("/native-triggers")) {
+                runOnServerThread(() -> handleVirtualBlockDeviceNativeTriggers(exchange, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/virtual-block-devices/")) {
@@ -798,6 +804,35 @@ public final class WebAdminServer {
                 isWriteSameOrigin(exchange)
         );
         WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleVirtualBlockDeviceNativeTriggers(HttpExchange exchange, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/virtual-block-devices/";
+        String suffix = "/native-triggers";
+        if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "虚拟方块设备原生触发只读接口不存在。");
+            return;
+        }
+        if (!method.equalsIgnoreCase("GET")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "7.9 P1 原生触发配置接口只支持 GET，不提供写入 API。");
+            return;
+        }
+        String encodedDeviceId = path.substring(prefix.length(), path.length() - suffix.length());
+        String deviceId = decodePathSegment(encodedDeviceId);
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "虚拟方块设备 ID 不能为空。");
+            return;
+        }
+        Map<String, Object> data = virtualBlockDeviceNativeTriggerService.overview(minecraftServer, deviceId);
+        if (data == null) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "虚拟方块设备不存在。");
+            return;
+        }
+        if (Boolean.FALSE.equals(data.get("supported"))) {
+            WebAdminJsonResponse.error(exchange, 400, "VALIDATION_ERROR", String.valueOf(data.getOrDefault("unsupportedReason", "该接口仅支持 virtual_block_device。")));
+            return;
+        }
+        WebAdminJsonResponse.ok(exchange, data);
     }
 
     private void handleSignalListenerLifecycle(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
