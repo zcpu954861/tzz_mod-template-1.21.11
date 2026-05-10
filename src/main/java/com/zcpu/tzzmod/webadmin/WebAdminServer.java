@@ -3,10 +3,13 @@ package com.zcpu.tzzmod.webadmin;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.signal.device.SignalDeviceData;
+import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
@@ -17,6 +20,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -37,7 +41,10 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.fabricmc.loader.api.FabricLoader;
@@ -59,6 +66,7 @@ public final class WebAdminServer {
     private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
@@ -197,23 +205,27 @@ public final class WebAdminServer {
                     WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
                     return;
                 }
-                handleOnlinePlayers(exchange, auth);
+                runOnServerThread(() -> handleOnlinePlayers(exchange, auth));
                 return;
             }
             if (path.startsWith("/api/webadmin/edit-locks/")) {
-                handleEditLocks(exchange, auth, path, method);
+                runOnServerThread(() -> handleEditLocks(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/device-metadata/")) {
-                handleDeviceMetadata(exchange, auth, path, method);
+                runOnServerThread(() -> handleDeviceMetadata(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/device-basic-config/")) {
-                handleDeviceBasicConfig(exchange, auth, path, method);
+                runOnServerThread(() -> handleDeviceBasicConfig(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/device-extended-config/")) {
-                handleDeviceExtendedConfig(exchange, auth, path, method);
+                runOnServerThread(() -> handleDeviceExtendedConfig(exchange, auth, path, method));
+                return;
+            }
+            if (path.startsWith("/api/webadmin/action-relay-actions/")) {
+                runOnServerThread(() -> handleActionRelayActions(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
@@ -221,11 +233,11 @@ public final class WebAdminServer {
                 return;
             }
             if (path.startsWith("/api/webadmin/selection/")) {
-                handleSelection(exchange, auth, path, method);
+                runOnServerThread(() -> handleSelection(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/virtual-block-devices/")) {
-                handleVirtualBlockDeviceLifecycle(exchange, auth, path, method);
+                runOnServerThread(() -> handleVirtualBlockDeviceLifecycle(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/signal-listeners") || path.startsWith("/api/webadmin/signal-listeners/")) {
@@ -236,7 +248,9 @@ public final class WebAdminServer {
                 handleSignalListenerBasicConfig(exchange, auth, path, method);
                 return;
             }
-            if (readonlyRoutes.handle(exchange, minecraftServer, path)) {
+            final boolean[] readonlyHandled = new boolean[1];
+            runOnServerThread(() -> readonlyHandled[0] = readonlyRoutes.handle(exchange, minecraftServer, path));
+            if (readonlyHandled[0]) {
                 return;
             }
             WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "接口不存在。");
@@ -246,6 +260,41 @@ public final class WebAdminServer {
                 WebAdminJsonResponse.error(exchange, 500, "INTERNAL_ERROR", "WebAdmin 请求处理失败。");
             }
         }
+    }
+
+    private void runOnServerThread(ServerThreadAction action) throws IOException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        minecraftServer.execute(() -> {
+            try {
+                action.run();
+                future.complete(null);
+            } catch (Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+        });
+        try {
+            future.get();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for Minecraft server thread.", exception);
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof IOException ioException) {
+                throw ioException;
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IOException("Minecraft server thread task failed.", cause);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ServerThreadAction {
+        void run() throws Exception;
     }
 
     private void handleLogin(HttpExchange exchange) throws IOException {
@@ -366,9 +415,11 @@ public final class WebAdminServer {
                 return;
             }
             Map<String, String> query = queryParams(exchange);
+            String targetType = query.getOrDefault("targetType", "");
+            String targetId = canonicalizeEditLockTargetId(targetType, query.getOrDefault("targetId", ""));
             WebAdminJsonResponse.ok(exchange, editLockService.status(
-                    query.getOrDefault("targetType", ""),
-                    query.getOrDefault("targetId", ""),
+                    targetType,
+                    targetId,
                     auth.user,
                     auth.session
             ));
@@ -383,6 +434,7 @@ public final class WebAdminServer {
         if (request == null) {
             request = new WebAdminEditLockRequest();
         }
+        request.targetId = canonicalizeEditLockTargetId(request.targetType, request.targetId);
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result;
@@ -512,6 +564,65 @@ public final class WebAdminServer {
                 request,
                 csrfToken,
                 sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private String canonicalizeEditLockTargetId(String targetType, String targetId) {
+        String safeTargetId = targetId == null ? "" : targetId.trim();
+        if (safeTargetId.isBlank() || !isDeviceEditLockTarget(targetType)) {
+            return safeTargetId;
+        }
+        SignalDeviceStore.ResolveResult resolved = SignalDeviceStore.resolveDevice(minecraftServer, safeTargetId);
+        if (resolved.foundUnique()) {
+            SignalDeviceData device = resolved.device();
+            return device == null ? safeTargetId : device.normalized().id();
+        }
+        return safeTargetId;
+    }
+
+    private static boolean isDeviceEditLockTarget(String targetType) {
+        String safeTargetType = targetType == null ? "" : targetType.trim().toLowerCase(Locale.ROOT);
+        return WebAdminEditLockService.TARGET_DEVICE_METADATA.equals(safeTargetType)
+                || WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
+                || WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
+                || WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType);
+    }
+
+    private void handleActionRelayActions(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/action-relay-actions/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Action Relay 设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            Map<String, Object> actions = actionRelayActionsService.actionsFor(minecraftServer, auth.user, auth.session, deviceId);
+            if (actions == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Action Relay 设备不存在或引用不唯一。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, actions);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminActionRelayActionsUpdateRequest request = readJson(exchange, WebAdminActionRelayActionsUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminActionRelayActionsUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        WebAdminWriteResult result = actionRelayActionsService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                deviceId,
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
         );
         WebAdminJsonResponse.ok(exchange, result);
     }
@@ -839,7 +950,7 @@ public final class WebAdminServer {
     }
 
     private static String decodePathSegment(String value) {
-        return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
+        return URLDecoder.decode((value == null ? "" : value).replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
     private static Map<String, String> queryParams(HttpExchange exchange) {

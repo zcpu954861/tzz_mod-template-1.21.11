@@ -103,10 +103,11 @@ public final class WebAdminDeviceBasicConfigService {
     ) {
         String deviceId = request == null ? "" : safe(request.deviceId);
         SignalDeviceData device = findDevice(server, deviceId);
+        String canonicalDeviceId = device == null ? deviceId : device.id();
         WebAdminWriteTarget target = new WebAdminWriteTarget(
                 "DEVICE_BASIC_CONFIG",
-                deviceId,
-                device == null ? deviceId : WebAdminReadonlySupport.deviceDisplayName(device)
+                canonicalDeviceId,
+                device == null ? canonicalDeviceId : WebAdminReadonlySupport.deviceDisplayName(device)
         );
         WebAdminWriteContext writeContext = WebAdminWriteContext.of(
                 user,
@@ -124,6 +125,9 @@ public final class WebAdminDeviceBasicConfigService {
             );
             audit(writeContext, result, Map.of(), Map.of());
             return result;
+        }
+        if (request != null) {
+            request.deviceId = device.id();
         }
 
         WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG);
@@ -239,7 +243,7 @@ public final class WebAdminDeviceBasicConfigService {
                 data
         );
         WebAdminAuditEvent auditEvent = audit(writeContext, result, currentSummary(device), currentSummary(updated));
-        publishRealtime(updated, auditEvent, changedFields, user);
+        publishRealtime(device, updated, auditEvent, changedFields, user);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
     }
@@ -299,15 +303,9 @@ public final class WebAdminDeviceBasicConfigService {
         }
         return switch (device.type()) {
             case SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE -> new Support(true, "");
-            case SignalDeviceData.TYPE_SIGNAL_EMITTER -> SignalDeviceStore.getLoadedEmitter(server, device) == null
-                    ? new Support(false, "该 signal_emitter 所在区块未加载，WebAdmin 不会强制加载区块。")
-                    : new Support(true, "");
-            case SignalDeviceData.TYPE_SIGNAL_RECEIVER -> SignalDeviceStore.getLoadedReceiver(server, device) == null
-                    ? new Support(false, "该 signal_receiver 所在区块未加载，WebAdmin 不会强制加载区块。")
-                    : new Support(true, "");
-            case SignalDeviceData.TYPE_ACTION_RELAY -> SignalDeviceStore.getLoadedActionRelay(server, device) == null
-                    ? new Support(false, "该 action_relay 所在区块未加载，WebAdmin 不会强制加载区块。")
-                    : new Support(true, "");
+            case SignalDeviceData.TYPE_SIGNAL_EMITTER,
+                    SignalDeviceData.TYPE_SIGNAL_RECEIVER,
+                    SignalDeviceData.TYPE_ACTION_RELAY -> new Support(true, "");
             default -> new Support(false, "该设备类型暂不支持 WebAdmin 基础配置编辑。");
         };
     }
@@ -329,6 +327,7 @@ public final class WebAdminDeviceBasicConfigService {
     }
 
     private void publishRealtime(
+            SignalDeviceData before,
             SignalDeviceData device,
             WebAdminAuditEvent auditEvent,
             List<String> changedFields,
@@ -339,28 +338,39 @@ public final class WebAdminDeviceBasicConfigService {
         WebAdminRealtimeEvent configEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
                 .deviceId(deviceId)
                 .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("设备基础配置已更新。")
                 .routeTarget(routeTarget)
                 .payload("targetType", "device_basic_config")
+                .payload("deviceType", device.type())
                 .payload("changedFields", changedFields)
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent deviceEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
                 .deviceId(deviceId)
                 .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("设备基础配置已更新：" + WebAdminReadonlySupport.deviceDisplayName(device))
                 .routeTarget(routeTarget)
+                .payload("targetType", "device_basic_config")
+                .payload("deviceType", device.type())
                 .payload("changedFields", changedFields)
                 .payload("enabled", device.enabled())
                 .payload("channel", device.channel())
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .deviceId(deviceId)
                 .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("WebAdmin 写入审计已记录。")
                 .routeTarget(routeTarget)
+                .payload("targetType", "device_basic_config")
+                .payload("deviceType", device.type())
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("deviceEventId", deviceEvent == null ? "" : deviceEvent.id()));

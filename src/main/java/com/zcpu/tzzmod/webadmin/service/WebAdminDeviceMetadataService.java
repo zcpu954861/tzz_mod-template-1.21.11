@@ -80,7 +80,7 @@ public final class WebAdminDeviceMetadataService {
             return emptyDto("");
         }
         WebAdminDeviceMetadataStore.MetadataFile file = WebAdminDeviceMetadataStore.load(server);
-        WebAdminDeviceMetadataStore.MetadataEntry entry = file.devices.get(device.id());
+        WebAdminDeviceMetadataStore.MetadataEntry entry = metadataEntry(file, device);
         return dto(device, entry);
     }
 
@@ -95,10 +95,11 @@ public final class WebAdminDeviceMetadataService {
     ) {
         String deviceId = request == null ? "" : safe(request.deviceId);
         SignalDeviceData device = findDevice(server, deviceId);
+        String canonicalDeviceId = device == null ? deviceId : device.id();
         WebAdminWriteTarget target = new WebAdminWriteTarget(
                 "DEVICE_METADATA",
-                deviceId,
-                device == null ? deviceId : WebAdminReadonlySupport.deviceDisplayName(device)
+                canonicalDeviceId,
+                device == null ? canonicalDeviceId : WebAdminReadonlySupport.deviceDisplayName(device)
         );
         WebAdminWriteContext writeContext = WebAdminWriteContext.of(
                 user,
@@ -116,6 +117,9 @@ public final class WebAdminDeviceMetadataService {
             );
             audit(writeContext, result, Map.of(), Map.of());
             return result;
+        }
+        if (request != null) {
+            request.deviceId = device.id();
         }
 
         WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_DEVICE_METADATA);
@@ -161,9 +165,10 @@ public final class WebAdminDeviceMetadataService {
         }
 
         WebAdminDeviceMetadataStore.MetadataFile file = WebAdminDeviceMetadataStore.load(server);
+        String metadataKey = metadataKey(device);
         WebAdminDeviceMetadataStore.MetadataEntry before = WebAdminDeviceMetadataStore.MetadataEntry.normalized(
-                device.id(),
-                file.devices.get(device.id())
+                metadataKey,
+                metadataEntry(file, device)
         );
 
         if (request == null || request.expectedVersion == null) {
@@ -197,14 +202,19 @@ public final class WebAdminDeviceMetadataService {
         }
 
         WebAdminDeviceMetadataStore.MetadataEntry after = new WebAdminDeviceMetadataStore.MetadataEntry();
-        after.deviceId = device.id();
+        after.deviceId = metadataKey;
         after.displayName = normalized.displayName();
         after.note = normalized.note();
         after.iconKey = normalized.iconKey();
         after.updatedAt = Instant.now().toString();
         after.updatedBy = user == null ? "" : user.username;
         after.version = before.version + 1L;
-        file.devices.put(device.id(), after);
+        for (String alias : metadataKeys(device)) {
+            if (!alias.equals(metadataKey)) {
+                file.devices.remove(alias);
+            }
+        }
+        file.devices.put(metadataKey, after);
         boolean saved = WebAdminDeviceMetadataStore.save(server, file);
         if (!saved) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(
@@ -303,26 +313,37 @@ public final class WebAdminDeviceMetadataService {
         String routeTarget = "#/devices/" + encode(deviceId);
         WebAdminRealtimeEvent configEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
                 .deviceId(deviceId)
+                .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("WebAdmin 设备显示信息已更新。")
                 .routeTarget(routeTarget)
                 .payload("targetType", "device_metadata")
+                .payload("deviceType", device.type())
                 .payload("changedFields", changedFields)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent deviceEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
                 .deviceId(deviceId)
+                .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("设备显示信息已更新：" + WebAdminReadonlySupport.deviceDisplayName(device))
                 .routeTarget(routeTarget)
+                .payload("targetType", "device_metadata")
+                .payload("deviceType", device.type())
                 .payload("changedFields", changedFields)
                 .payload("displayName", metadata.displayName)
                 .payload("iconKey", metadata.iconKey)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .deviceId(deviceId)
+                .channel(device.channel())
+                .sourceType(device.type())
                 .severity("INFO")
                 .summary("WebAdmin 写入审计已记录。")
                 .routeTarget(routeTarget)
+                .payload("targetType", "device_metadata")
+                .payload("deviceType", device.type())
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("deviceEventId", deviceEvent == null ? "" : deviceEvent.id()));
@@ -377,7 +398,7 @@ public final class WebAdminDeviceMetadataService {
             SignalDeviceData device,
             WebAdminDeviceMetadataStore.MetadataEntry rawEntry
     ) {
-        WebAdminDeviceMetadataStore.MetadataEntry entry = WebAdminDeviceMetadataStore.MetadataEntry.normalized(device.id(), rawEntry);
+        WebAdminDeviceMetadataStore.MetadataEntry entry = WebAdminDeviceMetadataStore.MetadataEntry.normalized(metadataKey(device), rawEntry);
         String effectiveName = entry.displayName.isBlank()
                 ? WebAdminReadonlySupport.deviceDisplayName(device)
                 : entry.displayName;
@@ -399,6 +420,30 @@ public final class WebAdminDeviceMetadataService {
 
     private static WebAdminDtos.DeviceMetadataDto emptyDto(String deviceId) {
         return new WebAdminDtos.DeviceMetadataDto(safe(deviceId), "", "", "auto", "", "device", "", "", 0L);
+    }
+
+    private static String metadataKey(SignalDeviceData device) {
+        return WebAdminDeviceMetadataStore.metadataKey(device == null ? "" : device.id(), device == null ? "" : device.type());
+    }
+
+    private static List<String> metadataKeys(SignalDeviceData device) {
+        return WebAdminDeviceMetadataStore.metadataKeys(device == null ? "" : device.id(), device == null ? "" : device.type());
+    }
+
+    private static WebAdminDeviceMetadataStore.MetadataEntry metadataEntry(
+            WebAdminDeviceMetadataStore.MetadataFile file,
+            SignalDeviceData device
+    ) {
+        if (file == null || device == null) {
+            return null;
+        }
+        for (String key : metadataKeys(device)) {
+            WebAdminDeviceMetadataStore.MetadataEntry entry = file.devices.get(key);
+            if (entry != null) {
+                return entry;
+            }
+        }
+        return null;
     }
 
     private static String defaultIconKey(SignalDeviceData device) {

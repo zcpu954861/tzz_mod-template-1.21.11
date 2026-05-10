@@ -241,7 +241,6 @@ public final class ActionRelayCommand {
 
         ServerPlayerEntity player = source.getEntity() instanceof ServerPlayerEntity serverPlayer ? serverPlayer : null;
         ActionExecutionResult result = relay.executeRelayActions(source.getWorld(), player, true);
-        SignalDeviceStore.updateActions(source.getWorld(), pos, relay);
         if (!result.success()) {
             sendError(source, result.message());
             return 0;

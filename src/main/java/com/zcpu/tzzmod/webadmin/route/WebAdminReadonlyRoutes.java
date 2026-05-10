@@ -127,9 +127,10 @@ public final class WebAdminReadonlyRoutes {
     }
 
     private boolean handleDevice(HttpExchange exchange, MinecraftServer server, String tail) throws IOException {
+        tail = rawPathTail(exchange, "/api/devices/", tail);
         boolean debug = tail.endsWith("/debug");
         String rawId = debug ? tail.substring(0, tail.length() - "/debug".length()) : tail;
-        String id = decode(rawId);
+        String id = decodePath(rawId);
         SignalDeviceData device = deviceService.findDevice(server, id);
         if (device == null) {
             WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "设备不存在。");
@@ -183,6 +184,15 @@ public final class WebAdminReadonlyRoutes {
 
     private static String decode(String value) {
         return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private static String decodePath(String value) {
+        return URLDecoder.decode((value == null ? "" : value).replace("+", "%2B"), StandardCharsets.UTF_8);
+    }
+
+    private static String rawPathTail(HttpExchange exchange, String prefix, String fallback) {
+        String rawPath = exchange.getRequestURI() == null ? "" : exchange.getRequestURI().getRawPath();
+        return rawPath != null && rawPath.startsWith(prefix) ? rawPath.substring(prefix.length()) : fallback;
     }
 
 }
