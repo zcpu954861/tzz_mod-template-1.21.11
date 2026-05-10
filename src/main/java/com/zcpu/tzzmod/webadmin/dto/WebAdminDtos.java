@@ -74,10 +74,18 @@ public final class WebAdminDtos {
             String deviceType,
             Map<String, Object> values,
             List<String> supportedFields,
+            List<String> editableFields,
             Map<String, String> fieldLabels,
             Map<String, Boolean> clearableFields,
+            Map<String, String> fieldDisabledReasons,
             boolean supported,
             String unsupportedReason,
+            String runtimeState,
+            boolean worldAvailable,
+            boolean chunkLoaded,
+            boolean blockEntityLoaded,
+            String blockEntityType,
+            String blockId,
             String expectedFingerprint,
             WebAdminEditLockStatusDto lockStatus
     ) {

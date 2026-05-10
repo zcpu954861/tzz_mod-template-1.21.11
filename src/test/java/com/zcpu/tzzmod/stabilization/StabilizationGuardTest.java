@@ -1952,14 +1952,39 @@ public final class StabilizationGuardTest {
                 "place feature minecraft:oak 0 64 0",
                 "function guard:world_mutation",
                 "schedule function guard:world_mutation 1t",
+                "scoreboard objectives add guard dummy",
+                "tag PlayerName add guard",
+                "title PlayerName title {\"text\":\"Guard\"}",
+                "playsound minecraft:block.note_block.pling master PlayerName",
+                "particle minecraft:happy_villager 0 64 0",
+                "effect give PlayerName minecraft:speed 1 1",
                 "give PlayerName minecraft:stone",
-                "tp PlayerName 0 80 0"
+                "tp PlayerName 0 80 0",
+                "teleport PlayerName 0 80 0",
+                "say guard",
+                "tellraw PlayerName {\"text\":\"guard\"}",
+                "summon minecraft:marker 0 64 0",
+                "clear PlayerName minecraft:stone",
+                "gamemode adventure PlayerName",
+                "gamerule doDaylightCycle false",
+                "time set day",
+                "weather clear",
+                "bossbar add guard:bar \"Guard\"",
+                "team add guard",
+                "advancement grant PlayerName only minecraft:story/root",
+                "attribute PlayerName minecraft:generic.max_health get",
+                "data get entity PlayerName",
+                "save-off",
+                "save-on",
+                "save-all",
+                "reload"
         )) {
             requireTrue(WebAdminActionRelayActionsService.validateActionEntries(List.of(actionEntry("command", allowedCommand))).isEmpty(),
                     "7.7 action relay allows map-control command action: " + allowedCommand);
         }
         for (String blockedCommand : List.of(
                 "ban PlayerName",
+                "BAN PlayerName",
                 "ban-ip 127.0.0.1",
                 "kick PlayerName",
                 "op PlayerName",
@@ -1968,8 +1993,6 @@ public final class StabilizationGuardTest {
                 "whitelist add PlayerName",
                 "pardon PlayerName",
                 "pardon-ip 127.0.0.1",
-                "save-off",
-                "save-on",
                 "/minecraft:op PlayerName"
         )) {
             requireFalse(WebAdminActionRelayActionsService.validateActionEntries(List.of(actionEntry("command", blockedCommand))).isEmpty(),
@@ -2013,6 +2036,9 @@ public final class StabilizationGuardTest {
         Path root = Path.of("").toAbsolutePath();
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String actionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String extendedConfigService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDeviceExtendedConfigService.java"), StandardCharsets.UTF_8);
+        String basicConfigServiceFull = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDeviceBasicConfigService.java"), StandardCharsets.UTF_8);
+        String actionRelayCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/ActionRelayCommand.java"), StandardCharsets.UTF_8);
         String actionRelayBe = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/ModBlock/entity/ActionRelayBlockEntity.java"), StandardCharsets.UTF_8);
         String basicConfigService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDeviceBasicConfigService.java"), StandardCharsets.UTF_8);
         String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
@@ -2031,6 +2057,10 @@ public final class StabilizationGuardTest {
                 "server_management_command_forbidden",
                 "isBlockedServerManagementCommand",
                 "isServerManagementRoot",
+                "actionsReadable",
+                "actionsEditable",
+                "snapshotActionCount",
+                "blockId",
                 "DEVICE_CONFIG_CHANGED",
                 "replaceActions",
                 "ActionType.COMMAND",
@@ -2043,9 +2073,26 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(actionService, marker, "7.7 action relay service marker present: " + marker);
         }
+        requireFalse(actionService.contains("\"invalid_command\"") || actionService.contains("命令解析器"),
+                "7.7 action relay command validation must not hard-fail ordinary map commands through parser checks");
+        for (String marker : List.of(
+                "editableFields",
+                "fieldDisabledReasons",
+                "runtimeState",
+                "block_entity_missing",
+                "data-physical-tick-field",
+                "pulseTicks",
+                "cooldownTicks"
+        )) {
+            requireContains(extendedConfigService + js, marker, "7.7 Step 2 physical device extended config full coverage marker present: " + marker);
+        }
         requireContains(actionRelayBe, "replaceActions", "action relay block entity supports safe action list replacement");
+        requireFalse(actionRelayCommand.contains("ActionExecutionResult result = relay.executeRelayActions(source.getWorld(), player, true);\r\n        SignalDeviceStore.updateActions(source.getWorld(), pos, relay);")
+                        || actionRelayCommand.contains("ActionExecutionResult result = relay.executeRelayActions(source.getWorld(), player, true);\n        SignalDeviceStore.updateActions(source.getWorld(), pos, relay);"),
+                "manual action relay trigger must not publish action-list config changes");
         requireFalse(actionService.contains("setBlockState") || actionService.contains("breakBlock") || actionService.contains("removeBlock("),
                 "7.7 action relay action service must not mutate world blocks");
+        requireContains(basicConfigServiceFull, "previousChannel", "device basic config realtime includes previous channel for old signal detail refresh");
         for (String marker : List.of(
                 "TYPE_SIGNAL_EMITTER,",
                 "TYPE_SIGNAL_RECEIVER,",
@@ -2080,10 +2127,20 @@ public final class StabilizationGuardTest {
                 "data-sound-action-editor",
                 "data-action-add",
                 "data-action-delete",
+                "data-action-delete-confirm",
                 "data-action-reorder",
+                "requestDeleteActionRelayAction",
+                "confirmDeleteActionRelayAction",
                 "action_relay_actions",
+                "动作详情当前不可读取；store 快照记录",
+                "snapshotActionCount",
+                "actionsReadable",
+                "actionsEditable",
                 "expectedFingerprint",
                 "handleActionRelayActionsRealtimeEvent",
+                "actionRelayRuntimeStatusHtml",
+                "data-action-relay-loaded-state",
+                "data-device-runtime-state",
                 "data-physical-device-delete-disabled",
                 "channel-combo action-relay-channel-combo",
                 "closeDeviceMoreMenu",
@@ -2095,6 +2152,9 @@ public final class StabilizationGuardTest {
                 "7.7 config/action realtime marks only related routes for action relay actions");
         requireContains(js, "if(target==='action_relay_actions'){add('dashboard','history','signals','devices','actions','actionTemplates')",
                 "7.7 write audit realtime maps action relay action changes to related routes");
+        requireContains(js, "event?.payload?.previousChannel", "device basic config route mapping refreshes previous channel detail");
+        requireContains(js, "applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(deviceId)",
+                "action relay action editor rerender preserves other unified config draft inputs");
         requireFalse(js.contains("openPhysicalDeviceDeleteModal"), "frontend does not expose physical signal device delete modal");
         requireFalse(js.contains("data-signal-receiver-action-list") || js.contains("receiverOutputTarget"),
                 "signal_receiver remains redstone pulse only and does not expose action list or arbitrary output target");
@@ -2102,6 +2162,8 @@ public final class StabilizationGuardTest {
                 "7.7 Step 1 does not enter matcher/itemSubmit/ConditionEngine editors");
         requireFalse(js.contains("raw-json-textarea") || js.contains("action-json"),
                 "7.7 action relay action list does not use raw JSON textarea markers");
+        requireFalse(js.contains("confirm("),
+                "7.7 action relay delete confirmation uses the fixed WebAdmin modal flow instead of native browser confirm");
     }
 
     private static WebAdminActionRelayActionsUpdateRequest.ActionEntry actionEntry(String type, String value) {

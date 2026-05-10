@@ -108,7 +108,10 @@ public final class SignalDeviceStore {
     }
 
     public static synchronized SignalDeviceData updateActions(ServerWorld world, BlockPos pos, ActionRelayBlockEntity blockEntity) {
-        return upsertActionRelay(world, pos, blockEntity);
+        SignalDeviceData updated = upsertActionRelay(world, pos, blockEntity);
+        publishDeviceChange(WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED, updated);
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED, updated);
+        return updated;
     }
 
     public static synchronized SignalDeviceData upsertVirtualBlock(ServerWorld world, BlockPos pos, String channel) {

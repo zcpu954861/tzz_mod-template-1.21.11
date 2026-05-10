@@ -1,6 +1,5 @@
 package com.zcpu.tzzmod.webadmin.service;
 
-import com.mojang.brigadier.ParseResults;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
@@ -39,9 +38,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.command.permission.PermissionPredicate;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 
@@ -73,18 +71,35 @@ public final class WebAdminActionRelayActionsService {
         if (!SignalDeviceData.TYPE_ACTION_RELAY.equals(relayTarget.device().type())) {
             Map<String, Object> data = baseData(relayTarget.device(), null, user, session);
             data.put("supported", false);
+            data.put("typeSupported", false);
+            data.put("actionsReadable", false);
+            data.put("actionsEditable", false);
             data.put("unsupportedReason", "只有 action_relay 支持 Action 列表。");
+            data.put("loadedState", "not_action_relay");
+            data.put("worldAvailable", false);
+            data.put("chunkLoaded", false);
+            data.put("blockEntityLoaded", false);
+            data.put("blockEntityType", "");
+            data.put("blockId", "");
             return data;
         }
-        boolean supported = relayTarget.editable();
+        boolean typeSupported = SignalDeviceData.TYPE_ACTION_RELAY.equals(relayTarget.device().type());
+        boolean actionsReadable = relayTarget.actionsReadable();
+        boolean actionsEditable = relayTarget.editable();
         Map<String, Object> data = baseData(relayTarget.device(), relayTarget.relay(), user, session);
-        data.put("supported", supported);
-        data.put("unsupportedReason", supported ? "" : relayTarget.unsupportedReason());
+        data.put("supported", typeSupported);
+        data.put("typeSupported", typeSupported);
+        data.put("actionsReadable", actionsReadable);
+        data.put("actionsEditable", actionsEditable);
+        data.put("unsupportedReason", actionsEditable ? "" : relayTarget.unsupportedReason());
         data.put("loadedState", relayTarget.loadedState());
         data.put("worldAvailable", relayTarget.worldAvailable());
         data.put("chunkLoaded", relayTarget.chunkLoaded());
         data.put("blockEntityLoaded", relayTarget.blockEntityLoaded());
         data.put("blockEntityType", relayTarget.blockEntityType());
+        data.put("blockId", relayTarget.blockId());
+        data.put("dimension", relayTarget.device().dimension());
+        data.put("position", Map.of("x", relayTarget.device().x(), "y", relayTarget.device().y(), "z", relayTarget.device().z()));
         return data;
     }
 
@@ -285,7 +300,8 @@ public final class WebAdminActionRelayActionsService {
         data.put("deviceType", device.type());
         data.put("displayName", WebAdminReadonlySupport.deviceDisplayName(device));
         data.put("channel", device.channel());
-        data.put("actionCount", actions.size());
+        data.put("actionCount", relay == null ? device.actionCount() : actions.size());
+        data.put("snapshotActionCount", device.actionCount());
         data.put("actions", actionDtos(actions));
         data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
         data.put("expectedFingerprint", fingerprintFor(device, actions));
@@ -300,7 +316,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("physicalDeviceDeleteAllowed", false);
         data.put("notes", List.of(
                 "Action 列表属于 action_relay BlockEntity 配置，不会创建或删除真实方块。",
-                "command action 会按服务器命令解析器校验；WebAdmin 只阻断 ban/kick/op/stop/whitelist 等服务器管理高风险命令。",
+                "command action 是地图玩法控制能力；WebAdmin 只硬阻断 ban/kick/op/stop/whitelist 等服务器管理高风险命令。",
                 "sound action 当前底层只存储 sound id；per-action cooldown/requiresOp 字段会保留，但执行语义以现有 ActionEngine 为准。"
         ));
         return data;
@@ -394,8 +410,6 @@ public final class WebAdminActionRelayActionsService {
                     errors.add(new WebAdminValidationError(field, "too_long", "命令长度不能超过 " + MAX_COMMAND_LENGTH + " 个字符。", value));
                 } else if (isBlockedServerManagementCommand(value)) {
                     errors.add(new WebAdminValidationError(field, "server_management_command_forbidden", "该命令属于服务器管理高风险命令，不允许通过 WebAdmin action_relay 保存。", value));
-                } else if (server != null && !isCommandValid(server, value)) {
-                    errors.add(new WebAdminValidationError(field, "invalid_command", "命令无法被当前服务器命令解析器识别。", value));
                 }
             }
             case SIGNAL -> {
@@ -437,9 +451,7 @@ public final class WebAdminActionRelayActionsService {
                 || "stop".equals(root)
                 || "whitelist".equals(root)
                 || "pardon".equals(root)
-                || "pardon-ip".equals(root)
-                || "save-off".equals(root)
-                || "save-on".equals(root);
+                || "pardon-ip".equals(root);
     }
 
     private static String commandRoot(String token) {
@@ -490,22 +502,6 @@ public final class WebAdminActionRelayActionsService {
             tokens.add(current.toString());
         }
         return List.copyOf(tokens);
-    }
-
-    private static boolean isCommandValid(MinecraftServer server, String command) {
-        try {
-            String normalized = ActionConfig.normalizeCommand(command);
-            ServerCommandSource source = server.getCommandSource()
-                    .withPermissions(PermissionPredicate.ALL)
-                    .withSilent();
-            ParseResults<ServerCommandSource> parseResults = server.getCommandManager()
-                    .getDispatcher()
-                    .parse(normalized, source);
-            return parseResults.getReader().getRemaining().isEmpty()
-                    && parseResults.getExceptions().isEmpty();
-        } catch (Exception ignored) {
-            return false;
-        }
     }
 
     private static ActionType parseType(String raw) {
@@ -568,9 +564,11 @@ public final class WebAdminActionRelayActionsService {
         boolean worldAvailable = world != null;
         boolean chunkLoaded = false;
         BlockEntity blockEntity = null;
+        String blockId = "";
         if (world != null) {
             chunkLoaded = world.isChunkLoaded(pos);
             if (chunkLoaded) {
+                blockId = Registries.BLOCK.getId(world.getBlockState(pos).getBlock()).toString();
                 blockEntity = world.getBlockEntity(pos);
             }
         }
@@ -583,7 +581,8 @@ public final class WebAdminActionRelayActionsService {
                 worldAvailable,
                 chunkLoaded,
                 blockEntity != null,
-                blockEntity == null ? "" : blockEntity.getClass().getSimpleName()
+                blockEntity == null ? "" : blockEntity.getClass().getSimpleName(),
+                blockId
         );
     }
 
@@ -870,14 +869,19 @@ public final class WebAdminActionRelayActionsService {
             boolean worldAvailable,
             boolean chunkLoaded,
             boolean blockEntityLoaded,
-            String blockEntityType
+            String blockEntityType,
+            String blockId
     ) {
         static ActionRelayTarget missing() {
-            return new ActionRelayTarget(null, null, null, null, false, false, false, "");
+            return new ActionRelayTarget(null, null, null, null, false, false, false, "", "");
         }
 
         static ActionRelayTarget unsupportedType(SignalDeviceData device) {
-            return new ActionRelayTarget(device, null, null, null, false, false, false, "");
+            return new ActionRelayTarget(device, null, null, null, false, false, false, "", "");
+        }
+
+        boolean actionsReadable() {
+            return relay != null;
         }
 
         boolean editable() {
@@ -904,8 +908,8 @@ public final class WebAdminActionRelayActionsService {
             return switch (loadedState()) {
                 case "world_unavailable" -> "设备维度不可用或世界未加载。";
                 case "chunk_unloaded" -> "该 action_relay 所在区块未加载。WebAdmin 不会强制加载区块；请让玩家靠近该方块后重试。";
-                case "block_entity_missing" -> "区块已加载，但当前位置未找到 action_relay 方块实体。请确认方块未被破坏、坐标和维度仍匹配。";
-                case "block_entity_type_mismatch" -> "区块已加载，但当前位置的方块实体不是 action_relay（当前：" + blockEntityType + "）。";
+                case "block_entity_missing" -> "区块已加载，但当前位置未找到 action_relay 方块实体。当前方块：" + (isBlank(blockId) ? "未知" : blockId) + "。请确认方块未被破坏、坐标和维度仍匹配。";
+                case "block_entity_type_mismatch" -> "区块已加载，但当前位置的方块实体不是 action_relay（当前：" + blockEntityType + "，方块：" + (isBlank(blockId) ? "未知" : blockId) + "）。";
                 default -> "";
             };
         }

@@ -35,7 +35,11 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 
 public final class WebAdminDeviceExtendedConfigService {
     public static final int MAX_CHANNEL_LENGTH = 128;
@@ -86,10 +90,18 @@ public final class WebAdminDeviceExtendedConfigService {
                 WebAdminReadonlySupport.deviceType(device),
                 values(device, support.fields()),
                 support.fields(),
+                support.editableFields(),
                 fieldLabels(support.fields()),
                 clearableFields(support.fields()),
+                support.fieldDisabledReasons(),
                 support.supported(),
                 support.reason(),
+                support.runtimeState(),
+                support.worldAvailable(),
+                support.chunkLoaded(),
+                support.blockEntityLoaded(),
+                support.blockEntityType(),
+                support.blockId(),
                 fingerprintFor(device),
                 editLockService == null ? null : editLockService.status(
                         WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG,
@@ -168,6 +180,16 @@ public final class WebAdminDeviceExtendedConfigService {
             audit(writeContext, result, currentSummary(device), Map.of("attempt", "unsupported"));
             return result;
         }
+        if (support.editableFields().isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "device",
+                    "unsupported_state",
+                    support.reason().isBlank() ? "设备当前没有可安全写入的类型专属配置字段。" : support.reason(),
+                    device.type()
+            )));
+            audit(writeContext, result, currentSummary(device), Map.of("attempt", "unsupported_state", "runtimeState", support.runtimeState()));
+            return result;
+        }
 
         if (editLockService != null) {
             WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
@@ -200,16 +222,16 @@ public final class WebAdminDeviceExtendedConfigService {
             return result;
         }
 
-        List<WebAdminValidationError> errors = validateRequest(request, support.fields());
+        List<WebAdminValidationError> errors = validateRequest(request, support.editableFields());
         if (!errors.isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
             audit(writeContext, result, currentSummary(device), requestSummary(request));
             return result;
         }
 
-        SignalDeviceStore.ExtendedConfigPatch patch = patchFor(request, support.fields());
+        SignalDeviceStore.ExtendedConfigPatch patch = patchFor(request, support.editableFields());
         SignalDeviceData targetDevice = SignalDeviceStore.withExtendedConfigForWebAdmin(device, patch);
-        List<String> changedFields = changedFields(device, targetDevice, support.fields());
+        List<String> changedFields = changedFields(device, targetDevice, support.editableFields());
         if (changedFields.isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的设备扩展配置变化。");
             audit(writeContext, result, currentSummary(device), currentSummary(device));
@@ -406,24 +428,98 @@ public final class WebAdminDeviceExtendedConfigService {
 
     private static Support support(MinecraftServer server, SignalDeviceData device) {
         if (device == null) {
-            return new Support(false, "设备不存在。", List.of());
+            return Support.unsupported("设备不存在。");
         }
         return switch (device.type()) {
-            case SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE -> new Support(true, "", List.of(
+            case SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE -> Support.editable(List.of(
                     FIELD_INTERACT_CHANNEL,
                     FIELD_SUCCESS_CHANNEL,
                     FIELD_FAIL_CHANNEL,
                     FIELD_INTERACTION_COOLDOWN_TICKS
             ));
-            case SignalDeviceData.TYPE_SIGNAL_RECEIVER -> server != null && SignalDeviceStore.getLoadedReceiver(server, device) == null
-                    ? new Support(false, "该 signal_receiver 所在区块未加载，WebAdmin 不会强制加载区块。", List.of())
-                    : new Support(true, "", List.of(FIELD_PULSE_TICKS));
-            case SignalDeviceData.TYPE_ACTION_RELAY -> server != null && SignalDeviceStore.getLoadedActionRelay(server, device) == null
-                    ? new Support(false, "该 action_relay 所在区块未加载，WebAdmin 不会强制加载区块。", List.of())
-                    : new Support(true, "", List.of(FIELD_COOLDOWN_TICKS));
-            case SignalDeviceData.TYPE_SIGNAL_EMITTER -> new Support(false, "signal_emitter 当前没有可编辑的扩展基础配置。", List.of());
-            default -> new Support(false, "该设备类型暂无可编辑扩展配置。", List.of());
+            case SignalDeviceData.TYPE_SIGNAL_RECEIVER -> physicalSupport(
+                    server,
+                    device,
+                    List.of(FIELD_PULSE_TICKS),
+                    SignalReceiverBlockEntity.class,
+                    "signal_receiver"
+            );
+            case SignalDeviceData.TYPE_ACTION_RELAY -> physicalSupport(
+                    server,
+                    device,
+                    List.of(FIELD_COOLDOWN_TICKS),
+                    ActionRelayBlockEntity.class,
+                    "action_relay"
+            );
+            case SignalDeviceData.TYPE_SIGNAL_EMITTER -> Support.unsupported("signal_emitter 当前没有类型专属运行参数；请使用显示信息和基础配置编辑 displayName、note、iconKey、enabled、channel。");
+            default -> Support.unsupported("该设备类型暂无可编辑扩展配置。");
         };
+    }
+
+    private static Support physicalSupport(
+            MinecraftServer server,
+            SignalDeviceData device,
+            List<String> fields,
+            Class<? extends BlockEntity> expectedType,
+            String label
+    ) {
+        if (server == null) {
+            return Support.editable(fields);
+        }
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(server, device);
+        if (world == null) {
+            return Support.runtimeUnavailable(
+                    fields,
+                    "world_unavailable",
+                    false,
+                    false,
+                    false,
+                    "",
+                    "",
+                    "设备维度不可用或世界未加载，类型专属运行参数暂时只能查看快照。"
+            );
+        }
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        boolean chunkLoaded = world.isChunkLoaded(pos);
+        if (!chunkLoaded) {
+            return Support.runtimeUnavailable(
+                    fields,
+                    "chunk_unloaded",
+                    true,
+                    false,
+                    false,
+                    "",
+                    "",
+                    "该 " + label + " 所在区块未加载。WebAdmin 不会强制加载区块；请让玩家靠近该方块后重试。"
+            );
+        }
+        BlockEntity blockEntity = world.getBlockEntity(pos);
+        String blockId = Registries.BLOCK.getId(world.getBlockState(pos).getBlock()).toString();
+        if (blockEntity == null) {
+            return Support.runtimeUnavailable(
+                    fields,
+                    "block_entity_missing",
+                    true,
+                    true,
+                    false,
+                    "",
+                    blockId,
+                    "区块已加载，但当前位置未找到 " + label + " 方块实体。请确认方块未被破坏、坐标和维度仍匹配。"
+            );
+        }
+        if (!expectedType.isInstance(blockEntity)) {
+            return Support.runtimeUnavailable(
+                    fields,
+                    "block_entity_type_mismatch",
+                    true,
+                    true,
+                    true,
+                    blockEntity.getClass().getSimpleName(),
+                    blockId,
+                    "区块已加载，但当前位置的方块实体不是 " + label + "（当前：" + blockEntity.getClass().getSimpleName() + "）。"
+            );
+        }
+        return Support.editable(fields, blockId, blockEntity.getClass().getSimpleName());
     }
 
     private static Map<String, Object> values(SignalDeviceData device, List<String> fields) {
@@ -679,9 +775,56 @@ public final class WebAdminDeviceExtendedConfigService {
         return WebAdminWriteResultCode.INTERNAL_ERROR;
     }
 
-    private record Support(boolean supported, String reason, List<String> fields) {
+    private record Support(
+            boolean supported,
+            String reason,
+            List<String> fields,
+            List<String> editableFields,
+            Map<String, String> fieldDisabledReasons,
+            String runtimeState,
+            boolean worldAvailable,
+            boolean chunkLoaded,
+            boolean blockEntityLoaded,
+            String blockEntityType,
+            String blockId
+    ) {
+        static Support unsupported(String reason) {
+            return new Support(false, reason, List.of(), List.of(), Map.of(), "unsupported", false, false, false, "", "");
+        }
+
+        static Support editable(List<String> fields) {
+            return editable(fields, "", "");
+        }
+
+        static Support editable(List<String> fields, String blockId, String blockEntityType) {
+            return new Support(true, "", fields, fields, Map.of(), "ready", true, true, true, blockEntityType, blockId);
+        }
+
+        static Support runtimeUnavailable(
+                List<String> fields,
+                String runtimeState,
+                boolean worldAvailable,
+                boolean chunkLoaded,
+                boolean blockEntityLoaded,
+                String blockEntityType,
+                String blockId,
+                String reason
+        ) {
+            Map<String, String> disabled = new LinkedHashMap<>();
+            for (String field : fields == null ? List.<String>of() : fields) {
+                disabled.put(field, reason);
+            }
+            return new Support(true, reason, fields, List.of(), disabled, runtimeState, worldAvailable, chunkLoaded, blockEntityLoaded, blockEntityType, blockId);
+        }
+
         private Support {
             fields = fields == null ? List.of() : List.copyOf(fields);
+            editableFields = editableFields == null ? List.of() : List.copyOf(editableFields);
+            fieldDisabledReasons = fieldDisabledReasons == null ? Map.of() : Map.copyOf(fieldDisabledReasons);
+            reason = safe(reason);
+            runtimeState = safe(runtimeState);
+            blockEntityType = safe(blockEntityType);
+            blockId = safe(blockId);
         }
     }
 }

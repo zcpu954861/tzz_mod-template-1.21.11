@@ -239,7 +239,7 @@ public final class WebAdminDeviceBasicConfigService {
                 data
         );
         WebAdminAuditEvent auditEvent = audit(writeContext, result, currentSummary(device), currentSummary(updated));
-        publishRealtime(updated, auditEvent, changedFields, user);
+        publishRealtime(device, updated, auditEvent, changedFields, user);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
     }
@@ -323,6 +323,7 @@ public final class WebAdminDeviceBasicConfigService {
     }
 
     private void publishRealtime(
+            SignalDeviceData before,
             SignalDeviceData device,
             WebAdminAuditEvent auditEvent,
             List<String> changedFields,
@@ -340,6 +341,7 @@ public final class WebAdminDeviceBasicConfigService {
                 .payload("targetType", "device_basic_config")
                 .payload("deviceType", device.type())
                 .payload("changedFields", changedFields)
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent deviceEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
                 .deviceId(deviceId)
@@ -353,6 +355,7 @@ public final class WebAdminDeviceBasicConfigService {
                 .payload("changedFields", changedFields)
                 .payload("enabled", device.enabled())
                 .payload("channel", device.channel())
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .deviceId(deviceId)
@@ -363,6 +366,7 @@ public final class WebAdminDeviceBasicConfigService {
                 .routeTarget(routeTarget)
                 .payload("targetType", "device_basic_config")
                 .payload("deviceType", device.type())
+                .payload("previousChannel", before == null ? "" : before.channel())
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("deviceEventId", deviceEvent == null ? "" : deviceEvent.id()));

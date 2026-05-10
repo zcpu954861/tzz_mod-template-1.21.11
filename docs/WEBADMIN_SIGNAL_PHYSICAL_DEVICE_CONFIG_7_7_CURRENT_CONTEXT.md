@@ -45,6 +45,18 @@ Step 1 known limitations，必须在 Step 2 彻底解决：
 - command action validation 需要继续放宽：除 `ban` / `kick` / `op` / `stop` 等极高风险服务器管理命令外，地图制作常用命令应允许。
 - Step 2 硬标准：凡是报告支持编辑的字段，WebUI 必须有明确入口；没有入口就不能报告“已支持”。
 
+## 7.7 Step 2 目标
+
+Step 2 名称：Physical Signal Device Full Config Coverage。
+
+Step 2 必须补齐：
+
+- `signal_receiver.pulseTicks` 在详情卡片与统一配置 modal 中有明确入口；未 ready 时也显示快照值与禁用原因。
+- `action_relay.cooldownTicks` 在详情卡片与统一配置 modal 中有明确入口；未 ready 时也显示快照值与禁用原因。
+- `action_relay` Action list 区分类型支持、动作可读、动作可编辑、runtime ready 状态。
+- Action list 未 ready 时不再把 store 快照误显示为“没有动作”；应显示 snapshot action count 与 world/chunk/block entity/block id 状态。
+- command action 只硬阻断极高风险服务器管理命令；`save-off` / `save-on` / `save-all` / `reload` 这类命令不作为硬阻断项，后续可做 warning-only UI。
+
 ## 必须落地的编辑能力
 
 `signal_emitter`：
@@ -110,8 +122,6 @@ Step 1 known limitations，必须在 Step 2 彻底解决：
 - whitelist
 - pardon
 - pardon-ip
-- save-off
-- save-on
 
 命令校验只检查第一个命令词，不应误伤命令文本中的普通内容。
 
