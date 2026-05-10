@@ -1085,9 +1085,9 @@ public final class WebAdminFrontendScripts {
                     ${detailFixedLayout([
                       detailCard('配置摘要',deviceConfigOverview(detail),'','detail-card-stretchable'),
                       isActionRelay(detail)?detailCard('Action 列表',actionRelayActionListReadonlyCard(detail),actionListAction):'',
-                      isVirtualBlockDevice(detail)?detailCard('交互物品匹配',interactionItemMatcherReadonlyCard(detail),matcherAction):'',
                       detailCard('最近事件',`${history.ok?compactEventList(recentEvents,'当前设备暂无关联频道历史。'):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p>`)
                     ],[
+                      isVirtualBlockDevice(detail)?detailCard('交互物品匹配',`<div data-vbd-matcher-side-card="true" data-detail-side-card="interaction-item-matcher">${interactionItemMatcherReadonlyCard(detail)}</div>`,matcherAction):'',
                       detailCard('关联对象 / Doctor',`${deviceChannelSideCard(detail)}${deviceDoctorSideCard(detail,uniqueIssues(relatedDoctor))}`,'','detail-card-stretchable'),
                       detailCard('快捷操作',`<div class="wa-quick-grid">${actionListAction}${matcherAction}${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${deleteAction}</div><p class="wa-disabled-note">${esc(quickNote)}</p>`)
                     ],[
@@ -1574,7 +1574,7 @@ public final class WebAdminFrontendScripts {
                   const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):deviceConfigEditButton(detail,'编辑设备配置','primary');
                   const matcher=isVirtualBlockDevice(detail)?interactionItemMatcherSummaryHtml(detail):'';
                   const loadNotes=[detail.basicConfigError?`基础配置加载失败：${detail.basicConfigError.message||'未知错误'}`:'',detail.extendedConfigError?`扩展配置加载失败：${detail.extendedConfigError.message||'未知错误'}`:'',detail.interactionItemMatcherError?`交互物品匹配加载失败：${detail.interactionItemMatcherError.message||'未知错误'}`:''].filter(Boolean);
-                  return `<div class="wa-config-summary">
+                  return `<div class="wa-config-summary ${matcher?'wa-vbd-config-summary':''}" ${matcher?'data-vbd-config-summary="true"':''}>
                     <section class="wa-config-card"><h3>显示信息</h3><div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}</div></section>
                     <section class="wa-config-card"><h3>基础配置</h3><div class="identity-grid">${row('启用状态',esc(labelEnabledState(basic.enabled ?? detail.enabled)))}${row('主频道',channelCell(basic.channel||detail.channel))}</div></section>
                     <section class="wa-config-card"><h3>类型专属配置</h3><div class="identity-grid">${extRows}</div>${extNote}</section>
@@ -1584,7 +1584,7 @@ public final class WebAdminFrontendScripts {
                 function interactionItemMatcherSummaryHtml(detail){
                   const data=detail.interactionItemMatcher||{}, matcher=data.matcher||detail.configSummary?.interactionItem||{}, state=matcher.enabled||matcher.configured?'已配置':'未配置';
                   const count=matcher.countMode==='ignore'?'不检查数量':`${labelCountMode(matcher.countMode)} ${matcher.requiredCount||1}`;
-                  return `<section class="wa-config-card" data-vbd-matcher-summary-card="true"><h3>交互物品匹配</h3><div class="identity-grid">${row('状态',esc(data.itemSubmitEnabled?'itemSubmit 已启用，普通 matcher 只读':state))}${row('启用要求',esc(labelBool(!!matcher.enabled)))}${row('物品 ID',esc(matcher.templateItemId||'未设置'))}${row('数量规则',esc(count))}${row('物品来源',esc(matcher.interactionItemSourceDisplayName||labelInteractionSource(matcher.interactionItemSource||matcher.source)))}${row('原版交互',esc(matcher.interactionItemVanillaPolicyDisplayName||labelVanillaPolicy(matcher.interactionItemVanillaPolicy||matcher.vanillaPolicy)))}${row('模板摘要',esc(matcher.templateSummary||'未配置模板'))}</div><p class="muted">7.8 只编辑普通 interaction item matcher；success / fail / interact channel 与 cooldown 仍在类型专属配置中编辑。</p></section>`;
+                  return `<section class="wa-config-card wa-vbd-matcher-config-card" data-vbd-matcher-summary-card="true"><h3>交互物品匹配</h3><div class="identity-grid">${row('状态',esc(data.itemSubmitEnabled?'itemSubmit 已启用，普通 matcher 只读':state))}${row('启用要求',esc(labelBool(!!matcher.enabled)))}${row('物品 ID',esc(matcher.templateItemId||'未设置'))}${row('数量规则',esc(count))}${row('物品来源',esc(matcher.interactionItemSourceDisplayName||labelInteractionSource(matcher.interactionItemSource||matcher.source)))}${row('原版交互',esc(matcher.interactionItemVanillaPolicyDisplayName||labelVanillaPolicy(matcher.interactionItemVanillaPolicy||matcher.vanillaPolicy)))}${row('模板摘要',esc(matcher.templateSummary||'未配置模板'))}</div><p class="muted">7.8 只编辑普通 interaction item matcher；success / fail / interact channel 与 cooldown 仍在类型专属配置中编辑。</p></section>`;
                 }
                 function labelCountMode(value){return {ignore:'不检查数量',at_least:'至少',exactly:'等于',at_most:'至多'}[String(value||'').toLowerCase()]||value||'至少';}
                 function interactionItemMatcherReadonlyCard(detail){

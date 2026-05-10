@@ -2478,6 +2478,10 @@ public final class StabilizationGuardTest {
 
         for (String marker : List.of(
                 "data-vbd-matcher-summary-card=\"true\"",
+                "data-vbd-matcher-side-card=\"true\"",
+                "data-detail-side-card=\"interaction-item-matcher\"",
+                "data-vbd-config-summary=\"true\"",
+                "wa-vbd-matcher-config-card",
                 "openInteractionItemMatcherModal",
                 "openInteractionItemMatcherReadonlyModal",
                 "data-interaction-item-matcher-modal=\"true\"",
