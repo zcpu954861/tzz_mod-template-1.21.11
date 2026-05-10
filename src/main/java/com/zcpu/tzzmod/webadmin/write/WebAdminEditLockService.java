@@ -22,6 +22,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
     public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
     public static final String TARGET_ACTION_RELAY_ACTIONS = "action_relay_actions";
+    public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
@@ -498,6 +499,9 @@ public final class WebAdminEditLockService {
         if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
             return "Action Relay Action 列表";
         }
+        if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
+            return "交互物品匹配";
+        }
         if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
             return "频道显示信息";
         }
@@ -520,7 +524,8 @@ public final class WebAdminEditLockService {
         return TARGET_DEVICE_METADATA.equals(safeTargetType)
                 || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
                 || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
-                || TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType);
+                || TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)
+                || TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType);
     }
 
     private static WebAdminOperationType operationTypeForTarget(String targetType) {
@@ -536,6 +541,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS;
+        }
+        if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_ITEM_MATCHER;
         }
         if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CHANNEL_METADATA;

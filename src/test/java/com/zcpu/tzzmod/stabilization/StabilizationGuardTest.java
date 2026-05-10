@@ -49,6 +49,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminInteractionItemMatcherUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
@@ -62,6 +63,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
@@ -123,6 +125,7 @@ public final class StabilizationGuardTest {
         testWebAdminSelectionFoundation();
         testWebAdminLifecycleFoundation();
         testWebAdminPhysicalDeviceActionRelayFoundation();
+        testWebAdminInteractionItemMatcherEditing();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -2348,6 +2351,167 @@ public final class StabilizationGuardTest {
         return entry;
     }
 
+    private static void testWebAdminInteractionItemMatcherEditing() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_INTERACTION_ITEM_MATCHER_7_8_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String matcherService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminInteractionItemMatcherService.java"), StandardCharsets.UTF_8);
+        String matcherRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminInteractionItemMatcherUpdateRequest.java"), StandardCharsets.UTF_8);
+        String deviceStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceStore.java"), StandardCharsets.UTF_8);
+        String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String writeFoundation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminWriteFoundationService.java"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendAssets.appJs();
+
+        for (String marker : List.of(
+                "7.8 WebAdmin Interaction Item Matcher Editing",
+                "virtual_block_device",
+                "7.8 Step 1 当前实现内容",
+                "不做 itemSubmit",
+                "不做 consume",
+                "不做 ConditionEngine",
+                "不使用 raw JSON textarea"
+        )) {
+            requireContains(context, marker, "7.8 current context marker present: " + marker);
+        }
+        requireFalse(context.contains("尚未实现 interaction item matcher 编辑闭环"),
+                "7.8 context no longer claims the matcher editing loop is unimplemented after Step 1 implementation");
+
+        WebAdminInteractionItemMatcherUpdateRequest good = new WebAdminInteractionItemMatcherUpdateRequest();
+        good.enabled = Boolean.TRUE;
+        good.templateItemId = "minecraft:diamond";
+        good.countMode = ContainerItemCountMode.AT_LEAST.id();
+        good.requiredCount = 2;
+        good.matchDamage = Boolean.FALSE;
+        good.matchCustomName = Boolean.TRUE;
+        good.templateCustomName = "Access Key";
+        good.matchLore = Boolean.TRUE;
+        good.templateLore = List.of("Line A", "Line B");
+        good.interactionItemSource = InteractionItemSource.MAIN_HAND;
+        good.interactionItemVanillaPolicy = InteractionItemVanillaPolicy.REQUIRE_ITEM_MATCH;
+        requireTrue(WebAdminInteractionItemMatcherService.validateRequest(good).isEmpty(),
+                "7.8 interaction item matcher accepts ordinary item id/count/name/lore configuration");
+
+        WebAdminInteractionItemMatcherUpdateRequest badItem = new WebAdminInteractionItemMatcherUpdateRequest();
+        badItem.enabled = Boolean.TRUE;
+        badItem.templateItemId = "diamond";
+        badItem.countMode = ContainerItemCountMode.AT_LEAST.id();
+        badItem.requiredCount = 1;
+        badItem.interactionItemSource = InteractionItemSource.MAIN_HAND;
+        badItem.interactionItemVanillaPolicy = InteractionItemVanillaPolicy.ALLOW;
+        requireFalse(WebAdminInteractionItemMatcherService.validateRequest(badItem).isEmpty(),
+                "7.8 interaction item matcher validates namespace:path item ids");
+
+        WebAdminInteractionItemMatcherUpdateRequest forbiddenSource = new WebAdminInteractionItemMatcherUpdateRequest();
+        forbiddenSource.enabled = Boolean.TRUE;
+        forbiddenSource.templateItemId = "minecraft:diamond";
+        forbiddenSource.countMode = ContainerItemCountMode.AT_LEAST.id();
+        forbiddenSource.requiredCount = 1;
+        forbiddenSource.interactionItemSource = InteractionItemSource.INVENTORY_CONTAINS;
+        forbiddenSource.interactionItemVanillaPolicy = InteractionItemVanillaPolicy.ALLOW;
+        requireFalse(WebAdminInteractionItemMatcherService.validateRequest(forbiddenSource).isEmpty(),
+                "7.8 interaction item matcher rejects inventory/equipment sources for this phase");
+
+        SignalDeviceData before = fullDevice();
+        ItemStackMatcherData nextMatcher = new ItemStackMatcherData(
+                true,
+                "minecraft:emerald",
+                4,
+                ContainerItemCountMode.EXACTLY.id(),
+                4,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                "",
+                List.of(),
+                "",
+                "",
+                "minecraft:emerald x4",
+                100L,
+                200L
+        ).normalized();
+        SignalDeviceData updated = SignalDeviceStore.withInteractionItemMatcherForWebAdmin(before, nextMatcher, true).normalized();
+        requireEquals(before.itemSubmitEnabled(), updated.itemSubmitEnabled(), "7.8 matcher update preserves itemSubmit enabled flag");
+        requireEquals(before.itemSubmitRequirements().size(), updated.itemSubmitRequirements().size(), "7.8 matcher update preserves itemSubmit requirements");
+        requireEquals(before.interactChannel(), updated.interactChannel(), "7.8 matcher update preserves interaction channel");
+        requireEquals(before.interactionCooldownTicks(), updated.interactionCooldownTicks(), "7.8 matcher update preserves interaction cooldown");
+        requireEquals("minecraft:emerald", updated.interactionItemMatcher().templateItemId(), "7.8 matcher update changes only matcher template item");
+        requireFalse(WebAdminInteractionItemMatcherService.fingerprintFor(before).equals(WebAdminInteractionItemMatcherService.fingerprintFor(updated)),
+                "7.8 matcher fingerprint changes when editable matcher fields change");
+
+        for (String marker : List.of(
+                "/api/webadmin/interaction-item-matcher/",
+                "handleInteractionItemMatcher",
+                "WebAdminInteractionItemMatcherUpdateRequest",
+                "WebAdminInteractionItemMatcherService"
+        )) {
+            requireContains(webServer + matcherRequest, marker, "7.8 matcher API/server marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE",
+                "WebAdminOperationType.EDIT_ITEM_MATCHER",
+                "TARGET_INTERACTION_ITEM_MATCHER",
+                "request.deviceId = device.id();",
+                "unsupported_existing_matcher",
+                "expectedFingerprint",
+                "fingerprintFor",
+                "validateRequest",
+                "SignalDeviceStore.withInteractionItemMatcherForWebAdmin",
+                "String templateCustomData = previous.templateCustomData();",
+                "String templateComponents = previous.templateComponents();",
+                "CONFIG_CHANGED",
+                "DEVICE_CONFIG_CHANGED",
+                "WRITE_AUDIT_APPENDED",
+                "successChannel",
+                "failChannel",
+                "consumeEnabled()",
+                "templateComponents"
+        )) {
+            requireContains(matcherService, marker, "7.8 matcher service marker present: " + marker);
+        }
+        requireContains(deviceStore, "withInteractionItemMatcherForWebAdmin", "7.8 store exposes scoped matcher update helper");
+        requireContains(editLockService, "TARGET_INTERACTION_ITEM_MATCHER", "7.8 matcher edit lock target exists");
+        requireContains(writeFoundation, "interactionItemMatcherWriteEnabled", "7.8 write foundation exposes matcher capability");
+
+        for (String marker : List.of(
+                "data-vbd-matcher-summary-card=\"true\"",
+                "openInteractionItemMatcherModal",
+                "openInteractionItemMatcherReadonlyModal",
+                "data-interaction-item-matcher-modal=\"true\"",
+                "data-interaction-item-matcher-config-modal-section=\"true\"",
+                "data-matcher-enabled=\"true\"",
+                "data-matcher-template-item-id=\"true\"",
+                "data-matcher-count-mode=\"true\"",
+                "data-matcher-required-count=\"true\"",
+                "data-matcher-match-damage=\"true\"",
+                "data-matcher-match-custom-name=\"true\"",
+                "data-matcher-match-lore=\"true\"",
+                "data-matcher-source=\"true\"",
+                "data-matcher-source-readonly=\"true\"",
+                "data-matcher-vanilla-policy=\"true\"",
+                "data-matcher-vanilla-policy-readonly=\"true\"",
+                "saveInteractionItemMatcher",
+                "interactionItemMatcherDirty",
+                "modalSnapshot(kind,draft)",
+                "syncModalDraftBeforeClose('interaction_item_matcher'",
+                "interaction_item_matcher",
+                "handleInteractionItemMatcherRealtimeEvent",
+                "maybeReleaseInteractionItemMatcherEditForRoute",
+                "data-interaction-item-matcher-no-raw-json=\"true\""
+        )) {
+            requireContains(js + matcherService, marker, "7.8 matcher frontend/security marker present: " + marker);
+        }
+        requireFalse(js.contains("itemSubmitEditor") || js.contains("saveItemSubmit") || js.contains("consumeEditor")
+                        || js.contains("inventoryMatcherEditor") || js.contains("equipmentMatcherEditor")
+                        || js.contains("conditionEngineEditor") || js.contains("successFailPathGraph"),
+                "7.8 matcher stage does not expose itemSubmit/consume/inventory/equipment/ConditionEngine/path graph editors");
+        requireFalse(js.contains("raw-json-textarea") || js.contains("matcher-json") || js.contains("data-component-json"),
+                "7.8 matcher UI does not expose raw JSON/data component editors");
+    }
+
     private static void testWebAdminWriteFoundation() throws Exception {
         WebAdminPermissionService permissions = new WebAdminPermissionService();
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.READ, true);
@@ -2996,6 +3160,7 @@ public final class StabilizationGuardTest {
         requireContains(js, "/api/webadmin/device-basic-config/", "frontend exposes scoped device basic config write endpoint");
         requireContains(js, "/api/webadmin/device-extended-config/", "frontend exposes scoped device extended config write endpoint");
         requireContains(js, "/api/webadmin/action-relay-actions/", "frontend exposes scoped action relay action list endpoint");
+        requireContains(js, "/api/webadmin/interaction-item-matcher/", "frontend exposes scoped VBD interaction item matcher endpoint");
         requireContains(js, "/api/webadmin/channel-metadata?channel=", "frontend exposes scoped channel metadata write endpoint");
         requireContains(js, "/api/webadmin/signal-listener-basic-config/", "frontend exposes scoped signal listener basic config endpoint");
         requireContains(js, "/api/webadmin/virtual-block-devices/", "frontend exposes scoped VBD lifecycle endpoint");
@@ -3033,6 +3198,7 @@ public final class StabilizationGuardTest {
         requireContains(js, "device_basic_config", "frontend uses distinct basic config edit lock target");
         requireContains(js, "device_extended_config", "frontend uses distinct extended config edit lock target");
         requireContains(js, "action_relay_actions", "frontend uses distinct action relay action list edit lock target");
+        requireContains(js, "interaction_item_matcher", "frontend uses distinct interaction item matcher edit lock target");
         requireContains(js, "channel_metadata", "frontend uses distinct channel metadata edit lock target");
         requireContains(js, "signal_listener_basic_config", "frontend uses distinct signal listener edit lock target");
         requireContains(js, "expectedVersion", "frontend sends expectedVersion for metadata writes");
@@ -3062,7 +3228,7 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("fetch('/api/actions', {method:'PATCH'"), "frontend does not expose action write PATCH");
         requireFalse(js.contains("fetch('/api/regions', {method:'PATCH'"), "frontend does not expose region write PATCH");
         requireFalse(js.contains("fetch('/api/webadmin/users', {method:'PATCH'"), "frontend does not expose user write PATCH");
-        requireFalse(js.contains("saveItemSubmit") || js.contains("saveMatcher"), "frontend does not expose itemSubmit or matcher save flow");
+        requireFalse(js.contains("saveItemSubmit"), "frontend does not expose itemSubmit save flow");
         requireFalse(js.contains("saveRegion") || js.contains("saveSettings"), "frontend does not expose region/settings save flow");
         requireFalse(js.contains("saveAction(") || js.contains("saveActionTemplate"), "frontend still avoids generic action editor save flow");
         requireContains(js, "data-danger-confirm-modal=\"true\"", "supported lifecycle deletes use dangerous confirm modal");

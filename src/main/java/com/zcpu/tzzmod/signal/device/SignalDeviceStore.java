@@ -331,6 +331,27 @@ public final class SignalDeviceStore {
         return normalized;
     }
 
+    public static SignalDeviceData withInteractionItemMatcherForWebAdmin(
+            SignalDeviceData device,
+            ItemStackMatcherData matcher,
+            boolean enabled
+    ) {
+        if (device == null) {
+            return null;
+        }
+        SignalDeviceData normalized = device.normalized();
+        if (!SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(normalized.type())) {
+            return normalized;
+        }
+        return withInteractionItemMatcher(
+                normalized,
+                enabled,
+                matcher == null ? ItemStackMatcherData.empty() : matcher,
+                normalized.lastInteractionItemMatched(),
+                normalized.lastInteractionItemResult()
+        );
+    }
+
     private static SignalDeviceData applyVirtualExtendedPatch(SignalDeviceData existing, ExtendedConfigPatch patch) {
         SignalDeviceData updated = existing.normalized();
         if (patch.updateInteractChannel()) {
