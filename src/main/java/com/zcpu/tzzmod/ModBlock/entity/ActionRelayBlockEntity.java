@@ -152,6 +152,22 @@ public class ActionRelayBlockEntity extends BlockEntity {
         markDirty();
     }
 
+    public void replaceActions(List<ActionConfig> newActions) {
+        if (newActions == null || newActions.isEmpty()) {
+            actions = List.of();
+            markDirty();
+            return;
+        }
+        List<ActionConfig> copy = new ArrayList<>();
+        for (ActionConfig action : newActions) {
+            if (action != null) {
+                copy.add(normalizeAction(action));
+            }
+        }
+        actions = List.copyOf(copy);
+        markDirty();
+    }
+
     public long remainingCooldownTicks(long currentGameTime) {
         if (cooldownTicks <= 0 || lastRunGameTime <= 0L) {
             return 0L;

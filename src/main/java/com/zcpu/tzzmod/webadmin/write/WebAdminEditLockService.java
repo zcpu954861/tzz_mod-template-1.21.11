@@ -21,6 +21,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_METADATA = "device_metadata";
     public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
     public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
+    public static final String TARGET_ACTION_RELAY_ACTIONS = "action_relay_actions";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
@@ -288,7 +289,7 @@ public final class WebAdminEditLockService {
             return WebAdminWriteResult.validationFailed(target, java.util.List.of(new WebAdminValidationError(
                     "targetType",
                     "unsupported_target",
-                    "当前阶段只支持 WebAdmin 设备显示信息编辑锁。",
+                    "当前阶段只支持已接入 WebAdmin 安全写链路的编辑锁目标。",
                     targetType
             )));
         }
@@ -495,7 +496,8 @@ public final class WebAdminEditLockService {
         String safeTargetType = normalizeTargetType(targetType);
         return TARGET_DEVICE_METADATA.equals(safeTargetType)
                 || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
-                || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType);
+                || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
+                || TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType);
     }
 
     private static WebAdminOperationType operationTypeForTarget(String targetType) {
@@ -508,6 +510,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG;
+        }
+        if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS;
         }
         if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CHANNEL_METADATA;

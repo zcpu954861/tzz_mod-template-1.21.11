@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
@@ -17,6 +18,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -59,6 +61,7 @@ public final class WebAdminServer {
     private final WebAdminDeviceMetadataService deviceMetadataService = new WebAdminDeviceMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
@@ -214,6 +217,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/device-extended-config/")) {
                 handleDeviceExtendedConfig(exchange, auth, path, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/action-relay-actions/")) {
+                handleActionRelayActions(exchange, auth, path, method);
                 return;
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
@@ -512,6 +519,44 @@ public final class WebAdminServer {
                 request,
                 csrfToken,
                 sameOrigin
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleActionRelayActions(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/action-relay-actions/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Action Relay 设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            Map<String, Object> actions = actionRelayActionsService.actionsFor(minecraftServer, auth.user, auth.session, deviceId);
+            if (actions == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Action Relay 设备不存在或引用不唯一。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, actions);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminActionRelayActionsUpdateRequest request = readJson(exchange, WebAdminActionRelayActionsUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminActionRelayActionsUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        WebAdminWriteResult result = actionRelayActionsService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                deviceId,
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
         );
         WebAdminJsonResponse.ok(exchange, result);
     }
@@ -839,7 +884,7 @@ public final class WebAdminServer {
     }
 
     private static String decodePathSegment(String value) {
-        return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
+        return URLDecoder.decode((value == null ? "" : value).replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
     private static Map<String, String> queryParams(HttpExchange exchange) {

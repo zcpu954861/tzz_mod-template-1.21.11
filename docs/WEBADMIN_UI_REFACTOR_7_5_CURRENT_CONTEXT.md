@@ -41,6 +41,14 @@
 
 7.6 第二阶段仍不做 interaction matcher、itemSubmit、consume / inventory / equipment、Action list 完整编辑、ConditionEngine、Scratch-like editor、GameController、phone/task/blocking/password 联动、region 编辑或 Figma 修改。
 
+### 2026-05-10 7.7 独立上下文
+
+7.7 WebAdmin Signal Physical Device Config 已迁出独立 current context：
+
+`docs/WEBADMIN_SIGNAL_PHYSICAL_DEVICE_CONFIG_7_7_CURRENT_CONTEXT.md`
+
+后续 7.7 任务以该文件和当前用户提示为准，不再把 7.7 内容继续堆进 7.5 context。
+
 Step 1、Step 2、Step 2.5、Step 3 和 Step 4 已完成代码层落地。当前 Step 5 已补强 route / render / realtime 稳定化守卫；Step 5.5 只同步当前状态与 7.6 规划建议，不进入 7.6 代码实现。
 
 Step 1 已落地 3 个代表页面：

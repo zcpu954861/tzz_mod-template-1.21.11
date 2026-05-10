@@ -204,42 +204,50 @@ public final class SignalDeviceStore {
             replaceOrAdd(state, updated);
             state.markDirty();
             publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
-        } else {
+        } else if (isPhysicalSignalDeviceType(existing.type())) {
             ServerWorld world = getDeviceWorld(server, existing);
-            if (world == null) {
-                return null;
+            if (world != null) {
+                BlockPos pos = new BlockPos(existing.x(), existing.y(), existing.z());
+                if (SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(existing.type())) {
+                    SignalEmitterBlockEntity emitter = getLoadedEmitter(server, existing);
+                    if (emitter != null) {
+                        emitter.setEnabled(enabled);
+                        emitter.setChannel(normalizedChannel);
+                        updated = updateChannel(world, pos, emitter);
+                    }
+                } else if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(existing.type())) {
+                    SignalReceiverBlockEntity receiver = getLoadedReceiver(server, existing);
+                    if (receiver != null) {
+                        receiver.setEnabled(enabled);
+                        receiver.setChannel(normalizedChannel);
+                        updated = updateChannel(world, pos, receiver);
+                    }
+                } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(existing.type())) {
+                    ActionRelayBlockEntity relay = getLoadedActionRelay(server, existing);
+                    if (relay != null) {
+                        relay.setEnabled(enabled);
+                        relay.setChannel(normalizedChannel);
+                        updated = updateChannel(world, pos, relay);
+                    }
+                }
             }
-            BlockPos pos = new BlockPos(existing.x(), existing.y(), existing.z());
-            if (SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(existing.type())) {
-                SignalEmitterBlockEntity emitter = getLoadedEmitter(server, existing);
-                if (emitter == null) {
-                    return null;
-                }
-                emitter.setEnabled(enabled);
-                emitter.setChannel(normalizedChannel);
-                updated = updateChannel(world, pos, emitter);
-            } else if (SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(existing.type())) {
-                SignalReceiverBlockEntity receiver = getLoadedReceiver(server, existing);
-                if (receiver == null) {
-                    return null;
-                }
-                receiver.setEnabled(enabled);
-                receiver.setChannel(normalizedChannel);
-                updated = updateChannel(world, pos, receiver);
-            } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(existing.type())) {
-                ActionRelayBlockEntity relay = getLoadedActionRelay(server, existing);
-                if (relay == null) {
-                    return null;
-                }
-                relay.setEnabled(enabled);
-                relay.setChannel(normalizedChannel);
-                updated = updateChannel(world, pos, relay);
+            if (updated == null) {
+                updated = withBasicConfigForWebAdmin(existing, enabled, normalizedChannel);
+                replaceOrAdd(state, updated);
+                state.markDirty();
+                publishDeviceChange(WebAdminRealtimeEventType.DEVICE_CHANGED, updated);
             }
         }
         if (updated != null) {
             state.flushDirty(true, currentGameTime(server));
         }
         return updated == null ? null : updated.normalized();
+    }
+
+    private static boolean isPhysicalSignalDeviceType(String type) {
+        return SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(type)
+                || SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(type)
+                || SignalDeviceData.TYPE_ACTION_RELAY.equals(type);
     }
 
     public static SignalDeviceData withBasicConfigForWebAdmin(SignalDeviceData device, boolean enabled, String channel) {
@@ -2111,6 +2119,13 @@ public final class SignalDeviceStore {
             }
         }
 
+        List<SignalDeviceData> positionMatches = findBySourcePosition(state, query);
+        if (!positionMatches.isEmpty()) {
+            return positionMatches.size() == 1
+                    ? ResolveResult.unique(positionMatches.getFirst())
+                    : ResolveResult.ambiguous(positionMatches);
+        }
+
         String shortQuery = query.endsWith("...") ? query.substring(0, query.length() - 3) : query;
         List<SignalDeviceData> matches = new ArrayList<>();
         for (SignalDeviceData device : state.devices) {
@@ -3399,6 +3414,50 @@ public final class SignalDeviceStore {
         return null;
     }
 
+    private static List<SignalDeviceData> findBySourcePosition(State state, String deviceRef) {
+        SourcePositionRef ref = parseSourcePositionRef(deviceRef);
+        if (ref == null) {
+            return List.of();
+        }
+        List<SignalDeviceData> matches = new ArrayList<>();
+        for (SignalDeviceData device : state.devices) {
+            SignalDeviceData normalized = device.normalized();
+            if (normalized.dimension().equals(ref.dimension())
+                    && normalized.x() == ref.x()
+                    && normalized.y() == ref.y()
+                    && normalized.z() == ref.z()) {
+                matches.add(normalized);
+            }
+        }
+        return List.copyOf(matches);
+    }
+
+    private static SourcePositionRef parseSourcePositionRef(String deviceRef) {
+        String value = cleanUserText(deviceRef);
+        if (value.startsWith(SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE + ":")) {
+            value = value.substring((SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE + ":").length());
+        }
+        int at = value.lastIndexOf('@');
+        if (at <= 0 || at + 1 >= value.length()) {
+            return null;
+        }
+        String dimension = value.substring(0, at).trim();
+        String[] parts = value.substring(at + 1).split(",", -1);
+        if (dimension.isBlank() || parts.length != 3) {
+            return null;
+        }
+        try {
+            return new SourcePositionRef(
+                    dimension,
+                    Integer.parseInt(parts[0].trim()),
+                    Integer.parseInt(parts[1].trim()),
+                    Integer.parseInt(parts[2].trim())
+            );
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private static State getState(MinecraftServer server) {
         return CACHE.computeIfAbsent(server, SignalDeviceStore::load);
     }
@@ -3475,6 +3534,9 @@ public final class SignalDeviceStore {
         public boolean foundUnique() {
             return device != null && !ambiguous;
         }
+    }
+
+    private record SourcePositionRef(String dimension, int x, int y, int z) {
     }
 
     private static final class State {
