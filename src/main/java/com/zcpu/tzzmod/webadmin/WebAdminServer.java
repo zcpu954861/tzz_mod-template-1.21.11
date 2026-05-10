@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminInteractionItemMatcherUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
@@ -23,6 +24,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
@@ -67,6 +69,7 @@ public final class WebAdminServer {
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService = new WebAdminDeviceBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminDeviceExtendedConfigService deviceExtendedConfigService = new WebAdminDeviceExtendedConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminInteractionItemMatcherService interactionItemMatcherService = new WebAdminInteractionItemMatcherService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
@@ -226,6 +229,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/action-relay-actions/")) {
                 runOnServerThread(() -> handleActionRelayActions(exchange, auth, path, method));
+                return;
+            }
+            if (path.startsWith("/api/webadmin/interaction-item-matcher/")) {
+                runOnServerThread(() -> handleInteractionItemMatcher(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
@@ -586,7 +593,8 @@ public final class WebAdminServer {
         return WebAdminEditLockService.TARGET_DEVICE_METADATA.equals(safeTargetType)
                 || WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
                 || WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
-                || WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType);
+                || WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)
+                || WebAdminEditLockService.TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType);
     }
 
     private void handleActionRelayActions(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
@@ -615,6 +623,44 @@ public final class WebAdminServer {
         }
         request.deviceId = deviceId;
         WebAdminWriteResult result = actionRelayActionsService.update(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                deviceId,
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
+        );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleInteractionItemMatcher(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/interaction-item-matcher/";
+        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "virtual_block_device 设备 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("GET")) {
+            Map<String, Object> config = interactionItemMatcherService.configFor(minecraftServer, auth.user, auth.session, deviceId);
+            if (config == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "virtual_block_device 不存在或引用不唯一。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, config);
+            return;
+        }
+        if (!method.equalsIgnoreCase("PATCH")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
+            return;
+        }
+        WebAdminInteractionItemMatcherUpdateRequest request = readJson(exchange, WebAdminInteractionItemMatcherUpdateRequest.class);
+        if (request == null) {
+            request = new WebAdminInteractionItemMatcherUpdateRequest();
+        }
+        request.deviceId = deviceId;
+        WebAdminWriteResult result = interactionItemMatcherService.update(
                 minecraftServer,
                 auth.user,
                 auth.session,
