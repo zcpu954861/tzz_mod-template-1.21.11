@@ -22,6 +22,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_BASIC_CONFIG = "device_basic_config";
     public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
     public static final String TARGET_ACTION_RELAY_ACTIONS = "action_relay_actions";
+    public static final String TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS = "virtual_block_device_triggers";
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
@@ -499,6 +500,9 @@ public final class WebAdminEditLockService {
         if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
             return "Action Relay Action 列表";
         }
+        if (TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)) {
+            return "VBD 原生触发配置";
+        }
         if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
             return "交互物品匹配";
         }
@@ -525,6 +529,7 @@ public final class WebAdminEditLockService {
                 || TARGET_DEVICE_BASIC_CONFIG.equals(safeTargetType)
                 || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
                 || TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)
+                || TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)
                 || TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType);
     }
 
@@ -541,6 +546,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS;
+        }
+        if (TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS;
         }
         if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_ITEM_MATCHER;

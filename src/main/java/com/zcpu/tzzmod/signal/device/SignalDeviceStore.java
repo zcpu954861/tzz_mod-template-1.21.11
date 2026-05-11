@@ -30,6 +30,36 @@ public final class SignalDeviceStore {
     private SignalDeviceStore() {
     }
 
+    public record WebAdminNativeTriggerPatch(
+            boolean redstoneEnabled,
+            String channel,
+            String offChannel,
+            String mode,
+            boolean conditionEnabled,
+            String conditionBlockId,
+            Map<String, String> conditionProperties,
+            String conditionRaw,
+            String conditionMode,
+            boolean currentConditionMatched,
+            String conditionResult,
+            boolean interactionEnabled,
+            String interactChannel,
+            int interactionCooldownTicks,
+            boolean containerOpenEnabled,
+            String containerOpenChannel,
+            boolean containerCloseEnabled,
+            String containerCloseChannel,
+            boolean containerChangeEnabled,
+            String containerChangeChannel,
+            int containerCooldownTicks,
+            int containerChangeCheckIntervalTicks,
+            String containerFingerprint
+    ) {
+        public WebAdminNativeTriggerPatch {
+            conditionProperties = conditionProperties == null ? Map.of() : Map.copyOf(conditionProperties);
+        }
+    }
+
     public static synchronized List<SignalDeviceData> getSnapshot(MinecraftServer server) {
         State state = getState(server);
         refreshLoadedDevices(server, state);
@@ -1132,6 +1162,96 @@ public final class SignalDeviceStore {
                 existing.lastContainerPlayerUuid(),
                 existing.lastContainerResult(),
                 existing.lastContainerEventType()
+        );
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
+        return updated;
+    }
+
+    public static synchronized SignalDeviceData updateVirtualNativeTriggersForWebAdmin(
+            ServerWorld world,
+            BlockPos pos,
+            WebAdminNativeTriggerPatch patch
+    ) {
+        if (world == null || pos == null || patch == null) {
+            return null;
+        }
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(existing.type())) {
+            return null;
+        }
+
+        SignalDeviceData updated = withVirtualSettings(
+                existing,
+                SignalChannel.normalize(patch.channel()),
+                SignalChannel.normalize(patch.offChannel()),
+                patch.redstoneEnabled()
+                        ? VirtualBlockDeviceMode.normalize(patch.mode())
+                        : VirtualBlockDeviceMode.REDSTONE_DISABLED.id(),
+                existing.enabled()
+        );
+        updated = withCondition(
+                updated,
+                patch.conditionEnabled(),
+                safe(patch.conditionBlockId()),
+                patch.conditionProperties(),
+                safe(patch.conditionRaw()),
+                BlockStateConditionMode.normalize(patch.conditionMode()),
+                patch.currentConditionMatched(),
+                world.getTime(),
+                safe(patch.conditionResult())
+        );
+        updated = withInteraction(
+                updated,
+                patch.interactionEnabled(),
+                SignalChannel.normalize(patch.interactChannel()),
+                Math.max(0, patch.interactionCooldownTicks()),
+                updated.lastInteractionGameTime(),
+                updated.lastInteractionWallTimeMillis(),
+                updated.lastInteractionPlayerName(),
+                updated.lastInteractionPlayerUuid(),
+                updated.lastInteractionResult(),
+                updated.lastInteractionHand(),
+                updated.lastInteractionSide()
+        );
+        boolean nextContainerEnabled = patch.containerOpenEnabled() || patch.containerCloseEnabled() || patch.containerChangeEnabled();
+        String nextOpen = patch.containerOpenEnabled()
+                ? SignalChannel.normalize(patch.containerOpenChannel())
+                : (nextContainerEnabled ? "" : SignalChannel.normalize(patch.containerOpenChannel()));
+        String nextClose = patch.containerCloseEnabled()
+                ? SignalChannel.normalize(patch.containerCloseChannel())
+                : (nextContainerEnabled ? "" : SignalChannel.normalize(patch.containerCloseChannel()));
+        String nextChange = patch.containerChangeEnabled()
+                ? SignalChannel.normalize(patch.containerChangeChannel())
+                : (nextContainerEnabled ? "" : SignalChannel.normalize(patch.containerChangeChannel()));
+        long checkTime = patch.containerChangeEnabled() && !safe(patch.containerFingerprint()).isBlank()
+                ? world.getTime()
+                : updated.lastContainerCheckGameTime();
+        String fingerprint = patch.containerChangeEnabled() && !safe(patch.containerFingerprint()).isBlank()
+                ? safe(patch.containerFingerprint())
+                : updated.lastContainerFingerprint();
+        updated = withContainer(
+                updated,
+                nextContainerEnabled,
+                nextOpen,
+                nextClose,
+                nextChange,
+                Math.max(0, patch.containerCooldownTicks()),
+                Math.max(1, patch.containerChangeCheckIntervalTicks()),
+                checkTime,
+                fingerprint,
+                updated.lastContainerOpenGameTime(),
+                updated.lastContainerOpenWallTimeMillis(),
+                updated.lastContainerCloseGameTime(),
+                updated.lastContainerCloseWallTimeMillis(),
+                updated.lastContainerChangeGameTime(),
+                updated.lastContainerChangeWallTimeMillis(),
+                updated.lastContainerPlayerName(),
+                updated.lastContainerPlayerUuid(),
+                updated.lastContainerResult(),
+                updated.lastContainerEventType()
         );
         replaceOrAdd(state, updated);
         state.markDirty();
@@ -3631,6 +3751,10 @@ public final class SignalDeviceStore {
             return "";
         }
         return id.substring(atIndex + 1);
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 
     public static final class DataFile {

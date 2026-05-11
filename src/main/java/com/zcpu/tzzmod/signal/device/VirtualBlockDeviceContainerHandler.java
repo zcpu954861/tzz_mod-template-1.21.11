@@ -144,7 +144,7 @@ public final class VirtualBlockDeviceContainerHandler {
             boolean hasChangeChannel = device.containerEnabled()
                     && !device.containerChangeChannel().isBlank()
                     && SignalChannel.isValid(device.containerChangeChannel());
-            boolean hasItemConditions = hasEnabledItemConditions(device.itemConditions());
+            boolean hasItemConditions = device.containerEnabled() && hasEnabledItemConditions(device.itemConditions());
             if (!device.enabled() || (!hasChangeChannel && !hasItemConditions)) {
                 continue;
             }

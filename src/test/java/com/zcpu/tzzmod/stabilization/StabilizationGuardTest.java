@@ -1162,7 +1162,7 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/selection/cancel')) return { success:true, targetType:'OBJECT_SELECTION', targetId:'sel-1', changed:true, message:'选择已取消。', data:{ selection:{ selectionId:'sel-1', targetPlayerName:'Owner', status:'cancelled', channel:'test.channel' } } };
                   if (url.startsWith('/api/webadmin/selection/status')) return { active:true, selectionId:'sel-1', status:'active', purpose:'create_virtual_block_device', targetPlayerName:'Owner', channel:'test.channel' };
                   if (url.startsWith('/api/webadmin/online-players')) return [{ name:'Owner', uuid:'00000000-0000-0000-0000-000000000001' }, { name:'Builder', uuid:'00000000-0000-0000-0000-000000000002' }];
-                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:true, writeApiEnabled:false, p1NoNativeTriggerWriteApi:true, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], activeTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / 受电状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP1:['nativeTriggerWriteApi','itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea'] };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:false, writeApiEnabled:true, nativeTriggerWriteApiEnabled:true, expectedFingerprint:'native-fp', lockStatus:{ locked:false }, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], allowedRedstoneModes:['redstone_rising','redstone_falling','redstone_both'], allowedConditionModes:['condition_enter','condition_exit','condition_both'], activeTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / 受电状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,currentPoweredExpression:'currentPowered = blockStatePowered || receivedPowerLevel > 0',lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,serverValidatesBoundBlockProperties:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],itemConditionsReadOnly:true,templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP2:['itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea','containerItemTemplateGui'] };
                   if (url.startsWith('/api/webadmin/virtual-block-devices/')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE', targetId:'vdev-1', changed:true, message:'虚拟方块设备已删除 / 解绑，世界方块未被破坏。', data:{ deviceId:'vdev-1', routeTarget:'#/virtual-block-devices' } };
                   if (url === '/api/webadmin/signal-listeners') return { success:true, targetType:'SIGNAL_LISTENER', targetId:'new-listener', changed:true, message:'Signal Listener 已创建。', data:{ listenerId:'new-listener', routeTarget:'#/listeners/new-listener?returnTo=%23%2Flisteners' } };
                   if (url.startsWith('/api/webadmin/signal-listeners/')) return { success:true, targetType:'SIGNAL_LISTENER', targetId:'test-listener', changed:true, message:'Signal Listener 已删除。', data:{ listenerId:'test-listener', routeTarget:'#/listeners' } };
@@ -2529,7 +2529,7 @@ public final class StabilizationGuardTest {
         requireContains(js, "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"", "unified config modal opens matcher editing from the native trigger interaction context");
         requireContains(js, "data-vbd-native-trigger-matcher-disabled-warning=\"true\"", "matcher configured while right-click trigger disabled is warned inside interaction summary");
         requireContains(js, "data-vbd-native-trigger-interaction-matcher-entry=\"true\"", "7.8 matcher entry remains available from the 7.9 right-click trigger context");
-        requireContains(js, "interactionItemMatcherForm(detail,appState.interactionItemMatcherEdit,true)", "unified device config modal reuses the same conditional matcher UI");
+        requireContains(js, "interactionItemMatcherForm(detail,matcher,true)", "unified device config modal reuses the same conditional matcher UI inside the right-click native trigger section");
         requireContains(js, "document.getElementById('matcher-template-item-id')?.value ?? v.templateItemId", "hidden matcher fields preserve draft values when collapsed");
         requireContains(js, "document.getElementById('matcher-template-lore'))v.templateLore", "hidden matcher lore preserves draft values when collapsed");
         requireContains(js, "interactionItemMatcherPatchBody(draft)", "matcher patch body stays scoped to ordinary editable fields");
@@ -2557,6 +2557,7 @@ public final class StabilizationGuardTest {
         String manual = Files.readString(root.resolve("docs/test/测试_7.9_WebAdmin虚拟方块设备原生触发配置P1验收.md"), StandardCharsets.UTF_8);
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String nativeTriggerRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
         String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
         String js = WebAdminFrontendAssets.appJs();
         String css = WebAdminFrontendStyles.appCss();
@@ -2576,7 +2577,11 @@ public final class StabilizationGuardTest {
                 "不做 consume",
                 "不做 ConditionEngine",
                 "不做成功 / 失败路径图",
-                "不新增 native trigger 持久化写 API",
+                "VBD 原生触发普通配置完整编辑",
+                "服务端二次校验 BlockState 属性和值",
+                "virtual_block_device_triggers",
+                "redstone_disabled",
+                "不会误关右键交互或容器触发",
                 "Container Change Template GUI",
                 "不在 P1 / P2 普通 Web 表单里硬做复杂物品模板"
         )) {
@@ -2620,13 +2625,15 @@ public final class StabilizationGuardTest {
                 "/native-triggers",
                 "handleVirtualBlockDeviceNativeTriggers",
                 "virtualBlockDeviceNativeTriggerService.overview",
+                "virtualBlockDeviceNativeTriggerService.update",
                 "method.equalsIgnoreCase(\"GET\")",
-                "7.9 P1 原生触发配置接口只支持 GET"
+                "method.equalsIgnoreCase(\"PATCH\")",
+                "该接口只支持 GET / PATCH"
         )) {
-            requireContains(webServer, marker, "7.9 P1 native trigger readonly route marker present: " + marker);
+            requireContains(webServer, marker, "7.9 P2 native trigger route marker present: " + marker);
         }
-        requireFalse(webServer.contains("NativeTriggerUpdateRequest") || webServer.contains("handleVirtualBlockDeviceNativeTriggerWrite"),
-                "7.9 P1 does not add native trigger write request or write handler");
+        requireContains(webServer, "WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest",
+                "7.9 P2 native trigger write request DTO is routed through WebAdminServer");
 
         for (String marker : List.of(
                 "knownChannels(server, devices, listeners, regions)",
@@ -2639,8 +2646,12 @@ public final class StabilizationGuardTest {
 
         for (String marker : List.of(
                 "SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE",
-                "writeApiEnabled\", false",
-                "p1NoNativeTriggerWriteApi",
+                "writeApiEnabled\", true",
+                "nativeTriggerWriteApiEnabled",
+                "EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
+                "expectedFingerprint",
+                "fingerprintFor(device)",
                 "redstone_powered",
                 "blockstate",
                 "right_click",
@@ -2649,15 +2660,19 @@ public final class StabilizationGuardTest {
                 "container_change",
                 "activeTriggerTypes",
                 "VirtualBlockDeviceSupport.powerState",
+                "currentPowered = blockStatePowered || receivedPowerLevel > 0",
+                "redstone_disabled",
+                "runtimeEnabled",
                 "world.isChunkLoaded(pos)",
                 "state.getProperties()",
                 "rawProperty.getValues()",
-                "BlockStateConditionParser.validateSavedCondition",
+                "BlockStateConditionParser.fromPropertiesAndValidate",
                 "interaction item matcher 是右键交互之后的条件/判定层",
+                "itemConditionsReadOnly",
                 "templateEditorPhase",
                 "7.9 P3"
         )) {
-            requireContains(nativeTriggerService, marker, "7.9 P1 native trigger service marker present: " + marker);
+            requireContains(nativeTriggerService, marker, "7.9 P2 native trigger service marker present: " + marker);
         }
 
         for (String marker : List.of(
@@ -2694,18 +2709,37 @@ public final class StabilizationGuardTest {
                 "data-vbd-native-blockstate-properties-from-bound-block=\"true\"",
                 "data-vbd-native-blockstate-allowed-values=\"true\"",
                 "data-vbd-native-trigger-config-modal-section=\"true\"",
-                "data-vbd-native-trigger-readonly=\"true\"",
-                "data-vbd-native-trigger-no-write-api=\"true\"",
+                "data-vbd-native-trigger-edit-modal=\"true\"",
+                "data-vbd-native-trigger-patch-api=\"true\"",
+                "data-vbd-native-trigger-lock-disabled=\"true\"",
+                "data-vbd-native-redstone-edit=\"true\"",
+                "data-vbd-native-blockstate-edit=\"true\"",
+                "data-vbd-native-blockstate-property-dropdown-from-bound-block=\"true\"",
+                "data-vbd-native-blockstate-allowed-values-from-property=\"true\"",
+                "data-vbd-native-interaction-edit=\"true\"",
+                "data-vbd-native-trigger-matcher-hidden-when-interaction-disabled=\"true\"",
+                "data-vbd-native-trigger-matcher-visible-inside-interaction=\"true\"",
+                "data-vbd-native-container-open-edit=\"true\"",
+                "data-vbd-native-container-close-edit=\"true\"",
+                "data-vbd-native-container-change-edit=\"true\"",
+                "data-vbd-native-container-common-edit=\"true\"",
+                "data-vbd-native-container-itemconditions-readonly=\"true\"",
+                "data-vbd-native-trigger-matcher-lock-disabled=\"true\"",
                 "data-vbd-native-trigger-no-raw-json=\"true\"",
                 "data-vbd-native-trigger-interaction-matcher-summary=\"true\"",
                 "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"",
                 "data-vbd-native-trigger-matcher-disabled-warning=\"true\"",
+                "redstoneEnabled:!!red.configured&&red.mode!=='redstone_disabled'",
+                "matcherDraftHiddenWhenInteractionDisabled",
+                "saveVbdNativeTrigger",
+                "vbdNativeTriggerPatchBody",
+                "virtual_block_device_triggers",
                 "activeVbdNativeTriggerTypes",
                 "vbdNativeTriggerConfigModalSection",
                 "vbdBlockStatePropertyList",
                 "vbdInteractionTriggerSummary"
         )) {
-            requireContains(js, marker, "7.9 P1 native trigger frontend marker present: " + marker);
+            requireContains(js, marker, "7.9 P2 native trigger frontend marker present: " + marker);
         }
         for (String marker : List.of(
                 ".wa-native-trigger-grid",
@@ -2725,10 +2759,13 @@ public final class StabilizationGuardTest {
                 "VBD detail should not inline fully expanded native trigger detail fields");
         requireFalse(css.contains(".wa-vbd-matcher-config-card"),
                 "7.9 P1 no longer keeps standalone interaction matcher summary card styling");
-        requireFalse(js.contains("saveVbdNativeTrigger") || js.contains("nativeTriggerPatchBody") || js.contains("native-trigger-json")
-                        || js.contains("startVbdNativeTriggerEdit") || js.contains("acquireVbdNativeTriggerEditLock")
-                        || js.contains("virtual_block_device_triggers") || js.contains("data-vbd-native-trigger-save"),
-                "7.9 P1 frontend does not expose native trigger save or raw JSON editing");
+        requireFalse(js.contains("native-trigger-json") || js.contains("data-vbd-native-trigger-save")
+                        || js.contains("containerTemplateGui") || js.contains("ghostTemplateItemGui"),
+                "7.9 P2 native trigger edit does not expose raw JSON or container template GUI");
+        for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine")) {
+            requireFalse(nativeTriggerRequest.contains(forbidden),
+                    "7.9 P2 native trigger PATCH DTO must not expose forbidden field: " + forbidden);
+        }
         requireFalse(js.contains("itemSubmitEditor") || js.contains("consumeEditor") || js.contains("conditionEngineEditor")
                         || js.contains("scratchLikeNativeTriggerEditor") || js.contains("successFailPathGraph")
                         || js.contains("pathVisualization") || js.contains("nativeTriggerGraph") || js.contains("mindMap"),
@@ -2744,6 +2781,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2758,6 +2796,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2773,6 +2812,7 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_CHANNEL_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, true);

@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal.device;
 
 public enum VirtualBlockDeviceMode {
+    REDSTONE_DISABLED("redstone_disabled"),
     REDSTONE_RISING("redstone_rising"),
     REDSTONE_FALLING("redstone_falling"),
     REDSTONE_BOTH("redstone_both");
@@ -45,6 +46,7 @@ public enum VirtualBlockDeviceMode {
 
     public static String displayName(String raw) {
         return switch (fromId(raw)) {
+            case REDSTONE_DISABLED -> "不触发红石边沿（redstone_disabled）";
             case REDSTONE_FALLING -> "断电时触发（redstone_falling）";
             case REDSTONE_BOTH -> "通电和断电都触发（redstone_both）";
             default -> "通电时触发（redstone_rising）";

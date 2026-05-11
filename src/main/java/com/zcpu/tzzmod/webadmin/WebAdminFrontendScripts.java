@@ -126,7 +126,7 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,vbdNativeTriggerEdit:null,vbdNativeTriggerLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;appState.modalCloseHandler=null;appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalDiscardConfirmOpen=false;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -204,7 +204,7 @@ public final class WebAdminFrontendScripts {
                 function markChannelOptionsDirty(event){
                   const type=String(event?.type||''), target=String(event?.payload?.targetType||'').toLowerCase(), source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
                   const types=['signal_channel_changed','channel_metadata_changed','signal_listener_changed','signal_listener_config_changed','device_registered','device_removed','device_changed','device_config_changed','virtual_block_device_changed','selection_completed','selection_cancelled','selection_failed','action_changed','signal_listener_action_changed','config_changed','signal_history_appended','sync_required'];
-                  const targets=['device_basic_config','device_extended_config','interaction_item_matcher','action_relay_actions','channel_metadata','signal_listener_basic_config','virtual_block_device'];
+                  const targets=['device_basic_config','device_extended_config','interaction_item_matcher','virtual_block_device_triggers','action_relay_actions','channel_metadata','signal_listener_basic_config','virtual_block_device'];
                   const sources=['signal_receiver','action_relay','signal_emitter','virtual_block_device'];
                   if(types.includes(type)||target.includes('channel')||targets.includes(target)||sources.includes(source))appState.channelOptionsDirty=true;
                 }
@@ -382,9 +382,9 @@ public final class WebAdminFrontendScripts {
                 function eventAffectedChannels(event){const raw=event?.payload?.affectedChannels;if(Array.isArray(raw))return raw.map(v=>String(v||'')).filter(v=>!isBlank(v));return [];}
                 function lockHeldByOther(lock){return !!(lock&&lock.locked&&!lock.heldByCurrentUser);}
                 function lockMessage(lock,label='配置'){return `${label}正在由 ${lock?.holderUsername||'其他用户'} 编辑，锁到期：${formatDateTime(lock?.expiresAt)}`;}
-                const DEVICE_EDIT_LOCK_TYPES=['device_metadata','device_basic_config','device_extended_config','action_relay_actions','interaction_item_matcher'];
+                const DEVICE_EDIT_LOCK_TYPES=['device_metadata','device_basic_config','device_extended_config','action_relay_actions','virtual_block_device_triggers','interaction_item_matcher'];
                 function isDeviceConfigLockType(targetType){return DEVICE_EDIT_LOCK_TYPES.includes(String(targetType||''));}
-                function deviceConfigLockLabel(targetType){const type=String(targetType||'');if(type==='device_metadata')return '显示信息';if(type==='device_basic_config')return '基础配置';if(type==='device_extended_config')return '类型专属配置';if(type==='action_relay_actions')return 'Action 列表';if(type==='interaction_item_matcher')return '交互物品匹配';return '配置';}
+                function deviceConfigLockLabel(targetType){const type=String(targetType||'');if(type==='device_metadata')return '显示信息';if(type==='device_basic_config')return '基础配置';if(type==='device_extended_config')return '类型专属配置';if(type==='action_relay_actions')return 'Action 列表';if(type==='virtual_block_device_triggers')return '原生触发配置';if(type==='interaction_item_matcher')return '交互物品匹配';return '配置';}
                 function editLockCacheKey(targetType,targetId){return `${String(targetType||'')}\n${stripDeviceTypeRef(targetId)}`;}
                 function rememberDeviceEditLockEvent(event){
                   if(String(event?.type||'')!=='edit_lock_changed')return;
@@ -408,6 +408,7 @@ public final class WebAdminFrontendScripts {
                   if(detail?.basicConfig?.lockStatus)locks.push({label:'基础配置',lock:detail.basicConfig.lockStatus});
                   if(detail?.extendedConfig?.lockStatus)locks.push({label:'类型专属配置',lock:detail.extendedConfig.lockStatus});
                   if(isActionRelay(detail)){const actionLock=actionRelayLockForDevice(detail);if(actionLock)locks.push({label:'Action 列表',lock:actionLock});}
+                  if(isVirtualBlockDevice(detail)&&detail?.nativeTriggers?.lockStatus)locks.push({label:'原生触发配置',lock:detail.nativeTriggers.lockStatus});
                   if(isVirtualBlockDevice(detail)&&detail?.interactionItemMatcher?.lockStatus)locks.push({label:'交互物品匹配',lock:detail.interactionItemMatcher.lockStatus});
                   const seen=new Set(locks.map(item=>String(item.lock?.targetType||'')));
                   cachedDeviceConfigLocks(detail?.id||'').forEach(item=>{if(!seen.has(String(item.lock?.targetType||''))){locks.push(item);seen.add(String(item.lock?.targetType||''));}});
@@ -415,7 +416,7 @@ public final class WebAdminFrontendScripts {
                 }
                 function deviceConfigLockBlocker(detail){return deviceConfigLocks(detail).find(item=>lockHeldByOther(item.lock))||null;}
                 function deviceConfigLockMessage(detail){const blocker=deviceConfigLockBlocker(detail);return blocker?lockMessage(blocker.lock,blocker.label):'';}
-                function canEditDeviceConfig(detail){return canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig()||(isActionRelay(detail)&&canEditActionRelayActions())||(isVirtualBlockDevice(detail)&&canEditInteractionItemMatcher());}
+                function canEditDeviceConfig(detail){return canEditDeviceMetadata()||canEditDeviceBasicConfig()||canEditDeviceExtendedConfig()||(isActionRelay(detail)&&canEditActionRelayActions())||(isVirtualBlockDevice(detail)&&(canEditVbdNativeTriggers()||canEditInteractionItemMatcher()));}
                 function deviceConfigEditButton(detail,label='编辑设备配置',kind='primary'){
                   const canEdit=canEditDeviceConfig(detail);
                   if(!canEdit)return waButton(label,'settings','disabled title="需要 EDITOR 或 OWNER 权限才能编辑设备配置。"','ghost');
@@ -567,6 +568,7 @@ public final class WebAdminFrontendScripts {
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
                   maybeReleaseDeviceExtendedConfigEditForRoute(hash);
+                  maybeReleaseVbdNativeTriggerEditForRoute(hash);
                   maybeReleaseInteractionItemMatcherEditForRoute(hash);
                   maybeReleaseDeviceConfigEditForRoute(hash);
                   maybeReleaseChannelMetadataEditForRoute(hash);
@@ -776,7 +778,7 @@ public final class WebAdminFrontendScripts {
                   if(isAny('config_changed')){
                     const target=String(event?.payload?.targetType||'');
                     if(target==='action_relay_actions'){add('dashboard','signals','devices','actions','actionTemplates','doctor');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'action_relay');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
-                    else if(target==='interaction_item_matcher'){add('dashboard','devices','virtualBlockDevices','doctor');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'virtual_block_device');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
+                    else if(target==='interaction_item_matcher'||target==='virtual_block_device_triggers'){add('dashboard','signals','devices','virtualBlockDevices','doctor');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'virtual_block_device');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
                     else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','devices','doctor');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');else if(!source)add('receivers','virtualBlockDevices','actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);}
                     else if(target.includes('listener')){add('dashboard','signals','listeners','doctor');if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);}
                     else if(target.includes('channel')){add('dashboard','signals','doctor');if(event?.channel)add(`signalDetail:${event.channel}`);}
@@ -821,14 +823,14 @@ public final class WebAdminFrontendScripts {
                   if(starts('webadmin_audit_')||isAny('write_audit_appended')){
                     const target=String(event?.payload?.targetType||'');
                     if(target==='action_relay_actions'){add('dashboard','history','signals','devices','actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'action_relay');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
-                    else if(target==='interaction_item_matcher'){add('dashboard','history','devices','virtualBlockDevices');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'virtual_block_device');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
+                    else if(target==='interaction_item_matcher'||target==='virtual_block_device_triggers'){add('dashboard','history','devices','virtualBlockDevices','signals');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,event?.sourceType||event?.payload?.deviceType||'virtual_block_device');if(event?.channel)add(`signalDetail:${event.channel}`);eventAffectedChannels(event).forEach(channel=>add(`signalDetail:${channel}`));}
                     else if(target.includes('device')){const source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();add('dashboard','history','devices');if(target==='device_basic_config'){add('signals');if(event?.channel)add(`signalDetail:${event.channel}`);if(event?.payload?.previousChannel)add(`signalDetail:${event.payload.previousChannel}`);}if(source==='signal_receiver')add('receivers');else if(source==='virtual_block_device')add('virtualBlockDevices');else if(source==='action_relay')add('actions','actionTemplates');if(event?.deviceId)addDeviceDetailRouteKeys(add,event.deviceId,source);}
                     else add('dashboard','history','settings','config','users');
                   }
                   if(starts('webadmin_settings_')||isAny('system_settings_changed'))add('settings','config','dashboard');
                   if(type==='edit_lock_changed'){
                     const target=String(event?.payload?.targetType||'');
-                    if(target.includes('device')||target==='action_relay_actions'||target==='interaction_item_matcher'){add('devices');if(event?.payload?.targetId)addDeviceDetailRouteKeys(add,event.payload.targetId,target==='action_relay_actions'?'action_relay':(target==='interaction_item_matcher'?'virtual_block_device':''));}
+                    if(target.includes('device')||target==='action_relay_actions'||target==='interaction_item_matcher'||target==='virtual_block_device_triggers'){add('devices');if(event?.payload?.targetId)addDeviceDetailRouteKeys(add,event.payload.targetId,target==='action_relay_actions'?'action_relay':(target==='interaction_item_matcher'||target==='virtual_block_device_triggers'?'virtual_block_device':''));}
                     if(target.includes('channel'))add('signals');
                     if(target.includes('listener')){add('listeners','signals');if(listenerEventRef(event))add(`listenerDetail:${listenerEventRef(event)}`);}
                   }
@@ -1124,6 +1126,7 @@ public final class WebAdminFrontendScripts {
                 function canCreateSignalListener(){const flag=appState.capabilities?.signalListenerLifecycleWriteEnabled;return flag!==false&&operationAllowed('CREATE_SIGNAL_LISTENER');}
                 function canDeleteSignalListener(){const flag=appState.capabilities?.signalListenerLifecycleWriteEnabled;return flag!==false&&operationAllowed('DELETE_SIGNAL_LISTENER');}
                 function canEditActionRelayActions(){const flag=appState.capabilities?.actionRelayActionListWriteEnabled;return flag!==false&&operationAllowed('EDIT_ACTION_RELAY_ACTIONS');}
+                function canEditVbdNativeTriggers(){const flag=appState.capabilities?.vbdNativeTriggerWriteEnabled;return flag!==false&&operationAllowed('EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS');}
                 function canEditInteractionItemMatcher(){const flag=appState.capabilities?.interactionItemMatcherWriteEnabled;return flag!==false&&operationAllowed('EDIT_ITEM_MATCHER');}
                 function isActionRelay(d){return String(d?.type||d?.deviceType||'').toUpperCase()==='ACTION_RELAY';}
                 function isPhysicalSignalDevice(d){return ['SIGNAL_EMITTER','SIGNAL_RECEIVER','ACTION_RELAY'].includes(String(d?.type||d?.deviceType||'').toUpperCase());}
@@ -1609,12 +1612,14 @@ public final class WebAdminFrontendScripts {
                   const data=vbdNativeTriggerData(detail), map=vbdNativeTriggerMap(detail);
                   const allowed=new Set(nativeTriggerTypes().map(item=>item.type));
                   const fromApi=Array.isArray(data.activeTriggerTypes)?data.activeTriggerTypes.filter(type=>allowed.has(type)):[];
-                  const matcher=map.right_click?.interactionItemMatcherLayer||{};
-                  if((matcher.enabled||matcher.configured)&&!fromApi.includes('right_click'))fromApi.push('right_click');
                   if(fromApi.length)return fromApi;
-                  const active=nativeTriggerTypes().map(item=>item.type).filter(type=>!!map[type]?.enabled);
-                  if((matcher.enabled||matcher.configured)&&!active.includes('right_click'))active.push('right_click');
-                  return active;
+                  return nativeTriggerTypes().map(item=>item.type).filter(type=>!!map[type]?.enabled);
+                }
+                function vbdNativeTriggerEditAction(detail,kind='primary'){
+                  const data=vbdNativeTriggerData(detail), lock=data.lockStatus||appState.deviceEditLocks[editLockCacheKey('virtual_block_device_triggers',detail?.id||'')]||null;
+                  if(lockHeldByOther(lock))return `${waButton('编辑原生触发配置','settings',`disabled title="${esc(lockMessage(lock,'原生触发配置'))}" data-vbd-native-trigger-lock-disabled="true"`,'ghost is-locked')}<span class="wa-lock-badge">${esc(lockMessage(lock,'原生触发配置'))}</span>`;
+                  if(!canEditVbdNativeTriggers())return waButton('编辑原生触发配置','settings','disabled title="需要 EDITOR 或 OWNER 权限才能编辑原生触发配置。"','ghost');
+                  return waButton('编辑原生触发配置','settings',htmlHandler(`startVbdNativeTriggerEdit(${jsString(detail.id)})`),kind);
                 }
                 function vbdNativeTriggerOverviewCard(detail,options={}){
                   if(!isVirtualBlockDevice(detail))return '';
@@ -1623,21 +1628,23 @@ public final class WebAdminFrontendScripts {
                   if(!data.supported)return `<div class="readonly-note">${esc(data.unsupportedReason||'当前设备不支持原生触发摘要。')}</div>`;
                   const active=activeVbdNativeTriggerTypes(detail);
                   const summaries=active.map(type=>vbdNativeTriggerCompactCard(detail,type,options)).join('');
-                  return `<div class="wa-native-trigger-area" data-vbd-native-trigger-area="true" data-vbd-native-trigger-readonly="true" data-vbd-native-trigger-no-write-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-manual-selector="true">
-                    <p class="readonly-note">7.9 P1 仅按当前 VBD 实际已启用或已配置的原生触发数据展示摘要；完整编辑将在 7.9 P2 支持。</p>
-                    <div class="wa-native-trigger-grid" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-data-driven="true" data-vbd-native-trigger-inline-full-detail="false">${summaries||`<div class="readonly-note" data-vbd-native-trigger-empty-state="true" data-vbd-native-trigger-compact-empty-state="true">尚未启用原生触发方式。完整编辑将在 7.9 P2 支持。</div>`}</div>
+                  const action=options.inConfigModal?'':`<div class="inline-actions">${vbdNativeTriggerEditAction(detail)}</div>`;
+                  return `<div class="wa-native-trigger-area" data-vbd-native-trigger-area="true" data-vbd-native-trigger-write-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-manual-selector="true">
+                    <p class="readonly-note">7.9 P2 按当前 VBD 已启用的原生触发数据展示摘要；点击编辑可配置六类原生触发源。</p>
+                    <div class="wa-native-trigger-grid" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-data-driven="true" data-vbd-native-trigger-inline-full-detail="false">${summaries||`<div class="readonly-note" data-vbd-native-trigger-empty-state="true" data-vbd-native-trigger-compact-empty-state="true">尚未启用原生触发方式。可点击编辑原生触发配置启用。</div>`}</div>
+                    ${action}
                   </div>`;
                 }
                 function vbdNativeTriggerConfigSummaryCard(detail){
                   const data=vbdNativeTriggerData(detail), active=activeVbdNativeTriggerTypes(detail).map(labelNativeTriggerType);
-                  const state=data.supported===false?(data.unsupportedReason||'不可用'):'数据驱动只读摘要';
-                  return `<section class="wa-config-card wa-vbd-native-config-card" data-vbd-native-trigger-config-summary="true"><h3>原生触发配置</h3><div class="identity-grid">${row('P1 状态',esc('只读摘要'))}${row('展示方式',esc(state))}${row('已启用 / 已配置项',esc(active.join(' / ')||'暂无'))}${row('写入 API',esc(data.writeApiEnabled?'已启用':'P1 未提供'))}</div><p class="muted">原生触发源仅包含红石、BlockState、右键交互、容器打开、容器关闭、容器内容变化。interaction item matcher 是右键之后的条件层。</p></section>`;
+                  const state=data.supported===false?(data.unsupportedReason||'不可用'):'数据驱动可编辑摘要';
+                  return `<section class="wa-config-card wa-vbd-native-config-card" data-vbd-native-trigger-config-summary="true"><h3>原生触发配置</h3><div class="identity-grid">${row('P2 状态',esc('可编辑'))}${row('展示方式',esc(state))}${row('已启用 / 已配置项',esc(active.join(' / ')||'暂无'))}${row('写入 API',esc(data.writeApiEnabled?'已启用':'不可用'))}</div><p class="muted">原生触发源仅包含红石、BlockState、右键交互、容器打开、容器关闭、容器内容变化。interaction item matcher 是右键之后的条件层。</p><div class="inline-actions">${vbdNativeTriggerEditAction(detail,'ghost')}</div></section>`;
                 }
                 function vbdNativeTriggerConfigModalSection(detail){
                   if(!isVirtualBlockDevice(detail))return '';
-                  const body=vbdNativeTriggerOverviewCard(detail,{inConfigModal:true});
-                  const matcherInline=appState.interactionItemMatcherEdit&&sameDeviceRef(appState.interactionItemMatcherEdit.deviceId,detail.id)?`<div data-vbd-native-trigger-interaction-matcher-inline-edit="true">${interactionItemMatcherForm(detail,appState.interactionItemMatcherEdit,true)}</div>`:'';
-                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill info">7.9 P1 readonly</span></header>${body}${matcherInline}<p class="muted">该 section 是 7.9 P1 骨架，不获取 native trigger 编辑锁、不发送 native trigger 写请求。右键交互中的交互物品匹配入口沿用 7.8 matcher 独立保存链路；P2 才会接入原生触发保存、fingerprint、audit 和 realtime 写链路。</p></section>`;
+                  const draft=appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,detail.id)?appState.vbdNativeTriggerEdit:null;
+                  const body=draft?vbdNativeTriggerEditForm(detail,draft,true):`${vbdNativeTriggerOverviewCard(detail,{inConfigModal:true})}<div class="inline-actions">${vbdNativeTriggerEditAction(detail,'ghost')}</div>`;
+                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill ok">7.9 P2 edit</span></header>${body}<p class="muted">保存只写入 VBD 原生触发字段；不会创建 itemSubmit、consume、ConditionEngine、路径图，也不会清空 7.8 matcher 或容器 itemConditions。</p></section>`;
                 }
                 function vbdNativeTriggerCompactCard(detail,type,options={}){
                   const trigger=vbdNativeTriggerMap(detail)[type]||{}, clickable=!options.inConfigModal;
@@ -1675,7 +1682,7 @@ public final class WebAdminFrontendScripts {
                   const detail=appState.currentDeviceDetail&&sameDeviceRef(appState.currentDeviceDetail.id,deviceId)?appState.currentDeviceDetail:null;
                   if(!detail){toast('当前设备详情已变化，请刷新后重试。');return;}
                   const title=`${labelNativeTriggerType(type)} · 原生触发详情`;
-                  const body=`<section class="edit-form" data-vbd-native-trigger-readonly-modal="true" data-vbd-native-trigger-readonly-detail="true" data-vbd-native-trigger-detail-modal-body="true" data-vbd-native-trigger-detail-type="${esc(type)}" data-vbd-native-trigger-readonly-no-save="true" data-vbd-native-trigger-readonly-no-edit-lock="true" data-vbd-native-trigger-detail-no-dirty-guard="true" data-vbd-native-trigger-detail-no-write-request="true">${vbdNativeTriggerReadonlyDetail(detail,type)}<p class="muted">该弹窗只读展示，不获取编辑锁、不发送写请求；7.9 P2 才支持原生触发配置保存。</p></section>`;
+                  const body=`<section class="edit-form" data-vbd-native-trigger-readonly-modal="true" data-vbd-native-trigger-readonly-detail="true" data-vbd-native-trigger-detail-modal-body="true" data-vbd-native-trigger-detail-type="${esc(type)}" data-vbd-native-trigger-readonly-no-save="true" data-vbd-native-trigger-readonly-no-edit-lock="true" data-vbd-native-trigger-detail-no-dirty-guard="true" data-vbd-native-trigger-detail-no-write-request="true">${vbdNativeTriggerReadonlyDetail(detail,type)}<p class="muted">该弹窗只读展示，不获取编辑锁、不发送写请求；保存请使用“编辑原生触发配置”。</p></section>`;
                   openWebAdminModal(title,body,waButton('关闭','close','onclick="closeWebAdminModal()"','ghost'),{className:'wa-config-modal'});
                 }
                 function vbdNativeTriggerReadonlyDetail(detail,type){
@@ -1732,6 +1739,161 @@ public final class WebAdminFrontendScripts {
                 function nativeBlockRuntimeStatus(value){return {ready:'ready / 当前方块可读取',world_unavailable:'世界不可用',chunk_unloaded:'区块未加载',air:'当前位置为空气',block_mismatch:'当前方块与绑定方块不一致'}[String(value||'')]||value||'未知';}
                 function nativeTriggerTime(value){const n=Number(value||0);return n>0?formatDateTime(n):'暂无';}
                 function labelCountMode(value){return {ignore:'不检查数量',at_least:'至少',exactly:'等于',at_most:'至多'}[String(value||'').toLowerCase()]||value||'至少';}
+                """).append("""
+                function nativeTriggerEditableValuesFrom(data={}){
+                  const map=data.triggers||{}, red=map.redstone_powered||{}, block=map.blockstate||{}, interaction=map.right_click||{}, open=map.container_open||{}, close=map.container_close||{}, change=map.container_change||{};
+                  const conditionRows=Object.entries(block.conditionProperties||{}).map(([property,value])=>({property,value}));
+                  return {
+                    redstoneEnabled:!!red.configured&&red.mode!=='redstone_disabled',
+                    redstoneMode:red.mode==='redstone_disabled'?'redstone_rising':(red.mode||'redstone_rising'),
+                    channel:red.channel||'',
+                    offChannel:red.offChannel||'',
+                    blockStateEnabled:!!block.conditionEnabled,
+                    conditionMode:block.conditionMode||'condition_enter',
+                    conditionRows,
+                    interactionEnabled:!!interaction.interactionEnabled,
+                    interactChannel:interaction.interactChannel||'',
+                    interactionCooldownTicks:Number(interaction.interactionCooldownTicks||0),
+                    containerOpenEnabled:!!open.enabled,
+                    containerOpenChannel:open.containerOpenChannel||'',
+                    containerCloseEnabled:!!close.enabled,
+                    containerCloseChannel:close.containerCloseChannel||'',
+                    containerChangeEnabled:!!change.enabled,
+                    containerChangeChannel:change.containerChangeChannel||'',
+                    containerCooldownTicks:Number(change.containerCooldownTicks??open.containerCooldownTicks??close.containerCooldownTicks??0),
+                    containerChangeCheckIntervalTicks:Number(change.containerChangeCheckIntervalTicks||10)
+                  };
+                }
+                function vbdNativeTriggerEditableJson(draft){const v=draft?.values||{};return JSON.stringify({...v,conditionRows:(v.conditionRows||[]).filter(r=>!isBlank(r.property)||!isBlank(r.value)).map(r=>({property:String(r.property||''),value:String(r.value||'')}))});}
+                function vbdNativeTriggerDirty(draft){return !!draft&&vbdNativeTriggerEditableJson(draft)!==String(draft.originalJson||'{}');}
+                async function prepareVbdNativeTriggerDraft(deviceId,acquireLock=false){
+                  const encoded=encodeURIComponent(deviceApiRef(deviceId)), data=await api(`/api/webadmin/virtual-block-devices/${encoded}/native-triggers`), channelOptions=await loadSignalChannelOptions();
+                  const canonicalId=data.deviceId||deviceApiRef(deviceId), values=nativeTriggerEditableValuesFrom(data);
+                  const draft={deviceId:canonicalId,displayName:data.displayName||canonicalId,supported:data.supported!==false,typeSupported:data.typeSupported!==false,unsupportedReason:data.unsupportedReason||'',values,originalJson:JSON.stringify(values),expectedFingerprint:data.expectedFingerprint||'',lockStatus:data.lockStatus||null,lockId:'',lock:null,errors:[],saving:false,conflict:null,data,channelOptions,channelOptionsError:appState.channelOptionsError,channelComboOpen:{},channelComboIndex:{},channelComboQuery:{},channelComboSearchActive:{},initialSnapshot:JSON.stringify(values)};
+                  if(acquireLock&&draft.supported&&canEditVbdNativeTriggers()){
+                    if(lockHeldByOther(draft.lockStatus)){draft.errors=[{message:lockMessage(draft.lockStatus,'原生触发配置')}];appState.vbdNativeTriggerEdit=draft;return draft;}
+                    const result=await acquireWebAdminEditLock('virtual_block_device_triggers',canonicalId);
+                    if(result.success){draft.lock=result.data?.lock||{};draft.lockId=draft.lock.lockId||'';scheduleVbdNativeTriggerLockHeartbeat();}
+                    else draft.errors=[{message:result.message||'原生触发配置编辑锁获取失败'}];
+                  }
+                  appState.vbdNativeTriggerEdit=draft;
+                  return draft;
+                }
+                async function startVbdNativeTriggerEdit(deviceId){try{const draft=await prepareVbdNativeTriggerDraft(deviceId,true);showVbdNativeTriggerEditModal(draft.deviceId);if(draft.errors.length)toast(draft.errors[0].message||'无法进入原生触发配置编辑。');}catch(err){toast(err.message||'原生触发配置加载失败');}}
+                function showVbdNativeTriggerEditModal(deviceId){
+                  const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;
+                  markModalInitialSnapshot('vbd_native_triggers',draft);
+                  const footer=draft.lockId?editModalFooter(draft.saving):waButton('关闭','close','onclick="closeWebAdminModal()"','ghost');
+                  openWebAdminModal(draft.lockId?'编辑原生触发配置':'查看原生触发配置',vbdNativeTriggerEditForm({id:draft.deviceId,displayName:draft.displayName,nativeTriggers:draft.data},draft,false),footer,{className:'wa-config-modal',onClose:async()=>{await cancelVbdNativeTriggerEdit(draft.deviceId,true);await dismissWebAdminModal();},syncBeforeClose:()=>syncModalDraftBeforeClose('vbd_native_triggers',draft.deviceId),dirtyCheck:()=>!!appState.vbdNativeTriggerEdit?.lockId&&modalDraftDirty('vbd_native_triggers',appState.vbdNativeTriggerEdit)});
+                }
+                function vbdNativeTriggerEditForm(detail,draft,inline=false){
+                  const v=draft.values||{}, disabled=!draft.lockId||draft.saving, data=draft.data||vbdNativeTriggerData(detail), errors=(draft.errors||[]).length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||e||'保存失败')}</li>`).join('')}</ul>`:'';
+                  const conflict=draft.conflict?`<div class="readonly-note danger">原生触发配置已被其他操作修改，请重新加载后再保存。<button class="link-button" type="button" onclick='reloadVbdNativeTriggerAfterConflict(${jsString(draft.deviceId)})'>重新加载</button></div>`:'';
+                  const lockLine=draft.lockId?`<div class="readonly-note">正在编辑原生触发配置 · 锁到期：${esc(formatDateTime(draft.lock?.expiresAt))}</div>`:(lockHeldByOther(draft.lockStatus)?`<div class="readonly-note danger">${esc(lockMessage(draft.lockStatus,'原生触发配置'))}</div>`:`<div class="readonly-note">当前为只读预览；需要获取编辑锁后才能保存。</div>`);
+                  const toggles=`<div class="wa-native-trigger-enable-grid" data-vbd-native-trigger-enable-controls="true">${nativeTriggerTypes().map(item=>{const key=nativeTriggerEnabledKey(item.type), checked=!!v[key];return `<label class="switch-row wa-native-trigger-toggle" data-vbd-native-trigger-toggle="${esc(item.type)}"><span>${esc(item.label)}</span><input id="vbdnt-${esc(item.type)}-enabled" type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''} onchange='toggleVbdNativeTrigger(${jsString(draft.deviceId)},${jsString(item.type)})'></label>`;}).join('')}</div>`;
+                  const sections=[
+                    v.redstoneEnabled?vbdNativeRedstoneEditSection(draft,disabled):'',
+                    v.blockStateEnabled?vbdNativeBlockStateEditSection(draft,disabled):'',
+                    v.interactionEnabled?vbdNativeInteractionEditSection(detail,draft,disabled,inline):'',
+                    (v.containerOpenEnabled||v.containerCloseEnabled||v.containerChangeEnabled)?vbdNativeContainerCommonEditSection(draft,disabled):'',
+                    v.containerOpenEnabled?vbdNativeContainerOpenEditSection(draft,disabled):'',
+                    v.containerCloseEnabled?vbdNativeContainerCloseEditSection(draft,disabled):'',
+                    v.containerChangeEnabled?vbdNativeContainerChangeEditSection(draft,disabled):''
+                  ].filter(Boolean).join('');
+                  const empty=!sections?'<div class="readonly-note" data-vbd-native-trigger-edit-empty-state="true">尚未选择原生触发方式。启用上方任一触发方式后才会显示对应配置字段。</div>':'';
+                  const body=`${lockLine}${errors}${conflict}${toggles}<div class="wa-native-trigger-edit-sections" data-vbd-native-trigger-edit-modal="true" data-vbd-native-trigger-patch-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-template-gui="true" data-vbd-native-trigger-field-preservation="true">${sections||empty}</div><p class="muted">本表单只编辑红石 / 受电状态、BlockState、右键交互和容器 open / close / change 基础字段。不会编辑 itemSubmit、consume、inventory/equipment、ConditionEngine、路径图或容器物品模板 GUI。隐藏未启用 section 不会清空 7.8 matcher、itemConditions 或未来保留字段。</p>`;
+                  if(inline)return `<div class="wa-native-trigger-inline-editor" data-vbd-native-trigger-inline-edit="true">${body}</div>`;
+                  return `<form class="edit-form" onsubmit='event.preventDefault();saveVbdNativeTrigger(${jsString(draft.deviceId)})'>${body}</form>`;
+                }
+                function nativeTriggerEnabledKey(type){return {redstone_powered:'redstoneEnabled',blockstate:'blockStateEnabled',right_click:'interactionEnabled',container_open:'containerOpenEnabled',container_close:'containerCloseEnabled',container_change:'containerChangeEnabled'}[type]||type;}
+                function vbdNativeRedstoneEditSection(draft,disabled){
+                  const v=draft.values||{};
+                  return `<section class="wa-matcher-option" data-vbd-native-redstone-edit="true"><header><strong>红石 / 受电状态</strong><span class="pill ok">currentPowered = blockStatePowered || receivedPowerLevel &gt; 0</span></header><div class="wa-action-editor-grid"><label>触发模式<select id="vbdnt-redstone-mode" class="select" ${disabled?'disabled':''} onchange='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'>${[['redstone_rising','通电时触发'],['redstone_falling','断电时触发'],['redstone_both','通电和断电都触发']].map(([id,label])=>`<option value="${id}" ${v.redstoneMode===id?'selected':''}>${label}</option>`).join('')}</select></label><label>主频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'channel',v.channel,draft,disabled)}</label><label>断电频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'offChannel',v.offChannel,draft,disabled)}</label></div><p class="muted">红石受电状态包含方块自身 powered=true，也包含当前位置收到的弱充能 / 强充能 / 红石强度。</p><p id="vbdnt-channel-hint" class="readonly-note">${channelHintHtml(v.channel,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError)}</p></section>`;
+                }
+                function vbdNativeBlockStateEditSection(draft,disabled){
+                  const v=draft.values||{}, props=((draft.data||{}).triggers?.blockstate?.supportedProperties)||[], rows=(v.conditionRows||[]);
+                  const rowHtml=rows.length?rows.map((row,index)=>vbdNativeBlockStateConditionRow(draft,index,row,props,disabled)).join(''):'<div class="readonly-note">尚未添加 BlockState 条件行。</div>';
+                  return `<section class="wa-matcher-option" data-vbd-native-blockstate-edit="true" data-vbd-native-blockstate-property-dropdown-from-bound-block="true" data-vbd-native-blockstate-allowed-values-from-property="true"><header><strong>BlockState 条件</strong><span class="pill info">服务端保存时二次校验</span></header><label>条件模式<select id="vbdnt-condition-mode" class="select" ${disabled?'disabled':''} onchange='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'>${[['condition_enter','进入条件时触发'],['condition_exit','退出条件时触发'],['condition_both','进入和退出都触发']].map(([id,label])=>`<option value="${id}" ${v.conditionMode===id?'selected':''}>${label}</option>`).join('')}</select></label><div class="wa-native-blockstate-rows">${rowHtml}</div><div class="inline-actions"><button class="wa-btn ghost" type="button" ${disabled?'disabled':''} onclick='addVbdNativeBlockStateCondition(${jsString(draft.deviceId)})'>${icon('plus')}<span>新增属性条件</span></button></div>${vbdBlockStatePropertyList(props,((draft.data||{}).triggers?.blockstate?.validationIssues)||[])}<p class="muted">属性名和目标值都来自当前绑定方块实际 BlockState；不能输入任意 NBT path 或 raw JSON。</p></section>`;
+                }
+                function vbdNativeBlockStateConditionRow(draft,index,row,props,disabled){
+                  const selected=String(row.property||''), prop=props.find(p=>p.name===selected)||props[0]||{}, values=prop.allowedValues||[], currentValue=values.includes(row.value)?row.value:(row.value||values[0]||'');
+                  return `<div class="wa-action-editor-grid" data-vbd-native-blockstate-row="${index}"><label>属性<select id="vbdnt-condition-property-${index}" class="select" ${disabled?'disabled':''} onchange='changeVbdNativeBlockStateProperty(${jsString(draft.deviceId)},${index})'>${props.map(p=>`<option value="${esc(p.name||'')}" ${p.name===selected?'selected':''}>${esc(p.name||'')}</option>`).join('')}</select></label><label>目标值<select id="vbdnt-condition-value-${index}" class="select" ${disabled?'disabled':''} onchange='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'>${values.map(value=>`<option value="${esc(value)}" ${value===currentValue?'selected':''}>${esc(value)}</option>`).join('')}</select></label><button class="wa-btn ghost" type="button" ${disabled?'disabled':''} onclick='removeVbdNativeBlockStateCondition(${jsString(draft.deviceId)},${index})'>删除</button></div>`;
+                }
+                function vbdNativeInteractionEditSection(detail,draft,disabled,inline=false){
+                  const v=draft.values||{}, matcher=appState.interactionItemMatcherEdit&&sameDeviceRef(appState.interactionItemMatcherEdit.deviceId,draft.deviceId)?appState.interactionItemMatcherEdit:null;
+                  const summary=vbdInteractionTriggerSummary({id:draft.deviceId,nativeTriggers:draft.data,interactionItemMatcher:detail.interactionItemMatcher||{}},(draft.data?.triggers||{}).right_click||{interactionItemMatcherLayer:{}});
+                  const matcherInline=inline&&matcher?`<div data-vbd-native-trigger-interaction-matcher-inline-edit="true">${interactionItemMatcherForm(detail,matcher,true)}</div>`:'';
+                  const matcherLock=detail?.interactionItemMatcher?.lockStatus||appState.deviceEditLocks[editLockCacheKey('interaction_item_matcher',draft.deviceId)]||null;
+                  const matcherEntry=!inline?'<div class="readonly-note" data-vbd-native-trigger-interaction-matcher-entry="true">交互物品匹配编辑入口保留在 VBD 详情页右键交互摘要和统一设备配置 modal 内；独立原生触发 modal 不嵌套第二个可保存编辑器。</div>':(matcherInline||`<div class="inline-actions" data-vbd-native-trigger-interaction-matcher-entry="true">${lockHeldByOther(matcherLock)?waButton('编辑交互物品匹配','settings',`disabled title="${esc(lockMessage(matcherLock,'交互物品匹配'))}" data-vbd-native-trigger-matcher-lock-disabled="true"`,'ghost is-locked'):waButton('编辑交互物品匹配','settings',disabled?'disabled':htmlHandler(`openInlineInteractionMatcherForVbdNativeTrigger(${jsString(draft.deviceId)})`),'ghost')}</div>`);
+                  return `<section class="wa-matcher-option" data-vbd-native-interaction-edit="true" data-vbd-native-trigger-matcher-hidden-when-interaction-disabled="true"><header><strong>玩家右键交互</strong><span class="pill ok">matcher 条件层在此处</span></header><div class="wa-action-editor-grid"><label>交互频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'interactChannel',v.interactChannel,draft,disabled)}</label><label>交互冷却 tick<input id="vbdnt-interaction-cooldown" class="input" type="number" min="0" max="72000" value="${esc(v.interactionCooldownTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label></div><div class="readonly-note" data-vbd-native-trigger-matcher-visible-inside-interaction="true">${summary}</div>${matcherEntry}<p class="muted">交互物品匹配不是原生触发源；未启用右键交互时会完全隐藏且不会清空已有 matcher 数据。</p></section>`;
+                }
+                function vbdNativeContainerCommonEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-common-edit="true"><header><strong>容器公共设置</strong><span class="pill info">open / close / change 共用</span></header><label>容器冷却 tick<input id="vbdnt-container-cooldown" class="input" type="number" min="0" max="72000" value="${esc(v.containerCooldownTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label><p class="muted">启用任一容器事件时 containerEnabled=true；全部关闭时容器事件和只读 itemConditions 都不会触发，但已保存字段会保留。</p></section>`;}
+                function vbdNativeContainerOpenEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-open-edit="true"><header><strong>容器打开</strong><span class="pill info">共用 containerEnabled</span></header><label>打开频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerOpenChannel',v.containerOpenChannel,draft,disabled)}</label></section>`;}
+                function vbdNativeContainerCloseEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-close-edit="true"><header><strong>容器关闭</strong><span class="pill info">共用 containerEnabled</span></header><label>关闭频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerCloseChannel',v.containerCloseChannel,draft,disabled)}</label></section>`;}
+                function vbdNativeContainerChangeEditSection(draft,disabled){const v=draft.values||{}, change=(draft.data?.triggers||{}).container_change||{}, conditions=change.itemConditions||[];const itemSummary=conditions.length?conditions.map(c=>`${c.name||c.id||'条件'}: ${c.itemId||c.type||'模板'}`).join('；'):'暂无物品模板条件';return `<section class="wa-matcher-option" data-vbd-native-container-change-edit="true"><header><strong>容器内容变化</strong><span class="pill warning">itemConditions 只读，模板 GUI 在 P3</span></header><div class="wa-action-editor-grid"><label>内容变化频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerChangeChannel',v.containerChangeChannel,draft,disabled)}</label><label>检查间隔 tick<input id="vbdnt-container-check-interval" class="input" type="number" min="1" max="72000" value="${esc(v.containerChangeCheckIntervalTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label></div><div class="readonly-note" data-vbd-native-container-itemconditions-readonly="true">物品条件只读保留：${esc(itemSummary)}</div><p class="muted">P2 不做容器物品模板 GUI、ghost/template item、consume 或 itemSubmit。</p></section>`;}
+                function renderVbdNativeTriggerChannelCombo(deviceId,key,value,draft,disabled){
+                  const safeKey=String(key).replace(/[^a-zA-Z0-9_-]/g,'-'), open=(draft.channelComboOpen||{})[key]?' open':'';
+                  return `<div id="vbdnt-${safeKey}-combo" class="channel-combo vbd-native-channel-combo${open}" data-vbd-native-channel-combo="${esc(key)}"><div class="channel-combo-control"><input id="vbdnt-${safeKey}" class="input" maxlength="128" value="${esc(value||'')}" ${disabled?'disabled':''} placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${(draft.channelComboOpen||{})[key]?'true':'false'}" aria-controls="vbdnt-${safeKey}-menu" onfocus='openVbdNativeTriggerChannelMenu(${jsString(deviceId)},${jsString(key)})' oninput='syncVbdNativeTriggerDraftFromForm(${jsString(deviceId)},${jsString(key)},true)' onkeydown='handleVbdNativeTriggerChannelKey(event,${jsString(deviceId)},${jsString(key)})'><button class="channel-combo-toggle" type="button" ${disabled?'disabled':''} onclick='toggleVbdNativeTriggerChannelMenu(${jsString(deviceId)},${jsString(key)})' aria-label="显示已有频道">⌄</button></div><div id="vbdnt-${safeKey}-menu" class="channel-combo-menu" role="listbox">${vbdNativeTriggerChannelOptionsHtml(deviceId,key,draft)}</div></div>`;
+                }
+                function vbdNativeTriggerChannelOptionsHtml(deviceId,key,draft){
+                  if(draft.channelOptionsError||appState.channelOptionsError)return '<div class="channel-combo-empty">频道候选加载失败，仍可手动输入新的频道名。</div>';
+                  const value=(draft.values||{})[key]||'', options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,key)), current=normalizeChannelName(value).toLowerCase(), active=Math.max(0,Number((draft.channelComboIndex||{})[key]||0));
+                  if(options.length===0)return '<div class="channel-combo-empty">没有匹配的已有频道，可直接保存为新频道</div>';
+                  return options.map((c,index)=>`<button type="button" class="channel-combo-option ${index===active?'active':''} ${String(c.channel||'').trim().toLowerCase()===current?'selected':''}" role="option" onmousedown="event.preventDefault()" onclick='selectVbdNativeTriggerChannel(${jsString(deviceId)},${jsString(key)},${jsString(c.channel||'')})'><strong>${esc(c.channel||'未命名频道')}</strong><span>${esc(channelOptionLabel(c))}</span></button>`).join('');
+                }
+                function syncVbdNativeTriggerChannelCombo(deviceId,key){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;const safeKey=String(key).replace(/[^a-zA-Z0-9_-]/g,'-'), combo=document.getElementById(`vbdnt-${safeKey}-combo`), menu=document.getElementById(`vbdnt-${safeKey}-menu`), input=document.getElementById(`vbdnt-${safeKey}`);if(combo)combo.classList.toggle('open',!!(draft.channelComboOpen||{})[key]);if(input)input.setAttribute('aria-expanded',(draft.channelComboOpen||{})[key]?'true':'false');if(menu)menu.innerHTML=vbdNativeTriggerChannelOptionsHtml(deviceId,key,draft);}
+                function openVbdNativeTriggerChannelMenu(deviceId,key){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;syncVbdNativeTriggerDraftFromForm(deviceId);draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[key]=true;draft.channelComboIndex[key]=0;resetChannelComboQuery(draft,key);syncVbdNativeTriggerChannelCombo(deviceId,key);}
+                function toggleVbdNativeTriggerChannelMenu(deviceId,key){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;syncVbdNativeTriggerDraftFromForm(deviceId);draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[key]=!draft.channelComboOpen[key];if(draft.channelComboOpen[key])resetChannelComboQuery(draft,key);syncVbdNativeTriggerChannelCombo(deviceId,key);document.getElementById(`vbdnt-${String(key).replace(/[^a-zA-Z0-9_-]/g,'-')}`)?.focus();}
+                function selectVbdNativeTriggerChannel(deviceId,key,channel){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;syncVbdNativeTriggerDraftFromForm(deviceId);draft.values[key]=channel||'';draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[key]=false;draft.channelComboIndex[key]=0;resetChannelComboQuery(draft,key);const input=document.getElementById(`vbdnt-${String(key).replace(/[^a-zA-Z0-9_-]/g,'-')}`);if(input)input.value=draft.values[key];syncVbdNativeTriggerChannelCombo(deviceId,key);}
+                function handleVbdNativeTriggerChannelKey(event,deviceId,key){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,key));if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboOpen[key]=false;syncVbdNativeTriggerChannelCombo(deviceId,key);return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[key]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number(draft.channelComboIndex[key]||0)+1:Number(draft.channelComboIndex[key]||0)-1;draft.channelComboIndex[key]=Math.min(max,Math.max(0,next));syncVbdNativeTriggerChannelCombo(deviceId,key);return;}if(event.key==='Enter'&&draft.channelComboOpen?.[key]&&options.length>0){event.preventDefault();selectVbdNativeTriggerChannel(deviceId,key,options[Math.min(options.length-1,Number((draft.channelComboIndex||{})[key]||0))].channel);}}
+                function syncVbdNativeTriggerDraftFromForm(deviceId,keyToOpen=null,openMenu=false){
+                  const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;const v=draft.values||{};
+                  nativeTriggerTypes().forEach(item=>{const key=nativeTriggerEnabledKey(item.type), el=document.getElementById(`vbdnt-${item.type}-enabled`);if(el)v[key]=!!el.checked;});
+                  if(document.getElementById('vbdnt-redstone-mode'))v.redstoneMode=document.getElementById('vbdnt-redstone-mode').value;
+                  ['channel','offChannel','interactChannel','containerOpenChannel','containerCloseChannel','containerChangeChannel'].forEach(key=>{const el=document.getElementById(`vbdnt-${key.replace(/[^a-zA-Z0-9_-]/g,'-')}`);if(el)v[key]=el.value||'';});
+                  if(document.getElementById('vbdnt-condition-mode'))v.conditionMode=document.getElementById('vbdnt-condition-mode').value;
+                  if(v.blockStateEnabled)v.conditionRows=(v.conditionRows||[]).map((row,index)=>({property:document.getElementById(`vbdnt-condition-property-${index}`)?.value??row.property??'',value:document.getElementById(`vbdnt-condition-value-${index}`)?.value??row.value??''}));
+                  const interactionCooldown=document.getElementById('vbdnt-interaction-cooldown');if(interactionCooldown)v.interactionCooldownTicks=Number(interactionCooldown.value||0);
+                  const commonCooldown=document.getElementById('vbdnt-container-cooldown');if(commonCooldown)v.containerCooldownTicks=Number(commonCooldown.value||0);else{const cooldownIds=['vbdnt-container-cooldown-open','vbdnt-container-cooldown-close','vbdnt-container-cooldown-change'];for(const id of cooldownIds){const el=document.getElementById(id);if(el){v.containerCooldownTicks=Number(el.value||0);break;}}}
+                  const interval=document.getElementById('vbdnt-container-check-interval');if(interval)v.containerChangeCheckIntervalTicks=Number(interval.value||1);
+                  draft.values=v;if(openMenu&&keyToOpen){draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[keyToOpen]=true;draft.channelComboIndex[keyToOpen]=0;setChannelComboQuery(draft,v[keyToOpen]||'',keyToOpen);}
+                  appState.vbdNativeTriggerEdit=draft;if(keyToOpen)syncVbdNativeTriggerChannelCombo(deviceId,keyToOpen);
+                }
+                function rerenderVbdNativeTriggerEditor(deviceId){const draft=appState.vbdNativeTriggerEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;withPreservedModalScroll(()=>{syncVbdNativeTriggerDraftFromForm(deviceId);if(appState.deviceConfigEdit&&sameDeviceRef(appState.deviceConfigEdit.deviceId,deviceId)){applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(draft.deviceId);}else showVbdNativeTriggerEditModal(draft.deviceId);});}
+                function toggleVbdNativeTrigger(deviceId,type){
+                  syncVbdNativeTriggerDraftFromForm(deviceId);
+                  const draft=appState.vbdNativeTriggerEdit;
+                  if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;
+                  const key=nativeTriggerEnabledKey(type);
+                  draft.values[key]=!!document.getElementById(`vbdnt-${type}-enabled`)?.checked;
+                  if(type==='redstone_powered'&&draft.values[key]&&(!draft.values.redstoneMode||draft.values.redstoneMode==='redstone_disabled'))draft.values.redstoneMode='redstone_rising';
+                  if(type==='blockstate'&&draft.values[key]&&!(draft.values.conditionRows||[]).length){
+                    const prop=(draft.data?.triggers?.blockstate?.supportedProperties||[])[0];
+                    if(prop)draft.values.conditionRows=[{property:prop.name||'',value:(prop.targetValue||prop.currentValue||(prop.allowedValues||[])[0]||'')}];
+                  }
+                  if(type==='right_click'&&!draft.values[key]){
+                    const matcher=appState.interactionItemMatcherEdit;
+                    if(matcher&&sameDeviceRef(matcher.deviceId,deviceId))syncInteractionItemMatcherDraftFromForm(deviceId);
+                    draft.matcherDraftHiddenWhenInteractionDisabled=true;
+                  }else if(type==='right_click'&&draft.values[key]){
+                    draft.matcherDraftHiddenWhenInteractionDisabled=false;
+                  }
+                  rerenderVbdNativeTriggerEditor(deviceId);
+                }
+                function changeVbdNativeBlockStateProperty(deviceId,index){syncVbdNativeTriggerDraftFromForm(deviceId);const draft=appState.vbdNativeTriggerEdit;if(!draft)return;const propName=draft.values.conditionRows[index]?.property||'', prop=(draft.data?.triggers?.blockstate?.supportedProperties||[]).find(p=>p.name===propName);if(prop)draft.values.conditionRows[index].value=prop.currentValue||(prop.allowedValues||[])[0]||'';rerenderVbdNativeTriggerEditor(deviceId);}
+                function addVbdNativeBlockStateCondition(deviceId){syncVbdNativeTriggerDraftFromForm(deviceId);const draft=appState.vbdNativeTriggerEdit;if(!draft||!draft.lockId)return;const used=new Set((draft.values.conditionRows||[]).map(r=>r.property)), prop=(draft.data?.triggers?.blockstate?.supportedProperties||[]).find(p=>!used.has(p.name))||(draft.data?.triggers?.blockstate?.supportedProperties||[])[0]||{};draft.values.conditionRows=draft.values.conditionRows||[];draft.values.conditionRows.push({property:prop.name||'',value:prop.currentValue||(prop.allowedValues||[])[0]||''});rerenderVbdNativeTriggerEditor(deviceId);}
+                function removeVbdNativeBlockStateCondition(deviceId,index){syncVbdNativeTriggerDraftFromForm(deviceId);const draft=appState.vbdNativeTriggerEdit;if(!draft||!draft.lockId)return;draft.values.conditionRows.splice(index,1);rerenderVbdNativeTriggerEditor(deviceId);}
+                async function openInlineInteractionMatcherForVbdNativeTrigger(deviceId){try{syncVbdNativeTriggerDraftFromForm(deviceId);const draft=await prepareInteractionItemMatcherDraft(deviceId,canEditInteractionItemMatcher());rerenderVbdNativeTriggerEditor(deviceId);if(draft.errors.length)toast(draft.errors[0].message||'交互物品匹配编辑锁获取失败');}catch(err){toast(err.message||'交互物品匹配加载失败');}}
+                function vbdNativeTriggerPatchBody(draft){const v=draft.values||{};return {expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||'',redstoneEnabled:!!v.redstoneEnabled,redstoneMode:v.redstoneMode||'redstone_rising',channel:v.channel||'',offChannel:v.offChannel||'',blockStateEnabled:!!v.blockStateEnabled,conditionMode:v.conditionMode||'condition_enter',conditionProperties:(v.conditionRows||[]).filter(r=>!isBlank(r.property)||!isBlank(r.value)).map(r=>({property:r.property||'',value:r.value||''})),interactionEnabled:!!v.interactionEnabled,interactChannel:v.interactChannel||'',interactionCooldownTicks:Number(v.interactionCooldownTicks||0),containerOpenEnabled:!!v.containerOpenEnabled,containerOpenChannel:v.containerOpenChannel||'',containerCloseEnabled:!!v.containerCloseEnabled,containerCloseChannel:v.containerCloseChannel||'',containerChangeEnabled:!!v.containerChangeEnabled,containerChangeChannel:v.containerChangeChannel||'',containerCooldownTicks:Number(v.containerCooldownTicks||0),containerChangeCheckIntervalTicks:Number(v.containerChangeCheckIntervalTicks||1)};}
+                async function patchVbdNativeTriggerDraft(deviceId,draft){return await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(deviceId)}/native-triggers`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(vbdNativeTriggerPatchBody(draft))});}
+                async function saveVbdNativeTrigger(deviceId){const draft=appState.vbdNativeTriggerEdit;if(!draft||!draft.lockId){toast('当前原生触发配置只读。');return;}syncVbdNativeTriggerDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.vbdNativeTriggerEdit=draft;rerenderVbdNativeTriggerEditor(deviceId);try{const result=await patchVbdNativeTriggerDraft(deviceId,draft);if(result.success){markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'virtual_block_device_triggers'}});appState.vbdNativeTriggerEdit=null;stopVbdNativeTriggerLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'原生触发配置已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code)){draft.lockId='';draft.lock=null;stopVbdNativeTriggerLockHeartbeat();}appState.vbdNativeTriggerEdit=draft;toast(result.message||'保存失败');rerenderVbdNativeTriggerEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.vbdNativeTriggerEdit=draft;toast(err.message||'保存失败');rerenderVbdNativeTriggerEditor(deviceId);}}
+                async function reloadVbdNativeTriggerAfterConflict(deviceId){try{await releaseVbdNativeTriggerLock(appState.vbdNativeTriggerEdit,true);await prepareVbdNativeTriggerDraft(deviceId,true);rerenderVbdNativeTriggerEditor(deviceId);}catch(err){toast(err.message||'原生触发配置重新加载失败');}}
+                function scheduleVbdNativeTriggerLockHeartbeat(){stopVbdNativeTriggerLockHeartbeat();appState.vbdNativeTriggerLockTimer=setTimeout(async()=>{await heartbeatVbdNativeTriggerLock();if(appState.vbdNativeTriggerEdit?.lockId)scheduleVbdNativeTriggerLockHeartbeat();},30000);}
+                function stopVbdNativeTriggerLockHeartbeat(){if(appState.vbdNativeTriggerLockTimer){clearTimeout(appState.vbdNativeTriggerLockTimer);appState.vbdNativeTriggerLockTimer=null;}}
+                async function heartbeatVbdNativeTriggerLock(){const draft=appState.vbdNativeTriggerEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'virtual_block_device_triggers',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.vbdNativeTriggerEdit=draft;return;}draft.errors=[{message:result.message||'原生触发配置编辑锁续期失败'}];draft.lockId='';draft.lock=null;appState.vbdNativeTriggerEdit=draft;stopVbdNativeTriggerLockHeartbeat();rerenderVbdNativeTriggerEditor(draft.deviceId);}catch(err){draft.errors=[{message:err.message||'原生触发配置编辑锁续期失败'}];draft.lockId='';draft.lock=null;appState.vbdNativeTriggerEdit=draft;stopVbdNativeTriggerLockHeartbeat();rerenderVbdNativeTriggerEditor(draft.deviceId);}}
+                async function releaseVbdNativeTriggerLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'virtual_block_device_triggers',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'原生触发配置编辑锁释放失败，将等待自动过期。');}}
+                async function cancelVbdNativeTriggerEdit(deviceId,silent=false){const draft=appState.vbdNativeTriggerEdit;if(draft&&sameDeviceRef(draft.deviceId,deviceId))await releaseVbdNativeTriggerLock(draft,silent);if(draft&&sameDeviceRef(draft.deviceId,deviceId)){appState.vbdNativeTriggerEdit=null;stopVbdNativeTriggerLockHeartbeat();}}
+                function maybeReleaseVbdNativeTriggerEditForRoute(hash){const draft=appState.vbdNativeTriggerEdit;if(!draft)return;if(String(hash||'').startsWith('#/devices/')){const info=detailRoute(String(hash).substring('#/devices/'.length),'#/devices'), routeType=deviceTypeRefPrefix(info.id);if((!routeType||routeType==='virtual_block_device')&&sameDeviceRef(info.id,draft.deviceId))return;}releaseVbdNativeTriggerLock(draft,true);appState.vbdNativeTriggerEdit=null;stopVbdNativeTriggerLockHeartbeat();}
                 function deviceFlowPanel(detail){
                   const cfg=detail.configSummary||{}, item=cfg.interactionItem||{};
                   const nodes=[
@@ -1820,10 +1982,18 @@ public final class WebAdminFrontendScripts {
                       else session.errors.push({message:draft.errors[0]?.message||draft.unsupportedReason||'Action 列表编辑锁获取失败'});
                     }
                     if(isVirtualBlockDevice(detail)){
-                      const draft=await prepareInteractionItemMatcherDraft(canonicalId,canEditInteractionItemMatcher());
-                      if(draft.lockId)acquired++;
-                      else if(draft.matcherReadable)visibleSections++;
-                      else session.errors.push({message:draft.errors[0]?.message||draft.unsupportedReason||'交互物品匹配编辑锁获取失败'});
+                      const nativeDraft=await prepareVbdNativeTriggerDraft(canonicalId,canEditVbdNativeTriggers());
+                      if(nativeDraft.lockId)acquired++;
+                      else if(nativeDraft.supported)visibleSections++;
+                      else session.errors.push({message:nativeDraft.errors[0]?.message||nativeDraft.unsupportedReason||'原生触发配置编辑锁获取失败'});
+                      if(nativeDraft.values?.interactionEnabled){
+                        const matcherDraft=await prepareInteractionItemMatcherDraft(canonicalId,canEditInteractionItemMatcher());
+                        if(matcherDraft.lockId)acquired++;
+                        else if(matcherDraft.matcherReadable)visibleSections++;
+                        else session.errors.push({message:matcherDraft.errors[0]?.message||matcherDraft.unsupportedReason||'交互物品匹配编辑锁获取失败'});
+                      }else{
+                        appState.interactionItemMatcherEdit=null;stopInteractionItemMatcherLockHeartbeat();
+                      }
                     }
                     if(!acquired&&!visibleSections){await releaseAllDeviceConfigLocks(canonicalId,true);toast(session.errors[0]?.message||'当前设备没有可编辑配置区。');return;}
                     appState.deviceConfigEdit=session;
@@ -1841,11 +2011,12 @@ public final class WebAdminFrontendScripts {
                   if(appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===deviceId)updateDeviceBasicConfigDraftFromForm(deviceId);
                   if(appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===deviceId)updateDeviceExtendedConfigDraftFromForm(deviceId);
                   if(appState.actionRelayActionsEdit&&appState.actionRelayActionsEdit.deviceId===deviceId)syncActionRelayActionsDraftFromForm(deviceId);
+                  if(appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,deviceId))syncVbdNativeTriggerDraftFromForm(deviceId);
                   if(appState.interactionItemMatcherEdit&&sameDeviceRef(appState.interactionItemMatcherEdit.deviceId,deviceId))syncInteractionItemMatcherDraftFromForm(deviceId);
                 }
                 async function saveDeviceConfig(deviceId){
                   const session=appState.deviceConfigEdit||{deviceId,errors:[]};
-                  applyDeviceConfigDraftsFromForm(deviceId);session.saving=true;session.errors=[];appState.deviceConfigEdit=session;showDeviceConfigEditModal(deviceId);
+                  applyDeviceConfigDraftsFromForm(deviceId);session.saving=true;session.errors=[];appState.deviceConfigEdit=session;withPreservedModalScroll(()=>showDeviceConfigEditModal(deviceId));
                   let changed=false;
                   try{
                     const meta=appState.deviceMetadataEdit;
@@ -1870,18 +2041,6 @@ public final class WebAdminFrontendScripts {
                     }else if(ext&&ext.deviceId===deviceId){
                       appState.deviceExtendedConfigEdit=null;
                     }
-                    const actionDraft=appState.actionRelayActionsEdit;
-                    if(actionDraft&&actionDraft.deviceId===deviceId){
-                      if(actionRelayActionsDirty(actionDraft)){
-                        const result=await patchActionRelayActionsDraft(deviceId,actionDraft);
-                        if(!result.success)return deviceConfigSaveFailed(deviceId,actionDraft,result,'actionRelayActions');
-                        markChannelOptionsDirty({type:'action_changed',payload:{targetType:'action_relay_actions'}});
-                        changed=changed||!!result.changed;
-                      }else{
-                        await releaseActionRelayActionsLock(actionDraft,true);
-                      }
-                      appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();
-                    }
                     const matcherDraft=appState.interactionItemMatcherEdit, currentDetail=appState.currentDeviceDetail;
                     if(matcherDraft&&sameDeviceRef(matcherDraft.deviceId,deviceId)){
                       if(currentDetail&&sameDeviceRef(currentDetail.id,deviceId)&&!isVirtualBlockDevice(currentDetail)){
@@ -1901,8 +2060,32 @@ public final class WebAdminFrontendScripts {
                       appState.interactionItemMatcherEdit=null;stopInteractionItemMatcherLockHeartbeat();
                       }
                     }
+                    const nativeDraft=appState.vbdNativeTriggerEdit;
+                    if(nativeDraft&&sameDeviceRef(nativeDraft.deviceId,deviceId)){
+                      if(nativeDraft.lockId&&vbdNativeTriggerDirty(nativeDraft)){
+                        const result=await patchVbdNativeTriggerDraft(deviceId,nativeDraft);
+                        if(!result.success)return deviceConfigSaveFailed(deviceId,nativeDraft,result,'vbdNativeTriggers');
+                        markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'virtual_block_device_triggers'}});
+                        changed=changed||!!result.changed;
+                      }else if(nativeDraft.lockId){
+                        await releaseVbdNativeTriggerLock(nativeDraft,true);
+                      }
+                      appState.vbdNativeTriggerEdit=null;stopVbdNativeTriggerLockHeartbeat();
+                    }
+                    const actionDraft=appState.actionRelayActionsEdit;
+                    if(actionDraft&&actionDraft.deviceId===deviceId){
+                      if(actionRelayActionsDirty(actionDraft)){
+                        const result=await patchActionRelayActionsDraft(deviceId,actionDraft);
+                        if(!result.success)return deviceConfigSaveFailed(deviceId,actionDraft,result,'actionRelayActions');
+                        markChannelOptionsDirty({type:'action_changed',payload:{targetType:'action_relay_actions'}});
+                        changed=changed||!!result.changed;
+                      }else{
+                        await releaseActionRelayActionsLock(actionDraft,true);
+                      }
+                      appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();
+                    }
                     appState.deviceConfigEdit=null;await dismissWebAdminModal();toast(changed?'设备配置已保存。':'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
-                  }catch(err){session.saving=false;session.errors=[{message:err.message||'保存失败'}];appState.deviceConfigEdit=session;toast(err.message||'保存失败');showDeviceConfigEditModal(deviceId);}
+                  }catch(err){session.saving=false;session.errors=[{message:err.message||'保存失败'}];appState.deviceConfigEdit=session;toast(err.message||'保存失败');withPreservedModalScroll(()=>showDeviceConfigEditModal(deviceId));}
                 }
                 function deviceConfigSaveFailed(deviceId,draft,result,section){
                   const session=appState.deviceConfigEdit||{deviceId,errors:[]};
@@ -1911,8 +2094,9 @@ public final class WebAdminFrontendScripts {
                   if(section==='basic'){appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();}
                   if(section==='extended'){appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();}
                   if(section==='actionRelayActions'){appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();}
+                  if(section==='vbdNativeTriggers'){if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code)){draft.lockId='';draft.lock=null;stopVbdNativeTriggerLockHeartbeat();}appState.vbdNativeTriggerEdit=draft;}
                   if(section==='interactionItemMatcher'){if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code)){draft.lockId='';draft.lock=null;stopInteractionItemMatcherLockHeartbeat();}appState.interactionItemMatcherEdit=draft;}
-                  session.saving=false;session.errors=[{message:result.message||'保存失败'}];appState.deviceConfigEdit=session;toast(result.message||'保存失败');if(section==='actionRelayActions')rerenderActionRelayActionsEditor(deviceId);else showDeviceConfigEditModal(deviceId);return false;
+                  session.saving=false;session.errors=[{message:result.message||'保存失败'}];appState.deviceConfigEdit=session;toast(result.message||'保存失败');if(section==='actionRelayActions')rerenderActionRelayActionsEditor(deviceId);else withPreservedModalScroll(()=>showDeviceConfigEditModal(deviceId));return false;
                 }
                 """).append("""
                 function normalizeInteractionItemMatcherDraftData(raw={}){
@@ -2143,16 +2327,18 @@ public final class WebAdminFrontendScripts {
                 async function cancelActionRelayActionsEdit(deviceId,silent=false){const draft=appState.actionRelayActionsEdit;if(draft&&draft.deviceId===deviceId)await releaseActionRelayActionsLock(draft,silent);if(draft&&draft.deviceId===deviceId){appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();}}
                 """).append("""
                 async function releaseAllDeviceConfigLocks(deviceId,silent){
-                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit,actions=appState.actionRelayActionsEdit,matcher=appState.interactionItemMatcherEdit;
+                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit,actions=appState.actionRelayActionsEdit,native=appState.vbdNativeTriggerEdit,matcher=appState.interactionItemMatcherEdit;
                   if(meta&&meta.deviceId===deviceId)await releaseDeviceMetadataLock(meta,silent);
                   if(basic&&basic.deviceId===deviceId)await releaseDeviceBasicConfigLock(basic,silent);
                   if(ext&&ext.deviceId===deviceId)await releaseDeviceExtendedConfigLock(ext,silent);
                   if(actions&&actions.deviceId===deviceId)await releaseActionRelayActionsLock(actions,silent);
+                  if(native&&sameDeviceRef(native.deviceId,deviceId))await releaseVbdNativeTriggerLock(native,silent);
                   if(matcher&&sameDeviceRef(matcher.deviceId,deviceId))await releaseInteractionItemMatcherLock(matcher,silent);
                   if(meta&&meta.deviceId===deviceId){appState.deviceMetadataEdit=null;stopDeviceMetadataLockHeartbeat();}
                   if(basic&&basic.deviceId===deviceId){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();}
                   if(ext&&ext.deviceId===deviceId){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();}
                   if(actions&&actions.deviceId===deviceId){appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();}
+                  if(native&&sameDeviceRef(native.deviceId,deviceId)){appState.vbdNativeTriggerEdit=null;stopVbdNativeTriggerLockHeartbeat();}
                   if(matcher&&sameDeviceRef(matcher.deviceId,deviceId)){appState.interactionItemMatcherEdit=null;stopInteractionItemMatcherLockHeartbeat();}
                 }
                 async function cancelDeviceConfigEdit(deviceId){
@@ -3252,6 +3438,7 @@ public final class WebAdminFrontendScripts {
                   if(k==='device_basic_config')return JSON.stringify({enabled:!!draft.enabled,channel:normalizeChannelName(draft.channel)});
                   if(k==='device_extended_config'){const values={}, clear={};(draft.supportedFields||Object.keys(draft.values||{})).forEach(field=>{const value=(draft.values||{})[field];values[field]=isExtendedTickField(field)?Number(value||0):(isExtendedChannelField(field)?normalizeChannelName(value):String(value??''));if((draft.clear||{})[field])clear[field]=true;});return JSON.stringify({values,clear});}
                   if(k==='action_relay_actions')return actionRelayActionsEditableJson(draft.actions||[]);
+                  if(k==='vbd_native_triggers')return vbdNativeTriggerEditableJson(draft);
                   if(k==='interaction_item_matcher')return interactionItemMatcherEditableJson(draft);
                   if(k==='channel_metadata')return JSON.stringify({displayName:String(draft.displayName||''),note:String(draft.note||''),iconKey:String(draft.iconKey||'auto')});
                   if(k==='signal_listener_basic_config')return JSON.stringify({enabled:!!draft.enabled,channel:normalizeChannelName(draft.channel),cooldownTicks:Number(draft.cooldownTicks||0)});
@@ -3267,6 +3454,7 @@ public final class WebAdminFrontendScripts {
                   if(k==='device_basic_config')updateDeviceBasicConfigDraftFromForm(id,false);
                   if(k==='device_extended_config')updateDeviceExtendedConfigDraftFromForm(id);
                   if(k==='action_relay_actions')syncActionRelayActionsDraftFromForm(id);
+                  if(k==='vbd_native_triggers')syncVbdNativeTriggerDraftFromForm(id);
                   if(k==='interaction_item_matcher')syncInteractionItemMatcherDraftFromForm(id);
                   if(k==='device_config')applyDeviceConfigDraftsFromForm(id);
                   if(k==='channel_metadata'){const d=appState.channelMetadataEdit;if(d){d.displayName=document.getElementById('channel-metadata-display-name')?.value||'';d.note=document.getElementById('channel-metadata-note')?.value||'';d.iconKey=document.getElementById('channel-metadata-icon')?.value||'auto';}}
@@ -3275,8 +3463,8 @@ public final class WebAdminFrontendScripts {
                   if(k==='selection_create_virtual_block'){const d=appState.selectionCreateVirtualBlock;if(d&&d.step==='config')appState.selectionCreateVirtualBlock=selectionDraftFromForm();}
                 }
                 function isDeviceConfigModalDirty(deviceId){
-                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit,actions=appState.actionRelayActionsEdit,matcher=appState.interactionItemMatcherEdit;
-                  return !!((meta&&meta.deviceId===deviceId&&modalDraftDirty('device_metadata',meta))||(basic&&basic.deviceId===deviceId&&modalDraftDirty('device_basic_config',basic))||(ext&&ext.deviceId===deviceId&&modalDraftDirty('device_extended_config',ext))||(actions&&actions.deviceId===deviceId&&modalDraftDirty('action_relay_actions',actions))||(matcher&&sameDeviceRef(matcher.deviceId,deviceId)&&modalDraftDirty('interaction_item_matcher',matcher)));
+                  const meta=appState.deviceMetadataEdit,basic=appState.deviceBasicConfigEdit,ext=appState.deviceExtendedConfigEdit,actions=appState.actionRelayActionsEdit,native=appState.vbdNativeTriggerEdit,matcher=appState.interactionItemMatcherEdit;
+                  return !!((meta&&meta.deviceId===deviceId&&modalDraftDirty('device_metadata',meta))||(basic&&basic.deviceId===deviceId&&modalDraftDirty('device_basic_config',basic))||(ext&&ext.deviceId===deviceId&&modalDraftDirty('device_extended_config',ext))||(actions&&actions.deviceId===deviceId&&modalDraftDirty('action_relay_actions',actions))||(native&&sameDeviceRef(native.deviceId,deviceId)&&modalDraftDirty('vbd_native_triggers',native))||(matcher&&sameDeviceRef(matcher.deviceId,deviceId)&&modalDraftDirty('interaction_item_matcher',matcher)));
                 }
                 function cancelDiscardModalClose(){
                   appState.modalDiscardConfirmOpen=false;

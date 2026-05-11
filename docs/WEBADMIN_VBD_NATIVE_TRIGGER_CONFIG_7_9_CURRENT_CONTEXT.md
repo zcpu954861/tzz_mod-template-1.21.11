@@ -73,14 +73,17 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 详情页和统一设备配置 modal 中的原生触发配置骨架。
 - 数据驱动的原生触发只读摘要。
 - BlockState 支持属性与目标值的只读读取基础。
+- 7.9 P2 中 `virtual_block_device` 原生触发普通配置编辑闭环：
+  - 红石 / 受电状态。
+  - BlockState 条件结构化编辑。
+  - 玩家右键交互基础配置。
+  - 容器打开 / 关闭 / 内容变化基础配置。
+  - `virtual_block_device_triggers:<deviceId>` 编辑锁、fingerprint、audit、realtime 和 `WebAdminWriteResult`。
 - 7.9 P1 验收文档。
 - P1 smoke / guard。
 
 ## 禁止范围
 
-- 不做完整保存红石配置。
-- 不做完整保存 BlockState 条件。
-- 不做完整保存容器 open / close / change 配置。
 - 不做容器内容变化物品模板 GUI。
 - 不做 itemSubmit。
 - 不做 consume。
@@ -94,7 +97,8 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 不做命令方块命令检测。
 - 不做刷怪笼 NBT 检测。
 - 不使用 raw JSON textarea。
-- 不新增 native trigger 持久化写 API。
+- 不把 interaction item matcher 做成独立触发源。
+- 不清空 7.8 matcher 数据、itemSubmit 未来字段或 container itemConditions。
 
 ## 当前已实现内容
 
@@ -127,6 +131,32 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 已将 7.8 interaction item matcher 摘要和入口合并到“玩家右键交互”摘要中；独立 matcher 编辑 modal / API / 保存链路保留，但 VBD 详情页不再显示 standalone matcher card。
 - 已创建 P1 手工验收文档和 stabilization guard。
 
+7.9 P2 当前实现状态：
+
+- 已扩展原生触发 API：
+  - `GET /api/webadmin/virtual-block-devices/{deviceId}/native-triggers`
+  - `PATCH /api/webadmin/virtual-block-devices/{deviceId}/native-triggers`
+  - 仅支持 `virtual_block_device`；非 VBD 返回 validation error。
+- PATCH 接入 EDITOR / OWNER 权限、CSRF / same-origin、`WebAdminWriteResult`、`virtual_block_device_triggers:<deviceId>` edit lock、expected fingerprint、audit 和 realtime。
+- 已实现红石 / 受电状态编辑；文案保留 `currentPowered = blockStatePowered || receivedPowerLevel > 0` 语义，不把红石简化为 `powered` 属性。
+- 红石触发禁用使用 `redstone_disabled` 模式停止红石边沿触发，不写入 VBD 全局 `enabled=false`，因此不会误关右键交互或容器触发。主频道 / 断电频道字段保留。
+- 已实现 BlockState 条件结构化编辑：
+  - 属性名下拉只来自当前绑定方块实际 `BlockState.getProperties()`。
+  - 目标值只来自该属性实际 `Property.getValues()`。
+  - 服务端保存时再次校验方块、属性和值。
+  - 不提供 raw JSON / raw condition textarea。
+- 已实现右键交互基础配置：`interactionEnabled`、`interactChannel`、`interactionCooldownTicks`。
+- 已实现容器打开 / 关闭 / 内容变化基础配置：channel、container cooldown、change check interval。`itemConditions` 只读保留，复杂物品模板 GUI 仍在 P3。
+- 容器 open / close / change 共用 `containerEnabled`；全部关闭时 `containerEnabled=false`，保存的 `itemConditions` 仍保留但不会触发。
+- 统一设备配置 modal 内可以直接编辑原生触发配置；独立“编辑原生触发配置”modal 也可用。
+- P2 的触发方式选择是真实配置；编辑 UI 只显示已启用 / 已选中的触发 section。
+- interaction item matcher 在 P2 中完全受右键交互控制：
+  - 右键交互未启用 / 未选中时隐藏 matcher 摘要与入口。
+  - 右键交互启用 / 选中后，matcher 摘要和编辑入口显示在右键交互 section 内。
+  - 隐藏 matcher 不清空 matcher 数据。
+- 保存 native trigger 只写入原生触发字段，不重写整个 VBD JSON，不清空 redstone / BlockState / interaction / matcher / container / `itemConditions` / itemSubmit 保留字段。
+- 保存成功发布 `virtual_block_device_changed`、`device_config_changed`、`config_changed`、`write_audit_appended` 等 realtime 事件，并让 channel catalog cache dirty。
+
 ## 待验收内容
 
 - VBD 详情页右侧 detail / secondary column 出现“原生触发配置”区域。
@@ -142,7 +172,10 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - BlockState 属性来自当前绑定方块实际 `BlockState.getProperties()`。
 - BlockState 目标值来自该属性实际支持值。
 - 统一设备配置 modal 内能看到“原生触发配置”section。
-- P1 不新增 native trigger 写 API。
+- 统一设备配置 modal 内可以直接编辑原生触发配置，切换 section 不重置滚动。
+- 独立 native trigger 编辑 modal 可保存红石 / BlockState / 右键交互 / 容器 open / close / change 基础配置。
+- 他人持有 `virtual_block_device_triggers` lock 时，编辑按钮前置禁用。
+- BlockState 保存拒绝当前方块不支持的属性和值。
 - 不出现 itemSubmit / consume / ConditionEngine / 路径图 / raw JSON。
 
 ## 后续阶段边界

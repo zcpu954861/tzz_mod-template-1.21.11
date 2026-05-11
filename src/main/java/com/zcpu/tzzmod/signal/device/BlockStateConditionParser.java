@@ -32,6 +32,32 @@ public final class BlockStateConditionParser {
         return validate(parsed.condition(), currentState);
     }
 
+    public static BlockStateConditionResult fromPropertiesAndValidate(
+            Map<String, String> properties,
+            BlockState currentState
+    ) {
+        if (currentState == null || currentState.isAir()) {
+            return BlockStateConditionResult.failure("当前位置是空气，不能设置方块状态条件。");
+        }
+        if (properties == null || properties.isEmpty()) {
+            return BlockStateConditionResult.failure("BlockState 条件至少需要一个属性。");
+        }
+        Map<String, String> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : properties.entrySet()) {
+            String propertyName = entry.getKey() == null ? "" : entry.getKey().trim();
+            String value = entry.getValue() == null ? "" : entry.getValue().trim();
+            if (propertyName.isBlank() || value.isBlank()) {
+                return BlockStateConditionResult.failure("BlockState 属性名和值不能为空。");
+            }
+            if (normalized.containsKey(propertyName)) {
+                return BlockStateConditionResult.failure("条件中重复设置了状态 " + propertyName + "。");
+            }
+            normalized.put(propertyName, value);
+        }
+        String blockId = VirtualBlockDeviceSupport.blockId(currentState);
+        return validate(new BlockStateCondition(blockId, normalized, normalizedRaw(blockId, normalized)), currentState);
+    }
+
     public static boolean matches(BlockState state, SignalDeviceData device) {
         if (state == null || device == null || !device.conditionEnabled()) {
             return false;
