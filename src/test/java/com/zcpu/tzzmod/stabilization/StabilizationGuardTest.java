@@ -2569,6 +2569,11 @@ public final class StabilizationGuardTest {
                 "7.9 P3",
                 "红石 / 受电状态",
                 "BlockState 条件",
+                "`condition_enter` 只在条件从不满足变为满足时触发",
+                "`condition_exit` 只在条件从满足变为不满足时触发",
+                "`condition_both` 在进入和退出条件时触发",
+                "保存配置不会立即触发 BlockState signal",
+                "BlockState 条件没有独立 `conditionChannel` 字段",
                 "玩家右键交互",
                 "容器打开",
                 "容器关闭",
@@ -2667,6 +2672,8 @@ public final class StabilizationGuardTest {
                 "state.getProperties()",
                 "rawProperty.getValues()",
                 "BlockStateConditionParser.fromPropertiesAndValidate",
+                "conditionModeUsesChannelAndOffChannelSemantics",
+                "saveDoesNotEmitBlockStateSignal",
                 "interaction item matcher 是右键交互之后的条件/判定层",
                 "itemConditionsReadOnly",
                 "templateEditorPhase",
@@ -2716,6 +2723,18 @@ public final class StabilizationGuardTest {
                 "data-vbd-native-blockstate-edit=\"true\"",
                 "data-vbd-native-blockstate-property-dropdown-from-bound-block=\"true\"",
                 "data-vbd-native-blockstate-allowed-values-from-property=\"true\"",
+                "data-vbd-native-blockstate-trigger-channel-combo=\"true\"",
+                "data-vbd-native-blockstate-trigger-channel-shares-main-channel=\"true\"",
+                "data-vbd-native-blockstate-exit-channel-uses-off-channel=\"true\"",
+                "data-vbd-native-blockstate-channel-unified-catalog=\"true\"",
+                "data-vbd-native-blockstate-no-condition-channel=\"true\"",
+                "data-custom-combobox-arrow-toggle-close=\"true\"",
+                "data-custom-combobox-outside-click-close=\"true\"",
+                "data-custom-combobox-escape-close=\"true\"",
+                "data-custom-combobox-select-option-close=\"true\"",
+                "data-custom-combobox-single-open=\"true\"",
+                "data-custom-combobox-toggle-no-dirty=\"true\"",
+                "closeAllCustomComboboxes",
                 "data-vbd-native-interaction-edit=\"true\"",
                 "data-vbd-native-trigger-matcher-hidden-when-interaction-disabled=\"true\"",
                 "data-vbd-native-trigger-matcher-visible-inside-interaction=\"true\"",
@@ -2762,10 +2781,12 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("native-trigger-json") || js.contains("data-vbd-native-trigger-save")
                         || js.contains("containerTemplateGui") || js.contains("ghostTemplateItemGui"),
                 "7.9 P2 native trigger edit does not expose raw JSON or container template GUI");
-        for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine")) {
+        for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine", "conditionChannel")) {
             requireFalse(nativeTriggerRequest.contains(forbidden),
                     "7.9 P2 native trigger PATCH DTO must not expose forbidden field: " + forbidden);
         }
+        requireFalse(js.contains("conditionChannel"),
+                "7.9 P2 BlockState UI must not invent a conditionChannel field");
         requireFalse(js.contains("itemSubmitEditor") || js.contains("consumeEditor") || js.contains("conditionEngineEditor")
                         || js.contains("scratchLikeNativeTriggerEditor") || js.contains("successFailPathGraph")
                         || js.contains("pathVisualization") || js.contains("nativeTriggerGraph") || js.contains("mindMap"),

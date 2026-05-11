@@ -685,6 +685,12 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         data.put("conditionRaw", device.conditionRaw());
         data.put("conditionMode", device.conditionMode());
         data.put("conditionModeDisplayName", BlockStateConditionMode.displayName(device.conditionMode()));
+        data.put("channel", device.channel());
+        data.put("offChannel", device.offChannel());
+        data.put("usesMainChannel", true);
+        data.put("exitUsesOffChannelFallbackToMain", true);
+        data.put("conditionModeUsesChannelAndOffChannelSemantics", true);
+        data.put("saveDoesNotEmitBlockStateSignal", true);
         data.put("lastConditionMatched", device.lastConditionMatched());
         data.put("lastConditionCheckGameTime", device.lastConditionCheckGameTime());
         data.put("lastConditionResult", device.lastConditionResult());

@@ -143,8 +143,14 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 已实现 BlockState 条件结构化编辑：
   - 属性名下拉只来自当前绑定方块实际 `BlockState.getProperties()`。
   - 目标值只来自该属性实际 `Property.getValues()`。
+  - BlockState 条件没有独立 `conditionChannel` 字段，WebUI 中的“BlockState 触发频道 / 主频道”写入 VBD 共享 `channel`。
+  - `condition_enter` 只在条件从不满足变为满足时触发，使用 VBD 主 `channel`。
+  - `condition_exit` 只在条件从满足变为不满足时触发，使用 `offChannel`，未设置时回退主 `channel`。
+  - `condition_both` 在进入和退出条件时触发，进入使用主 `channel`，退出使用 `offChannel` 回退主 `channel`。
+  - 保存配置不会立即触发 BlockState signal；保存时记录当前匹配状态，之后需要绑定方块状态变化才会按 `conditionMode` 触发。
   - 服务端保存时再次校验方块、属性和值。
   - 不提供 raw JSON / raw condition textarea。
+- 已修复 WebAdmin 自定义 channel combobox 的 toggle 行为：点击箭头可打开，再次点击同一箭头可关闭；点击外部、ESC、选择选项会关闭；打开一个 combobox 会关闭其它 combobox；这些开关状态不进入 dirty 判断。
 - 已实现右键交互基础配置：`interactionEnabled`、`interactChannel`、`interactionCooldownTicks`。
 - 已实现容器打开 / 关闭 / 内容变化基础配置：channel、container cooldown、change check interval。`itemConditions` 只读保留，复杂物品模板 GUI 仍在 P3。
 - 容器 open / close / change 共用 `containerEnabled`；全部关闭时 `containerEnabled=false`，保存的 `itemConditions` 仍保留但不会触发。
