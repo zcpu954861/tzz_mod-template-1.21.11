@@ -879,6 +879,34 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualItemConditionsForWebAdmin(
+            MinecraftServer server,
+            String deviceId,
+            List<ContainerItemConditionData> itemConditions
+    ) {
+        if (server == null || deviceId == null || deviceId.isBlank() || itemConditions == null) {
+            return null;
+        }
+        State state = getState(server);
+        refreshLoadedDevices(server, state);
+        SignalDeviceData existing = findById(state, cleanUserText(deviceId));
+        if (existing == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(existing.type())) {
+            return null;
+        }
+        List<ContainerItemConditionData> normalizedConditions = new ArrayList<>();
+        for (ContainerItemConditionData condition : itemConditions) {
+            if (condition != null) {
+                normalizedConditions.add(condition.normalized());
+            }
+        }
+        SignalDeviceData updated = withItemConditions(existing, normalizedConditions);
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        state.flushDirty(true, currentGameTime(server));
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
+        return updated.normalized();
+    }
+
     public static synchronized SignalDeviceData updateVirtualItemCondition(ServerWorld world, BlockPos pos, ContainerItemConditionData condition) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));

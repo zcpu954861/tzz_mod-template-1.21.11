@@ -1166,7 +1166,7 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/start')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'已通知目标玩家打开 GUI。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'started', active:true } } };
                   if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.includes('/container-template-session/status')) return { sessionRef:'ct-1', id:'ct-1', status:'started', active:true, message:'等待目标玩家打开 GUI。' };
                   if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/cancel')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'容器模板会话已取消。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'cancelled', active:false } } };
-                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template')) { const id = decodeURIComponent(url.substring('/api/webadmin/virtual-block-devices/'.length).slice(0, -'/container-template'.length)); return { deviceId:id, displayName:'Complex VBD', supported:true, typeSupported:true, p3aSkeleton:true, saveImplemented:false, dryRunGhostInteraction:false, expectedFingerprint:'container-template-fp', lockStatus:{ locked:false }, itemConditions:[{ id:'slot-0', name:'Slot 0 stone', type:'slot_item', slot:0, itemId:'minecraft:stone', templateItemId:'minecraft:stone', countMode:'at_least', count:1 }, { id:'total-stick', name:'Total sticks', type:'total_item', itemId:'minecraft:stick', templateItemId:'minecraft:stick', countMode:'exactly', count:8 }] }; }
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template')) { const id = decodeURIComponent(url.substring('/api/webadmin/virtual-block-devices/'.length).slice(0, -'/container-template'.length)); return { deviceId:id, displayName:'Complex VBD', supported:true, typeSupported:true, p3bGhostEditing:true, saveImplemented:true, dryRunGhostInteraction:false, expectedFingerprint:'container-template-fp', lockStatus:{ locked:false }, itemConditions:[{ id:'slot-0', name:'Slot 0 stone', type:'slot_item', slot:0, itemId:'minecraft:stone', templateItemId:'minecraft:stone', countMode:'at_least', count:1 }, { id:'total-stick', name:'Total sticks', type:'total_item', itemId:'minecraft:stick', templateItemId:'minecraft:stick', countMode:'exactly', count:8 }] }; }
                   if (url.startsWith('/api/webadmin/virtual-block-devices/')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE', targetId:'vdev-1', changed:true, message:'虚拟方块设备已删除 / 解绑，世界方块未被破坏。', data:{ deviceId:'vdev-1', routeTarget:'#/virtual-block-devices' } };
                   if (url === '/api/webadmin/signal-listeners') return { success:true, targetType:'SIGNAL_LISTENER', targetId:'new-listener', changed:true, message:'Signal Listener 已创建。', data:{ listenerId:'new-listener', routeTarget:'#/listeners/new-listener?returnTo=%23%2Flisteners' } };
                   if (url.startsWith('/api/webadmin/signal-listeners/')) return { success:true, targetType:'SIGNAL_LISTENER', targetId:'test-listener', changed:true, message:'Signal Listener 已删除。', data:{ listenerId:'test-listener', routeTarget:'#/listeners' } };
@@ -1184,7 +1184,7 @@ public final class StabilizationGuardTest {
                     { id:'action-1', name:'Open Door', type:'COMMAND', summary:'command: say test', doctorStatus:'OK', ownerType:'LISTENER', channel:'test.channel', executionCountToday:2, lastExecutedAt:'2026-05-09T10:00:00Z' },
                     { id:'action-2', name:'Send Signal', type:'SIGNAL', summary:'signal: next', doctorStatus:'WARNING', ownerType:'ACTION_RELAY', channel:'next.channel', executionCountToday:0 }
                   ];
-                  if (url.startsWith('/api/doctor')) return { summary:{errorCount:1, warningCount:1, infoCount:0}, issues:[{id:'issue-1', title:'Bad device', severity:'ERROR', relatedObjectType:'DEVICE', relatedObjectId:'dev-1', message:'broken', suggestion:'check', detectedAt:'2026-05-09T10:00:00Z'}] };
+                  if (url.startsWith('/api/doctor')) return { summary:{errorCount:2, warningCount:6, infoCount:4}, issues:Array.from({length:12}, (_, index) => ({id:`issue-${index + 1}`, title:`Doctor issue ${index + 1}`, severity:index < 2 ? 'ERROR' : (index < 8 ? 'WARNING' : 'INFO'), relatedObjectType:index % 2 === 0 ? 'DEVICE' : 'CHANNEL', relatedObjectId:index % 2 === 0 ? 'dev-1' : '', channel:index % 2 === 0 ? '' : 'test.channel', message:`message ${index + 1}`, suggestion:`suggestion ${index + 1}`, detectedAt:'2026-05-09T10:00:00Z'})) };
                   if (url.startsWith('/api/signals/history')) return [{ time:'2026-05-09T10:00:00Z', channel:'test.channel', sourceType:'DEVICE', sourceName:'Emitter', sourceId:'dev-1', result:'SUCCESS' }];
                   if (url.startsWith('/api/regions/')) { const id = decodeURIComponent(url.substring('/api/regions/'.length).split('?')[0]); return { id, name:'Spawn', world:'world', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, targetFilter:'ALL', actions:{enter:[{id:'action-1', type:'COMMAND', summary:'command: say test', enabled:true}], exit:[], stay:[]}, boundChannels:['test.channel'], playersInside:['Owner'], recentEvents:[{type:'enter', time:'2026-05-09T10:00:00Z', playerName:'Owner'}], doctorIssues:[] }; }
                   if (url.startsWith('/api/regions')) return [{ id:'region-1', name:'Spawn', world:'world', enabled:true, doctorStatus:'OK', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, controllerCount:1, enterActionCount:1, exitActionCount:0, stayActionCount:0, targetFilter:'ALL' }];
@@ -1237,6 +1237,24 @@ public final class StabilizationGuardTest {
                     const urls = requestedUrls.join('|');
                     await cancelDeviceConfigEdit('vdev-1');
                     return { detailHtml, modalHtml, urls };
+                  };
+                  globalThis.__smokeDoctorPagination = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    appState.doctorFilters = { search:'', severity:'ALL', objectType:'ALL', jump:'ALL' };
+                    appState.uiPages = appState.uiPages || {};
+                    appState.uiPages.doctor = 1;
+                    location.hash = '#/doctor';
+                    await route();
+                    const page1 = String(document.getElementById('view').innerHTML || '');
+                    setWaPage('doctor', 2);
+                    const page2 = String(document.getElementById('view').innerHTML || '');
+                    const pageAfterNext = appState.uiPages.doctor;
+                    const filtersAfterPage = JSON.stringify(appState.doctorFilters);
+                    appState.doctorFilters.severity = 'ERROR';
+                    appState.uiPages.doctor = 2;
+                    renderDoctorList('');
+                    const filteredPage = appState.uiPages.doctor;
+                    return { page1, page2, pageAfterNext, filtersAfterPage, filteredPage };
                   };
                   globalThis.__smokeToggleAdvanced = async function(kind,id){ await toggleAdvancedDetail(kind,id); return String(document.getElementById('view').innerHTML || ''); };
                   globalThis.__smokeModalSilent = async function(){
@@ -1615,6 +1633,26 @@ public final class StabilizationGuardTest {
                     failures.push(`VBD device config modal cleanup: ${err.name}: ${err.message}`);
                   }
                   try {
+                    const doctorPager = await context.__smokeDoctorPagination();
+                    if (!doctorPager.page1.includes('data-shared-pagination-helper="true"') || !doctorPager.page1.includes('data-action="wa-pagination-page"') || !doctorPager.page1.includes('data-page-key="doctor"')) {
+                      failures.push('doctor pagination: controls must render with shared delegated pagination actions');
+                    }
+                    if (doctorPager.page1.includes('onclick="setWaPage')) {
+                      failures.push('doctor pagination: should not depend on unsafe inline pagination onclick handlers');
+                    }
+                    if (doctorPager.pageAfterNext !== 2 || !doctorPager.page2.includes('Doctor issue 11')) {
+                      failures.push('doctor pagination: clicking page 2 should update page state and rerender page 2 results');
+                    }
+                    if (!doctorPager.filtersAfterPage.includes('"severity":"ALL"') || !doctorPager.filtersAfterPage.includes('"search":""')) {
+                      failures.push('doctor pagination: filters/search should be preserved across pagination');
+                    }
+                    if (doctorPager.filteredPage !== 1) {
+                      failures.push('doctor pagination: filter changes should clamp/reset page to a valid page');
+                    }
+                  } catch (err) {
+                    failures.push(`doctor pagination smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
                     const modalSilent = await context.__smokeModalSilent();
                     if (!modalSilent.stillOpen || !modalSilent.before.includes('data-unified-device-config="true"') || !modalSilent.after.includes('data-unified-device-config="true"')) {
                       failures.push('device config modal: silent refresh closed modal or dropped unified sections');
@@ -1730,7 +1768,7 @@ public final class StabilizationGuardTest {
                     const expectedOverview = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template';
                     const expectedStart = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/start';
                     const expectedCancel = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/cancel';
-                    if (!p3a.config.includes('data-container-template-session="p3a"') || !p3a.config.includes('data-action="container-template-start"') || !p3a.config.includes('data-device-id="virtual_block_device:minecraft:overworld@-11,-60,-7"')) {
+                    if (!p3a.config.includes('data-container-template-session="p3b"') || !p3a.config.includes('data-container-template-save-itemconditions="true"') || !p3a.config.includes('data-action="container-template-start"') || !p3a.config.includes('data-device-id="virtual_block_device:minecraft:overworld@-11,-60,-7"')) {
                       failures.push('container template modal: missing escaped data-action/data-device-id start button for complex device id');
                     }
                     if (p3a.config.includes('onclick="startContainerTemplateSession(') || p3a.config.includes('onclick="cancelContainerTemplateSession(') || p3a.config.includes('onsubmit="event.preventDefault();startContainerTemplateSession(')) {
@@ -2654,6 +2692,9 @@ public final class StabilizationGuardTest {
                 + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateS2CPayload.java"), StandardCharsets.UTF_8)
                 + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateC2SPayload.java"), StandardCharsets.UTF_8);
         String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
+        String itemConditionSupport = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/ContainerItemConditionSupport.java"), StandardCharsets.UTF_8);
+        String vbdContainerHandler = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceContainerHandler.java"), StandardCharsets.UTF_8);
+        String diagnosticService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/debug/VirtualBlockDeviceDiagnosticService.java"), StandardCharsets.UTF_8);
         String js = WebAdminFrontendAssets.appJs();
         String css = WebAdminFrontendStyles.appCss();
 
@@ -2687,6 +2728,17 @@ public final class StabilizationGuardTest {
                 "P3a 不真实保存 `itemConditions`",
                 "virtual_block_device_container_template:<deviceId>",
                 "P3b：Ghost item editing + save",
+                "玩家可以从下方背包 / 快捷栏真实拿起鼠标 cursor 物品",
+                "单个 slot 模板格显示和保存的数量必须 clamp 到该物品 `ItemStack#getMaxCount`",
+                "P3b 当前仅完整编辑 slot_* 模板",
+                "total_* 表示“匹配整个容器中某物品 / matcher 的总数量，不对应具体槽位”",
+                "保存成功后 WebUI container template modal 必须刷新 `GET /container-template` 快照",
+                "P3b 保存的模板条件默认继承父 VBD 的 `containerChangeChannel`",
+                "`condition.channel` 非空时作为显式覆盖",
+                "`condition.channel` 为空时使用父 VBD `containerChangeChannel` 作为 effective channel",
+                "`condition.channel` 和父 VBD `containerChangeChannel` 都为空时才是真正的频道缺失错误",
+                "P3b GUI 不要求每个模板格单独配置 channel",
+                "同一个 save / cancel / close / expired terminal 事件只向目标玩家反馈一次",
                 "不在 P1 / P2 普通 Web 表单里硬做复杂物品模板",
                 "`virtual_block_device` 的旧“类型专属配置”不再作为 WebUI 中的独立显示或编辑区域",
                 "VBD 原生触发字段统一归入“原生触发配置”",
@@ -2806,63 +2858,107 @@ public final class StabilizationGuardTest {
                 "expectedFingerprint",
                 "fingerprintFor(device)",
                 "fingerprintConditions(device.itemConditions())",
-                "itemConditionDtos(device.itemConditions())",
-                "p3aSkeleton",
-                "saveImplemented\", false",
+                "itemConditionDtos(device.itemConditions(), device.containerChangeChannel())",
+                "p3bItemConditionInheritsContainerChangeChannel",
+                "perSlotChannelRequired",
+                "effectiveChannel",
+                "inheritsContainerChangeChannel",
+                "p3bGhostEditing",
+                "saveImplemented\", true",
                 "dryRunGhostInteraction\", false",
-                "p3aDoesNotSaveItemConditions",
-                "saveDisabledUntilP3b",
+                "p3bSavesItemConditions",
+                "saveEnabledInP3b",
+                "ghostTemplateEditingEnabled",
                 "noRealInventoryTransfer",
                 "targetPlayerName",
                 "目标玩家不在线",
                 "只支持 virtual_block_device"
         )) {
-            requireContains(containerTemplateService, marker, "7.9 P3a container template service marker present: " + marker);
+            requireContains(containerTemplateService, marker, "7.9 P3b container template service marker present: " + marker);
         }
-        requireFalse(containerTemplateService.contains("updateVirtualItemCondition(")
-                        || containerTemplateService.contains("addVirtualItemCondition(")
-                        || containerTemplateService.contains("removeVirtualItemCondition(")
-                        || containerTemplateService.contains("clearVirtualItemConditions("),
-                "7.9 P3a service must not save or mutate itemConditions");
+        requireContains(Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceStore.java"), StandardCharsets.UTF_8),
+                "updateVirtualItemConditionsForWebAdmin",
+                "7.9 P3b saves itemConditions through a scoped WebAdmin store update");
+        for (String marker : List.of(
+                "effectiveChannel(ContainerItemConditionData rawCondition, String inheritedContainerChangeChannel, boolean exiting)",
+                "effectiveChannelSource",
+                "return inherited",
+                "物品条件频道为空，且父 VBD 未配置容器内容变化频道。"
+        )) {
+            requireContains(itemConditionSupport, marker, "7.9 P3b itemCondition effective channel marker present: " + marker);
+        }
+        requireContains(vbdContainerHandler,
+                "ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), exiting)",
+                "7.9 P3b runtime itemConditions inherit containerChangeChannel when condition channel is empty");
+        for (String marker : List.of(
+                "ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), false)",
+                "没有显式频道，且父 VBD 未配置容器内容变化频道",
+                "ContainerItemConditionSupport.validate(inventory, condition, device.containerChangeChannel())"
+        )) {
+            requireContains(diagnosticService, marker, "7.9 P3b Doctor effective itemCondition channel marker present: " + marker);
+        }
 
         for (String marker : List.of(
                 "SESSION_TTL_MILLIS",
                 "TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
                 "CONTAINER_TEMPLATE_SESSION_STARTED",
                 "CONTAINER_TEMPLATE_SESSION_OPENED",
+                "CONTAINER_TEMPLATE_SESSION_SAVED",
                 "CONTAINER_TEMPLATE_SESSION_CANCELLED",
                 "CONTAINER_TEMPLATE_SESSION_FAILED",
                 "CONTAINER_TEMPLATE_SESSION_EXPIRED",
                 "sendOpen(targetPlayer, session)",
+                "saveFromClient",
+                "saveSession",
+                "publishConfigChangedAfterSave",
                 "cancelFromWebAdmin",
                 "cancelFromClient",
                 "cancelForDisconnect",
                 "sendEnd(player, \"cancelled\"",
+                "sendEnd(player, \"saved\"",
+                "notifyPlayer",
                 "data.put(\"sessionRef\", session.sessionId)",
                 "alreadyTerminal",
                 "idempotentNoOp",
                 "releaseForSessionCleanup",
                 "WRITE_AUDIT_APPENDED",
-                "p3aDoesNotSaveItemConditions"
+                "p3bSavesItemConditions"
         )) {
-            requireContains(containerTemplateSessions, marker, "7.9 P3a container template session marker present: " + marker);
+            requireContains(containerTemplateSessions, marker, "7.9 P3b container template session marker present: " + marker);
         }
         for (String marker : List.of(
                 "WebAdminContainerTemplatePreviewScreen.fromJson",
                 "sendOpened(screen.sessionId(), screen.nonce())",
                 "static void sendCancel",
+                "static void sendSave",
                 "ClientPlayConnectionEvents.DISCONNECT",
-                "cancelled\", \"failed\", \"expired"
+                "saved\", \"cancelled\", \"failed\", \"expired"
         )) {
-            requireContains(containerTemplateClient, marker, "7.9 P3a client session marker present: " + marker);
+            requireContains(containerTemplateClient, marker, "7.9 P3b client session marker present: " + marker);
         }
         for (String marker : List.of(
                 "extends Screen",
-                "保存（P3b）",
-                "save.active = false",
+                "保存模板",
+                "TemplateCondition.newSlotItem",
+                "payloadConditions",
+                "copySourceToTemplateSlot",
+                "clearTemplateSlot",
+                "adjustCount",
+                "ctrlDown",
+                "SlotActionType.PICKUP",
+                "screenHandlerSlotForInventorySlot",
+                "clickPlayerInventorySlot",
+                "cursorStack()",
+                "playerStack",
+                "player.currentScreenHandler.getCursorStack",
+                "stack.getMaxCount()",
+                "总量模板后续支持",
+                "total_* 条件按整个容器总数量匹配",
+                "sendSave(sessionId, nonce, deviceId, expectedFingerprint",
                 "drawItemTooltip",
-                "ESC 或取消按钮会先打开取消确认",
-                "P3b 才支持左键复制、右键清空、滚轮数量和保存",
+                "左键复制来源物品为模板",
+                "右键清空模板格",
+                "Ctrl+滚轮一次调整 8",
                 "slotCondition",
                 "totalCondition",
                 "WebAdminContainerTemplateClient.sendCancel",
@@ -2876,21 +2972,32 @@ public final class StabilizationGuardTest {
                 "cancelSent",
                 "ItemStack.EMPTY"
         )) {
-            requireContains(containerTemplateScreen, marker, "7.9 P3a GUI skeleton marker present: " + marker);
+            requireContains(containerTemplateScreen, marker, "7.9 P3b GUI ghost editing marker present: " + marker);
         }
-        requireFalse(containerTemplateSessions.contains("CONFIG_CHANGED") || containerTemplateSessions.contains("config_changed"),
-                "7.9 P3a container template cancel must not publish config_changed");
-        requireFalse(containerTemplateScreen.contains("HandledScreen") || containerTemplateScreen.contains("ScreenHandler")
+        requireContains(js, "refreshContainerTemplateSessionOverview", "7.9 P3b saved snapshot refresh marker present");
+        requireContains(js, "await refreshContainerTemplateSessionOverview(draft.deviceId,true)", "7.9 P3b saved status refreshes container template snapshot");
+        requireContains(js, "containerTemplateConditionChannelText", "7.9 P3b WebUI snapshot displays effective itemCondition channel");
+        requireContains(js, "继承容器内容变化频道", "7.9 P3b WebUI snapshot shows inherited containerChangeChannel wording");
+        requireFalse(containerTemplateClient.contains("sendMessage("),
+                "7.9 P3b terminal player feedback is server-side only; client must not duplicate chat");
+        int cancelStart = containerTemplateSessions.indexOf("private static WebAdminWriteResult cancelSession");
+        int saveStart = containerTemplateSessions.indexOf("private static WebAdminWriteResult saveSession");
+        requireTrue(cancelStart >= 0 && saveStart > cancelStart, "7.9 P3b cancel and save handlers are both present");
+        requireFalse(containerTemplateSessions.substring(cancelStart, saveStart).contains("CONFIG_CHANGED")
+                        || containerTemplateSessions.substring(cancelStart, saveStart).contains("config_changed"),
+                "7.9 P3b container template cancel must not publish config_changed");
+        requireFalse(containerTemplateScreen.contains("HandledScreen") || containerTemplateScreen.contains("extends ScreenHandler")
                         || containerTemplateScreen.contains("quickMove") || containerTemplateScreen.contains("insertItem")
                         || containerTemplateScreen.contains("dropSlot") || containerTemplateScreen.contains("onSlotClick"),
-                "7.9 P3a preview screen must not expose real inventory transfer paths");
+                "7.9 P3b preview screen must not expose real inventory transfer paths");
         for (String marker : List.of(
                 "registerGlobalReceiver(WebAdminContainerTemplateC2SPayload.ID",
                 "ServerPlayConnectionEvents.DISCONNECT",
                 "openedFromClient",
+                "saveFromClient",
                 "cancelFromClient"
         )) {
-            requireContains(containerTemplateServer, marker, "7.9 P3a server payload marker present: " + marker);
+            requireContains(containerTemplateServer, marker, "7.9 P3b server payload marker present: " + marker);
         }
         for (String marker : List.of(
                 "webadmin_container_template_s2c",
@@ -3009,16 +3116,24 @@ public final class StabilizationGuardTest {
                 "container-template-open-unified",
                 "data-container-template-session-entry=\"detail\"",
                 "data-container-template-session-entry=\"unified-config\"",
-                "data-container-template-session=\"p3a\"",
-                "data-container-template-no-save-itemconditions=\"true\"",
+                "data-container-template-session=\"p3b\"",
+                "data-container-template-save-itemconditions=\"true\"",
+                "data-container-template-real-item-safe=\"true\"",
+                "data-container-template-ghost-editing=\"true\"",
+                "handlePaginationAction",
+                "data-shared-pagination-helper=\"true\"",
+                "data-action=\"wa-pagination-page\"",
+                "if(key==='doctor')renderDoctorList('')",
+                "appState.uiPages.doctor=1;renderDoctorList",
                 "data-container-template-lock-target=\"virtual_block_device_container_template\"",
                 "data-container-template-fingerprint=\"itemConditions-only\"",
                 "data-container-template-session-requires-clean-native-draft=\"true\"",
-                "7.9 P3a 可从 WebAdmin 发起游戏内容器变化模板 GUI skeleton",
-                "保存按钮在游戏内保持禁用",
-                "不会写入 itemConditions",
+                "P3b 会在目标玩家客户端打开箱子式模板 GUI",
+                "点击游戏内“保存模板”才写入 itemConditions",
+                "不会修改世界容器或玩家物品",
                 "container_template_session_started",
                 "container_template_session_opened",
+                "container_template_session_saved",
                 "container_template_session_cancelled",
                 "container_template_session_failed",
                 "container_template_session_expired"

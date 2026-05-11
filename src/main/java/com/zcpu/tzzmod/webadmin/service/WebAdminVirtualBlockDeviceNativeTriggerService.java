@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.signal.device.BlockStateConditionParser;
 import com.zcpu.tzzmod.signal.device.BlockStateConditionResult;
 import com.zcpu.tzzmod.signal.device.ContainerDeviceSupport;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
+import com.zcpu.tzzmod.signal.device.ContainerItemConditionSupport;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceMode;
@@ -785,7 +786,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         data.put("lastContainerEventType", device.lastContainerEventType());
         data.put("lastContainerResult", device.lastContainerResult());
         data.put("itemConditionCount", device.itemConditions().size());
-        data.put("itemConditions", containerItemConditionSummaries(device.itemConditions()));
+        data.put("itemConditions", containerItemConditionSummaries(device.itemConditions(), device.containerChangeChannel()));
         data.put("itemConditionsReadOnly", true);
         data.put("templateEditorPhase", "7.9 P3");
         data.put("sharedSwitchNote", "容器打开、关闭和内容变化共用 containerEnabled；物品模板 GUI 不在 P2 普通 Web 表单中实现。");
@@ -813,13 +814,15 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         return List.copyOf(active);
     }
 
-    private static List<Map<String, Object>> containerItemConditionSummaries(List<ContainerItemConditionData> rawConditions) {
+    private static List<Map<String, Object>> containerItemConditionSummaries(List<ContainerItemConditionData> rawConditions, String inheritedContainerChangeChannel) {
         List<Map<String, Object>> summaries = new ArrayList<>();
         for (ContainerItemConditionData raw : rawConditions == null ? List.<ContainerItemConditionData>of() : rawConditions) {
             ContainerItemConditionData condition = raw == null ? null : raw.normalized();
             if (condition == null) {
                 continue;
             }
+            String effectiveChannel = ContainerItemConditionSupport.effectiveChannel(condition, inheritedContainerChangeChannel, false);
+            String effectiveChannelSource = ContainerItemConditionSupport.effectiveChannelSource(condition, inheritedContainerChangeChannel, false);
             Map<String, Object> summary = new LinkedHashMap<>();
             summary.put("id", condition.id());
             summary.put("name", condition.name());
@@ -831,6 +834,10 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
             summary.put("count", condition.count());
             summary.put("channel", condition.channel());
             summary.put("offChannel", condition.offChannel());
+            summary.put("effectiveChannel", effectiveChannel);
+            summary.put("effectiveChannelSource", effectiveChannelSource);
+            summary.put("inheritsContainerChangeChannel", "container_change_channel".equals(effectiveChannelSource));
+            summary.put("perSlotChannelRequired", false);
             summary.put("mode", condition.mode());
             summary.put("lastMatched", condition.lastMatched());
             summary.put("lastResult", condition.lastResult());

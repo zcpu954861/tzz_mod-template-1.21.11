@@ -26,6 +26,7 @@ public final class WebAdminContainerTemplateServer {
     ) {
         switch (payload.action()) {
             case "opened" -> WebAdminContainerTemplateSessions.openedFromClient(server, player, payload.bodyJson());
+            case "save" -> WebAdminContainerTemplateSessions.saveFromClient(server, player, payload.bodyJson());
             case "cancel" -> WebAdminContainerTemplateSessions.cancelFromClient(server, player, payload.bodyJson());
             default -> {
             }

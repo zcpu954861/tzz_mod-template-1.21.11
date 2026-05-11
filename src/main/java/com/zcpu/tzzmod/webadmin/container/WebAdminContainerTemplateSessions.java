@@ -1,9 +1,17 @@
 package com.zcpu.tzzmod.webadmin.container;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.network.WebAdminContainerTemplateS2CPayload;
+import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
+import com.zcpu.tzzmod.signal.device.ContainerItemConditionType;
+import com.zcpu.tzzmod.signal.device.ContainerItemCountMode;
+import com.zcpu.tzzmod.signal.device.SignalDeviceData;
+import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.util.NullSafety;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
@@ -11,6 +19,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
+import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -29,11 +38,16 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.UUID;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.Formatting;
 
 public final class WebAdminContainerTemplateSessions {
@@ -152,6 +166,18 @@ public final class WebAdminContainerTemplateSessions {
         cancelSession(session, getString(body, "reason").isBlank() ? "client_close" : getString(body, "reason"), "游戏内 GUI 已关闭，容器模板会话已取消。", true, true);
     }
 
+    public static synchronized void saveFromClient(MinecraftServer server, ServerPlayerEntity player, String bodyJson) {
+        if (server != null) {
+            currentServer = server;
+        }
+        JsonObject body = parse(bodyJson);
+        WebAdminContainerTemplateSession session = validateClientSession(player, body);
+        if (session == null) {
+            return;
+        }
+        saveSession(server, player, session, body);
+    }
+
     public static synchronized void cancelForDisconnect(ServerPlayerEntity player) {
         if (player == null) {
             return;
@@ -192,7 +218,9 @@ public final class WebAdminContainerTemplateSessions {
 
     private static void expireSession(WebAdminContainerTemplateSession session) {
         removeActive(session);
-        sendEnd(findOnlinePlayer(session), "expired", session, "容器模板会话已过期。", Map.of("source", "timeout"));
+        ServerPlayerEntity player = findOnlinePlayer(session);
+        notifyPlayer(player, "容器模板会话已过期。", Formatting.YELLOW);
+        sendEnd(player, "expired", session, "容器模板会话已过期。", Map.of("source", "timeout"));
         releaseLock(session, "容器模板会话过期，编辑锁已释放。");
         Map<String, Object> after = baseStatus(session, "expired");
         after.put("source", "timeout");
@@ -206,8 +234,9 @@ public final class WebAdminContainerTemplateSessions {
         removeActive(session);
         ServerPlayerEntity player = findOnlinePlayer(session);
         if (notifyPlayer && player != null) {
-            player.sendMessage(Text.literal(safe(message).isBlank() ? "容器模板会话已取消。" : message).formatted(Formatting.YELLOW), false);
-            sendEnd(player, "cancelled", session, safe(message).isBlank() ? "容器模板会话已取消。" : message, Map.of("source", source));
+            String terminalMessage = safe(message).isBlank() ? "容器模板会话已取消。" : message;
+            notifyPlayer(player, terminalMessage, Formatting.YELLOW);
+            sendEnd(player, "cancelled", session, terminalMessage, Map.of("source", source));
         }
         releaseLock(session, "容器模板会话取消，编辑锁已释放。");
         Map<String, Object> after = baseStatus(session, "cancelled");
@@ -220,11 +249,59 @@ public final class WebAdminContainerTemplateSessions {
         return result;
     }
 
-    private static void failSession(WebAdminContainerTemplateSession session, String code, String message, boolean notifyPlayer) {
+    private static WebAdminWriteResult saveSession(
+            MinecraftServer server,
+            ServerPlayerEntity player,
+            WebAdminContainerTemplateSession session,
+            JsonObject body
+    ) {
+        MinecraftServer activeServer = server == null ? currentServer : server;
+        SignalDeviceData before = currentDevice(activeServer, session);
+        if (before == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(before.type())) {
+            return failSession(session, "device_missing", "目标 virtual_block_device 不存在，容器模板保存失败。", true);
+        }
+        String requestFingerprint = getString(body, "expectedFingerprint");
+        String currentFingerprint = WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(before);
+        if (!session.expectedFingerprint.equals(currentFingerprint)
+                || (!requestFingerprint.isBlank() && !session.expectedFingerprint.equals(requestFingerprint))) {
+            return failSession(session, "fingerprint_conflict", "容器模板已被其他操作修改，保存已取消。", true);
+        }
+        List<ContainerItemConditionData> nextConditions;
+        try {
+            nextConditions = parseItemConditions(body);
+        } catch (IllegalArgumentException exception) {
+            return failSession(session, "invalid_item_conditions", exception.getMessage(), true);
+        }
+        SignalDeviceData after = SignalDeviceStore.updateVirtualItemConditionsForWebAdmin(activeServer, session.deviceId, nextConditions);
+        if (after == null) {
+            return failSession(session, "save_failed", "容器模板保存失败，设备状态未更新。", true);
+        }
+        removeActive(session);
+        String message = "容器变化模板已保存。";
+        if (player != null) {
+            notifyPlayer(player, message, Formatting.GREEN);
+            sendEnd(player, "saved", session, message, Map.of("source", "client_save"));
+        }
+        releaseLock(session, "容器模板保存完成，编辑锁已释放。");
+        Map<String, Object> beforeSummary = templateSummary(before, session.expectedFingerprint);
+        Map<String, Object> afterSummary = templateSummary(after, WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(after));
+        WebAdminRealtimeEvent sessionEvent = publishEvent(WebAdminRealtimeEventType.CONTAINER_TEMPLATE_SESSION_SAVED, session, message, afterSummary);
+        Map<String, Object> status = baseStatus(session, "saved");
+        status.put("message", message);
+        status.put("itemConditionCount", after.itemConditions().size());
+        status.put("expectedFingerprint", WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(after));
+        rememberTerminal(session, "saved", status);
+        WebAdminWriteResult result = result(session, true, true, message, status, sessionEvent);
+        WebAdminAuditEvent auditEvent = audit(contextFor(session, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE), result, beforeSummary, afterSummary);
+        publishConfigChangedAfterSave(session, after, auditEvent);
+        return result;
+    }
+
+    private static WebAdminWriteResult failSession(WebAdminContainerTemplateSession session, String code, String message, boolean notifyPlayer) {
         removeActive(session);
         ServerPlayerEntity player = findOnlinePlayer(session);
         if (notifyPlayer && player != null) {
-            player.sendMessage(Text.literal(message).formatted(Formatting.YELLOW), false);
+            notifyPlayer(player, message, Formatting.YELLOW);
             sendEnd(player, "failed", session, message, Map.of("code", code));
         }
         releaseLock(session, "容器模板会话失败，编辑锁已释放。");
@@ -235,6 +312,7 @@ public final class WebAdminContainerTemplateSessions {
         rememberTerminal(session, "failed", after);
         WebAdminWriteResult result = new WebAdminWriteResult(false, WebAdminWriteResultCode.VALIDATION_FAILED.id(), message, "CONTAINER_TEMPLATE_SESSION", session.sessionId, false, List.of(new WebAdminValidationError("containerTemplateSession", code, message, "")), "", event == null ? "" : event.id(), false, Map.of(), Map.of("containerTemplateSession", after));
         audit(contextFor(session, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION), result, Map.of("status", "active"), after);
+        return result;
     }
 
     private static WebAdminWriteResult failedResult(WebAdminContainerTemplateSession session, String code, String message) {
@@ -334,6 +412,20 @@ public final class WebAdminContainerTemplateSessions {
         ServerPlayNetworking.send(NullSafety.requireNonNull(player), new WebAdminContainerTemplateS2CPayload(action, body.toString()));
     }
 
+    private static void notifyPlayer(ServerPlayerEntity player, String message, Formatting formatting) {
+        if (player != null && !safe(message).isBlank()) {
+            player.sendMessage(Text.literal(message).formatted(formatting), false);
+        }
+    }
+
+    private static SignalDeviceData currentDevice(MinecraftServer server, WebAdminContainerTemplateSession session) {
+        if (server == null || session == null || session.deviceId.isBlank()) {
+            return null;
+        }
+        SignalDeviceStore.ResolveResult resolved = SignalDeviceStore.resolveDevice(server, session.deviceId);
+        return resolved.foundUnique() && resolved.device() != null ? resolved.device().normalized() : null;
+    }
+
     private static ServerPlayerEntity findOnlinePlayer(WebAdminContainerTemplateSession session) {
         if (session == null || session.targetPlayerUuid == null || currentServer == null) {
             return null;
@@ -359,9 +451,178 @@ public final class WebAdminContainerTemplateSessions {
         data.put("expiresAtMillis", session.expiresAtMillis);
         data.put("opened", session.opened);
         data.put("itemConditionCount", session.itemConditions.size());
-        data.put("p3aDoesNotSaveItemConditions", true);
+        data.put("p3bSavesItemConditions", true);
         return data;
     }
+
+    private static List<ContainerItemConditionData> parseItemConditions(JsonObject body) {
+        JsonArray array = body != null && body.has("itemConditions") && body.get("itemConditions").isJsonArray()
+                ? body.getAsJsonArray("itemConditions")
+                : new JsonArray();
+        List<ContainerItemConditionData> result = new ArrayList<>();
+        int index = 0;
+        for (JsonElement element : array) {
+            if (element == null || !element.isJsonObject()) {
+                continue;
+            }
+            JsonObject object = element.getAsJsonObject();
+            String type = ContainerItemConditionType.normalize(getString(object, "type"));
+            String itemId = getString(object, "itemId").trim().toLowerCase();
+            String matcherItemId = getString(object, "matcherTemplateItemId").trim().toLowerCase();
+            if (itemId.isBlank()) {
+                itemId = getString(object, "templateItemId").trim().toLowerCase();
+            }
+            String countMode = ContainerItemCountMode.normalize(getString(object, "countMode").isBlank()
+                    ? getString(object, "templateCountMode")
+                    : getString(object, "countMode"));
+            int count = Math.max(0, getInt(object, "count", getInt(object, "templateCount", 1)));
+            if (type.startsWith("slot_") && !ContainerItemConditionType.SLOT_EMPTY.id().equals(type)) {
+                count = clampSlotItemCount(itemId, count);
+            }
+            ItemStackMatcherData matcher = parseMatcher(object, type, itemId, countMode, count);
+            if (ContainerItemConditionType.SLOT_MATCHER.id().equals(type)
+                    || ContainerItemConditionType.TOTAL_MATCHER.id().equals(type)) {
+                itemId = matcher.templateItemId();
+                countMode = matcher.countMode();
+                count = matcher.requiredCount();
+            }
+            if (!ContainerItemConditionType.SLOT_EMPTY.id().equals(type) && itemId.isBlank() && matcherItemId.isBlank()) {
+                continue;
+            }
+            String fallbackId = type + "-" + index;
+            String id = getString(object, "id").isBlank() ? fallbackId : getString(object, "id");
+            String name = getString(object, "name").isBlank() ? defaultConditionName(type, getInt(object, "slot", 0), itemId, index) : getString(object, "name");
+            result.add(new ContainerItemConditionData(
+                    id,
+                    name,
+                    !object.has("enabled") || getBoolean(object, "enabled", true),
+                    type,
+                    Math.max(0, getInt(object, "slot", 0)),
+                    itemId,
+                    countMode,
+                    count,
+                    getString(object, "channel"),
+                    getString(object, "offChannel"),
+                    getString(object, "mode"),
+                    false,
+                    0L,
+                    0L,
+                    0L,
+                    "",
+                    matcher
+            ).normalized());
+            index++;
+        }
+        return List.copyOf(result);
+    }
+
+    private static ItemStackMatcherData parseMatcher(JsonObject object, String type, String itemId, String countMode, int count) {
+        boolean matcherType = ContainerItemConditionType.SLOT_MATCHER.id().equals(type)
+                || ContainerItemConditionType.TOTAL_MATCHER.id().equals(type);
+        if (!matcherType) {
+            return ItemStackMatcherData.empty();
+        }
+        String templateItemId = getString(object, "matcherTemplateItemId").isBlank()
+                ? itemId
+                : getString(object, "matcherTemplateItemId").trim().toLowerCase();
+        String matcherCountMode = ContainerItemCountMode.normalize(getString(object, "matcherCountMode").isBlank()
+                ? countMode
+                : getString(object, "matcherCountMode"));
+        int requiredCount = getInt(object, "matcherRequiredCount", count);
+        int templateCount = getInt(object, "matcherTemplateCount", Math.max(1, count));
+        if (ContainerItemConditionType.SLOT_MATCHER.id().equals(type)) {
+            requiredCount = ContainerItemCountMode.IGNORE.id().equals(matcherCountMode) ? 0 : clampSlotItemCount(templateItemId, requiredCount);
+            templateCount = clampSlotItemCount(templateItemId, templateCount);
+        }
+        return new ItemStackMatcherData(
+                !templateItemId.isBlank(),
+                templateItemId,
+                Math.max(1, templateCount),
+                matcherCountMode,
+                Math.max(0, requiredCount),
+                getBoolean(object, "matcherMatchItemId", true),
+                getBoolean(object, "matcherMatchDamage", false),
+                getBoolean(object, "matcherMatchCustomName", false),
+                getBoolean(object, "matcherMatchLore", false),
+                getBoolean(object, "matcherMatchCustomData", false),
+                getBoolean(object, "matcherMatchComponents", false),
+                Math.max(0, getInt(object, "matcherTemplateDamage", 0)),
+                getString(object, "matcherTemplateCustomName"),
+                getStringList(object, "matcherTemplateLore"),
+                getString(object, "matcherTemplateCustomData"),
+                getString(object, "matcherTemplateComponents"),
+                getString(object, "matcherSummary"),
+                0L,
+                System.currentTimeMillis()
+        ).normalized();
+    }
+
+    private static Map<String, Object> templateSummary(SignalDeviceData device, String fingerprint) {
+        if (device == null) {
+            return Map.of();
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("deviceId", device.id());
+        data.put("displayName", displayName(device));
+        data.put("itemConditionCount", device.itemConditions().size());
+        data.put("expectedFingerprint", safe(fingerprint));
+        data.put("containerChangeChannel", device.containerChangeChannel());
+        return data;
+    }
+
+    private static void publishConfigChangedAfterSave(
+            WebAdminContainerTemplateSession session,
+            SignalDeviceData after,
+            WebAdminAuditEvent auditEvent
+    ) {
+        if (session == null || after == null) {
+            return;
+        }
+        String routeTarget = "#/devices/" + encode(after.id());
+        Map<String, Object> payload = Map.of(
+                "targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE,
+                "deviceType", after.type(),
+                "itemConditionCount", after.itemConditions().size(),
+                "expectedFingerprint", WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(after),
+                "actor", session.context == null ? "" : session.context.actorUsername()
+        );
+        WebAdminRealtimeEvent configEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
+                .deviceId(after.id())
+                .channel(after.containerChangeChannel().isBlank() ? after.channel() : after.containerChangeChannel())
+                .sourceType(after.type())
+                .severity("INFO")
+                .summary("VBD 容器变化模板已保存。")
+                .routeTarget(routeTarget)
+                .payload("targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE)
+                .payload("deviceType", after.type())
+                .payload("itemConditionCount", after.itemConditions().size())
+                .payload("expectedFingerprint", WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(after))
+                .payload("actor", session.context == null ? "" : session.context.actorUsername()));
+        WebAdminRealtimeEvent deviceEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
+                .deviceId(after.id())
+                .channel(after.containerChangeChannel().isBlank() ? after.channel() : after.containerChangeChannel())
+                .sourceType(after.type())
+                .severity("INFO")
+                .summary("VBD 容器变化模板已保存：" + displayName(after))
+                .routeTarget(routeTarget)
+                .payload("targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE)
+                .payload("deviceType", after.type())
+                .payload("itemConditionCount", after.itemConditions().size()));
+        WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
+                .deviceId(after.id())
+                .channel(after.containerChangeChannel().isBlank() ? after.channel() : after.containerChangeChannel())
+                .sourceType(after.type())
+                .severity("INFO")
+                .summary("WebAdmin 写入审计已记录。")
+                .routeTarget(routeTarget)
+                .payload("targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE)
+                .payload("deviceType", after.type())
+                .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
+                .payload("configEventId", configEvent == null ? "" : configEvent.id())
+                .payload("deviceEventId", deviceEvent == null ? "" : deviceEvent.id())
+                .payload("payload", payload.toString()));
+    }
+
 
     private static void rememberTerminal(WebAdminContainerTemplateSession session, String status, Map<String, Object> data) {
         Map<String, Object> entry = baseStatus(session, status);
@@ -480,6 +741,79 @@ public final class WebAdminContainerTemplateSessions {
         } catch (Exception ignored) {
             return "";
         }
+    }
+
+    private static int getInt(JsonObject object, String key, int fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static List<String> getStringList(JsonObject object, String key) {
+        if (object == null || !object.has(key) || !object.get(key).isJsonArray()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        for (JsonElement element : object.getAsJsonArray(key)) {
+            if (element != null && !element.isJsonNull()) {
+                try {
+                    result.add(element.getAsString());
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static String defaultConditionName(String type, int slot, String itemId, int index) {
+        String safeType = safe(type);
+        if (safeType.startsWith("slot_")) {
+            return "Slot " + Math.max(0, slot) + (safe(itemId).isBlank() ? "" : " " + safe(itemId));
+        }
+        if (safeType.startsWith("total_")) {
+            return "Total " + (safe(itemId).isBlank() ? ("condition " + index) : safe(itemId));
+        }
+        return "Condition " + index;
+    }
+
+    private static int clampSlotItemCount(String itemId, int count) {
+        int max = maxStackCount(itemId);
+        return Math.max(1, Math.min(max, count));
+    }
+
+    private static int maxStackCount(String itemId) {
+        Identifier id = Identifier.tryParse(safe(itemId));
+        if (id == null) {
+            return 64;
+        }
+        Item item = Registries.ITEM.get(id);
+        if (item == null) {
+            return 64;
+        }
+        return Math.max(1, new ItemStack(item).getMaxCount());
+    }
+
+    private static String displayName(SignalDeviceData device) {
+        if (device == null) {
+            return "";
+        }
+        return safe(device.name()).isBlank() ? device.id() : device.name();
     }
 
     private static String encode(String value) {

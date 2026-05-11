@@ -4,11 +4,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.network.WebAdminContainerTemplateC2SPayload;
 import com.zcpu.tzzmod.network.WebAdminContainerTemplateS2CPayload;
+import java.util.List;
+import java.util.Map;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 public final class WebAdminContainerTemplateClient {
     private WebAdminContainerTemplateClient() {
@@ -37,6 +37,14 @@ public final class WebAdminContainerTemplateClient {
         send("cancel", body);
     }
 
+    static void sendSave(String sessionId, String nonce, String deviceId, String expectedFingerprint, List<Map<String, Object>> itemConditions) {
+        JsonObject body = baseBody(sessionId, nonce);
+        body.addProperty("deviceId", deviceId == null ? "" : deviceId);
+        body.addProperty("expectedFingerprint", expectedFingerprint == null ? "" : expectedFingerprint);
+        body.add("itemConditions", WebAdminContainerTemplatePreviewScreen.GSON.toJsonTree(itemConditions == null ? List.of() : itemConditions));
+        send("save", body);
+    }
+
     private static void handlePayload(MinecraftClient client, WebAdminContainerTemplateS2CPayload payload) {
         JsonObject body = parse(payload.bodyJson());
         switch (payload.action()) {
@@ -49,16 +57,10 @@ public final class WebAdminContainerTemplateClient {
                 client.setScreen(screen);
                 sendOpened(screen.sessionId(), screen.nonce());
             }
-            case "cancelled", "failed", "expired" -> {
+            case "saved", "cancelled", "failed", "expired" -> {
                 if (client.currentScreen instanceof WebAdminContainerTemplatePreviewScreen screen
                         && screen.sessionId().equals(getString(body, "sessionId"))) {
                     screen.closeFromServer();
-                }
-                if (client.player != null) {
-                    String message = getString(body, "message");
-                    if (!message.isBlank()) {
-                        client.player.sendMessage(Text.literal(message).formatted(Formatting.YELLOW), false);
-                    }
                 }
             }
             default -> {

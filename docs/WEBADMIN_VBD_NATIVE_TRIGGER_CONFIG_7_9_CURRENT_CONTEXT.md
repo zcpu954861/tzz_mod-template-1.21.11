@@ -83,6 +83,7 @@ P3 拆分为：
   - 左键复制模板、右键清空、滚轮 / Ctrl+滚轮调整数量。
   - 点击保存才写入 `itemConditions`。
   - 完整 field preservation、audit、realtime 和失败处理闭环。
+  - GUI 采用接近原版箱子的布局：上方 ghost/template 槽，下方玩家背包与快捷栏展示；玩家背包只作为安全来源选择，不走真实物品转移路径。
 
 ## 允许范围
 
@@ -101,7 +102,7 @@ P3 拆分为：
 
 ## 禁止范围
 
-- P1 / P2 不做容器内容变化物品模板 GUI；P3a 只允许 session + 只读 GUI skeleton，不保存 `itemConditions`。
+- P1 / P2 不做容器内容变化物品模板 GUI；P3a 只允许 session + 只读 GUI skeleton，不保存 `itemConditions`；P3b 才允许通过游戏内 ghost/template GUI 保存 `itemConditions`。
 - 不做 itemSubmit。
 - 不做 consume。
 - 不做 inventory / equipment / armor。
@@ -199,6 +200,28 @@ P3 拆分为：
 - GUI ESC、关闭窗口或 WebUI cancel 都取消 session，不保存 `itemConditions`。
 - P3a 发送 `container_template_session_started/opened/cancelled/failed/expired` realtime 状态事件；不发布 `config_changed`，因为不保存配置。
 - P3a audit 只记录 session start / cancel / fail / expire，不伪造配置写入。
+
+7.9 P3b 当前实现目标：
+
+- 在 P3a session / lock / status / cancel lifecycle 基础上，实现游戏内 ghost/template item 编辑与保存。
+- 客户端 GUI 使用接近原版箱子的布局：模板槽区域、玩家背包区域和快捷栏区域；模板槽是 ghost/template，不绑定世界真实容器。
+- 玩家背包和快捷栏应尽量遵循原版箱子操作逻辑：玩家可以从下方背包 / 快捷栏真实拿起鼠标 cursor 物品，也可以放回玩家背包；模板槽永远不参与真实物品转移。
+- 左键模板格复制当前鼠标 cursor 物品为 ghost/template，不消耗 cursor stack；鼠标为空点击模板槽不会从 ghost 模板取出真实物品；右键清空模板格；滚轮调整数量，Ctrl + 滚轮一次调整 8。
+- 单个 slot 模板格显示和保存的数量必须 clamp 到该物品 `ItemStack#getMaxCount` 或当前版本等价 API；不可堆叠物品不得超过 1。
+- P3b 当前仅完整编辑 slot_* 模板。total_* 表示“匹配整个容器中某物品 / matcher 的总数量，不对应具体槽位”，本轮作为只读保留显示；总量模板完整编辑后续再支持，避免显示看似可用但保存 / 回显语义不清的区域。
+- 保存成功后 WebUI container template modal 必须刷新 `GET /container-template` 快照，立即显示刚保存的 `itemConditions` 摘要；二次打开游戏内 GUI 也必须回显保存后的模板。
+- P3b 保存的模板条件默认继承父 VBD 的 `containerChangeChannel`：
+  - `condition.channel` 非空时作为显式覆盖。
+  - `condition.channel` 为空时使用父 VBD `containerChangeChannel` 作为 effective channel。
+  - `condition.channel` 和父 VBD `containerChangeChannel` 都为空时才是真正的频道缺失错误。
+  - Doctor、runtime 和 WebUI snapshot 必须统一使用 effective channel 语义。
+  - P3b GUI 不要求每个模板格单独配置 channel，也不把 per-slot channel 作为主要入口。
+  - 父 `containerChangeChannel` 为空时允许保存模板，但 WebUI / Doctor 需要清楚提示模板不会发出 signal，直到配置容器内容变化频道或显式 condition channel。
+- 同一个 save / cancel / close / expired terminal 事件只向目标玩家反馈一次；玩家可见反馈由服务端 terminal handler 统一发送，客户端只关闭 UI，不重复发送聊天文本。
+- Tooltip 使用正常 `ItemStack` tooltip 展示；tooltip 只是展示，不代表所有字段都会参与匹配，实际匹配仍由 `slot_*` / `total_*` 和 `countMode` / matcher 字段决定。
+- 点击游戏内“保存模板”才通过 session 保存 `itemConditions`；保存前校验 sessionId / nonce / target player / expected fingerprint / VBD 类型和 itemConditions 数据。
+- 保存只做 scoped update `SignalDeviceData.itemConditions`，不重写 P2 原生触发、7.8 matcher、metadata、itemSubmit / consume 未来保留字段，也不修改世界容器或玩家物品。
+- 保存成功发布 `container_template_session_saved`、`config_changed`、`device_config_changed`、`write_audit_appended` 等 realtime / audit；取消仍不保存且不发布 `config_changed`。
 
 ## 待验收内容
 

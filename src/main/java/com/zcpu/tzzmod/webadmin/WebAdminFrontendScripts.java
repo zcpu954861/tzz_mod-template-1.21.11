@@ -779,12 +779,14 @@ public final class WebAdminFrontendScripts {
                   draft.sessionId=sessionId||draft.sessionId||'';
                   draft.status=type.replace('container_template_session_','')||draft.status||'started';
                   if(type==='container_template_session_opened')draft.status='opened';
+                  if(type==='container_template_session_saved')draft.status='saved';
                   if(type==='container_template_session_cancelled')draft.status='cancelled';
                   if(type==='container_template_session_failed')draft.status='failed';
                   if(type==='container_template_session_expired')draft.status='expired';
-                  draft.active=!['cancelled','failed','expired'].includes(draft.status);
+                  draft.active=!['saved','completed','cancelled','failed','expired'].includes(draft.status);
                   if(!draft.active){draft.lockId='';draft.lock=null;stopContainerTemplateSessionHeartbeat();stopContainerTemplateSessionStatusPoll();cancelContainerTemplateCancelConfirm();}
                   draft.message=event.summary||payload.message||draft.message||'';
+                  if(['saved','completed'].includes(draft.status)){refreshContainerTemplateSessionOverview(draft.deviceId);return;}
                   showContainerTemplateSessionModal(draft.deviceId);
                 }
                 function listenerEventRef(event){return String(event?.listenerId||event?.payload?.listenerId||event?.payload?.listenerRef||event?.payload?.targetId||event?.payload?.id||'');}
@@ -978,6 +980,7 @@ public final class WebAdminFrontendScripts {
                 document.addEventListener('click',event=>{
                   const target=event.target;
                   if(handleContainerTemplateAction(event))return;
+                  if(handlePaginationAction(event))return;
                   if(!(target&&target.closest&&target.closest('.channel-combo')))closeAllCustomComboboxes();
                   const basic=appState.deviceBasicConfigEdit;
                   if(basic&&!(target&&target.closest&&target.closest('#basic-channel-combo'))){basic.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(basic.deviceId);}
@@ -1782,10 +1785,15 @@ public final class WebAdminFrontendScripts {
                 }
                 function vbdContainerChangeSummary(t){
                   const conditions=t.itemConditions||[];
-                  const itemSummary=conditions.length?conditions.slice(0,3).map(c=>`${c.name||c.id||'条件'}: ${c.itemId||c.type||'模板'}`).join('；'):'未配置';
+                  const itemSummary=conditions.length?conditions.slice(0,3).map(c=>`${c.name||c.id||'条件'}: ${c.itemId||c.type||'模板'} · ${containerTemplateConditionChannelText(c)}`).join('；'):'未配置';
                   const deviceId=t.deviceId||appState.currentDeviceDetail?.id||'';
-                  const entry=deviceId?`<div class="inline-actions" data-container-template-session-entry="detail" data-container-template-p3a-entry="true">${waButton('编辑容器变化模板','selection',containerTemplateActionAttrs('container-template-open',deviceId),'ghost')}</div>`:'';
-                  return `<div class="identity-grid">${row('容器总开关',esc(labelBool(!!t.containerEnabled)))}${row('内容变化频道',channelCell(t.containerChangeChannel))}${row('容器冷却',esc(formatTicks(t.containerCooldownTicks)||'0 tick'))}${row('检查间隔',esc(formatTicks(t.containerChangeCheckIntervalTicks)||'0 tick'))}${row('物品条件数',esc(t.itemConditionCount??conditions.length))}${row('条件摘要',esc(itemSummary))}${row('最近指纹',esc(t.lastContainerFingerprint||'暂无'))}${row('最近变化时间',esc(nativeTriggerTime(t.lastContainerChangeWallTimeMillis)))}${row('最近结果',esc(t.lastContainerResult||'暂无'))}</div>${entry}<p class="muted">7.9 P3a 可从 WebAdmin 发起游戏内容器变化模板 GUI skeleton；本阶段只展示已保存 itemConditions，不保存。</p>`;
+                  const entry=deviceId?`<div class="inline-actions" data-container-template-session-entry="detail" data-container-template-p3b-entry="true">${waButton('编辑容器变化模板','selection',containerTemplateActionAttrs('container-template-open',deviceId),'ghost')}</div>`:'';
+                  return `<div class="identity-grid">${row('容器总开关',esc(labelBool(!!t.containerEnabled)))}${row('内容变化频道',channelCell(t.containerChangeChannel))}${row('容器冷却',esc(formatTicks(t.containerCooldownTicks)||'0 tick'))}${row('检查间隔',esc(formatTicks(t.containerChangeCheckIntervalTicks)||'0 tick'))}${row('物品条件数',esc(t.itemConditionCount??conditions.length))}${row('条件摘要',esc(itemSummary))}${row('最近指纹',esc(t.lastContainerFingerprint||'暂无'))}${row('最近变化时间',esc(nativeTriggerTime(t.lastContainerChangeWallTimeMillis)))}${row('最近结果',esc(t.lastContainerResult||'暂无'))}</div>${entry}<p class="muted">7.9 P3b 可从 WebAdmin 发起游戏内容器变化模板 GUI，左键复制 ghost 模板、右键清空、滚轮调整数量，点击保存才写入 itemConditions。</p>`;
+                }
+                function containerTemplateConditionChannelText(c){
+                  const channel=c?.effectiveChannel||c?.channel||'';
+                  if(!channel)return '触发频道：未设置';
+                  return c?.inheritsContainerChangeChannel||c?.effectiveChannelSource==='container_change_channel'?`触发频道：继承容器内容变化频道 ${channel}`:`触发频道：${channel}`;
                 }
                 function vbdBlockStatePropertyList(properties,issues){
                   const issueHtml=(issues||[]).length?`<div class="readonly-note danger">${(issues||[]).map(esc).join('<br>')}</div>`:'';
@@ -1887,7 +1895,7 @@ public final class WebAdminFrontendScripts {
                 function vbdNativeContainerCommonEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-common-edit="true"><header><strong>容器公共设置</strong><span class="pill info">open / close / change 共用</span></header><label>容器冷却 tick<input id="vbdnt-container-cooldown" class="input" type="number" min="0" max="72000" value="${esc(v.containerCooldownTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label><p class="muted">启用任一容器事件时 containerEnabled=true；全部关闭时容器事件和只读 itemConditions 都不会触发，但已保存字段会保留。</p></section>`;}
                 function vbdNativeContainerOpenEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-open-edit="true"><header><strong>容器打开</strong><span class="pill info">共用 containerEnabled</span></header><label>打开频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerOpenChannel',v.containerOpenChannel,draft,disabled)}</label></section>`;}
                 function vbdNativeContainerCloseEditSection(draft,disabled){const v=draft.values||{};return `<section class="wa-matcher-option" data-vbd-native-container-close-edit="true"><header><strong>容器关闭</strong><span class="pill info">共用 containerEnabled</span></header><label>关闭频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerCloseChannel',v.containerCloseChannel,draft,disabled)}</label></section>`;}
-                function vbdNativeContainerChangeEditSection(draft,disabled){const v=draft.values||{}, change=(draft.data?.triggers||{}).container_change||{}, conditions=change.itemConditions||[];const itemSummary=conditions.length?conditions.map(c=>`${c.name||c.id||'条件'}: ${c.itemId||c.type||'模板'}`).join('；'):'暂无物品模板条件';const templateDisabled=disabled||vbdNativeTriggerDirty(draft);const templateTitle=vbdNativeTriggerDirty(draft)?'请先保存或放弃当前原生触发配置草稿，再启动游戏内模板编辑会话。':'当前没有可用编辑锁。';const templateAttrs=containerTemplateActionAttrs('container-template-open-unified',draft.deviceId,templateDisabled,templateDisabled?templateTitle:'');const templateEntry=`<div class="inline-actions" data-container-template-session-entry="unified-config" data-container-template-p3a-entry="true" data-container-template-session-requires-clean-native-draft="true">${waButton('编辑容器变化模板','selection',templateAttrs,'ghost')}</div>`;return `<section class="wa-matcher-option" data-vbd-native-container-change-edit="true"><header><strong>容器内容变化</strong><span class="pill warning">itemConditions 只读，P3a GUI skeleton</span></header><div class="wa-action-editor-grid"><label>内容变化频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerChangeChannel',v.containerChangeChannel,draft,disabled)}</label><label>检查间隔 tick<input id="vbdnt-container-check-interval" class="input" type="number" min="1" max="72000" value="${esc(v.containerChangeCheckIntervalTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label></div><div class="readonly-note" data-vbd-native-container-itemconditions-readonly="true">物品条件只读保留：${esc(itemSummary)}</div>${templateEntry}<p class="muted">P3a 可发起游戏内模板 GUI skeleton 并展示已保存 itemConditions；保存按钮保持禁用，不写入 itemConditions，不做 ghost/template 持久化、consume 或 itemSubmit。</p></section>`;}
+                function vbdNativeContainerChangeEditSection(draft,disabled){const v=draft.values||{}, change=(draft.data?.triggers||{}).container_change||{}, conditions=change.itemConditions||[];const itemSummary=conditions.length?conditions.map(c=>`${c.name||c.id||'条件'}: ${c.itemId||c.type||'模板'}`).join('；'):'暂无物品模板条件';const templateDisabled=disabled||vbdNativeTriggerDirty(draft);const templateTitle=vbdNativeTriggerDirty(draft)?'请先保存或放弃当前原生触发配置草稿，再启动游戏内模板编辑会话。':'当前没有可用编辑锁。';const templateAttrs=containerTemplateActionAttrs('container-template-open-unified',draft.deviceId,templateDisabled,templateDisabled?templateTitle:'');const templateEntry=`<div class="inline-actions" data-container-template-session-entry="unified-config" data-container-template-p3b-entry="true" data-container-template-session-requires-clean-native-draft="true">${waButton('编辑容器变化模板','selection',templateAttrs,'ghost')}</div>`;return `<section class="wa-matcher-option" data-vbd-native-container-change-edit="true"><header><strong>容器内容变化</strong><span class="pill ok">itemConditions 可通过游戏内模板 GUI 编辑</span></header><div class="wa-action-editor-grid"><label>内容变化频道${renderVbdNativeTriggerChannelCombo(draft.deviceId,'containerChangeChannel',v.containerChangeChannel,draft,disabled)}</label><label>检查间隔 tick<input id="vbdnt-container-check-interval" class="input" type="number" min="1" max="72000" value="${esc(v.containerChangeCheckIntervalTicks)}" ${disabled?'disabled':''} oninput='syncVbdNativeTriggerDraftFromForm(${jsString(draft.deviceId)})'></label></div><div class="readonly-note" data-vbd-native-container-itemconditions-summary="true" data-vbd-native-container-itemconditions-readonly="true">当前物品条件：${esc(itemSummary)}</div>${templateEntry}<p class="muted">P3b 通过游戏内箱子式 GUI 编辑 ghost/template item；普通原生触发表单仍只读展示 itemConditions；点击保存才写入 itemConditions，不做 consume、itemSubmit 或路径可视化。</p></section>`;}
                 function renderVbdNativeTriggerChannelCombo(deviceId,key,value,draft,disabled){
                   const safeKey=String(key).replace(/[^a-zA-Z0-9_-]/g,'-'), open=(draft.channelComboOpen||{})[key]?' open':'';
                   return `<div id="vbdnt-${safeKey}-combo" class="channel-combo vbd-native-channel-combo${open}" data-vbd-native-channel-combo="${esc(key)}"><div class="channel-combo-control"><input id="vbdnt-${safeKey}" class="input" maxlength="128" value="${esc(value||'')}" ${disabled?'disabled':''} placeholder="选择已有频道或输入新频道" autocomplete="off" role="combobox" aria-expanded="${(draft.channelComboOpen||{})[key]?'true':'false'}" aria-controls="vbdnt-${safeKey}-menu" onfocus='openVbdNativeTriggerChannelMenu(${jsString(deviceId)},${jsString(key)})' oninput='syncVbdNativeTriggerDraftFromForm(${jsString(deviceId)},${jsString(key)},true)' onkeydown='handleVbdNativeTriggerChannelKey(event,${jsString(deviceId)},${jsString(key)})'><button class="channel-combo-toggle" type="button" ${disabled?'disabled':''} onclick='toggleVbdNativeTriggerChannelMenu(${jsString(deviceId)},${jsString(key)})' aria-label="显示已有频道">⌄</button></div><div id="vbdnt-${safeKey}-menu" class="channel-combo-menu" role="listbox">${vbdNativeTriggerChannelOptionsHtml(deviceId,key,draft)}</div></div>`;
@@ -2036,8 +2044,9 @@ public final class WebAdminFrontendScripts {
                   const lockLine=lockHeldByOther(lock)?`<div class="readonly-note danger">${esc(lockMessage(lock,'容器变化模板'))}</div>`:'';
                   const playerSelect=draft.active?`<div class="readonly-note">目标玩家：${esc(draft.targetPlayerName||'-')} · Session：${esc(shortId(draft.sessionId||''))}</div>`:`<label>目标在线玩家<select id="container-template-player" class="input" ${playerOptions.length?'':'disabled'} onchange="syncContainerTemplateSessionDraftFromForm(${jsString(draft.deviceId)})">${playerOptions.map(p=>`<option value="${esc(p.name||'')}" data-uuid="${esc(p.uuid||'')}" ${String(p.name||'')===String(draft.targetPlayerName||'')?'selected':''}>${esc(p.name||'未命名玩家')}</option>`).join('')}</select><span class="muted">${draft.playersError?'在线玩家加载失败。':'选择要打开游戏内模板 GUI 的在线玩家。'}</span></label>`;
                   const conditions=overview.itemConditions||[];
-                  const conditionSummary=conditions.length?conditions.slice(0,8).map(c=>`<span class="pill info">${esc(c.name||c.type||'条件')} · ${esc(c.templateItemId||c.itemId||'模板')} ${esc(c.countMode||'')}</span>`).join(''):'<span class="muted">当前没有已保存 itemConditions，GUI 会显示空状态。</span>';
-                  return `<form class="edit-form wa-container-template-session-form" data-container-template-session="p3a" data-container-template-no-save-itemconditions="true" data-container-template-lock-target="virtual_block_device_container_template" data-container-template-fingerprint="itemConditions-only" onsubmit="event.preventDefault()">${errors}${lockLine}${status}${playerSelect}<div class="readonly-note"><strong>已保存模板快照</strong><div class="wa-template-condition-pills">${conditionSummary}</div></div><p class="muted">P3a 只建立 WebAdmin session、获取 edit lock、打开客户端 GUI skeleton 并展示已保存 itemConditions。保存按钮在游戏内保持禁用；不会写入 itemConditions，不会修改世界容器，不会消耗或转移玩家物品。</p></form>`;
+                  const conditionSummary=conditions.length?conditions.slice(0,8).map(c=>`<span class="pill info">${esc(c.name||c.type||'条件')} · ${esc(c.templateItemId||c.itemId||'模板')} ${esc(c.countMode||'')} · ${esc(containerTemplateConditionChannelText(c))}</span>`).join(''):'<span class="muted">当前没有已保存 itemConditions，GUI 会显示空状态。</span>';
+                  const channelWarning=overview.containerChangeChannelMissingWarning?'<div class="readonly-note warning" data-p3b-inherited-channel-warning="true">容器内容变化频道未设置；模板条件可以保存，但不会发出 signal，直到配置 containerChangeChannel 或显式 condition channel。</div>':'';
+                  return `<form class="edit-form wa-container-template-session-form" data-container-template-session="p3b" data-container-template-save-itemconditions="true" data-container-template-real-item-safe="true" data-container-template-ghost-editing="true" data-container-template-lock-target="virtual_block_device_container_template" data-container-template-fingerprint="itemConditions-only" onsubmit="event.preventDefault()">${errors}${lockLine}${status}${playerSelect}${channelWarning}<div class="readonly-note"><strong>已保存模板快照</strong><div class="wa-template-condition-pills">${conditionSummary}</div></div><p class="muted">P3b 会在目标玩家客户端打开箱子式模板 GUI。左键复制 ghost 模板、右键清空、滚轮调整数量；点击游戏内“保存模板”才写入 itemConditions，取消不会保存，不会修改世界容器或玩家物品。</p></form>`;
                 }
                 function syncContainerTemplateSessionDraftFromForm(deviceId){
                   const draft=appState.containerTemplateSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return draft;
@@ -2047,8 +2056,8 @@ public final class WebAdminFrontendScripts {
                 }
                 function containerTemplateStatusLine(draft){
                   const status=String(draft.status||'ready');
-                  const tone={ready:'info',started:'info',opened:'ok',cancelled:'warning',failed:'error',expired:'warning'}[status]||'info';
-                  const label={ready:'准备启动',started:'已启动，等待玩家打开 GUI',opened:'GUI 已打开',cancelled:'会话已取消',failed:'会话失败',expired:'会话已过期'}[status]||status;
+                  const tone={ready:'info',started:'info',opened:'ok',saved:'ok',completed:'ok',cancelled:'warning',failed:'error',expired:'warning'}[status]||'info';
+                  const label={ready:'准备启动',started:'已启动，等待玩家打开 GUI',opened:'GUI 已打开',saved:'模板已保存',completed:'模板已保存',cancelled:'会话已取消',failed:'会话失败',expired:'会话已过期'}[status]||status;
                   return `<div class="wa-selection-status ${tone}" data-container-template-session-status="${esc(status)}"><strong>${esc(label)}</strong><span>${esc(draft.message||'游戏内 ESC / 关闭窗口会取消，不保存。')}</span>${draft.lockId?`<span>锁：${esc(shortId(draft.lockId))} · expectedFingerprint：${esc(shortId(draft.expectedFingerprint||''))}</span>`:''}</div>`;
                 }
                 async function startContainerTemplateSession(deviceId){
@@ -2076,8 +2085,26 @@ public final class WebAdminFrontendScripts {
                   const status=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(draft.deviceId)}/container-template-session/status?sessionId=${encodeURIComponent(draft.sessionId)}`);
                   const sessionId=containerTemplateSessionId(status);if(sessionId&&draft.sessionId&&sessionId!==draft.sessionId)return;
                   draft.status=status.status||draft.status;draft.active=!!status.active;draft.message=status.message||draft.message;draft.sessionId=sessionId||draft.sessionId;
-                  if(!draft.active){draft.lockId='';draft.lock=null;stopContainerTemplateSessionHeartbeat();stopContainerTemplateSessionStatusPoll();cancelContainerTemplateCancelConfirm();showContainerTemplateSessionModal(draft.deviceId);}
+                  if(!draft.active){draft.lockId='';draft.lock=null;stopContainerTemplateSessionHeartbeat();stopContainerTemplateSessionStatusPoll();cancelContainerTemplateCancelConfirm();if(['saved','completed'].includes(String(draft.status||''))){markRealtimeRouteKeyDirty('devices',{type:'config_changed'});if(draft.deviceId)markRealtimeRouteKeyDirty(`device:${draft.deviceId}`,{type:'config_changed'});await refreshContainerTemplateSessionOverview(draft.deviceId,true);return;}showContainerTemplateSessionModal(draft.deviceId);}
                   else if(source==='poll'){appState.containerTemplateSession=draft;}
+                }
+                async function refreshContainerTemplateSessionOverview(deviceId,silent=false){
+                  const draft=appState.containerTemplateSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;
+                  try{
+                    const overview=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(draft.deviceId)}/container-template`);
+                    const current=appState.containerTemplateSession;
+                    if(!current||!sameDeviceRef(current.deviceId,deviceId))return;
+                    current.overview=overview||current.overview||{};
+                    current.expectedFingerprint=current.overview.expectedFingerprint||current.expectedFingerprint||'';
+                    current.errors=[];
+                    appState.containerTemplateSession=current;
+                    showContainerTemplateSessionModal(current.deviceId);
+                  }catch(err){
+                    if(!silent){toast(err.message||'已保存模板快照刷新失败');}
+                    draft.errors=[{message:err.message||'已保存模板快照刷新失败，请重新打开查看。'}];
+                    appState.containerTemplateSession=draft;
+                    showContainerTemplateSessionModal(draft.deviceId);
+                  }
                 }
                 async function releaseContainerTemplateSessionLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'virtual_block_device_container_template',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'容器变化模板编辑锁释放失败，将等待自动过期。');}}
                 function containerTemplateSessionIsActive(draft){return !!(draft&&draft.active&&draft.sessionId);}
@@ -2922,13 +2949,13 @@ public final class WebAdminFrontendScripts {
                 function doctorFilterSelect(label,id,options,value){return `<label class="filter-field"><span>${esc(label)}</span><select class="select" id="${id}">${options.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(doctorOptionLabel(o))}</option>`).join('')}</select></label>`}
                 function doctorOptionLabel(v){return {ALL:'全部',ERROR:'错误',WARNING:'警告',INFO:'信息',DEVICE:'设备',CHANNEL:'频道',LISTENER:'监听器',RECEIVER:'接收器',ACTION_RELAY:'动作继电器',ACTION:'动作',REGION:'区域',SYSTEM:'系统',UNKNOWN:'未知',HAS_TARGET:'有跳转目标',NO_TARGET:'无跳转目标'}[v]||v;}
                 function bindDoctorFilters(focusId){
-                  const update=(event)=>{appState.doctorFilters.search=document.getElementById('doctor-search').value;appState.doctorFilters.severity=document.getElementById('doctor-severity').value;appState.doctorFilters.objectType=document.getElementById('doctor-object').value;appState.doctorFilters.jump=document.getElementById('doctor-jump').value;renderDoctorList(event.target.id);};
+                  const update=(event)=>{appState.doctorFilters.search=document.getElementById('doctor-search').value;appState.doctorFilters.severity=document.getElementById('doctor-severity').value;appState.doctorFilters.objectType=document.getElementById('doctor-object').value;appState.doctorFilters.jump=document.getElementById('doctor-jump').value;appState.uiPages.doctor=1;renderDoctorList(event.target.id);};
                   ['doctor-search','doctor-severity','doctor-object','doctor-jump'].forEach(id=>document.getElementById(id).addEventListener(id==='doctor-search'?'input':'change',update));
                   if(focusId){const el=document.getElementById(focusId);if(el){el.focus();if(el.setSelectionRange&&el.value){el.setSelectionRange(el.value.length,el.value.length);}}}
                 }
                 function filterDoctorIssues(items){const f=appState.doctorFilters;return (items||[]).filter(i=>{const hay=[i.title,i.message,i.relatedObjectName,i.relatedObjectId,i.channel,i.suggestion,i.code,i.id].join(' ').toLowerCase();if(f.search&&!hay.includes(f.search.toLowerCase()))return false;if(f.severity!=='ALL'&&String(i.severity||'').toUpperCase()!==f.severity)return false;if(f.objectType!=='ALL'&&String(i.relatedObjectType||'UNKNOWN').toUpperCase()!==f.objectType)return false;const hasTarget=!isBlank(i.navigationTarget)||!isBlank(i.channel);if(f.jump==='HAS_TARGET'&&!hasTarget)return false;if(f.jump==='NO_TARGET'&&hasTarget)return false;return true;});}
                 function doctorTable(items){return `<div class="wa-table-scroll"><table class="wa-table"><thead><tr><th>问题类型</th><th>对象</th><th>级别</th><th>描述</th><th>发现时间</th><th>操作</th></tr></thead><tbody>${items.map(i=>`<tr><td><span class="device-name"><span class="device-icon">${icon(doctorIssueIcon(i.severity))}</span><span><strong>${issueTitle(i)}</strong><span class="device-subtitle">${esc(i.id||i.code||'unknown')}</span></span></span></td><td><strong>${esc(i.relatedObjectName||i.relatedObjectId||'暂无')}</strong><span class="device-subtitle">${esc(labelObjectType(i.relatedObjectType))}${isBlank(i.channel)?'':` · ${esc(i.channel)}`}</span></td><td>${pill(i.severity)}</td><td><span>${issueMessage(i)}</span><span class="device-subtitle">${issueSuggestion(i)}</span></td><td>${fmtTime(i.detectedAt||i.createdAt||'')}</td><td><div class="wa-action-cell">${issueNavigation(i)}<button class="wa-btn ghost" disabled>自动修复</button>${waIconButton('导出不可用','download','disabled')}</div></td></tr>`).join('')}</tbody></table></div>`;}
-                function doctorSummaryPanel(issues,filtered){if(!issues||issues.length===0)return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${empty('当前没有诊断问题。')}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('自动修复','critical-issue','disabled','danger')}${waButton('清空问题','channel-error','disabled','ghost')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">Doctor 自动修复、清空与报告导出没有完整后端支持，本轮保持禁用。</p></article></aside>`;const current=filtered||issues, jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${progressList(distributionItems(current,i=>String(i.severity||'UNKNOWN').toUpperCase(),labelStatus,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>范围筛选</h2>${progressList(distributionItems(current,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase(),labelObjectType,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid"><button class="wa-btn ghost" onclick="appState.doctorFilters.severity='ERROR';renderDoctorList()">${icon('critical-issue')}<span>仅错误</span></button><button class="wa-btn ghost" onclick="appState.doctorFilters.jump='HAS_TARGET';renderDoctorList()">${icon('signalbridge-main')}<span>有跳转目标</span></button>${waButton('自动修复','critical-issue','disabled','danger')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">可跳转问题 ${esc(jumpTargets)} 个。自动修复、清空问题和导出报告均未接入完整后端能力，不发送写请求。</p></article><article class="wa-panel"><h2>最近问题</h2><div class="list-stack">${issues.slice(0,5).map(i=>`<div class="event-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('')}</div></article></aside>`;}
+                function doctorSummaryPanel(issues,filtered){if(!issues||issues.length===0)return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${empty('当前没有诊断问题。')}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid">${waButton('自动修复','critical-issue','disabled','danger')}${waButton('清空问题','channel-error','disabled','ghost')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">Doctor 自动修复、清空与报告导出没有完整后端支持，本轮保持禁用。</p></article></aside>`;const current=filtered||issues, jumpTargets=issues.filter(i=>!isBlank(i.navigationTarget)||!isBlank(i.channel)).length;return `<aside class="wa-right-rail"><article class="wa-panel"><h2>问题分布</h2>${progressList(distributionItems(current,i=>String(i.severity||'UNKNOWN').toUpperCase(),labelStatus,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>范围筛选</h2>${progressList(distributionItems(current,i=>String(i.relatedObjectType||'UNKNOWN').toUpperCase(),labelObjectType,Math.max(1,current.length)))}</article><article class="wa-panel"><h2>快速操作</h2><div class="wa-quick-grid"><button class="wa-btn ghost" onclick="appState.doctorFilters.severity='ERROR';appState.uiPages.doctor=1;renderDoctorList()">${icon('critical-issue')}<span>仅错误</span></button><button class="wa-btn ghost" onclick="appState.doctorFilters.jump='HAS_TARGET';appState.uiPages.doctor=1;renderDoctorList()">${icon('signalbridge-main')}<span>有跳转目标</span></button>${waButton('自动修复','critical-issue','disabled','danger')}${waButton('导出报告','download','disabled','ghost')}</div><p class="wa-disabled-note">可跳转问题 ${esc(jumpTargets)} 个。自动修复、清空问题和导出报告均未接入完整后端能力，不发送写请求。</p></article><article class="wa-panel"><h2>最近问题</h2><div class="list-stack">${issues.slice(0,5).map(i=>`<div class="event-row"><strong>${pill(i.severity)} ${issueTitle(i)}</strong><span class="meta">${esc(issueContext(i))}</span><span>${issueSuggestion(i)}</span></div>`).join('')}</div></article></aside>`;}
                 function doctorIssueIcon(severity){const s=String(severity||'').toUpperCase();return s==='ERROR'?'doctor-error':(s==='WARNING'?'doctor-warning':'doctor-ok');}
                 """).append("""
                 async function renderUsersPage(options={}){
@@ -3624,6 +3651,19 @@ public final class WebAdminFrontendScripts {
                   appState.uiPages[key]=current;
                   return {items:items.slice((current-1)*pageSize,current*pageSize),total,pages,current,pageSize};
                 }
+                function handlePaginationAction(event){
+                  const target=event.target;
+                  const button=target&&target.closest?target.closest('[data-action="wa-pagination-page"]'):null;
+                  if(!button)return false;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if(button.disabled)return true;
+                  const key=button.dataset.pageKey;
+                  const page=Number(button.dataset.page);
+                  if(!key||!Number.isFinite(page))return true;
+                  setWaPage(key,page);
+                  return true;
+                }
                 function setWaPage(key,page){
                   waEnsureState();
                   appState.uiPages[key]=Math.max(1,Number(page)||1);
@@ -3636,6 +3676,7 @@ public final class WebAdminFrontendScripts {
                   if(key==='actions')renderActionList('');
                   if(key==='actionTemplates')renderActionTemplateList('');
                   if(key==='history')renderHistoryListPage('');
+                  if(key==='doctor')renderDoctorList('');
                   if(key==='config')renderConfigList('');
                   if(key==='users')renderUserList('');
                   if(key==='regions')renderRegionList('');
@@ -3647,7 +3688,8 @@ public final class WebAdminFrontendScripts {
                   if(page.pages>4)nums.push('…');
                   if(page.pages>3)nums.push(page.pages);
                   const prev=Math.max(1,page.current-1), next=Math.min(page.pages,page.current+1);
-                  return `<div class="wa-pagination"><div class="wa-page-buttons"><button class="wa-page-btn" onclick="setWaPage('${key}',${prev})">‹</button>${nums.map(n=>n==='…'?`<span class="wa-page-meta">…</span>`:`<button class="wa-page-btn ${n===page.current?'active':''}" onclick="setWaPage('${key}',${n})">${n}</button>`).join('')}<button class="wa-page-btn" onclick="setWaPage('${key}',${next})">›</button></div><span class="wa-page-meta">共 ${esc(page.total)} 条</span><span class="wa-page-meta">每页 ${esc(page.pageSize)} 条</span></div>`;
+                  const pageButton=(label,targetPage,active=false,disabled=false,ariaLabel='')=>`<button type="button" class="wa-page-btn ${active?'active':''}" data-action="wa-pagination-page" data-page-key="${esc(key)}" data-page="${esc(targetPage)}" ${active?'aria-current="page"':''} ${disabled?'disabled':''} aria-label="${esc(ariaLabel||`第 ${targetPage} 页`)}">${esc(label)}</button>`;
+                  return `<div class="wa-pagination" data-shared-pagination-helper="true"><div class="wa-page-buttons">${pageButton('‹',prev,false,page.current<=1,'上一页')}${nums.map(n=>n==='…'?`<span class="wa-page-meta">…</span>`:pageButton(n,n,n===page.current,false,`第 ${n} 页`)).join('')}${pageButton('›',next,false,page.current>=page.pages,'下一页')}</div><span class="wa-page-meta">共 ${esc(page.total)} 条</span><span class="wa-page-meta">每页 ${esc(page.pageSize)} 条</span></div>`;
                 }
                 function modalSnapshot(kind,draft){
                   const k=String(kind||'');

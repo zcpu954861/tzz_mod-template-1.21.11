@@ -49,6 +49,7 @@ public enum WebAdminRealtimeEventType {
     SELECTION_FAILED("selection_failed", "对象选择失败"),
     CONTAINER_TEMPLATE_SESSION_STARTED("container_template_session_started", "容器模板会话已开始"),
     CONTAINER_TEMPLATE_SESSION_OPENED("container_template_session_opened", "容器模板 GUI 已打开"),
+    CONTAINER_TEMPLATE_SESSION_SAVED("container_template_session_saved", "容器模板会话已保存"),
     CONTAINER_TEMPLATE_SESSION_CANCELLED("container_template_session_cancelled", "容器模板会话已取消"),
     CONTAINER_TEMPLATE_SESSION_FAILED("container_template_session_failed", "容器模板会话失败"),
     CONTAINER_TEMPLATE_SESSION_EXPIRED("container_template_session_expired", "容器模板会话已过期"),

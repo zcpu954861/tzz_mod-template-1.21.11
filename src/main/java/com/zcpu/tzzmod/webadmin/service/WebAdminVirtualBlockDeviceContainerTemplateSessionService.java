@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
+import com.zcpu.tzzmod.signal.device.ContainerItemConditionSupport;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionType;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -74,8 +75,8 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
         data.put("supported", true);
         data.put("typeSupported", true);
         data.put("readOnly", true);
-        data.put("p3aSkeleton", true);
-        data.put("saveImplemented", false);
+        data.put("p3bGhostEditing", true);
+        data.put("saveImplemented", true);
         data.put("dryRunGhostInteraction", false);
         data.put("lockTarget", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE + ":" + device.id());
         data.put("expectedFingerprint", fingerprintFor(device));
@@ -86,9 +87,10 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
                 session
         ));
         data.put("notes", List.of(
-                "7.9 P3a 只打开游戏内容器模板 GUI skeleton 并展示已保存 itemConditions。",
-                "本阶段不会保存 itemConditions，也不会消耗玩家物品或修改世界容器。",
-                "左键复制模板、右键清空、滚轮数量和保存写入将在 7.9 P3b 完整实现。"
+                "7.9 P3b 通过游戏内箱子式模板 GUI 编辑容器内容变化 itemConditions。",
+                "左键复制模板、右键清空模板格、滚轮 / Ctrl+滚轮调整数量。",
+                "模板条件默认继承 VBD 容器内容变化频道；不要求每个模板格单独配置 channel。",
+                "点击保存才写入 itemConditions；取消不会保存，不会消耗玩家物品或修改世界容器。"
         ));
         return data;
     }
@@ -210,7 +212,7 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
                 user,
                 session,
                 context,
-                itemConditionDtos(device.itemConditions())
+                itemConditionDtos(device.itemConditions(), device.containerChangeChannel())
         );
         return WebAdminContainerTemplateSessions.startSession(server, targetPlayer, editLockService, templateSession);
     }
@@ -314,7 +316,13 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
         data.put("y", device.y());
         data.put("z", device.z());
         data.put("blockId", device.blockId());
-        List<Map<String, Object>> all = itemConditionDtos(device.itemConditions());
+        data.put("containerChangeChannel", device.containerChangeChannel());
+        data.put("containerChangeChannelMissingWarning", device.containerChangeChannel().isBlank());
+        data.put("itemConditionChannelInheritance", true);
+        data.put("p3bItemConditionInheritsContainerChangeChannel", true);
+        data.put("perSlotChannelRequired", false);
+        data.put("itemConditionChannelInheritanceNote", "P3b 模板条件默认继承 VBD 容器内容变化频道；显式 condition.channel 仅作为覆盖。");
+        List<Map<String, Object>> all = itemConditionDtos(device.itemConditions(), device.containerChangeChannel());
         List<Map<String, Object>> slots = new ArrayList<>();
         List<Map<String, Object>> totals = new ArrayList<>();
         List<Map<String, Object>> advanced = new ArrayList<>();
@@ -337,19 +345,28 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
         data.put("advancedConditions", List.copyOf(advanced));
         data.put("itemConditionCount", all.size());
         data.put("slotCount", slotPreviewCount(maxSlot, slots.isEmpty()));
-        data.put("p3aDoesNotSaveItemConditions", true);
-        data.put("saveDisabledUntilP3b", true);
+        data.put("p3bSavesItemConditions", true);
+        data.put("saveEnabledInP3b", true);
+        data.put("ghostTemplateEditingEnabled", true);
         data.put("noRealInventoryTransfer", true);
         return data;
     }
 
     private static List<Map<String, Object>> itemConditionDtos(List<ContainerItemConditionData> rawConditions) {
+        return itemConditionDtos(rawConditions, "");
+    }
+
+    private static List<Map<String, Object>> itemConditionDtos(List<ContainerItemConditionData> rawConditions, String inheritedContainerChangeChannel) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (ContainerItemConditionData raw : rawConditions == null ? List.<ContainerItemConditionData>of() : rawConditions) {
             ContainerItemConditionData condition = raw == null ? null : raw.normalized();
             if (condition == null) {
                 continue;
             }
+            String effectiveChannel = ContainerItemConditionSupport.effectiveChannel(condition, inheritedContainerChangeChannel, false);
+            String effectiveOffChannel = ContainerItemConditionSupport.effectiveChannel(condition, inheritedContainerChangeChannel, true);
+            String effectiveChannelSource = ContainerItemConditionSupport.effectiveChannelSource(condition, inheritedContainerChangeChannel, false);
+            String effectiveOffChannelSource = ContainerItemConditionSupport.effectiveChannelSource(condition, inheritedContainerChangeChannel, true);
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("id", condition.id());
             data.put("name", condition.name());
@@ -361,12 +378,19 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
             data.put("count", condition.count());
             data.put("channel", condition.channel());
             data.put("offChannel", condition.offChannel());
+            data.put("effectiveChannel", effectiveChannel);
+            data.put("effectiveOffChannel", effectiveOffChannel);
+            data.put("effectiveChannelSource", effectiveChannelSource);
+            data.put("effectiveOffChannelSource", effectiveOffChannelSource);
+            data.put("inheritsContainerChangeChannel", "container_change_channel".equals(effectiveChannelSource));
+            data.put("perSlotChannelRequired", false);
+            data.put("channelInheritanceEnabled", true);
             data.put("mode", condition.mode());
             data.put("lastMatched", condition.lastMatched());
             data.put("lastResult", condition.lastResult());
             data.put("displayZone", displayZone(condition.type()));
-            data.put("readonly", true);
-            data.put("editableInP3a", false);
+            data.put("readonly", false);
+            data.put("editableInP3b", true);
             data.put("participatingFieldsDependOnMode", true);
             ItemStackMatcherData matcher = condition.matcher() == null ? ItemStackMatcherData.empty() : condition.matcher().normalized();
             data.put("matcherEnabled", matcher.enabled());

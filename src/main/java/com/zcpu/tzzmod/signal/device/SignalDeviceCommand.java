@@ -1044,14 +1044,15 @@ public final class SignalDeviceCommand {
             if (!condition.enabled()) {
                 hints.add(Text.literal("物品条件“" + condition.name() + "”已禁用。").formatted(Formatting.YELLOW));
             }
-            if (condition.channel().isBlank() || !SignalChannel.isValid(condition.channel())) {
-                hints.add(Text.literal("物品条件“" + condition.name() + "”的频道为空或无效。").formatted(Formatting.RED));
+            String effectiveItemConditionChannel = ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), false);
+            if (effectiveItemConditionChannel.isBlank() || !SignalChannel.isValid(effectiveItemConditionChannel)) {
+                hints.add(Text.literal("物品条件“" + condition.name() + "”的有效频道为空或无效。").formatted(Formatting.RED));
             }
             if (!condition.offChannel().isBlank() && !SignalChannel.isValid(condition.offChannel())) {
                 hints.add(Text.literal("物品条件“" + condition.name() + "”的退出频道无效。").formatted(Formatting.RED));
             }
             if (containerInventory != null) {
-                for (String issue : ContainerItemConditionSupport.validate(containerInventory, condition)) {
+                for (String issue : ContainerItemConditionSupport.validate(containerInventory, condition, device.containerChangeChannel())) {
                     hints.add(Text.literal("物品条件“" + condition.name() + "”："
                             + issue).formatted(Formatting.YELLOW));
                 }
