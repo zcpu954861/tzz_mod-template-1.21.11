@@ -67,6 +67,23 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 匹配模式决定哪些字段参与匹配。
 - 不在 P1 / P2 普通 Web 表单里硬做复杂物品模板。
 
+P3 拆分为：
+
+- P3a：Container Change Template GUI Session + GUI Skeleton。
+  - WebAdmin 从 VBD 详情页和统一设备配置 modal 的容器内容变化 section 发起模板编辑 session。
+  - 目标在线玩家打开游戏内“容器内容变化模板”GUI skeleton。
+  - Session 使用 `virtual_block_device_container_template:<deviceId>` lock target。
+  - expected fingerprint 只覆盖 normalized `itemConditions`，包含 condition 基础字段和 matcher 模板 / 匹配开关 / hash；排除 runtime `last*`、P2 native trigger 基础字段、itemSubmit / consume、raw / NBT / path 字段。
+  - GUI 从已保存 `itemConditions` 加载只读模板快照；二次打开必须显示当前已保存配置。
+  - slot 条件映射到模板槽，总量条件映射到总量模板区域，高级 / 无法映射条件显示为只读摘要。
+  - ESC、关闭窗口、WebUI cancel、目标玩家离线或 session 超时都取消 session，不保存，并释放 lock。
+  - P3a 不真实保存 `itemConditions`，保存按钮禁用或 not_implemented。
+  - P3a 不实现持久化 ghost item editing，不修改世界容器，不消耗或转移玩家真实物品。
+- P3b：Ghost item editing + save。
+  - 左键复制模板、右键清空、滚轮 / Ctrl+滚轮调整数量。
+  - 点击保存才写入 `itemConditions`。
+  - 完整 field preservation、audit、realtime 和失败处理闭环。
+
 ## 允许范围
 
 - `virtual_block_device` 原生触发只读摘要。
@@ -84,7 +101,7 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 
 ## 禁止范围
 
-- 不做容器内容变化物品模板 GUI。
+- P1 / P2 不做容器内容变化物品模板 GUI；P3a 只允许 session + 只读 GUI skeleton，不保存 `itemConditions`。
 - 不做 itemSubmit。
 - 不做 consume。
 - 不做 inventory / equipment / armor。
@@ -155,6 +172,11 @@ P1 不做持久化写入，不新增 native trigger 写 API。
 - 已实现容器打开 / 关闭 / 内容变化基础配置：channel、container cooldown、change check interval。`itemConditions` 只读保留，复杂物品模板 GUI 仍在 P3。
 - 容器 open / close / change 共用 `containerEnabled`；全部关闭时 `containerEnabled=false`，保存的 `itemConditions` 仍保留但不会触发。
 - 统一设备配置 modal 内可以直接编辑原生触发配置；独立“编辑原生触发配置”modal 也可用。
+- 7.9 后，`virtual_block_device` 的旧“类型专属配置”不再作为 WebUI 中的独立显示或编辑区域：
+  - VBD 原生触发字段统一归入“原生触发配置”。
+  - interaction item matcher 归入“玩家右键交互”的条件 / 判定层。
+  - itemSubmit 后续单独阶段处理。
+  - receiver / relay 的类型专属配置仍保留，不属于本次清理范围。
 - P2 的触发方式选择是真实配置；编辑 UI 只显示已启用 / 已选中的触发 section。
 - interaction item matcher 在 P2 中完全受右键交互控制：
   - 右键交互未启用 / 未选中时隐藏 matcher 摘要与入口。
@@ -162,6 +184,21 @@ P1 不做持久化写入，不新增 native trigger 写 API。
   - 隐藏 matcher 不清空 matcher 数据。
 - 保存 native trigger 只写入原生触发字段，不重写整个 VBD JSON，不清空 redstone / BlockState / interaction / matcher / container / `itemConditions` / itemSubmit 保留字段。
 - 保存成功发布 `virtual_block_device_changed`、`device_config_changed`、`config_changed`、`write_audit_appended` 等 realtime 事件，并让 channel catalog cache dirty。
+
+7.9 P3a 当前实现目标：
+
+- 新增容器内容变化模板 session API：
+  - `GET /api/webadmin/virtual-block-devices/{deviceId}/container-template`
+  - `POST /api/webadmin/virtual-block-devices/{deviceId}/container-template-session/start`
+  - `GET /api/webadmin/virtual-block-devices/{deviceId}/container-template-session/status`
+  - `POST /api/webadmin/virtual-block-devices/{deviceId}/container-template-session/cancel`
+- WebAdmin start / cancel 需要 EDITOR / OWNER、CSRF / same-origin、`WebAdminWriteResult` 风格响应和 edit lock；overview 可供 VIEWER 查看。
+- P3a 只创建独立 session、获取 `virtual_block_device_container_template:<deviceId>` lock、计算 itemConditions fingerprint、向目标在线玩家打开 GUI skeleton、展示 session 状态。
+- 客户端 GUI skeleton 是只读预览，不使用真实容器路径，不允许真实物品转移，不写入世界容器。
+- GUI 读取已保存 `itemConditions` 并展示 slot / total / advanced 条件摘要；tooltip 只作展示，不代表所有字段都会参与匹配。
+- GUI ESC、关闭窗口或 WebUI cancel 都取消 session，不保存 `itemConditions`。
+- P3a 发送 `container_template_session_started/opened/cancelled/failed/expired` realtime 状态事件；不发布 `config_changed`，因为不保存配置。
+- P3a audit 只记录 session start / cancel / fail / expire，不伪造配置写入。
 
 ## 待验收内容
 

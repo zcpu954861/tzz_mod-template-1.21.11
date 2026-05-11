@@ -15,6 +15,7 @@ import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceDispatcher;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminLifecycle;
+import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateSessions;
 import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionSessions;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -43,10 +44,12 @@ public final class TzzLifecycleBootstrap {
             RegionControllerStore.flushDirty(server);
             SignalListenerStore.flushDirty(server);
             SignalDeviceStore.flushDirty(server);
+            WebAdminContainerTemplateSessions.expireOld(server);
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             WebAdminSelectionSessions.clearAll(server, "server_stopping");
+            WebAdminContainerTemplateSessions.clearAll(server, "server_stopping");
             MapDataStore.flushDirty(server);
             TaskDataStore.flushDirty(server);
             NoteDataStore.flushDirty(server);
@@ -59,6 +62,7 @@ public final class TzzLifecycleBootstrap {
 
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             WebAdminSelectionSessions.clearAll(server, "server_stopped");
+            WebAdminContainerTemplateSessions.clearAll(server, "server_stopped");
             WebAdminLifecycle.stop();
             SignalDeviceStore.forceFlushDirty(server);
             MapDataStore.clearCache(server);

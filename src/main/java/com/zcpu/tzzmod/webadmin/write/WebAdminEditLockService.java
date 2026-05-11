@@ -23,6 +23,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_DEVICE_EXTENDED_CONFIG = "device_extended_config";
     public static final String TARGET_ACTION_RELAY_ACTIONS = "action_relay_actions";
     public static final String TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS = "virtual_block_device_triggers";
+    public static final String TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE = "virtual_block_device_container_template";
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
@@ -194,6 +195,29 @@ public final class WebAdminEditLockService {
         WebAdminWriteTarget target = lockTarget(normalizeTargetType(targetType), targetId);
         WebAdminWriteContext context = writeContext(user, session, remoteAddress, WebAdminOperationType.RELEASE_EDIT_LOCK, target);
         return releaseInternal(normalizeTargetType(targetType), targetId, lockId, user, session, context, true, "保存完成，编辑锁已释放。");
+    }
+
+    public WebAdminWriteResult releaseForSessionCleanup(
+            String targetType,
+            String targetId,
+            String lockId,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String message
+    ) {
+        WebAdminWriteTarget target = lockTarget(normalizeTargetType(targetType), targetId);
+        WebAdminWriteContext context = writeContext(user, session, remoteAddress, WebAdminOperationType.RELEASE_EDIT_LOCK, target);
+        return releaseInternal(
+                normalizeTargetType(targetType),
+                targetId,
+                lockId,
+                user,
+                session,
+                context,
+                true,
+                safe(message).isBlank() ? "会话结束，编辑锁已释放。" : message
+        );
     }
 
     public LockValidation validateLock(
@@ -503,6 +527,9 @@ public final class WebAdminEditLockService {
         if (TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)) {
             return "VBD 原生触发配置";
         }
+        if (TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE.equals(safeTargetType)) {
+            return "VBD 容器变化模板";
+        }
         if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
             return "交互物品匹配";
         }
@@ -530,6 +557,7 @@ public final class WebAdminEditLockService {
                 || TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
                 || TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)
                 || TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)
+                || TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE.equals(safeTargetType)
                 || TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType);
     }
 
@@ -549,6 +577,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS;
+        }
+        if (TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE.equals(safeTargetType)) {
+            return WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION;
         }
         if (TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_ITEM_MATCHER;

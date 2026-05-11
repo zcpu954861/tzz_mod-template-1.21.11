@@ -12,6 +12,8 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionCancelRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
@@ -28,6 +30,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
@@ -77,6 +80,7 @@ public final class WebAdminServer {
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
     private HttpServer httpServer;
     private ExecutorService executor;
@@ -248,6 +252,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/virtual-block-devices/") && path.endsWith("/native-triggers")) {
                 runOnServerThread(() -> handleVirtualBlockDeviceNativeTriggers(exchange, auth, path, method));
+                return;
+            }
+            if (path.startsWith("/api/webadmin/virtual-block-devices/") && path.contains("/container-template")) {
+                runOnServerThread(() -> handleVirtualBlockDeviceContainerTemplate(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/virtual-block-devices/")) {
@@ -602,6 +610,7 @@ public final class WebAdminServer {
                 || WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG.equals(safeTargetType)
                 || WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS.equals(safeTargetType)
                 || WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS.equals(safeTargetType)
+                || WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE.equals(safeTargetType)
                 || WebAdminEditLockService.TARGET_INTERACTION_ITEM_MATCHER.equals(safeTargetType);
     }
 
@@ -854,6 +863,106 @@ public final class WebAdminServer {
             return;
         }
         WebAdminJsonResponse.ok(exchange, data);
+    }
+
+    private void handleVirtualBlockDeviceContainerTemplate(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String prefix = "/api/webadmin/virtual-block-devices/";
+        String overviewSuffix = "/container-template";
+        String startSuffix = "/container-template-session/start";
+        String statusSuffix = "/container-template-session/status";
+        String cancelSuffix = "/container-template-session/cancel";
+        String suffix;
+        if (path.startsWith(prefix) && path.endsWith(overviewSuffix)) {
+            suffix = overviewSuffix;
+        } else if (path.startsWith(prefix) && path.endsWith(startSuffix)) {
+            suffix = startSuffix;
+        } else if (path.startsWith(prefix) && path.endsWith(statusSuffix)) {
+            suffix = statusSuffix;
+        } else if (path.startsWith(prefix) && path.endsWith(cancelSuffix)) {
+            suffix = cancelSuffix;
+        } else {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "虚拟方块设备容器模板会话接口不存在。");
+            return;
+        }
+        String encodedDeviceId = path.substring(prefix.length(), path.length() - suffix.length());
+        String deviceId = decodePathSegment(encodedDeviceId);
+        if (deviceId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "虚拟方块设备 ID 不能为空。");
+            return;
+        }
+
+        if (overviewSuffix.equals(suffix)) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, Object> data = containerTemplateSessionService.overview(minecraftServer, auth.user, auth.session, deviceId);
+            if (data == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "虚拟方块设备不存在。");
+                return;
+            }
+            if (Boolean.FALSE.equals(data.get("supported"))) {
+                WebAdminJsonResponse.error(exchange, 400, "VALIDATION_ERROR", String.valueOf(data.getOrDefault("unsupportedReason", "该接口仅支持 virtual_block_device。")));
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, data);
+            return;
+        }
+
+        if (statusSuffix.equals(suffix)) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, containerTemplateSessionService.status(query.getOrDefault("sessionId", "")));
+            return;
+        }
+
+        if (startSuffix.equals(suffix)) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminContainerTemplateSessionStartRequest request = readJson(exchange, WebAdminContainerTemplateSessionStartRequest.class);
+            if (request == null) {
+                request = new WebAdminContainerTemplateSessionStartRequest();
+            }
+            request.deviceId = deviceId;
+            WebAdminWriteResult result = containerTemplateSessionService.start(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    deviceId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        WebAdminContainerTemplateSessionCancelRequest request = readJson(exchange, WebAdminContainerTemplateSessionCancelRequest.class);
+        if (request == null) {
+            request = new WebAdminContainerTemplateSessionCancelRequest();
+        }
+        request.deviceId = deviceId;
+        WebAdminWriteResult result = containerTemplateSessionService.cancel(
+                minecraftServer,
+                auth.user,
+                auth.session,
+                sourceIp(exchange),
+                deviceId,
+                request,
+                header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                isWriteSameOrigin(exchange)
+        );
+        WebAdminJsonResponse.ok(exchange, result);
     }
 
     private void handleSignalListenerLifecycle(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {

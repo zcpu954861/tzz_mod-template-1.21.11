@@ -1163,6 +1163,10 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/selection/status')) return { active:true, selectionId:'sel-1', status:'active', purpose:'create_virtual_block_device', targetPlayerName:'Owner', channel:'test.channel' };
                   if (url.startsWith('/api/webadmin/online-players')) return [{ name:'Owner', uuid:'00000000-0000-0000-0000-000000000001' }, { name:'Builder', uuid:'00000000-0000-0000-0000-000000000002' }];
                   if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:false, writeApiEnabled:true, nativeTriggerWriteApiEnabled:true, expectedFingerprint:'native-fp', lockStatus:{ locked:false }, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], allowedRedstoneModes:['redstone_rising','redstone_falling','redstone_both'], allowedConditionModes:['condition_enter','condition_exit','condition_both'], activeTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / 受电状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,currentPoweredExpression:'currentPowered = blockStatePowered || receivedPowerLevel > 0',lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,serverValidatesBoundBlockProperties:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],itemConditionsReadOnly:true,templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP2:['itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea','containerItemTemplateGui'] };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/start')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'已通知目标玩家打开 GUI。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'started', active:true } } };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.includes('/container-template-session/status')) return { sessionRef:'ct-1', id:'ct-1', status:'started', active:true, message:'等待目标玩家打开 GUI。' };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/cancel')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'容器模板会话已取消。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'cancelled', active:false } } };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template')) { const id = decodeURIComponent(url.substring('/api/webadmin/virtual-block-devices/'.length).slice(0, -'/container-template'.length)); return { deviceId:id, displayName:'Complex VBD', supported:true, typeSupported:true, p3aSkeleton:true, saveImplemented:false, dryRunGhostInteraction:false, expectedFingerprint:'container-template-fp', lockStatus:{ locked:false }, itemConditions:[{ id:'slot-0', name:'Slot 0 stone', type:'slot_item', slot:0, itemId:'minecraft:stone', templateItemId:'minecraft:stone', countMode:'at_least', count:1 }, { id:'total-stick', name:'Total sticks', type:'total_item', itemId:'minecraft:stick', templateItemId:'minecraft:stick', countMode:'exactly', count:8 }] }; }
                   if (url.startsWith('/api/webadmin/virtual-block-devices/')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE', targetId:'vdev-1', changed:true, message:'虚拟方块设备已删除 / 解绑，世界方块未被破坏。', data:{ deviceId:'vdev-1', routeTarget:'#/virtual-block-devices' } };
                   if (url === '/api/webadmin/signal-listeners') return { success:true, targetType:'SIGNAL_LISTENER', targetId:'new-listener', changed:true, message:'Signal Listener 已创建。', data:{ listenerId:'new-listener', routeTarget:'#/listeners/new-listener?returnTo=%23%2Flisteners' } };
                   if (url.startsWith('/api/webadmin/signal-listeners/')) return { success:true, targetType:'SIGNAL_LISTENER', targetId:'test-listener', changed:true, message:'Signal Listener 已删除。', data:{ listenerId:'test-listener', routeTarget:'#/listeners' } };
@@ -1222,6 +1226,18 @@ public final class StabilizationGuardTest {
                 vm.runInContext(code + "\\n;globalThis.__smokeRoute = async function(hash){ location.hash = hash; return await route(); };globalThis.__smokeModal = async function(){ openWebAdminModal('Smoke Modal','<form class=\\\"edit-form\\\"><div class=\\\"form-actions\\\">hidden</div></form>',editModalFooter(false)); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const closePromise = closeWebAdminModal(false); const className = String(modal && modal.className || ''); const closingMarker = String(modal && modal.dataset && modal.dataset.modalClosing || ''); await closePromise; return {html, className, closingMarker, removed:!document.getElementById('wa-modal-root')}; };globalThis.__smokeDeviceConfigModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/devices/test-device'; await route(); await startDeviceConfigEdit('test-device'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const className = String(modal && modal.className || ''); await cancelDeviceConfigEdit('test-device'); return {html,className}; };globalThis.__smokeChannelModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/signals/test.channel'; await route(); await startChannelMetadataEdit('test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelChannelMetadataEdit('test.channel'); return {html}; };globalThis.__smokeListenerModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/listeners/test-listener'; await route(); await startSignalListenerBasicConfigEdit('test-listener','test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelSignalListenerBasicConfigEdit('test-listener','test.channel'); return {html}; };", context, { filename:'webadmin-app.js' });
                 vm.runInContext(`
                   globalThis.__smokeSilentRoute = async function(hash){ location.hash = hash; return await route({silent:true}); };
+                  globalThis.__smokeVbdDeviceConfigModal = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    location.hash = '#/devices/vdev-1';
+                    await route();
+                    const detailHtml = String(document.getElementById('view').innerHTML || '');
+                    await startDeviceConfigEdit('vdev-1');
+                    const modal = document.getElementById('wa-modal-root');
+                    const modalHtml = String(modal && modal.innerHTML || '');
+                    const urls = requestedUrls.join('|');
+                    await cancelDeviceConfigEdit('vdev-1');
+                    return { detailHtml, modalHtml, urls };
+                  };
                   globalThis.__smokeToggleAdvanced = async function(kind,id){ await toggleAdvancedDetail(kind,id); return String(document.getElementById('view').innerHTML || ''); };
                   globalThis.__smokeModalSilent = async function(){
                     appState.me = { username:'Owner', role:'OWNER' };
@@ -1322,6 +1338,28 @@ public final class StabilizationGuardTest {
                     const vbdDeleteUrls = requestedUrls.slice();
                     const keys = Array.from(realtimeRouteKeysForEvent({ type:'device_removed', deviceId:'vdev-1', sourceType:'virtual_block_device' })).join(',') + '|' + Array.from(realtimeRouteKeysForEvent({ type:'signal_listener_changed', channel:'test.channel', payload:{ listenerId:'test-listener' } })).join(',');
                     return { listenerCreateHtml, listenerCreateHash, listenerCreateUrls, listenerDeleteHtml, listenerDeleteHash, listenerDeleteUrls, vbdDeleteHtml, vbdDeleteHash, vbdDeleteUrls, keys };
+                  };
+                  globalThis.__smokeContainerTemplateModal = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    const complex = 'virtual_block_device:minecraft:overworld@-11,-60,-7';
+                    requestedUrls.length = 0;
+                    await openContainerTemplateSessionModal(complex);
+                    const config = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    const player = document.getElementById('container-template-player');
+                    player.value = 'Owner';
+                    player.selectedIndex = 0;
+                    player.options = [{ dataset:{ uuid:'00000000-0000-0000-0000-000000000001' } }];
+                    await startContainerTemplateSession(complex);
+                    const waiting = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    const closeAttempt = await closeContainerTemplateSessionModal(complex);
+                    const closeConfirmOpen = !!document.getElementById('wa-container-template-cancel-confirm');
+                    cancelContainerTemplateCancelConfirm();
+                    const afterContinue = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    requestContainerTemplateSessionCancel(complex);
+                    const cancelConfirmOpen = !!document.getElementById('wa-container-template-cancel-confirm');
+                    await confirmContainerTemplateSessionCancel();
+                    const afterClose = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    return { config, waiting, urls: requestedUrls.slice(), closeAttempt, closeConfirmOpen, afterContinue, cancelConfirmOpen, afterClose, session: appState.containerTemplateSession };
                   };
                   globalThis.__smokeRealtime = function(){
                     const listenerLock = { type:'edit_lock_changed', payload:{ targetType:'signal_listener_basic_config', targetId:'test-listener' } };
@@ -1554,6 +1592,29 @@ public final class StabilizationGuardTest {
                     failures.push(`device config modal: ${err.name}: ${err.message}`);
                   }
                   try {
+                    const vbdModal = await context.__smokeVbdDeviceConfigModal();
+                    if (vbdModal.detailHtml.includes('data-type-specific-config-card="true"') || vbdModal.detailHtml.includes('<h3>类型专属配置</h3>')) {
+                      failures.push('VBD detail config summary should not render legacy type-specific config card');
+                    }
+                    if (vbdModal.modalHtml.includes('data-edit-section="extended"') || vbdModal.modalHtml.includes('<h3>类型专属配置</h3>')) {
+                      failures.push('VBD unified config modal should not render legacy type-specific config editor');
+                    }
+                    if (!vbdModal.detailHtml.includes('data-vbd-native-trigger-config-summary="true"') || !vbdModal.modalHtml.includes('data-vbd-native-trigger-config-modal-section="true"')) {
+                      failures.push('VBD native trigger section should remain after legacy type-specific cleanup');
+                    }
+                    if (!vbdModal.modalHtml.includes('data-vbd-type-specific-suppressed="true"')) {
+                      failures.push('VBD unified config modal should document that legacy type-specific config is split into native trigger / matcher phases');
+                    }
+                    if (!vbdModal.modalHtml.includes('data-vbd-native-trigger-interaction-matcher-inline-edit="true"')) {
+                      failures.push('VBD matcher entry should remain inside right-click/native trigger flow');
+                    }
+                    if (vbdModal.urls.includes('/api/webadmin/device-extended-config/vdev-1')) {
+                      failures.push('VBD unified config modal should not fetch legacy device extended config');
+                    }
+                  } catch (err) {
+                    failures.push(`VBD device config modal cleanup: ${err.name}: ${err.message}`);
+                  }
+                  try {
                     const modalSilent = await context.__smokeModalSilent();
                     if (!modalSilent.stillOpen || !modalSilent.before.includes('data-unified-device-config="true"') || !modalSilent.after.includes('data-unified-device-config="true"')) {
                       failures.push('device config modal: silent refresh closed modal or dropped unified sections');
@@ -1663,6 +1724,32 @@ public final class StabilizationGuardTest {
                     }
                   } catch (err) {
                     failures.push(`realtime run smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const p3a = await context.__smokeContainerTemplateModal();
+                    const expectedOverview = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template';
+                    const expectedStart = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/start';
+                    const expectedCancel = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/cancel';
+                    if (!p3a.config.includes('data-container-template-session="p3a"') || !p3a.config.includes('data-action="container-template-start"') || !p3a.config.includes('data-device-id="virtual_block_device:minecraft:overworld@-11,-60,-7"')) {
+                      failures.push('container template modal: missing escaped data-action/data-device-id start button for complex device id');
+                    }
+                    if (p3a.config.includes('onclick="startContainerTemplateSession(') || p3a.config.includes('onclick="cancelContainerTemplateSession(') || p3a.config.includes('onsubmit="event.preventDefault();startContainerTemplateSession(')) {
+                      failures.push('container template modal: unsafe inline start/cancel handler remains');
+                    }
+                    if (!p3a.waiting.includes('data-container-template-session-status="started"')) {
+                      failures.push('container template modal: start did not update modal session status');
+                    }
+                    if (!p3a.urls.includes(expectedOverview) || !p3a.urls.includes(expectedStart) || !p3a.urls.includes(expectedCancel)) {
+                      failures.push('container template modal: complex device id did not call overview/start/cancel API with encoded route');
+                    }
+                    if (p3a.closeAttempt !== false || !p3a.closeConfirmOpen || !p3a.afterContinue.includes('data-container-template-session-status="started"') || !p3a.cancelConfirmOpen) {
+                      failures.push('container template modal: active close/cancel should open confirm and continue editing should keep session modal active');
+                    }
+                    if (!p3a.afterClose.includes('data-container-template-session-status="cancelled"') || !p3a.session || p3a.session.active) {
+                      failures.push('container template modal: confirmed cancel should leave a terminal cancelled status without active orphan state');
+                    }
+                  } catch (err) {
+                    failures.push(`container template modal smoke: ${err.name}: ${err.message}`);
                   }
                   if (failures.length) {
                     console.log(failures.join('\\n'));
@@ -2558,6 +2645,14 @@ public final class StabilizationGuardTest {
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
         String nativeTriggerRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
+        String containerTemplateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceContainerTemplateSessionService.java"), StandardCharsets.UTF_8);
+        String containerTemplateSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/container/WebAdminContainerTemplateSessions.java"), StandardCharsets.UTF_8);
+        String containerTemplateClient = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplateClient.java"), StandardCharsets.UTF_8);
+        String containerTemplateScreen = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplatePreviewScreen.java"), StandardCharsets.UTF_8);
+        String containerTemplateServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/container/WebAdminContainerTemplateServer.java"), StandardCharsets.UTF_8);
+        String containerTemplatePayloads = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplatePayloads.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateS2CPayload.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateC2SPayload.java"), StandardCharsets.UTF_8);
         String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
         String js = WebAdminFrontendAssets.appJs();
         String css = WebAdminFrontendStyles.appCss();
@@ -2588,7 +2683,15 @@ public final class StabilizationGuardTest {
                 "redstone_disabled",
                 "不会误关右键交互或容器触发",
                 "Container Change Template GUI",
-                "不在 P1 / P2 普通 Web 表单里硬做复杂物品模板"
+                "P3a：Container Change Template GUI Session + GUI Skeleton",
+                "P3a 不真实保存 `itemConditions`",
+                "virtual_block_device_container_template:<deviceId>",
+                "P3b：Ghost item editing + save",
+                "不在 P1 / P2 普通 Web 表单里硬做复杂物品模板",
+                "`virtual_block_device` 的旧“类型专属配置”不再作为 WebUI 中的独立显示或编辑区域",
+                "VBD 原生触发字段统一归入“原生触发配置”",
+                "interaction item matcher 归入“玩家右键交互”的条件 / 判定层",
+                "receiver / relay 的类型专属配置仍保留"
         )) {
             requireContains(context, marker, "7.9 current context marker present: " + marker);
         }
@@ -2639,6 +2742,20 @@ public final class StabilizationGuardTest {
         }
         requireContains(webServer, "WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest",
                 "7.9 P2 native trigger write request DTO is routed through WebAdminServer");
+        for (String marker : List.of(
+                "/container-template",
+                "/container-template-session/start",
+                "/container-template-session/status",
+                "/container-template-session/cancel",
+                "handleVirtualBlockDeviceContainerTemplate",
+                "containerTemplateSessionService.overview",
+                "containerTemplateSessionService.start",
+                "containerTemplateSessionService.cancel",
+                "WebAdminContainerTemplateSessionStartRequest",
+                "WebAdminContainerTemplateSessionCancelRequest"
+        )) {
+            requireContains(webServer, marker, "7.9 P3a container template route marker present: " + marker);
+        }
 
         for (String marker : List.of(
                 "knownChannels(server, devices, listeners, regions)",
@@ -2680,6 +2797,108 @@ public final class StabilizationGuardTest {
                 "7.9 P3"
         )) {
             requireContains(nativeTriggerService, marker, "7.9 P2 native trigger service marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION",
+                "CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION",
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "expectedFingerprint",
+                "fingerprintFor(device)",
+                "fingerprintConditions(device.itemConditions())",
+                "itemConditionDtos(device.itemConditions())",
+                "p3aSkeleton",
+                "saveImplemented\", false",
+                "dryRunGhostInteraction\", false",
+                "p3aDoesNotSaveItemConditions",
+                "saveDisabledUntilP3b",
+                "noRealInventoryTransfer",
+                "targetPlayerName",
+                "目标玩家不在线",
+                "只支持 virtual_block_device"
+        )) {
+            requireContains(containerTemplateService, marker, "7.9 P3a container template service marker present: " + marker);
+        }
+        requireFalse(containerTemplateService.contains("updateVirtualItemCondition(")
+                        || containerTemplateService.contains("addVirtualItemCondition(")
+                        || containerTemplateService.contains("removeVirtualItemCondition(")
+                        || containerTemplateService.contains("clearVirtualItemConditions("),
+                "7.9 P3a service must not save or mutate itemConditions");
+
+        for (String marker : List.of(
+                "SESSION_TTL_MILLIS",
+                "TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "CONTAINER_TEMPLATE_SESSION_STARTED",
+                "CONTAINER_TEMPLATE_SESSION_OPENED",
+                "CONTAINER_TEMPLATE_SESSION_CANCELLED",
+                "CONTAINER_TEMPLATE_SESSION_FAILED",
+                "CONTAINER_TEMPLATE_SESSION_EXPIRED",
+                "sendOpen(targetPlayer, session)",
+                "cancelFromWebAdmin",
+                "cancelFromClient",
+                "cancelForDisconnect",
+                "sendEnd(player, \"cancelled\"",
+                "data.put(\"sessionRef\", session.sessionId)",
+                "alreadyTerminal",
+                "idempotentNoOp",
+                "releaseForSessionCleanup",
+                "WRITE_AUDIT_APPENDED",
+                "p3aDoesNotSaveItemConditions"
+        )) {
+            requireContains(containerTemplateSessions, marker, "7.9 P3a container template session marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "WebAdminContainerTemplatePreviewScreen.fromJson",
+                "sendOpened(screen.sessionId(), screen.nonce())",
+                "static void sendCancel",
+                "ClientPlayConnectionEvents.DISCONNECT",
+                "cancelled\", \"failed\", \"expired"
+        )) {
+            requireContains(containerTemplateClient, marker, "7.9 P3a client session marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "extends Screen",
+                "保存（P3b）",
+                "save.active = false",
+                "drawItemTooltip",
+                "ESC 或取消按钮会先打开取消确认",
+                "P3b 才支持左键复制、右键清空、滚轮数量和保存",
+                "slotCondition",
+                "totalCondition",
+                "WebAdminContainerTemplateClient.sendCancel",
+                "button -> openCancelConfirm(\"button_cancel\")",
+                "openCancelConfirm(\"esc\")",
+                "cancelCancelConfirm()",
+                "confirmCancelSession()",
+                "requestCancel(pendingCancelReason.isBlank() ? \"confirm_cancel\"",
+                "private void requestCancel",
+                "sessionClosing",
+                "cancelSent",
+                "ItemStack.EMPTY"
+        )) {
+            requireContains(containerTemplateScreen, marker, "7.9 P3a GUI skeleton marker present: " + marker);
+        }
+        requireFalse(containerTemplateSessions.contains("CONFIG_CHANGED") || containerTemplateSessions.contains("config_changed"),
+                "7.9 P3a container template cancel must not publish config_changed");
+        requireFalse(containerTemplateScreen.contains("HandledScreen") || containerTemplateScreen.contains("ScreenHandler")
+                        || containerTemplateScreen.contains("quickMove") || containerTemplateScreen.contains("insertItem")
+                        || containerTemplateScreen.contains("dropSlot") || containerTemplateScreen.contains("onSlotClick"),
+                "7.9 P3a preview screen must not expose real inventory transfer paths");
+        for (String marker : List.of(
+                "registerGlobalReceiver(WebAdminContainerTemplateC2SPayload.ID",
+                "ServerPlayConnectionEvents.DISCONNECT",
+                "openedFromClient",
+                "cancelFromClient"
+        )) {
+            requireContains(containerTemplateServer, marker, "7.9 P3a server payload marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "webadmin_container_template_s2c",
+                "webadmin_container_template_c2s",
+                "PayloadTypeRegistry.playC2S()",
+                "PayloadTypeRegistry.playS2C()"
+        )) {
+            requireContains(containerTemplatePayloads, marker, "7.9 P3a payload marker present: " + marker);
         }
 
         for (String marker : List.of(
@@ -2756,7 +2975,53 @@ public final class StabilizationGuardTest {
                 "activeVbdNativeTriggerTypes",
                 "vbdNativeTriggerConfigModalSection",
                 "vbdBlockStatePropertyList",
-                "vbdInteractionTriggerSummary"
+                "vbdInteractionTriggerSummary",
+                "/container-template",
+                "/container-template-session/start",
+                "/container-template-session/status",
+                "/container-template-session/cancel",
+                "openContainerTemplateSessionModal",
+                "openContainerTemplateSessionModalFromUnified",
+                "containerTemplateActionAttrs",
+                "handleContainerTemplateAction",
+                "[data-action^=\"container-template-\"]",
+                "container-template-start",
+                "container-template-cancel",
+                "container-template-close",
+                "requestContainerTemplateSessionCancel",
+                "containerTemplateSessionId",
+                "sessionRef",
+                "scheduleContainerTemplateSessionStatusPoll",
+                "refreshContainerTemplateSessionStatus",
+                "openContainerTemplateCancelConfirm",
+                "data-container-template-cancel-confirm",
+                "data-container-template-confirm-esc-continues",
+                "data-container-template-confirm-backdrop-continues",
+                "confirmContainerTemplateSessionCancel",
+                "cancelContainerTemplateCancelConfirm",
+                "closeContainerTemplateSessionModal",
+                "closeAfter:true",
+                "WebAdmin 关闭窗口时取消容器模板会话。",
+                "maybeCancelContainerTemplateSessionForRoute",
+                "WebAdmin 离开页面时取消容器模板会话。",
+                "if(!draft.active){draft.lockId='';draft.lock=null;stopContainerTemplateSessionHeartbeat();stopContainerTemplateSessionStatusPoll();cancelContainerTemplateCancelConfirm();}",
+                "container-template-open",
+                "container-template-open-unified",
+                "data-container-template-session-entry=\"detail\"",
+                "data-container-template-session-entry=\"unified-config\"",
+                "data-container-template-session=\"p3a\"",
+                "data-container-template-no-save-itemconditions=\"true\"",
+                "data-container-template-lock-target=\"virtual_block_device_container_template\"",
+                "data-container-template-fingerprint=\"itemConditions-only\"",
+                "data-container-template-session-requires-clean-native-draft=\"true\"",
+                "7.9 P3a 可从 WebAdmin 发起游戏内容器变化模板 GUI skeleton",
+                "保存按钮在游戏内保持禁用",
+                "不会写入 itemConditions",
+                "container_template_session_started",
+                "container_template_session_opened",
+                "container_template_session_cancelled",
+                "container_template_session_failed",
+                "container_template_session_expired"
         )) {
             requireContains(js, marker, "7.9 P2 native trigger frontend marker present: " + marker);
         }
@@ -2764,7 +3029,9 @@ public final class StabilizationGuardTest {
                 ".wa-native-trigger-grid",
                 ".wa-native-trigger-compact-card",
                 ".wa-native-trigger-summary",
-                ".wa-native-property-list"
+                ".wa-native-property-list",
+                ".wa-container-template-session-form",
+                ".wa-template-condition-pills"
         )) {
             requireContains(css, marker, "7.9 P1 native trigger responsive style marker present: " + marker);
         }
@@ -2778,9 +3045,22 @@ public final class StabilizationGuardTest {
                 "VBD detail should not inline fully expanded native trigger detail fields");
         requireFalse(css.contains(".wa-vbd-matcher-config-card"),
                 "7.9 P1 no longer keeps standalone interaction matcher summary card styling");
+        for (String marker : List.of(
+                "data-vbd-type-specific-suppressed=\"true\"",
+                "isVirtualBlockDevice(detail)?''",
+                "!isVirtualBlockDevice(detail)&&appState.deviceExtendedConfigEdit",
+                "vbdDetail?Promise.resolve({ok:true,data:null}):settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`)",
+                "isVbdDetail?Promise.resolve({ok:true,data:null}):settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`)"
+        )) {
+            requireContains(js, marker, "7.9 VBD legacy type-specific UI cleanup marker present: " + marker);
+        }
         requireFalse(js.contains("native-trigger-json") || js.contains("data-vbd-native-trigger-save")
                         || js.contains("containerTemplateGui") || js.contains("ghostTemplateItemGui"),
                 "7.9 P2 native trigger edit does not expose raw JSON or container template GUI");
+        requireFalse(js.contains("onclick=\"startContainerTemplateSession(")
+                        || js.contains("onclick=\"cancelContainerTemplateSession(")
+                        || js.contains("onsubmit=\"event.preventDefault();startContainerTemplateSession("),
+                "7.9 P3a container template modal must use data-action event delegation instead of unsafe inline JS handlers");
         for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine", "conditionChannel")) {
             requireFalse(nativeTriggerRequest.contains(forbidden),
                     "7.9 P2 native trigger PATCH DTO must not expose forbidden field: " + forbidden);
@@ -2803,6 +3083,9 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2818,6 +3101,9 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2834,6 +3120,9 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_CHANNEL_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, true);
