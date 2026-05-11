@@ -728,7 +728,7 @@ public final class ContainerItemConditionCommand {
             sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
             return 0;
         }
-        sendConditionInfo(source, pos, target.inventory(), condition);
+        sendConditionInfo(source, pos, target.device(), target.inventory(), condition);
         return 1;
     }
 
@@ -869,12 +869,13 @@ public final class ContainerItemConditionCommand {
             sendError(source, Text.literal("找不到物品条件：" + cleanUserText(rawName)));
             return 0;
         }
-        if (condition.channel().isBlank() || !SignalChannel.isValid(condition.channel())) {
-            sendError(source, Text.literal("该物品条件的频道为空或无效。"));
+        String channel = ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), false);
+        if (channel.isBlank() || !SignalChannel.isValid(channel)) {
+            sendError(source, Text.literal("该物品条件的有效频道为空或无效。"));
             return 0;
         }
         ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
-                condition.channel(),
+                channel,
                 source.getEntity() instanceof ServerPlayerEntity player ? player : null,
                 source.getWorld(),
                 Vec3d.ofCenter(pos),
@@ -1273,11 +1274,13 @@ public final class ContainerItemConditionCommand {
     private static void sendConditionInfo(
             ServerCommandSource source,
             BlockPos pos,
+            SignalDeviceData device,
             Inventory inventory,
             ContainerItemConditionData condition
     ) {
         boolean currentMatched = ContainerItemConditionSupport.matches(inventory, condition);
-        List<String> issues = ContainerItemConditionSupport.validate(inventory, condition);
+        String inheritedChannel = device == null ? "" : device.containerChangeChannel();
+        List<String> issues = ContainerItemConditionSupport.validate(inventory, condition, inheritedChannel);
         sendHeader(source, Text.literal("容器物品条件详情").formatted(Formatting.GOLD));
         source.sendFeedback(() -> field("位置", posText(pos)), false);
         source.sendFeedback(() -> field("名称", nameText(condition.name())), false);
@@ -1286,6 +1289,7 @@ public final class ContainerItemConditionCommand {
         source.sendFeedback(() -> field("类型", typeText(condition.type())), false);
         source.sendFeedback(() -> field("条件", Text.literal(ContainerItemConditionSupport.summary(condition)).formatted(Formatting.WHITE)), false);
         source.sendFeedback(() -> field("频道", channelText(condition.channel())), false);
+        source.sendFeedback(() -> field("有效频道", channelText(ContainerItemConditionSupport.effectiveChannel(condition, inheritedChannel, false))), false);
         source.sendFeedback(() -> field("退出频道", channelOrEmpty(condition.offChannel())), false);
         source.sendFeedback(() -> field("模式", conditionModeText(condition.mode())), false);
         source.sendFeedback(() -> field("上次满足", boolText(condition.lastMatched())), false);

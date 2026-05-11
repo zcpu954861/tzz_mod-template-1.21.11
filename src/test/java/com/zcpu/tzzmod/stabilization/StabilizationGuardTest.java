@@ -68,6 +68,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
 import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionPurpose;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
@@ -126,6 +127,7 @@ public final class StabilizationGuardTest {
         testWebAdminLifecycleFoundation();
         testWebAdminPhysicalDeviceActionRelayFoundation();
         testWebAdminInteractionItemMatcherEditing();
+        testWebAdminVbdNativeTriggerOverview();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1160,6 +1162,11 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/selection/cancel')) return { success:true, targetType:'OBJECT_SELECTION', targetId:'sel-1', changed:true, message:'选择已取消。', data:{ selection:{ selectionId:'sel-1', targetPlayerName:'Owner', status:'cancelled', channel:'test.channel' } } };
                   if (url.startsWith('/api/webadmin/selection/status')) return { active:true, selectionId:'sel-1', status:'active', purpose:'create_virtual_block_device', targetPlayerName:'Owner', channel:'test.channel' };
                   if (url.startsWith('/api/webadmin/online-players')) return [{ name:'Owner', uuid:'00000000-0000-0000-0000-000000000001' }, { name:'Builder', uuid:'00000000-0000-0000-0000-000000000002' }];
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:false, writeApiEnabled:true, nativeTriggerWriteApiEnabled:true, expectedFingerprint:'native-fp', lockStatus:{ locked:false }, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], allowedRedstoneModes:['redstone_rising','redstone_falling','redstone_both'], allowedConditionModes:['condition_enter','condition_exit','condition_both'], activeTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / 受电状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,currentPoweredExpression:'currentPowered = blockStatePowered || receivedPowerLevel > 0',lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,serverValidatesBoundBlockProperties:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],itemConditionsReadOnly:true,templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP2:['itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea','containerItemTemplateGui'] };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/start')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'已通知目标玩家打开 GUI。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'started', active:true } } };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.includes('/container-template-session/status')) return { sessionRef:'ct-1', id:'ct-1', status:'started', active:true, message:'等待目标玩家打开 GUI。' };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template-session/cancel')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION', targetId:'ct-1', changed:false, message:'容器模板会话已取消。', data:{ containerTemplateSession:{ sessionRef:'ct-1', id:'ct-1', status:'cancelled', active:false } } };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/container-template')) { const id = decodeURIComponent(url.substring('/api/webadmin/virtual-block-devices/'.length).slice(0, -'/container-template'.length)); return { deviceId:id, displayName:'Complex VBD', supported:true, typeSupported:true, p3bGhostEditing:true, saveImplemented:true, dryRunGhostInteraction:false, expectedFingerprint:'container-template-fp', lockStatus:{ locked:false }, itemConditions:[{ id:'slot-0', name:'Slot 0 stone', type:'slot_item', slot:0, itemId:'minecraft:stone', templateItemId:'minecraft:stone', countMode:'at_least', count:1 }, { id:'total-stick', name:'Total sticks', type:'total_item', itemId:'minecraft:stick', templateItemId:'minecraft:stick', countMode:'exactly', count:8 }] }; }
                   if (url.startsWith('/api/webadmin/virtual-block-devices/')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE', targetId:'vdev-1', changed:true, message:'虚拟方块设备已删除 / 解绑，世界方块未被破坏。', data:{ deviceId:'vdev-1', routeTarget:'#/virtual-block-devices' } };
                   if (url === '/api/webadmin/signal-listeners') return { success:true, targetType:'SIGNAL_LISTENER', targetId:'new-listener', changed:true, message:'Signal Listener 已创建。', data:{ listenerId:'new-listener', routeTarget:'#/listeners/new-listener?returnTo=%23%2Flisteners' } };
                   if (url.startsWith('/api/webadmin/signal-listeners/')) return { success:true, targetType:'SIGNAL_LISTENER', targetId:'test-listener', changed:true, message:'Signal Listener 已删除。', data:{ listenerId:'test-listener', routeTarget:'#/listeners' } };
@@ -1177,7 +1184,7 @@ public final class StabilizationGuardTest {
                     { id:'action-1', name:'Open Door', type:'COMMAND', summary:'command: say test', doctorStatus:'OK', ownerType:'LISTENER', channel:'test.channel', executionCountToday:2, lastExecutedAt:'2026-05-09T10:00:00Z' },
                     { id:'action-2', name:'Send Signal', type:'SIGNAL', summary:'signal: next', doctorStatus:'WARNING', ownerType:'ACTION_RELAY', channel:'next.channel', executionCountToday:0 }
                   ];
-                  if (url.startsWith('/api/doctor')) return { summary:{errorCount:1, warningCount:1, infoCount:0}, issues:[{id:'issue-1', title:'Bad device', severity:'ERROR', relatedObjectType:'DEVICE', relatedObjectId:'dev-1', message:'broken', suggestion:'check', detectedAt:'2026-05-09T10:00:00Z'}] };
+                  if (url.startsWith('/api/doctor')) return { summary:{errorCount:2, warningCount:6, infoCount:4}, issues:Array.from({length:12}, (_, index) => ({id:`issue-${index + 1}`, title:`Doctor issue ${index + 1}`, severity:index < 2 ? 'ERROR' : (index < 8 ? 'WARNING' : 'INFO'), relatedObjectType:index % 2 === 0 ? 'DEVICE' : 'CHANNEL', relatedObjectId:index % 2 === 0 ? 'dev-1' : '', channel:index % 2 === 0 ? '' : 'test.channel', message:`message ${index + 1}`, suggestion:`suggestion ${index + 1}`, detectedAt:'2026-05-09T10:00:00Z'})) };
                   if (url.startsWith('/api/signals/history')) return [{ time:'2026-05-09T10:00:00Z', channel:'test.channel', sourceType:'DEVICE', sourceName:'Emitter', sourceId:'dev-1', result:'SUCCESS' }];
                   if (url.startsWith('/api/regions/')) { const id = decodeURIComponent(url.substring('/api/regions/'.length).split('?')[0]); return { id, name:'Spawn', world:'world', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, targetFilter:'ALL', actions:{enter:[{id:'action-1', type:'COMMAND', summary:'command: say test', enabled:true}], exit:[], stay:[]}, boundChannels:['test.channel'], playersInside:['Owner'], recentEvents:[{type:'enter', time:'2026-05-09T10:00:00Z', playerName:'Owner'}], doctorIssues:[] }; }
                   if (url.startsWith('/api/regions')) return [{ id:'region-1', name:'Spawn', world:'world', enabled:true, doctorStatus:'OK', bounds:{min:{x:0,y:60,z:0}, max:{x:10,y:70,z:10}}, controllerCount:1, enterActionCount:1, exitActionCount:0, stayActionCount:0, targetFilter:'ALL' }];
@@ -1219,6 +1226,36 @@ public final class StabilizationGuardTest {
                 vm.runInContext(code + "\\n;globalThis.__smokeRoute = async function(hash){ location.hash = hash; return await route(); };globalThis.__smokeModal = async function(){ openWebAdminModal('Smoke Modal','<form class=\\\"edit-form\\\"><div class=\\\"form-actions\\\">hidden</div></form>',editModalFooter(false)); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const closePromise = closeWebAdminModal(false); const className = String(modal && modal.className || ''); const closingMarker = String(modal && modal.dataset && modal.dataset.modalClosing || ''); await closePromise; return {html, className, closingMarker, removed:!document.getElementById('wa-modal-root')}; };globalThis.__smokeDeviceConfigModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/devices/test-device'; await route(); await startDeviceConfigEdit('test-device'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); const className = String(modal && modal.className || ''); await cancelDeviceConfigEdit('test-device'); return {html,className}; };globalThis.__smokeChannelModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/signals/test.channel'; await route(); await startChannelMetadataEdit('test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelChannelMetadataEdit('test.channel'); return {html}; };globalThis.__smokeListenerModal = async function(){ appState.me = { username:'Owner', role:'OWNER' }; location.hash = '#/listeners/test-listener'; await route(); await startSignalListenerBasicConfigEdit('test-listener','test.channel'); const modal = document.getElementById('wa-modal-root'); const html = String(modal && modal.innerHTML || ''); await cancelSignalListenerBasicConfigEdit('test-listener','test.channel'); return {html}; };", context, { filename:'webadmin-app.js' });
                 vm.runInContext(`
                   globalThis.__smokeSilentRoute = async function(hash){ location.hash = hash; return await route({silent:true}); };
+                  globalThis.__smokeVbdDeviceConfigModal = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    location.hash = '#/devices/vdev-1';
+                    await route();
+                    const detailHtml = String(document.getElementById('view').innerHTML || '');
+                    await startDeviceConfigEdit('vdev-1');
+                    const modal = document.getElementById('wa-modal-root');
+                    const modalHtml = String(modal && modal.innerHTML || '');
+                    const urls = requestedUrls.join('|');
+                    await cancelDeviceConfigEdit('vdev-1');
+                    return { detailHtml, modalHtml, urls };
+                  };
+                  globalThis.__smokeDoctorPagination = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    appState.doctorFilters = { search:'', severity:'ALL', objectType:'ALL', jump:'ALL' };
+                    appState.uiPages = appState.uiPages || {};
+                    appState.uiPages.doctor = 1;
+                    location.hash = '#/doctor';
+                    await route();
+                    const page1 = String(document.getElementById('view').innerHTML || '');
+                    setWaPage('doctor', 2);
+                    const page2 = String(document.getElementById('view').innerHTML || '');
+                    const pageAfterNext = appState.uiPages.doctor;
+                    const filtersAfterPage = JSON.stringify(appState.doctorFilters);
+                    appState.doctorFilters.severity = 'ERROR';
+                    appState.uiPages.doctor = 2;
+                    renderDoctorList('');
+                    const filteredPage = appState.uiPages.doctor;
+                    return { page1, page2, pageAfterNext, filtersAfterPage, filteredPage };
+                  };
                   globalThis.__smokeToggleAdvanced = async function(kind,id){ await toggleAdvancedDetail(kind,id); return String(document.getElementById('view').innerHTML || ''); };
                   globalThis.__smokeModalSilent = async function(){
                     appState.me = { username:'Owner', role:'OWNER' };
@@ -1320,6 +1357,28 @@ public final class StabilizationGuardTest {
                     const keys = Array.from(realtimeRouteKeysForEvent({ type:'device_removed', deviceId:'vdev-1', sourceType:'virtual_block_device' })).join(',') + '|' + Array.from(realtimeRouteKeysForEvent({ type:'signal_listener_changed', channel:'test.channel', payload:{ listenerId:'test-listener' } })).join(',');
                     return { listenerCreateHtml, listenerCreateHash, listenerCreateUrls, listenerDeleteHtml, listenerDeleteHash, listenerDeleteUrls, vbdDeleteHtml, vbdDeleteHash, vbdDeleteUrls, keys };
                   };
+                  globalThis.__smokeContainerTemplateModal = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    const complex = 'virtual_block_device:minecraft:overworld@-11,-60,-7';
+                    requestedUrls.length = 0;
+                    await openContainerTemplateSessionModal(complex);
+                    const config = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    const player = document.getElementById('container-template-player');
+                    player.value = 'Owner';
+                    player.selectedIndex = 0;
+                    player.options = [{ dataset:{ uuid:'00000000-0000-0000-0000-000000000001' } }];
+                    await startContainerTemplateSession(complex);
+                    const waiting = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    const closeAttempt = await closeContainerTemplateSessionModal(complex);
+                    const closeConfirmOpen = !!document.getElementById('wa-container-template-cancel-confirm');
+                    cancelContainerTemplateCancelConfirm();
+                    const afterContinue = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    requestContainerTemplateSessionCancel(complex);
+                    const cancelConfirmOpen = !!document.getElementById('wa-container-template-cancel-confirm');
+                    await confirmContainerTemplateSessionCancel();
+                    const afterClose = String(document.getElementById('wa-modal-root')?.innerHTML || '');
+                    return { config, waiting, urls: requestedUrls.slice(), closeAttempt, closeConfirmOpen, afterContinue, cancelConfirmOpen, afterClose, session: appState.containerTemplateSession };
+                  };
                   globalThis.__smokeRealtime = function(){
                     const listenerLock = { type:'edit_lock_changed', payload:{ targetType:'signal_listener_basic_config', targetId:'test-listener' } };
                     const signalEvent = { type:'channel_metadata_changed', channel:'test.channel' };
@@ -1373,6 +1432,7 @@ public final class StabilizationGuardTest {
                   '#/signal-doctor',
                   '#/signals/test.channel',
                   '#/devices/test-device',
+                  '#/devices/vdev-1',
                   '#/devices/minecraft%3Aoverworld%409%2C-60%2C13',
                   '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action',
@@ -1383,6 +1443,7 @@ public final class StabilizationGuardTest {
                 const detailRoutes = new Set([
                   '#/signals/test.channel',
                   '#/devices/test-device',
+                  '#/devices/vdev-1',
                   '#/devices/minecraft%3Aoverworld%409%2C-60%2C13',
                   '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action',
@@ -1404,6 +1465,7 @@ public final class StabilizationGuardTest {
                 const expectedDetailApi = {
                   '#/signals/test.channel':'/api/signals/channels/test.channel',
                   '#/devices/test-device':'/api/devices/test-device',
+                  '#/devices/vdev-1':'/api/devices/vdev-1',
                   '#/devices/minecraft%3Aoverworld%409%2C-60%2C13':'/api/devices/minecraft%3Aoverworld%409%2C-60%2C13',
                   '#/devices/signal_receiver%3Aminecraft%3Aoverworld%40-13%2C-60%2C10':'/api/devices/minecraft%3Aoverworld%40-13%2C-60%2C10',
                   '#/actions/test-action':'/api/actions/test-action',
@@ -1548,6 +1610,49 @@ public final class StabilizationGuardTest {
                     failures.push(`device config modal: ${err.name}: ${err.message}`);
                   }
                   try {
+                    const vbdModal = await context.__smokeVbdDeviceConfigModal();
+                    if (vbdModal.detailHtml.includes('data-type-specific-config-card="true"') || vbdModal.detailHtml.includes('<h3>类型专属配置</h3>')) {
+                      failures.push('VBD detail config summary should not render legacy type-specific config card');
+                    }
+                    if (vbdModal.modalHtml.includes('data-edit-section="extended"') || vbdModal.modalHtml.includes('<h3>类型专属配置</h3>')) {
+                      failures.push('VBD unified config modal should not render legacy type-specific config editor');
+                    }
+                    if (!vbdModal.detailHtml.includes('data-vbd-native-trigger-config-summary="true"') || !vbdModal.modalHtml.includes('data-vbd-native-trigger-config-modal-section="true"')) {
+                      failures.push('VBD native trigger section should remain after legacy type-specific cleanup');
+                    }
+                    if (!vbdModal.modalHtml.includes('data-vbd-type-specific-suppressed="true"')) {
+                      failures.push('VBD unified config modal should document that legacy type-specific config is split into native trigger / matcher phases');
+                    }
+                    if (!vbdModal.modalHtml.includes('data-vbd-native-trigger-interaction-matcher-inline-edit="true"')) {
+                      failures.push('VBD matcher entry should remain inside right-click/native trigger flow');
+                    }
+                    if (vbdModal.urls.includes('/api/webadmin/device-extended-config/vdev-1')) {
+                      failures.push('VBD unified config modal should not fetch legacy device extended config');
+                    }
+                  } catch (err) {
+                    failures.push(`VBD device config modal cleanup: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const doctorPager = await context.__smokeDoctorPagination();
+                    if (!doctorPager.page1.includes('data-shared-pagination-helper="true"') || !doctorPager.page1.includes('data-action="wa-pagination-page"') || !doctorPager.page1.includes('data-page-key="doctor"')) {
+                      failures.push('doctor pagination: controls must render with shared delegated pagination actions');
+                    }
+                    if (doctorPager.page1.includes('onclick="setWaPage')) {
+                      failures.push('doctor pagination: should not depend on unsafe inline pagination onclick handlers');
+                    }
+                    if (doctorPager.pageAfterNext !== 2 || !doctorPager.page2.includes('Doctor issue 11')) {
+                      failures.push('doctor pagination: clicking page 2 should update page state and rerender page 2 results');
+                    }
+                    if (!doctorPager.filtersAfterPage.includes('"severity":"ALL"') || !doctorPager.filtersAfterPage.includes('"search":""')) {
+                      failures.push('doctor pagination: filters/search should be preserved across pagination');
+                    }
+                    if (doctorPager.filteredPage !== 1) {
+                      failures.push('doctor pagination: filter changes should clamp/reset page to a valid page');
+                    }
+                  } catch (err) {
+                    failures.push(`doctor pagination smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
                     const modalSilent = await context.__smokeModalSilent();
                     if (!modalSilent.stillOpen || !modalSilent.before.includes('data-unified-device-config="true"') || !modalSilent.after.includes('data-unified-device-config="true"')) {
                       failures.push('device config modal: silent refresh closed modal or dropped unified sections');
@@ -1657,6 +1762,32 @@ public final class StabilizationGuardTest {
                     }
                   } catch (err) {
                     failures.push(`realtime run smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const p3a = await context.__smokeContainerTemplateModal();
+                    const expectedOverview = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template';
+                    const expectedStart = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/start';
+                    const expectedCancel = '/api/webadmin/virtual-block-devices/virtual_block_device%3Aminecraft%3Aoverworld%40-11%2C-60%2C-7/container-template-session/cancel';
+                    if (!p3a.config.includes('data-container-template-session="p3b"') || !p3a.config.includes('data-container-template-save-itemconditions="true"') || !p3a.config.includes('data-action="container-template-start"') || !p3a.config.includes('data-device-id="virtual_block_device:minecraft:overworld@-11,-60,-7"')) {
+                      failures.push('container template modal: missing escaped data-action/data-device-id start button for complex device id');
+                    }
+                    if (p3a.config.includes('onclick="startContainerTemplateSession(') || p3a.config.includes('onclick="cancelContainerTemplateSession(') || p3a.config.includes('onsubmit="event.preventDefault();startContainerTemplateSession(')) {
+                      failures.push('container template modal: unsafe inline start/cancel handler remains');
+                    }
+                    if (!p3a.waiting.includes('data-container-template-session-status="started"')) {
+                      failures.push('container template modal: start did not update modal session status');
+                    }
+                    if (!p3a.urls.includes(expectedOverview) || !p3a.urls.includes(expectedStart) || !p3a.urls.includes(expectedCancel)) {
+                      failures.push('container template modal: complex device id did not call overview/start/cancel API with encoded route');
+                    }
+                    if (p3a.closeAttempt !== false || !p3a.closeConfirmOpen || !p3a.afterContinue.includes('data-container-template-session-status="started"') || !p3a.cancelConfirmOpen) {
+                      failures.push('container template modal: active close/cancel should open confirm and continue editing should keep session modal active');
+                    }
+                    if (!p3a.afterClose.includes('data-container-template-session-status="cancelled"') || !p3a.session || p3a.session.active) {
+                      failures.push('container template modal: confirmed cancel should leave a terminal cancelled status without active orphan state');
+                    }
+                  } catch (err) {
+                    failures.push(`container template modal smoke: ${err.name}: ${err.message}`);
                   }
                   if (failures.length) {
                     console.log(failures.join('\\n'));
@@ -2477,26 +2608,37 @@ public final class StabilizationGuardTest {
         requireContains(writeFoundation, "interactionItemMatcherWriteEnabled", "7.8 write foundation exposes matcher capability");
 
         for (String marker : List.of(
-                "data-vbd-matcher-summary-card=\"true\"",
-                "data-vbd-matcher-side-card=\"true\"",
-                "data-detail-side-card=\"interaction-item-matcher\"",
                 "data-vbd-config-summary=\"true\"",
-                "wa-vbd-matcher-config-card",
                 "openInteractionItemMatcherModal",
                 "openInteractionItemMatcherReadonlyModal",
                 "data-interaction-item-matcher-modal=\"true\"",
                 "data-interaction-item-matcher-config-modal-section=\"true\"",
                 "data-matcher-enabled=\"true\"",
+                "data-matcher-disabled-fields-collapsed=\"true\"",
+                "data-matcher-enabled-item-id-shown=\"true\"",
                 "data-matcher-template-item-id=\"true\"",
+                "data-matcher-count-section=\"true\"",
                 "data-matcher-count-mode=\"true\"",
                 "data-matcher-required-count=\"true\"",
+                "data-matcher-count-ignore-hides-count=\"true\"",
                 "data-matcher-match-damage=\"true\"",
+                "data-matcher-damage-value-row=\"true\"",
+                "data-matcher-damage-value-hidden=\"true\"",
+                "data-matcher-template-damage=\"true\"",
                 "data-matcher-match-custom-name=\"true\"",
+                "data-matcher-custom-name-value-row=\"true\"",
+                "data-matcher-custom-name-value-hidden=\"true\"",
+                "data-matcher-template-custom-name=\"true\"",
                 "data-matcher-match-lore=\"true\"",
+                "data-matcher-lore-value-row=\"true\"",
+                "data-matcher-lore-value-hidden=\"true\"",
+                "data-matcher-template-lore=\"true\"",
                 "data-matcher-source=\"true\"",
                 "data-matcher-source-readonly=\"true\"",
                 "data-matcher-vanilla-policy=\"true\"",
                 "data-matcher-vanilla-policy-readonly=\"true\"",
+                "data-matcher-source-policy-section=\"true\"",
+                "data-matcher-advanced-readonly-section=\"true\"",
                 "saveInteractionItemMatcher",
                 "interactionItemMatcherDirty",
                 "modalSnapshot(kind,draft)",
@@ -2508,12 +2650,542 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(js + matcherService, marker, "7.8 matcher frontend/security marker present: " + marker);
         }
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-summary=\"true\"", "7.8 matcher summary is nested inside the 7.9 right-click native trigger summary");
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"", "unified config modal opens matcher editing from the native trigger interaction context");
+        requireContains(js, "data-vbd-native-trigger-matcher-disabled-warning=\"true\"", "matcher configured while right-click trigger disabled is warned inside interaction summary");
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-entry=\"true\"", "7.8 matcher entry remains available from the 7.9 right-click trigger context");
+        requireContains(js, "interactionItemMatcherForm(detail,matcher,true)", "unified device config modal reuses the same conditional matcher UI inside the right-click native trigger section");
+        requireContains(js, "document.getElementById('matcher-template-item-id')?.value ?? v.templateItemId", "hidden matcher fields preserve draft values when collapsed");
+        requireContains(js, "document.getElementById('matcher-template-lore'))v.templateLore", "hidden matcher lore preserves draft values when collapsed");
+        requireContains(js, "interactionItemMatcherPatchBody(draft)", "matcher patch body stays scoped to ordinary editable fields");
+        requireContains(js, "withPreservedModalScroll", "unified config modal preserves scroll when matcher sections rerender");
+        requireContains(js, "restoreModalScrollState", "modal scroll state is restored after matcher expand/collapse");
+        requireContains(js, "data-matcher-toggle-preserves-scroll=\"true\"", "matcher toggle scroll preservation marker exists");
+        requireFalse(js.contains("data-vbd-matcher-side-card=\"true\"") || js.contains("data-detail-side-card=\"interaction-item-matcher\"")
+                        || js.contains("wa-vbd-matcher-config-card") || js.contains("data-vbd-matcher-summary-card=\"true\""),
+                "VBD detail no longer renders a standalone interaction item matcher card");
+        requireFalse(js.contains("successChannel:v.") || js.contains("failChannel:v.") || js.contains("consumeEnabled:v.")
+                        || js.contains("templateCustomData:v.") || js.contains("templateComponents:v.")
+                        || js.contains("itemSubmitRequirements:v."),
+                "matcher patch body does not send preserved advanced/itemSubmit/consume fields");
         requireFalse(js.contains("itemSubmitEditor") || js.contains("saveItemSubmit") || js.contains("consumeEditor")
                         || js.contains("inventoryMatcherEditor") || js.contains("equipmentMatcherEditor")
                         || js.contains("conditionEngineEditor") || js.contains("successFailPathGraph"),
                 "7.8 matcher stage does not expose itemSubmit/consume/inventory/equipment/ConditionEngine/path graph editors");
         requireFalse(js.contains("raw-json-textarea") || js.contains("matcher-json") || js.contains("data-component-json"),
                 "7.8 matcher UI does not expose raw JSON/data component editors");
+    }
+
+    private static void testWebAdminVbdNativeTriggerOverview() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_VBD_NATIVE_TRIGGER_CONFIG_7_9_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String manual = Files.readString(root.resolve("docs/test/测试_7.9_WebAdmin虚拟方块设备原生触发配置P1验收.md"), StandardCharsets.UTF_8);
+        String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String nativeTriggerRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
+        String containerTemplateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceContainerTemplateSessionService.java"), StandardCharsets.UTF_8);
+        String containerTemplateSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/container/WebAdminContainerTemplateSessions.java"), StandardCharsets.UTF_8);
+        String containerTemplateClient = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplateClient.java"), StandardCharsets.UTF_8);
+        String containerTemplateScreen = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplatePreviewScreen.java"), StandardCharsets.UTF_8);
+        String containerTemplateServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/container/WebAdminContainerTemplateServer.java"), StandardCharsets.UTF_8);
+        String containerTemplatePayloads = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplatePayloads.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateS2CPayload.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateC2SPayload.java"), StandardCharsets.UTF_8);
+        String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
+        String itemConditionSupport = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/ContainerItemConditionSupport.java"), StandardCharsets.UTF_8);
+        String vbdContainerHandler = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceContainerHandler.java"), StandardCharsets.UTF_8);
+        String diagnosticService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/debug/VirtualBlockDeviceDiagnosticService.java"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendAssets.appJs();
+        String css = WebAdminFrontendStyles.appCss();
+
+        for (String marker : List.of(
+                "7.9 WebAdmin Virtual Block Device Native Trigger Config Coverage",
+                "7.9 P1",
+                "7.9 P2",
+                "7.9 P3",
+                "红石 / 受电状态",
+                "BlockState 条件",
+                "`condition_enter` 只在条件从不满足变为满足时触发",
+                "`condition_exit` 只在条件从满足变为不满足时触发",
+                "`condition_both` 在进入和退出条件时触发",
+                "保存配置不会立即触发 BlockState signal",
+                "BlockState 条件没有独立 `conditionChannel` 字段",
+                "玩家右键交互",
+                "容器打开",
+                "容器关闭",
+                "容器内容变化",
+                "不做 itemSubmit",
+                "不做 consume",
+                "不做 ConditionEngine",
+                "不做成功 / 失败路径图",
+                "VBD 原生触发普通配置完整编辑",
+                "服务端二次校验 BlockState 属性和值",
+                "virtual_block_device_triggers",
+                "redstone_disabled",
+                "不会误关右键交互或容器触发",
+                "Container Change Template GUI",
+                "P3a：Container Change Template GUI Session + GUI Skeleton",
+                "P3a 不真实保存 `itemConditions`",
+                "virtual_block_device_container_template:<deviceId>",
+                "P3b：Ghost item editing + save",
+                "玩家可以从下方背包 / 快捷栏真实拿起鼠标 cursor 物品",
+                "单个 slot 模板格显示和保存的数量必须 clamp 到该物品 `ItemStack#getMaxCount`",
+                "P3b 当前仅完整编辑 slot_* 模板",
+                "total_* 表示“匹配整个容器中某物品 / matcher 的总数量，不对应具体槽位”",
+                "保存成功后 WebUI container template modal 必须刷新 `GET /container-template` 快照",
+                "P3b 保存的模板条件默认继承父 VBD 的 `containerChangeChannel`",
+                "`condition.channel` 非空时作为显式覆盖",
+                "`condition.channel` 为空时使用父 VBD `containerChangeChannel` 作为 effective channel",
+                "`condition.channel` 和父 VBD `containerChangeChannel` 都为空时才是真正的频道缺失错误",
+                "P3b GUI 不要求每个模板格单独配置 channel",
+                "同一个 save / cancel / close / expired terminal 事件只向目标玩家反馈一次",
+                "不在 P1 / P2 普通 Web 表单里硬做复杂物品模板",
+                "`virtual_block_device` 的旧“类型专属配置”不再作为 WebUI 中的独立显示或编辑区域",
+                "VBD 原生触发字段统一归入“原生触发配置”",
+                "interaction item matcher 归入“玩家右键交互”的条件 / 判定层",
+                "receiver / relay 的类型专属配置仍保留"
+        )) {
+            requireContains(context, marker, "7.9 current context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "无手动触发方式选择器",
+                "只显示 active 触发摘要",
+                "右侧 detail / secondary column",
+                "channel catalog 与 combobox 来源一致",
+                "红石摘要",
+                "BlockState 属性读取",
+                "容器 open / close / change 摘要",
+                "统一设备配置 modal",
+                "不出现 itemSubmit / consume / ConditionEngine / 路径图",
+                "Console / Network"
+        )) {
+            requireContains(manual, marker, "7.9 P1 manual acceptance marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "native trigger compact cards",
+                "readonly native trigger detail modal",
+                "matcher toggle preserves modal scroll",
+                "详情页直接展开长篇完整字段",
+                "只读详情出现保存按钮 / edit lock",
+                "滚动位置跳回顶部或底部"
+        )) {
+            requireContains(manual, marker, "7.9 P1 compact trigger / scroll acceptance marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "interaction item matcher 必须完全隐藏，除非右键交互触发已启用或已选中",
+                "matcher 必须纳入“玩家右键交互”配置区域内",
+                "P1 暂时允许保留现有 matcher 编辑入口"
+        )) {
+            requireContains(context, marker, "7.9 P2 matcher hidden-until-interaction rule recorded: " + marker);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/virtual-block-devices/",
+                "/native-triggers",
+                "handleVirtualBlockDeviceNativeTriggers",
+                "virtualBlockDeviceNativeTriggerService.overview",
+                "virtualBlockDeviceNativeTriggerService.update",
+                "method.equalsIgnoreCase(\"GET\")",
+                "method.equalsIgnoreCase(\"PATCH\")",
+                "该接口只支持 GET / PATCH"
+        )) {
+            requireContains(webServer, marker, "7.9 P2 native trigger route marker present: " + marker);
+        }
+        requireContains(webServer, "WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest",
+                "7.9 P2 native trigger write request DTO is routed through WebAdminServer");
+        for (String marker : List.of(
+                "/container-template",
+                "/container-template-session/start",
+                "/container-template-session/status",
+                "/container-template-session/cancel",
+                "handleVirtualBlockDeviceContainerTemplate",
+                "containerTemplateSessionService.overview",
+                "containerTemplateSessionService.start",
+                "containerTemplateSessionService.cancel",
+                "WebAdminContainerTemplateSessionStartRequest",
+                "WebAdminContainerTemplateSessionCancelRequest"
+        )) {
+            requireContains(webServer, marker, "7.9 P3a container template route marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "knownChannels(server, devices, listeners, regions)",
+                "addActionRelayActionChannels",
+                "SignalDeviceStore.getLoadedActionRelay",
+                "countSignalActionsTo(relay.actions(), channel)"
+        )) {
+            requireContains(signalService, marker, "signal channel catalog includes loaded action relay signal action target: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE",
+                "writeApiEnabled\", true",
+                "nativeTriggerWriteApiEnabled",
+                "EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
+                "expectedFingerprint",
+                "fingerprintFor(device)",
+                "redstone_powered",
+                "blockstate",
+                "right_click",
+                "container_open",
+                "container_close",
+                "container_change",
+                "activeTriggerTypes",
+                "VirtualBlockDeviceSupport.powerState",
+                "currentPowered = blockStatePowered || receivedPowerLevel > 0",
+                "redstone_disabled",
+                "runtimeEnabled",
+                "world.isChunkLoaded(pos)",
+                "state.getProperties()",
+                "rawProperty.getValues()",
+                "BlockStateConditionParser.fromPropertiesAndValidate",
+                "conditionModeUsesChannelAndOffChannelSemantics",
+                "saveDoesNotEmitBlockStateSignal",
+                "interaction item matcher 是右键交互之后的条件/判定层",
+                "itemConditionsReadOnly",
+                "templateEditorPhase",
+                "7.9 P3"
+        )) {
+            requireContains(nativeTriggerService, marker, "7.9 P2 native trigger service marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION",
+                "CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION",
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "expectedFingerprint",
+                "fingerprintFor(device)",
+                "fingerprintConditions(device.itemConditions())",
+                "itemConditionDtos(device.itemConditions(), device.containerChangeChannel())",
+                "p3bItemConditionInheritsContainerChangeChannel",
+                "perSlotChannelRequired",
+                "effectiveChannel",
+                "inheritsContainerChangeChannel",
+                "p3bGhostEditing",
+                "saveImplemented\", true",
+                "dryRunGhostInteraction\", false",
+                "p3bSavesItemConditions",
+                "saveEnabledInP3b",
+                "ghostTemplateEditingEnabled",
+                "noRealInventoryTransfer",
+                "targetPlayerName",
+                "目标玩家不在线",
+                "只支持 virtual_block_device"
+        )) {
+            requireContains(containerTemplateService, marker, "7.9 P3b container template service marker present: " + marker);
+        }
+        requireContains(Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceStore.java"), StandardCharsets.UTF_8),
+                "updateVirtualItemConditionsForWebAdmin",
+                "7.9 P3b saves itemConditions through a scoped WebAdmin store update");
+        for (String marker : List.of(
+                "effectiveChannel(ContainerItemConditionData rawCondition, String inheritedContainerChangeChannel, boolean exiting)",
+                "effectiveChannelSource",
+                "return inherited",
+                "物品条件频道为空，且父 VBD 未配置容器内容变化频道。"
+        )) {
+            requireContains(itemConditionSupport, marker, "7.9 P3b itemCondition effective channel marker present: " + marker);
+        }
+        requireContains(vbdContainerHandler,
+                "ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), exiting)",
+                "7.9 P3b runtime itemConditions inherit containerChangeChannel when condition channel is empty");
+        for (String marker : List.of(
+                "ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), false)",
+                "没有显式频道，且父 VBD 未配置容器内容变化频道",
+                "ContainerItemConditionSupport.validate(inventory, condition, device.containerChangeChannel())"
+        )) {
+            requireContains(diagnosticService, marker, "7.9 P3b Doctor effective itemCondition channel marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SESSION_TTL_MILLIS",
+                "TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "CONTAINER_TEMPLATE_SESSION_STARTED",
+                "CONTAINER_TEMPLATE_SESSION_OPENED",
+                "CONTAINER_TEMPLATE_SESSION_SAVED",
+                "CONTAINER_TEMPLATE_SESSION_CANCELLED",
+                "CONTAINER_TEMPLATE_SESSION_FAILED",
+                "CONTAINER_TEMPLATE_SESSION_EXPIRED",
+                "sendOpen(targetPlayer, session)",
+                "saveFromClient",
+                "saveSession",
+                "publishConfigChangedAfterSave",
+                "cancelFromWebAdmin",
+                "cancelFromClient",
+                "cancelForDisconnect",
+                "sendEnd(player, \"cancelled\"",
+                "sendEnd(player, \"saved\"",
+                "notifyPlayer",
+                "data.put(\"sessionRef\", session.sessionId)",
+                "alreadyTerminal",
+                "idempotentNoOp",
+                "releaseForSessionCleanup",
+                "WRITE_AUDIT_APPENDED",
+                "p3bSavesItemConditions"
+        )) {
+            requireContains(containerTemplateSessions, marker, "7.9 P3b container template session marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "WebAdminContainerTemplatePreviewScreen.fromJson",
+                "sendOpened(screen.sessionId(), screen.nonce())",
+                "static void sendCancel",
+                "static void sendSave",
+                "ClientPlayConnectionEvents.DISCONNECT",
+                "saved\", \"cancelled\", \"failed\", \"expired"
+        )) {
+            requireContains(containerTemplateClient, marker, "7.9 P3b client session marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "extends Screen",
+                "保存模板",
+                "TemplateCondition.newSlotItem",
+                "payloadConditions",
+                "copySourceToTemplateSlot",
+                "clearTemplateSlot",
+                "adjustCount",
+                "ctrlDown",
+                "SlotActionType.PICKUP",
+                "screenHandlerSlotForInventorySlot",
+                "clickPlayerInventorySlot",
+                "cursorStack()",
+                "playerStack",
+                "player.currentScreenHandler.getCursorStack",
+                "stack.getMaxCount()",
+                "总量模板后续支持",
+                "total_* 条件按整个容器总数量匹配",
+                "sendSave(sessionId, nonce, deviceId, expectedFingerprint",
+                "drawItemTooltip",
+                "左键复制来源物品为模板",
+                "右键清空模板格",
+                "Ctrl+滚轮一次调整 8",
+                "slotCondition",
+                "totalCondition",
+                "WebAdminContainerTemplateClient.sendCancel",
+                "button -> openCancelConfirm(\"button_cancel\")",
+                "openCancelConfirm(\"esc\")",
+                "cancelCancelConfirm()",
+                "confirmCancelSession()",
+                "requestCancel(pendingCancelReason.isBlank() ? \"confirm_cancel\"",
+                "private void requestCancel",
+                "sessionClosing",
+                "cancelSent",
+                "ItemStack.EMPTY"
+        )) {
+            requireContains(containerTemplateScreen, marker, "7.9 P3b GUI ghost editing marker present: " + marker);
+        }
+        requireContains(js, "refreshContainerTemplateSessionOverview", "7.9 P3b saved snapshot refresh marker present");
+        requireContains(js, "await refreshContainerTemplateSessionOverview(draft.deviceId,true)", "7.9 P3b saved status refreshes container template snapshot");
+        requireContains(js, "containerTemplateConditionChannelText", "7.9 P3b WebUI snapshot displays effective itemCondition channel");
+        requireContains(js, "继承容器内容变化频道", "7.9 P3b WebUI snapshot shows inherited containerChangeChannel wording");
+        requireFalse(containerTemplateClient.contains("sendMessage("),
+                "7.9 P3b terminal player feedback is server-side only; client must not duplicate chat");
+        int cancelStart = containerTemplateSessions.indexOf("private static WebAdminWriteResult cancelSession");
+        int saveStart = containerTemplateSessions.indexOf("private static WebAdminWriteResult saveSession");
+        requireTrue(cancelStart >= 0 && saveStart > cancelStart, "7.9 P3b cancel and save handlers are both present");
+        requireFalse(containerTemplateSessions.substring(cancelStart, saveStart).contains("CONFIG_CHANGED")
+                        || containerTemplateSessions.substring(cancelStart, saveStart).contains("config_changed"),
+                "7.9 P3b container template cancel must not publish config_changed");
+        requireFalse(containerTemplateScreen.contains("HandledScreen") || containerTemplateScreen.contains("extends ScreenHandler")
+                        || containerTemplateScreen.contains("quickMove") || containerTemplateScreen.contains("insertItem")
+                        || containerTemplateScreen.contains("dropSlot") || containerTemplateScreen.contains("onSlotClick"),
+                "7.9 P3b preview screen must not expose real inventory transfer paths");
+        for (String marker : List.of(
+                "registerGlobalReceiver(WebAdminContainerTemplateC2SPayload.ID",
+                "ServerPlayConnectionEvents.DISCONNECT",
+                "openedFromClient",
+                "saveFromClient",
+                "cancelFromClient"
+        )) {
+            requireContains(containerTemplateServer, marker, "7.9 P3b server payload marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "webadmin_container_template_s2c",
+                "webadmin_container_template_c2s",
+                "PayloadTypeRegistry.playC2S()",
+                "PayloadTypeRegistry.playS2C()"
+        )) {
+            requireContains(containerTemplatePayloads, marker, "7.9 P3a payload marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/virtual-block-devices/${canonicalEncoded}/native-triggers",
+                "data-vbd-native-trigger-area=\"true\"",
+                "data-vbd-native-trigger-side-card=\"true\"",
+                "data-detail-side-card=\"vbd-native-triggers\"",
+                "redstone_powered",
+                "blockstate",
+                "right_click",
+                "container_open",
+                "container_close",
+                "container_change",
+                "data-vbd-native-trigger-summary-selected=\"true\"",
+                "data-vbd-native-trigger-summary-active=\"true\"",
+                "data-vbd-native-trigger-compact-card=\"true\"",
+                "data-vbd-native-trigger-card-summary=\"true\"",
+                "data-vbd-native-trigger-card-type=\"",
+                "data-vbd-native-trigger-card-click=\"readonly-detail\"",
+                "openVbdNativeTriggerReadonlyModal",
+                "vbdNativeTriggerCompactCard",
+                "vbdNativeTriggerReadonlyDetail",
+                "data-vbd-native-trigger-readonly-modal=\"true\"",
+                "data-vbd-native-trigger-readonly-detail=\"true\"",
+                "data-vbd-native-trigger-detail-modal-body=\"true\"",
+                "data-vbd-native-trigger-readonly-no-save=\"true\"",
+                "data-vbd-native-trigger-readonly-no-edit-lock=\"true\"",
+                "data-vbd-native-trigger-detail-no-dirty-guard=\"true\"",
+                "data-vbd-native-trigger-detail-no-write-request=\"true\"",
+                "data-vbd-native-trigger-compact-empty-state=\"true\"",
+                "data-vbd-native-trigger-summary-data-driven=\"true\"",
+                "data-vbd-native-trigger-no-manual-selector=\"true\"",
+                "data-vbd-native-trigger-empty-state=\"true\"",
+                "data-vbd-native-blockstate-properties-from-bound-block=\"true\"",
+                "data-vbd-native-blockstate-allowed-values=\"true\"",
+                "data-vbd-native-trigger-config-modal-section=\"true\"",
+                "data-vbd-native-trigger-edit-modal=\"true\"",
+                "data-vbd-native-trigger-patch-api=\"true\"",
+                "data-vbd-native-trigger-lock-disabled=\"true\"",
+                "data-vbd-native-redstone-edit=\"true\"",
+                "data-vbd-native-blockstate-edit=\"true\"",
+                "data-vbd-native-blockstate-property-dropdown-from-bound-block=\"true\"",
+                "data-vbd-native-blockstate-allowed-values-from-property=\"true\"",
+                "data-vbd-native-blockstate-trigger-channel-combo=\"true\"",
+                "data-vbd-native-blockstate-trigger-channel-shares-main-channel=\"true\"",
+                "data-vbd-native-blockstate-exit-channel-uses-off-channel=\"true\"",
+                "data-vbd-native-blockstate-channel-unified-catalog=\"true\"",
+                "data-vbd-native-blockstate-no-condition-channel=\"true\"",
+                "data-custom-combobox-arrow-toggle-close=\"true\"",
+                "data-custom-combobox-outside-click-close=\"true\"",
+                "data-custom-combobox-escape-close=\"true\"",
+                "data-custom-combobox-select-option-close=\"true\"",
+                "data-custom-combobox-single-open=\"true\"",
+                "data-custom-combobox-toggle-no-dirty=\"true\"",
+                "closeAllCustomComboboxes",
+                "data-vbd-native-interaction-edit=\"true\"",
+                "data-vbd-native-trigger-matcher-hidden-when-interaction-disabled=\"true\"",
+                "data-vbd-native-trigger-matcher-visible-inside-interaction=\"true\"",
+                "data-vbd-native-container-open-edit=\"true\"",
+                "data-vbd-native-container-close-edit=\"true\"",
+                "data-vbd-native-container-change-edit=\"true\"",
+                "data-vbd-native-container-common-edit=\"true\"",
+                "data-vbd-native-container-itemconditions-readonly=\"true\"",
+                "data-vbd-native-trigger-matcher-lock-disabled=\"true\"",
+                "data-vbd-native-trigger-no-raw-json=\"true\"",
+                "data-vbd-native-trigger-interaction-matcher-summary=\"true\"",
+                "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"",
+                "data-vbd-native-trigger-matcher-disabled-warning=\"true\"",
+                "redstoneEnabled:!!red.configured&&red.mode!=='redstone_disabled'",
+                "matcherDraftHiddenWhenInteractionDisabled",
+                "saveVbdNativeTrigger",
+                "vbdNativeTriggerPatchBody",
+                "virtual_block_device_triggers",
+                "activeVbdNativeTriggerTypes",
+                "vbdNativeTriggerConfigModalSection",
+                "vbdBlockStatePropertyList",
+                "vbdInteractionTriggerSummary",
+                "/container-template",
+                "/container-template-session/start",
+                "/container-template-session/status",
+                "/container-template-session/cancel",
+                "openContainerTemplateSessionModal",
+                "openContainerTemplateSessionModalFromUnified",
+                "containerTemplateActionAttrs",
+                "handleContainerTemplateAction",
+                "[data-action^=\"container-template-\"]",
+                "container-template-start",
+                "container-template-cancel",
+                "container-template-close",
+                "requestContainerTemplateSessionCancel",
+                "containerTemplateSessionId",
+                "sessionRef",
+                "scheduleContainerTemplateSessionStatusPoll",
+                "refreshContainerTemplateSessionStatus",
+                "openContainerTemplateCancelConfirm",
+                "data-container-template-cancel-confirm",
+                "data-container-template-confirm-esc-continues",
+                "data-container-template-confirm-backdrop-continues",
+                "confirmContainerTemplateSessionCancel",
+                "cancelContainerTemplateCancelConfirm",
+                "closeContainerTemplateSessionModal",
+                "closeAfter:true",
+                "WebAdmin 关闭窗口时取消容器模板会话。",
+                "maybeCancelContainerTemplateSessionForRoute",
+                "WebAdmin 离开页面时取消容器模板会话。",
+                "if(!draft.active){draft.lockId='';draft.lock=null;stopContainerTemplateSessionHeartbeat();stopContainerTemplateSessionStatusPoll();cancelContainerTemplateCancelConfirm();}",
+                "container-template-open",
+                "container-template-open-unified",
+                "data-container-template-session-entry=\"detail\"",
+                "data-container-template-session-entry=\"unified-config\"",
+                "data-container-template-session=\"p3b\"",
+                "data-container-template-save-itemconditions=\"true\"",
+                "data-container-template-real-item-safe=\"true\"",
+                "data-container-template-ghost-editing=\"true\"",
+                "handlePaginationAction",
+                "data-shared-pagination-helper=\"true\"",
+                "data-action=\"wa-pagination-page\"",
+                "if(key==='doctor')renderDoctorList('')",
+                "appState.uiPages.doctor=1;renderDoctorList",
+                "data-container-template-lock-target=\"virtual_block_device_container_template\"",
+                "data-container-template-fingerprint=\"itemConditions-only\"",
+                "data-container-template-session-requires-clean-native-draft=\"true\"",
+                "P3b 会在目标玩家客户端打开箱子式模板 GUI",
+                "点击游戏内“保存模板”才写入 itemConditions",
+                "不会修改世界容器或玩家物品",
+                "container_template_session_started",
+                "container_template_session_opened",
+                "container_template_session_saved",
+                "container_template_session_cancelled",
+                "container_template_session_failed",
+                "container_template_session_expired"
+        )) {
+            requireContains(js, marker, "7.9 P2 native trigger frontend marker present: " + marker);
+        }
+        for (String marker : List.of(
+                ".wa-native-trigger-grid",
+                ".wa-native-trigger-compact-card",
+                ".wa-native-trigger-summary",
+                ".wa-native-property-list",
+                ".wa-container-template-session-form",
+                ".wa-template-condition-pills"
+        )) {
+            requireContains(css, marker, "7.9 P1 native trigger responsive style marker present: " + marker);
+        }
+        requireFalse(js.contains("data-vbd-native-trigger-selector") || js.contains("data-vbd-native-trigger-option")
+                        || js.contains("vbdNativeTriggerSelector") || js.contains("vbdNativeTriggerFilters")
+                        || css.contains(".wa-native-trigger-selector") || css.contains(".wa-native-trigger-chip"),
+                "7.9 P1 does not render manual native trigger selector/filter controls");
+        requireFalse(js.contains("data-vbd-native-trigger-summary-active=\"false\"") || js.contains("请选择要查看的触发方式"),
+                "7.9 P1 hides unconfigured native trigger cards and uses empty state instead");
+        requireFalse(js.contains("data-vbd-native-trigger-summary-active=\"true\"><header") && js.contains("vbdRedstoneSummary(trigger)"),
+                "VBD detail should not inline fully expanded native trigger detail fields");
+        requireFalse(css.contains(".wa-vbd-matcher-config-card"),
+                "7.9 P1 no longer keeps standalone interaction matcher summary card styling");
+        for (String marker : List.of(
+                "data-vbd-type-specific-suppressed=\"true\"",
+                "isVirtualBlockDevice(detail)?''",
+                "!isVirtualBlockDevice(detail)&&appState.deviceExtendedConfigEdit",
+                "vbdDetail?Promise.resolve({ok:true,data:null}):settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`)",
+                "isVbdDetail?Promise.resolve({ok:true,data:null}):settle(`/api/webadmin/device-extended-config/${canonicalEncoded}`)"
+        )) {
+            requireContains(js, marker, "7.9 VBD legacy type-specific UI cleanup marker present: " + marker);
+        }
+        requireFalse(js.contains("native-trigger-json") || js.contains("data-vbd-native-trigger-save")
+                        || js.contains("containerTemplateGui") || js.contains("ghostTemplateItemGui"),
+                "7.9 P2 native trigger edit does not expose raw JSON or container template GUI");
+        requireFalse(js.contains("onclick=\"startContainerTemplateSession(")
+                        || js.contains("onclick=\"cancelContainerTemplateSession(")
+                        || js.contains("onsubmit=\"event.preventDefault();startContainerTemplateSession("),
+                "7.9 P3a container template modal must use data-action event delegation instead of unsafe inline JS handlers");
+        for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine", "conditionChannel")) {
+            requireFalse(nativeTriggerRequest.contains(forbidden),
+                    "7.9 P2 native trigger PATCH DTO must not expose forbidden field: " + forbidden);
+        }
+        requireFalse(js.contains("conditionChannel"),
+                "7.9 P2 BlockState UI must not invent a conditionChannel field");
+        requireFalse(js.contains("itemSubmitEditor") || js.contains("consumeEditor") || js.contains("conditionEngineEditor")
+                        || js.contains("scratchLikeNativeTriggerEditor") || js.contains("successFailPathGraph")
+                        || js.contains("pathVisualization") || js.contains("nativeTriggerGraph") || js.contains("mindMap"),
+                "7.9 P1 does not expose itemSubmit/consume/ConditionEngine/Scratch-like native trigger editors");
     }
 
     private static void testWebAdminWriteFoundation() throws Exception {
@@ -2525,6 +3197,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2539,6 +3215,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -2554,6 +3234,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_CHANNEL_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, true);
@@ -3185,6 +3869,12 @@ public final class StabilizationGuardTest {
         requireContains(js, "resetChannelComboQuery", "channel combobox resets search query when opening from a prefilled value");
         requireContains(js, "markChannelOptionsDirty(data)", "realtime channel/device changes invalidate the channel option cache");
         requireContains(js, "appState.channelOptionsDirty=true", "channel option cache marks dirty after related realtime events");
+        requireContains(js, "storeSignalChannelOptions(await api('/api/signals/channels'))", "channel combobox and Signal page share the same channel catalog loader");
+        requireContains(js, "storeSignalChannelOptions(channels)", "Signal page refresh updates combobox channel option cache");
+        requireContains(js, "selection_completed", "VBD selection completion invalidates channel option cache");
+        requireContains(js, "virtual_block_device", "virtual block device channel events invalidate channel option cache");
+        requireContains(js, "device_extended_config", "extended config channel writes invalidate channel option cache");
+        requireContains(js, "interaction_item_matcher", "interaction matcher success/fail channel writes invalidate channel option cache");
         requireContains(js, "if(!force&&!appState.channelOptionsDirty&&Array.isArray(appState.channelOptions))return appState.channelOptions;",
                 "channel options reload after dirty realtime events but remain cached otherwise");
         requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft))",

@@ -314,22 +314,23 @@ public final class VirtualBlockDeviceDiagnosticService {
                         "需要时执行 itemCondition enable。"
                 ));
             }
-            if (condition.channel().isBlank()) {
+            String effectiveChannel = ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), false);
+            if (effectiveChannel.isBlank()) {
                 issues.add(issue(
                         DiagnosticSeverity.ERROR,
                         "item_condition_channel_empty",
                         "物品条件频道为空",
-                        "条件“" + condition.name() + "”没有进入边沿 channel。",
-                        "设置 itemCondition channel 或重建该条件。"
+                        "条件“" + condition.name() + "”没有显式频道，且父 VBD 未配置容器内容变化频道。",
+                        "设置容器内容变化频道，或为该条件设置显式频道。"
                 ));
-            } else if (!SignalChannel.isValid(condition.channel())) {
+            } else if (!SignalChannel.isValid(effectiveChannel)) {
                 issues.add(issue(
                         DiagnosticSeverity.ERROR,
                         "item_condition_channel_invalid",
                         "物品条件频道无效",
-                        "条件“" + condition.name() + "”的 channel 不符合规则。",
-                        "删除或重新创建该条件。"
-                ).withChannel(condition.channel()));
+                        "条件“" + condition.name() + "”的有效 channel 不符合规则。",
+                        "修正显式 itemCondition channel，或修正父 VBD 容器内容变化频道。"
+                ).withChannel(effectiveChannel));
             }
             if (!condition.offChannel().isBlank() && !SignalChannel.isValid(condition.offChannel())) {
                 issues.add(issue(
@@ -486,7 +487,7 @@ public final class VirtualBlockDeviceDiagnosticService {
                 ));
             } else {
                 for (ContainerItemConditionData condition : device.itemConditions()) {
-                    for (String validationIssue : ContainerItemConditionSupport.validate(inventory, condition)) {
+                    for (String validationIssue : ContainerItemConditionSupport.validate(inventory, condition, device.containerChangeChannel())) {
                         issues.add(issue(
                                 DiagnosticSeverity.WARNING,
                                 "item_condition_validation",

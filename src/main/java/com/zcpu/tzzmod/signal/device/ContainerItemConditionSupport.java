@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.signal.device;
 
+import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcher;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import java.util.ArrayList;
@@ -53,6 +54,10 @@ public final class ContainerItemConditionSupport {
     }
 
     public static List<String> validate(Inventory inventory, ContainerItemConditionData rawCondition) {
+        return validate(inventory, rawCondition, "");
+    }
+
+    public static List<String> validate(Inventory inventory, ContainerItemConditionData rawCondition, String inheritedContainerChangeChannel) {
         List<String> issues = new ArrayList<>();
         if (rawCondition == null) {
             issues.add("物品条件为空。");
@@ -62,8 +67,8 @@ public final class ContainerItemConditionSupport {
         if (condition.name().isBlank()) {
             issues.add("物品条件名称为空。");
         }
-        if (condition.channel().isBlank()) {
-            issues.add("物品条件频道为空。");
+        if (effectiveChannel(condition, inheritedContainerChangeChannel, false).isBlank()) {
+            issues.add("物品条件频道为空，且父 VBD 未配置容器内容变化频道。");
         }
         ContainerItemConditionType type = ContainerItemConditionType.fromId(condition.type());
         if ((type == ContainerItemConditionType.SLOT_EMPTY
@@ -85,6 +90,36 @@ public final class ContainerItemConditionSupport {
             issues.add("ItemStack matcher 模板未配置。");
         }
         return issues;
+    }
+
+    public static String effectiveChannel(ContainerItemConditionData rawCondition, String inheritedContainerChangeChannel, boolean exiting) {
+        String inherited = SignalChannel.normalize(inheritedContainerChangeChannel);
+        if (rawCondition == null) {
+            return inherited;
+        }
+        ContainerItemConditionData condition = rawCondition.normalized();
+        if (exiting && !condition.offChannel().isBlank()) {
+            return condition.offChannel();
+        }
+        if (!condition.channel().isBlank()) {
+            return condition.channel();
+        }
+        return inherited;
+    }
+
+    public static String effectiveChannelSource(ContainerItemConditionData rawCondition, String inheritedContainerChangeChannel, boolean exiting) {
+        String inherited = SignalChannel.normalize(inheritedContainerChangeChannel);
+        if (rawCondition == null) {
+            return inherited.isBlank() ? "missing" : "container_change_channel";
+        }
+        ContainerItemConditionData condition = rawCondition.normalized();
+        if (exiting && !condition.offChannel().isBlank()) {
+            return "condition_off_channel";
+        }
+        if (!condition.channel().isBlank()) {
+            return "condition_channel";
+        }
+        return inherited.isBlank() ? "missing" : "container_change_channel";
     }
 
     public static Map<String, Integer> totalCounts(Inventory inventory, List<ContainerItemConditionData> conditions) {

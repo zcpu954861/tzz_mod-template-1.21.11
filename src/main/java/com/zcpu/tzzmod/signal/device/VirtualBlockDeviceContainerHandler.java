@@ -144,7 +144,7 @@ public final class VirtualBlockDeviceContainerHandler {
             boolean hasChangeChannel = device.containerEnabled()
                     && !device.containerChangeChannel().isBlank()
                     && SignalChannel.isValid(device.containerChangeChannel());
-            boolean hasItemConditions = hasEnabledItemConditions(device.itemConditions());
+            boolean hasItemConditions = device.containerEnabled() && hasEnabledItemConditions(device.itemConditions());
             if (!device.enabled() || (!hasChangeChannel && !hasItemConditions)) {
                 continue;
             }
@@ -244,9 +244,7 @@ public final class VirtualBlockDeviceContainerHandler {
             boolean entering = !condition.lastMatched() && currentMatched;
             boolean exiting = condition.lastMatched() && !currentMatched;
             boolean shouldEmit = entering ? mode.triggersEnter() : exiting && mode.triggersExit();
-            String channel = entering
-                    ? condition.channel()
-                    : condition.offChannel().isBlank() ? condition.channel() : condition.offChannel();
+            String channel = ContainerItemConditionSupport.effectiveChannel(condition, device.containerChangeChannel(), exiting);
             if (!shouldEmit || channel.isBlank() || !SignalChannel.isValid(channel)) {
                 SignalDeviceStore.recordVirtualItemConditionState(
                         world,

@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.network.NotePayloads;
 import com.zcpu.tzzmod.network.PasswordPayloads;
 import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.network.TaskPayloads;
+import com.zcpu.tzzmod.network.WebAdminContainerTemplatePayloads;
 import com.zcpu.tzzmod.network.WebAdminSelectionPayloads;
 
 public final class TzzNetworkBootstrap {
@@ -26,5 +27,6 @@ public final class TzzNetworkBootstrap {
         NotePayloads.register();
         AdminPayloads.register();
         WebAdminSelectionPayloads.register();
+        WebAdminContainerTemplatePayloads.register();
     }
 }

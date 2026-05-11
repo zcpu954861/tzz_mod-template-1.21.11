@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import com.zcpu.tzzmod.region.RegionControllerServer;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceInteractionHandler;
+import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateServer;
 import com.zcpu.tzzmod.task.TaskServer;
 import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionServer;
 
@@ -34,5 +35,6 @@ public final class TzzServerBootstrap {
         VirtualBlockDeviceInteractionHandler.register();
         VirtualBlockDeviceContainerHandler.register();
         WebAdminSelectionServer.register();
+        WebAdminContainerTemplateServer.register();
     }
 }
