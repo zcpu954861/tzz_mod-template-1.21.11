@@ -63,9 +63,10 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
                 "container_close",
                 "container_change"
         ));
-        data.put("defaultSelectedTriggerTypes", defaultSelectedTriggerTypes(device));
         data.put("boundBlock", boundBlock(device, runtime));
-        data.put("triggers", triggers(device, runtime));
+        Map<String, Object> triggers = triggers(device, runtime);
+        data.put("triggers", triggers);
+        data.put("activeTriggerTypes", activeTriggerTypes(triggers));
         data.put("forbiddenInP1", List.of(
                 "nativeTriggerWriteApi",
                 "itemSubmit",
@@ -81,7 +82,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         ));
         data.put("notes", List.of(
                 "7.9 P1 只读展示 VBD 原生触发配置和当前方块 BlockState 属性。",
-                "触发方式选择器只是详情页显示过滤；持久化启用/禁用在 7.9 P2 实现。",
+                "原生触发摘要按当前 VBD 已启用或已配置的数据自动显示；持久化启用/禁用在 7.9 P2 实现。",
                 "容器内容变化的物品模板编辑器规划在 7.9 P3。"
         ));
         return data;
@@ -99,7 +100,9 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     }
 
     private static Map<String, Object> redstone(SignalDeviceData device, NativeTriggerRuntime runtime) {
-        Map<String, Object> data = baseTrigger("redstone_powered", "红石 / powered 状态", true, true);
+        boolean configured = !isBlank(device.channel()) || !isBlank(device.offChannel());
+        boolean enabled = device.enabled() && configured;
+        Map<String, Object> data = baseTrigger("redstone_powered", "红石 / 受电状态", enabled, configured);
         data.put("mode", device.mode());
         data.put("modeDisplayName", VirtualBlockDeviceMode.displayName(device.mode()));
         data.put("channel", device.channel());
@@ -226,7 +229,8 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     }
 
     private static Map<String, Object> containerChange(SignalDeviceData device) {
-        boolean configured = !isBlank(device.containerChangeChannel()) || !device.itemConditions().isEmpty();
+        boolean hasEnabledItemCondition = hasEnabledContainerItemCondition(device.itemConditions());
+        boolean configured = !isBlank(device.containerChangeChannel()) || hasEnabledItemCondition;
         Map<String, Object> data = baseTrigger(
                 "container_change",
                 "容器内容变化",
@@ -262,6 +266,24 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         return data;
     }
 
+    private static List<String> activeTriggerTypes(Map<String, Object> triggers) {
+        List<String> active = new ArrayList<>();
+        for (String type : List.of(
+                "redstone_powered",
+                "blockstate",
+                "right_click",
+                "container_open",
+                "container_close",
+                "container_change"
+        )) {
+            Object value = triggers.get(type);
+            if (value instanceof Map<?, ?> trigger && Boolean.TRUE.equals(trigger.get("enabled"))) {
+                active.add(type);
+            }
+        }
+        return List.copyOf(active);
+    }
+
     private static List<Map<String, Object>> containerItemConditionSummaries(List<ContainerItemConditionData> rawConditions) {
         List<Map<String, Object>> summaries = new ArrayList<>();
         for (ContainerItemConditionData raw : rawConditions == null ? List.<ContainerItemConditionData>of() : rawConditions) {
@@ -288,25 +310,14 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         return List.copyOf(summaries);
     }
 
-    private static List<String> defaultSelectedTriggerTypes(SignalDeviceData device) {
-        List<String> selected = new ArrayList<>();
-        selected.add("redstone_powered");
-        if (device.conditionEnabled() || !device.conditionProperties().isEmpty() || !isBlank(device.conditionRaw())) {
-            selected.add("blockstate");
+    private static boolean hasEnabledContainerItemCondition(List<ContainerItemConditionData> conditions) {
+        for (ContainerItemConditionData raw : conditions == null ? List.<ContainerItemConditionData>of() : conditions) {
+            ContainerItemConditionData condition = raw == null ? null : raw.normalized();
+            if (condition != null && condition.enabled()) {
+                return true;
+            }
         }
-        if (device.interactionEnabled() || !isBlank(device.interactChannel()) || device.interactionCooldownTicks() > 0) {
-            selected.add("right_click");
-        }
-        if (!isBlank(device.containerOpenChannel())) {
-            selected.add("container_open");
-        }
-        if (!isBlank(device.containerCloseChannel())) {
-            selected.add("container_close");
-        }
-        if (!isBlank(device.containerChangeChannel()) || !device.itemConditions().isEmpty()) {
-            selected.add("container_change");
-        }
-        return List.copyOf(selected);
+        return false;
     }
 
     private static Map<String, Object> boundBlock(SignalDeviceData device, NativeTriggerRuntime runtime) {

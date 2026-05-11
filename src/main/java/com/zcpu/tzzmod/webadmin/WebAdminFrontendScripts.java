@@ -126,7 +126,7 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},vbdNativeTriggerFilters:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;appState.modalCloseHandler=null;appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalDiscardConfirmOpen=false;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -191,13 +191,22 @@ public final class WebAdminFrontendScripts {
                 function consumerCount(c){return Number(c?.listenerCount||0)+Number(c?.receiverCount||0)+Number(c?.actionRelayCount||0);}
                 async function loadSignalChannelOptions(force=false){
                   if(!force&&!appState.channelOptionsDirty&&Array.isArray(appState.channelOptions))return appState.channelOptions;
-                  try{appState.channelOptions=await api('/api/signals/channels');appState.channelOptionsError=null;appState.channelOptionsDirty=false;}
+                  try{return storeSignalChannelOptions(await api('/api/signals/channels'));}
                   catch(err){appState.channelOptions=Array.isArray(appState.channelOptions)?appState.channelOptions:[];appState.channelOptionsError=err.message||'频道候选加载失败';}
                   return appState.channelOptions||[];
                 }
+                function storeSignalChannelOptions(channels){
+                  appState.channelOptions=Array.isArray(channels)?channels:[];
+                  appState.channelOptionsError=null;
+                  appState.channelOptionsDirty=false;
+                  return appState.channelOptions;
+                }
                 function markChannelOptionsDirty(event){
-                  const type=String(event?.type||''), target=String(event?.payload?.targetType||''), source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
-                  if(type==='signal_channel_changed'||type==='channel_metadata_changed'||type==='signal_listener_changed'||type==='signal_listener_config_changed'||target.includes('channel')||target==='device_basic_config'||target==='action_relay_actions'||source==='signal_receiver'||source==='action_relay'||source==='signal_emitter')appState.channelOptionsDirty=true;
+                  const type=String(event?.type||''), target=String(event?.payload?.targetType||'').toLowerCase(), source=String(event?.sourceType||event?.payload?.deviceType||'').toLowerCase();
+                  const types=['signal_channel_changed','channel_metadata_changed','signal_listener_changed','signal_listener_config_changed','device_registered','device_removed','device_changed','device_config_changed','virtual_block_device_changed','selection_completed','selection_cancelled','selection_failed','action_changed','signal_listener_action_changed','config_changed','signal_history_appended','sync_required'];
+                  const targets=['device_basic_config','device_extended_config','interaction_item_matcher','action_relay_actions','channel_metadata','signal_listener_basic_config','virtual_block_device'];
+                  const sources=['signal_receiver','action_relay','signal_emitter','virtual_block_device'];
+                  if(types.includes(type)||target.includes('channel')||targets.includes(target)||sources.includes(source))appState.channelOptionsDirty=true;
                 }
                 function normalizeChannelName(value){return String(value||'').trim();}
                 function findChannelOption(channel,options){const name=normalizeChannelName(channel).toLowerCase();if(!name)return null;return (options||[]).find(c=>String(c.channel||'').trim().toLowerCase()===name)||null;}
@@ -355,7 +364,7 @@ public final class WebAdminFrontendScripts {
                 async function heartbeatDeviceExtendedConfigLock(){const draft=appState.deviceExtendedConfigEdit;if(!draft||!draft.lockId)return;try{const result=await api('/api/webadmin/edit-locks/heartbeat',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});if(result.success){draft.lock=result.data?.lock||draft.lock;appState.deviceExtendedConfigEdit=draft;return;}draft.errors=[{message:result.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();await renderDeviceDetail(currentDeviceRouteArg(draft.deviceId),{silent:true});}catch(err){draft.errors=[{message:err.message||'编辑锁续期失败'}];appState.deviceExtendedConfigEdit=draft;stopDeviceExtendedConfigLockHeartbeat();}}
                 async function releaseDeviceExtendedConfigLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'device_extended_config',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'编辑锁释放失败，将等待自动过期。');}}
                 function deviceExtendedConfigPatchBody(draft){const body={expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''};const original=draft.originalValues||{};const addChannel=(field,value,clearName,valueName)=>{if((draft.clear||{})[field]){body[clearName]=true;return;}const text=String(value??'').trim(), before=String(original[field]??'').trim();if(text||before)body[valueName]=value||'';};extendedEditableFields(draft).forEach(field=>{const value=(draft.values||{})[field];if(field==='interactChannel')addChannel(field,value,'clearInteractChannel','interactChannel');else if(field==='successChannel')addChannel(field,value,'clearSuccessChannel','successChannel');else if(field==='failChannel')addChannel(field,value,'clearFailChannel','failChannel');else if(field==='interactionCooldownTicks')body.interactionCooldownTicks=Number(value);else if(field==='pulseTicks')body.pulseTicks=Number(value);else if(field==='cooldownTicks')body.cooldownTicks=Number(value);});return body;}
-                async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};if(!draft.lockId){toast(draft.unsupportedReason||'当前运行状态下类型专属配置只读。');showDeviceExtendedConfigEditModal(deviceId);return;}updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}}
+                async function saveDeviceExtendedConfig(deviceId){const draft=appState.deviceExtendedConfigEdit||{deviceId};if(!draft.lockId){toast(draft.unsupportedReason||'当前运行状态下类型专属配置只读。');showDeviceExtendedConfigEditModal(deviceId);return;}updateDeviceExtendedConfigDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceExtendedConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});try{const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(draft))});if(result.success){markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'device_extended_config'}});appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备扩展配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceExtendedConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceExtendedConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceExtendedConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceExtendedConfigEditModal(deviceId);}}
                 function signalHash(channel){return `#/signals/${encodeURIComponent(channel||'')}`;}
                 function listenerHash(id){return `#/listeners/${encodeURIComponent(id||'')}`;}
                 function deviceRouteRef(id,type=''){
@@ -681,6 +690,7 @@ public final class WebAdminFrontendScripts {
                     appState.realtime.missed=true;
                     markAllRealtimeDirty(data);
                     markRealtimeDirty(currentRouteHash(),data);
+                    markChannelOptionsDirty(data);
                     flushVisibleRealtimeRefresh(data.type==='sync_required'?'sync_required':'seq_gap');
                     return;
                   }
@@ -1041,9 +1051,6 @@ public final class WebAdminFrontendScripts {
                   const configAction=deviceConfigEditButton(detail,'编辑设备配置','primary');
                   const actionLock=detail.actionRelayActions?.lockStatus||null, actionLockedByOther=actionRelayLockHeldByOther(actionLock);
                   const actionListAction=isActionRelay(detail)?waButton(actionLockedByOther?'只读查看 Action 列表':((detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false)?'查看 Action 状态':(canEditActionRelayActions()?'编辑 Action 列表':'查看 Action 列表')),'action-relay',actionLockedByOther?htmlHandler(`openActionRelayActionsReadonlyModal(${jsString(detail.id)})`):htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`),(canEditActionRelayActions()&&!actionLockedByOther&&!(detail.actionRelayActions&&detail.actionRelayActions.actionsEditable===false))?'primary':'ghost'):'';
-                  const matcherLock=detail.interactionItemMatcher?.lockStatus||null, matcherLockedByOther=lockHeldByOther(matcherLock);
-                  const matcherCanEdit=canEditInteractionItemMatcher()&&detail.interactionItemMatcher?.matcherEditable!==false;
-                  const matcherAction=isVirtualBlockDevice(detail)?(matcherLockedByOther?waButton('只读查看交互物品匹配','virtual-block-device',htmlHandler(`openInteractionItemMatcherReadonlyModal(${jsString(detail.id)})`),'ghost'):waButton(matcherCanEdit?'编辑交互物品匹配':'查看交互物品匹配','virtual-block-device',htmlHandler(`openInteractionItemMatcherModal(${jsString(detail.id)})`),matcherCanEdit?'primary':'ghost')):'';
                   const deleteAction=isVirtualBlockDevice(detail)?(canDeleteVirtualBlockDevice()?waButton('删除 / 解绑','channel-error',htmlHandler(`openVirtualBlockDeviceDeleteModal(${jsString(detail.id)})`),'danger'):waButton('删除 / 解绑','channel-error','disabled','danger')):'';
                   const quickNote=isVirtualBlockDevice(detail)?'删除 / 解绑只移除 virtual_block_device 配置，不破坏世界方块；导出和其它写操作仍保持禁用。':(isPhysicalSignalDevice(detail)?'这是已放置的真实方块设备。WebAdmin 只编辑安全配置，不创建、不删除、不 setblock；删除请在游戏内破坏方块。':'仅设备显示信息、基础配置和安全扩展配置可写；删除、导出和其它写操作没有完整后端支持，保持禁用。');
                   const statusValue=detail.enabled?'启用':'停用';
@@ -1060,7 +1067,7 @@ public final class WebAdminFrontendScripts {
                     ['doctor.status',doctorStatus]
                   ];
                   setView(`<section class="wa-page wa-detail-shell" data-detail-kind="device">
-                    ${detailHeader({back:backButton(routeInfo,'返回设备管理'),kicker:'设备详情',iconName:deviceTypeIcon(detail.type),title:detail.displayName||detail.id,subtitle:`${detail.world||'暂无世界'} · ${posText(detail.pos)} · ${labelChannel(detail.channel)}`,copyValue:detail.id,badges:[`<span class="pill">${esc(labelType(detail.type))}</span>`,pill(detail.enabled?'OK':'WARNING'),pill(doctorStatus)],actions:[actionListAction,matcherAction,configAction,waButton('导出设备配置','download','disabled','ghost'),waButton('更多','more','disabled','ghost')].filter(Boolean)})}
+                    ${detailHeader({back:backButton(routeInfo,'返回设备管理'),kicker:'设备详情',iconName:deviceTypeIcon(detail.type),title:detail.displayName||detail.id,subtitle:`${detail.world||'暂无世界'} · ${posText(detail.pos)} · ${labelChannel(detail.channel)}`,copyValue:detail.id,badges:[`<span class="pill">${esc(labelType(detail.type))}</span>`,pill(detail.enabled?'OK':'WARNING'),pill(doctorStatus)],actions:[actionListAction,configAction,waButton('导出设备配置','download','disabled','ghost'),waButton('更多','more','disabled','ghost')].filter(Boolean)})}
                     ${detailTabs(['基本信息','配置','最近事件','关联对象','Doctor'])}
                     <section class="wa-detail-first-row">
                       ${detailCard('基本信息',detailInfoGrid([
@@ -1086,14 +1093,13 @@ public final class WebAdminFrontendScripts {
                       ])}`)}
                     </section>
                     ${detailFixedLayout([
-                      isVirtualBlockDevice(detail)?detailCard('原生触发配置',vbdNativeTriggerOverviewCard(detail),'','detail-card-stretchable'):'',
                       detailCard('配置摘要',deviceConfigOverview(detail),'','detail-card-stretchable'),
                       isActionRelay(detail)?detailCard('Action 列表',actionRelayActionListReadonlyCard(detail),actionListAction):'',
                       detailCard('最近事件',`${history.ok?compactEventList(recentEvents,'当前设备暂无关联频道历史。'):errorBlock(history.error.message)}<p class="muted">${isBlank(detail.channel)?'当前设备暂无关联频道历史。':`<button class="link-button" ${navigationAttr(historyHash(detail.channel),false)}>查看相关历史</button>`}</p>`)
                     ],[
-                      isVirtualBlockDevice(detail)?detailCard('交互物品匹配',`<div data-vbd-matcher-side-card="true" data-detail-side-card="interaction-item-matcher">${interactionItemMatcherReadonlyCard(detail)}</div>`,matcherAction):'',
+                      isVirtualBlockDevice(detail)?detailCard('原生触发配置',`<div data-vbd-native-trigger-side-card="true" data-detail-side-card="vbd-native-triggers">${vbdNativeTriggerOverviewCard(detail)}</div>`,'','detail-card-stretchable'):'',
                       detailCard('关联对象 / Doctor',`${deviceChannelSideCard(detail)}${deviceDoctorSideCard(detail,uniqueIssues(relatedDoctor))}`,'','detail-card-stretchable'),
-                      detailCard('快捷操作',`<div class="wa-quick-grid">${actionListAction}${matcherAction}${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${deleteAction}</div><p class="wa-disabled-note">${esc(quickNote)}</p>`)
+                      detailCard('快捷操作',`<div class="wa-quick-grid">${actionListAction}${configAction}${waButton('打开频道','active-channel',detail.channel?navigationAttr(signalHash(detail.channel)):'disabled','ghost')}${waButton('查看历史','history',detail.channel?navigationAttr(historyHash(detail.channel)):'disabled','ghost')}${deleteAction}</div><p class="wa-disabled-note">${esc(quickNote)}</p>`)
                     ],[
                       advancedDetailCard('devices',detail.id,advancedRows,[
                       {title:'配置摘要完整字段',rows:advancedRowsFromObject(detail.configSummary||{},'configSummary')},
@@ -1336,6 +1342,7 @@ public final class WebAdminFrontendScripts {
                   if(terminal&&shouldIgnoreSelectionTerminal(draft.selectionId,terminal,eventId))return;
                   if(type==='selection_completed'){
                     const deviceId=String(event?.deviceId||payload.deviceId||''), routeTarget=selectionDeviceDetailRoute(deviceId,draft.returnTo||'#/virtual-block-devices');
+                    markChannelOptionsDirty(event);
                     markSelectionTerminal(draft.selectionId,'completed',eventId);
                     appState.selectionCreateVirtualBlock={...draft,...payload,step:'completed',status:'completed',terminalStatus:'completed',deviceId,routeTarget,message:event?.summary||payload.message||'虚拟方块设备已创建。',errors:[],saving:false};
                     showCreateVirtualBlockDeviceModal();
@@ -1433,6 +1440,7 @@ public final class WebAdminFrontendScripts {
                   try{
                     const result=await api('/api/webadmin/signal-listeners',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({name:draft.name,displayName:draft.name,channel:String(draft.channel||'').trim(),enabled:draft.enabled!==false,cooldownTicks:Number(draft.cooldownTicks||0)})});
                     if(result.success){
+                      markChannelOptionsDirty({type:'signal_listener_changed'});
                       const routeTarget=result.data?.routeTarget||lifecycleRouteWithReturn(listenerHash(result.data?.listenerId||result.targetId||''),'#/listeners');
                       appState.signalListenerCreate=null;
                       await dismissWebAdminModal();
@@ -1578,18 +1586,16 @@ public final class WebAdminFrontendScripts {
                   const editing=appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===detail.id;
                   const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):deviceConfigEditButton(detail,'编辑设备配置','primary');
                   const nativeTriggers=isVirtualBlockDevice(detail)?vbdNativeTriggerConfigSummaryCard(detail):'';
-                  const matcher=isVirtualBlockDevice(detail)?interactionItemMatcherSummaryHtml(detail):'';
                   const loadNotes=[detail.basicConfigError?`基础配置加载失败：${detail.basicConfigError.message||'未知错误'}`:'',detail.extendedConfigError?`扩展配置加载失败：${detail.extendedConfigError.message||'未知错误'}`:'',detail.nativeTriggersError?`原生触发配置加载失败：${detail.nativeTriggersError.message||'未知错误'}`:'',detail.interactionItemMatcherError?`交互物品匹配加载失败：${detail.interactionItemMatcherError.message||'未知错误'}`:''].filter(Boolean);
-                  return `<div class="wa-config-summary ${matcher?'wa-vbd-config-summary':''}" ${matcher?'data-vbd-config-summary="true"':''}>
+                  return `<div class="wa-config-summary ${nativeTriggers?'wa-vbd-config-summary':''}" ${nativeTriggers?'data-vbd-config-summary="true"':''}>
                     <section class="wa-config-card"><h3>显示信息</h3><div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}</div></section>
                     <section class="wa-config-card"><h3>基础配置</h3><div class="identity-grid">${row('启用状态',esc(labelEnabledState(basic.enabled ?? detail.enabled)))}${row('主频道',channelCell(basic.channel||detail.channel))}</div></section>
                     <section class="wa-config-card"><h3>类型专属配置</h3><div class="identity-grid">${extRows}</div>${extNote}</section>
                     ${nativeTriggers}
-                    ${matcher}
-                  </div>${loadNotes.length?`<div class="readonly-note">${loadNotes.map(esc).join('<br>')}</div>`:''}<p class="muted">基础配置与扩展配置使用同一个固定 Modal 编辑；virtual_block_device 可在同一 Modal 内编辑交互物品匹配；action_relay 可在同一 Modal 内打开 Action 列表。不会创建 itemSubmit、consume、ConditionEngine 或逻辑链图。</p><div class="inline-actions">${action}</div>`;
+                  </div>${loadNotes.length?`<div class="readonly-note">${loadNotes.map(esc).join('<br>')}</div>`:''}<p class="muted">基础配置与扩展配置使用同一个固定 Modal 编辑；virtual_block_device 的交互物品匹配从原生触发配置的右键交互条件层进入；action_relay 可在同一 Modal 内打开 Action 列表。不会创建 itemSubmit、consume、ConditionEngine 或逻辑链图。</p><div class="inline-actions">${action}</div>`;
                 }
                 function nativeTriggerTypes(){return [
-                  {type:'redstone_powered',label:'红石 / powered',icon:'enabled'},
+                  {type:'redstone_powered',label:'红石 / 受电状态',icon:'enabled'},
                   {type:'blockstate',label:'BlockState',icon:'device-overview'},
                   {type:'right_click',label:'右键交互',icon:'virtual-block-device'},
                   {type:'container_open',label:'容器打开',icon:'chest'},
@@ -1599,72 +1605,88 @@ public final class WebAdminFrontendScripts {
                 function labelNativeTriggerType(type){return (nativeTriggerTypes().find(item=>item.type===type)||{}).label||type;}
                 function vbdNativeTriggerData(detail){return detail?.nativeTriggers||{};}
                 function vbdNativeTriggerMap(detail){return vbdNativeTriggerData(detail).triggers||{};}
-                function vbdNativeTriggerDefaultSelection(detail){
+                function activeVbdNativeTriggerTypes(detail){
                   const data=vbdNativeTriggerData(detail), map=vbdNativeTriggerMap(detail);
-                  const fromApi=(data.defaultSelectedTriggerTypes||[]).filter(Boolean);
-                  if(fromApi.length)return fromApi;
-                  const configured=nativeTriggerTypes().map(item=>item.type).filter(type=>map[type]?.enabled||map[type]?.configured);
-                  return configured.length?configured:['redstone_powered'];
-                }
-                function selectedVbdNativeTriggerTypes(detail){
-                  waEnsureState();
-                  const key=detail?.id||'', stored=appState.vbdNativeTriggerFilters[key];
                   const allowed=new Set(nativeTriggerTypes().map(item=>item.type));
-                  const current=Array.isArray(stored)?stored.filter(type=>allowed.has(type)):[];
-                  return current.length?current:vbdNativeTriggerDefaultSelection(detail);
+                  const fromApi=Array.isArray(data.activeTriggerTypes)?data.activeTriggerTypes.filter(type=>allowed.has(type)):[];
+                  const matcher=map.right_click?.interactionItemMatcherLayer||{};
+                  if((matcher.enabled||matcher.configured)&&!fromApi.includes('right_click'))fromApi.push('right_click');
+                  if(fromApi.length)return fromApi;
+                  const active=nativeTriggerTypes().map(item=>item.type).filter(type=>!!map[type]?.enabled);
+                  if((matcher.enabled||matcher.configured)&&!active.includes('right_click'))active.push('right_click');
+                  return active;
                 }
-                async function toggleVbdNativeTriggerFilter(deviceId,type,event){
-                  waEnsureState();
-                  if(event)event.stopPropagation();
-                  const detail=appState.currentDeviceDetail||{id:deviceId,nativeTriggers:null};
-                  const selected=selectedVbdNativeTriggerTypes(detail);
-                  const multi=!!(event&&(event.ctrlKey||event.metaKey||event.shiftKey));
-                  let next=multi?(selected.includes(type)?selected.filter(item=>item!==type):[...selected,type]):[type];
-                  if(next.length===0)next=[type];
-                  appState.vbdNativeTriggerFilters[deviceId]=next;
-                  if(appState.deviceConfigEdit&&appState.deviceConfigEdit.deviceId===deviceId){applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(deviceId);return;}
-                  await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
-                }
-                function vbdNativeTriggerSelector(detail){
-                  const selected=new Set(selectedVbdNativeTriggerTypes(detail)), map=vbdNativeTriggerMap(detail);
-                  return `<div class="wa-native-trigger-selector" data-vbd-native-trigger-selector="true" role="group" aria-label="VBD 原生触发方式显示过滤">${nativeTriggerTypes().map(item=>{const active=selected.has(item.type), configured=!!(map[item.type]?.enabled||map[item.type]?.configured);return `<button type="button" class="wa-native-trigger-chip ${active?'active':''} ${configured?'configured':''}" aria-pressed="${active?'true':'false'}" data-native-trigger-type="${esc(item.type)}" data-vbd-native-trigger-option="${esc(item.type)}" ${htmlHandler(`toggleVbdNativeTriggerFilter(${jsString(detail.id)},${jsString(item.type)},event)`)}>${icon(item.icon)}<span>${esc(item.label)}</span>${configured?'<small>已配置</small>':'<small>未配置</small>'}</button>`;}).join('')}</div>`;
-                }
-                function vbdNativeTriggerOverviewCard(detail){
+                function vbdNativeTriggerOverviewCard(detail,options={}){
                   if(!isVirtualBlockDevice(detail))return '';
                   if(detail.nativeTriggersError)return errorBlock(detail.nativeTriggersError.message||'原生触发配置加载失败');
                   const data=vbdNativeTriggerData(detail);
                   if(!data.supported)return `<div class="readonly-note">${esc(data.unsupportedReason||'当前设备不支持原生触发摘要。')}</div>`;
-                  const selected=selectedVbdNativeTriggerTypes(detail);
-                  const summaries=selected.map(type=>vbdNativeTriggerSummaryCard(detail,type)).join('');
-                  return `<div class="wa-native-trigger-area" data-vbd-native-trigger-area="true" data-vbd-native-trigger-readonly="true" data-vbd-native-trigger-no-write-api="true" data-vbd-native-trigger-no-raw-json="true">
-                    <p class="readonly-note">7.9 P1 仅只读展示原生触发配置。下方选择器只过滤当前页面摘要，不保存配置；完整编辑将在 7.9 P2 支持。</p>
-                    ${vbdNativeTriggerSelector(detail)}
-                    <div class="wa-native-trigger-grid" data-vbd-native-trigger-summary-selected="true">${summaries||empty('请选择要查看的触发方式。')}</div>
+                  const active=activeVbdNativeTriggerTypes(detail);
+                  const summaries=active.map(type=>vbdNativeTriggerCompactCard(detail,type,options)).join('');
+                  return `<div class="wa-native-trigger-area" data-vbd-native-trigger-area="true" data-vbd-native-trigger-readonly="true" data-vbd-native-trigger-no-write-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-manual-selector="true">
+                    <p class="readonly-note">7.9 P1 仅按当前 VBD 实际已启用或已配置的原生触发数据展示摘要；完整编辑将在 7.9 P2 支持。</p>
+                    <div class="wa-native-trigger-grid" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-data-driven="true" data-vbd-native-trigger-inline-full-detail="false">${summaries||`<div class="readonly-note" data-vbd-native-trigger-empty-state="true" data-vbd-native-trigger-compact-empty-state="true">尚未启用原生触发方式。完整编辑将在 7.9 P2 支持。</div>`}</div>
                   </div>`;
                 }
                 function vbdNativeTriggerConfigSummaryCard(detail){
-                  const data=vbdNativeTriggerData(detail), map=vbdNativeTriggerMap(detail), selected=selectedVbdNativeTriggerTypes(detail);
-                  const labels=selected.map(labelNativeTriggerType).join(' / ')||'暂无';
-                  const active=nativeTriggerTypes().filter(item=>map[item.type]?.enabled||map[item.type]?.configured).map(item=>item.label);
-                  const state=data.supported===false?(data.unsupportedReason||'不可用'):`当前显示：${labels}`;
-                  return `<section class="wa-config-card wa-vbd-native-config-card" data-vbd-native-trigger-config-summary="true"><h3>原生触发配置</h3><div class="identity-grid">${row('P1 状态',esc('只读摘要'))}${row('显示过滤',esc(state))}${row('已配置项',esc(active.join(' / ')||'仅红石基础触发'))}${row('写入 API',esc(data.writeApiEnabled?'已启用':'P1 未提供'))}</div><p class="muted">原生触发源仅包含红石、BlockState、右键交互、容器打开、容器关闭、容器内容变化。interaction item matcher 是右键之后的条件层。</p></section>`;
+                  const data=vbdNativeTriggerData(detail), active=activeVbdNativeTriggerTypes(detail).map(labelNativeTriggerType);
+                  const state=data.supported===false?(data.unsupportedReason||'不可用'):'数据驱动只读摘要';
+                  return `<section class="wa-config-card wa-vbd-native-config-card" data-vbd-native-trigger-config-summary="true"><h3>原生触发配置</h3><div class="identity-grid">${row('P1 状态',esc('只读摘要'))}${row('展示方式',esc(state))}${row('已启用 / 已配置项',esc(active.join(' / ')||'暂无'))}${row('写入 API',esc(data.writeApiEnabled?'已启用':'P1 未提供'))}</div><p class="muted">原生触发源仅包含红石、BlockState、右键交互、容器打开、容器关闭、容器内容变化。interaction item matcher 是右键之后的条件层。</p></section>`;
                 }
                 function vbdNativeTriggerConfigModalSection(detail){
                   if(!isVirtualBlockDevice(detail))return '';
-                  const body=vbdNativeTriggerOverviewCard(detail);
-                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill info">7.9 P1 readonly</span></header>${body}<p class="muted">该 section 是 7.9 P1 骨架，不获取编辑锁、不参与 dirty 状态、不发送写请求。P2 才会接入保存、fingerprint、audit 和 realtime 写链路。</p></section>`;
+                  const body=vbdNativeTriggerOverviewCard(detail,{inConfigModal:true});
+                  const matcherInline=appState.interactionItemMatcherEdit&&sameDeviceRef(appState.interactionItemMatcherEdit.deviceId,detail.id)?`<div data-vbd-native-trigger-interaction-matcher-inline-edit="true">${interactionItemMatcherForm(detail,appState.interactionItemMatcherEdit,true)}</div>`:'';
+                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill info">7.9 P1 readonly</span></header>${body}${matcherInline}<p class="muted">该 section 是 7.9 P1 骨架，不获取 native trigger 编辑锁、不发送 native trigger 写请求。右键交互中的交互物品匹配入口沿用 7.8 matcher 独立保存链路；P2 才会接入原生触发保存、fingerprint、audit 和 realtime 写链路。</p></section>`;
                 }
-                function vbdNativeTriggerSummaryCard(detail,type){
-                  const trigger=vbdNativeTriggerMap(detail)[type]||{}, active=!!(trigger.enabled||trigger.configured);
-                  let content='';
-                  if(type==='redstone_powered')content=vbdRedstoneSummary(trigger);
-                  else if(type==='blockstate')content=vbdBlockStateSummary(detail,trigger);
-                  else if(type==='right_click')content=vbdInteractionTriggerSummary(detail,trigger);
-                  else if(type==='container_open')content=vbdContainerOpenSummary(trigger);
-                  else if(type==='container_close')content=vbdContainerCloseSummary(trigger);
-                  else if(type==='container_change')content=vbdContainerChangeSummary(trigger);
-                  else content=empty('未知触发方式。');
-                  return `<article class="wa-native-trigger-summary ${active?'active':''}" data-vbd-native-trigger-summary="${esc(type)}" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-active="${active?'true':'false'}"><header><h3>${esc(labelNativeTriggerType(type))}</h3>${active?'<span class="pill ok">已启用 / 已配置</span>':'<span class="pill info">只读预览</span>'}</header>${content}</article>`;
+                function vbdNativeTriggerCompactCard(detail,type,options={}){
+                  const trigger=vbdNativeTriggerMap(detail)[type]||{}, clickable=!options.inConfigModal;
+                  const title=labelNativeTriggerType(type), primary=vbdNativeTriggerPrimarySummary(type,trigger), recent=vbdNativeTriggerRecentSummary(type,trigger), note=vbdNativeTriggerShortSummary(type,trigger);
+                  const clickAttrs=clickable?`type="button" ${htmlHandler(`openVbdNativeTriggerReadonlyModal(${jsString(detail.id)},${jsString(type)})`)} onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVbdNativeTriggerReadonlyModal(${esc(jsString(detail.id))},${esc(jsString(type))});}" data-vbd-native-trigger-card-click="readonly-detail" data-vbd-native-trigger-open-readonly-detail="true"`:'type="button" disabled data-vbd-native-trigger-card-click="readonly-detail-disabled"';
+                  return `<button class="wa-native-trigger-compact-card" ${clickAttrs} data-vbd-native-trigger-compact-card="true" data-vbd-native-trigger-card-summary="true" data-vbd-native-trigger-card-type="${esc(type)}" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-active="true"><span class="wa-native-trigger-compact-head"><strong>${esc(title)}</strong><span class="pill ok">已启用 / 已配置</span></span><span class="wa-native-trigger-compact-line"><small>主项</small><b>${primary}</b></span><span class="wa-native-trigger-compact-line"><small>最近</small><b>${recent}</b></span><span class="muted">${note}</span></button>`;
+                }
+                function vbdNativeTriggerPrimarySummary(type,t){
+                  if(type==='redstone_powered')return esc(labelChannel(t.channel)||t.modeDisplayName||t.mode||'redstone');
+                  if(type==='blockstate')return esc(t.conditionBlockId||Object.entries(t.conditionProperties||{}).map(([k,v])=>`${k}=${v}`).join(', ')||'BlockState 条件');
+                  if(type==='right_click')return esc(labelChannel(t.interactChannel)||'右键交互启用');
+                  if(type==='container_open')return esc(labelChannel(t.containerOpenChannel)||'容器打开');
+                  if(type==='container_close')return esc(labelChannel(t.containerCloseChannel)||'容器关闭');
+                  if(type==='container_change')return esc(labelChannel(t.containerChangeChannel)||'容器内容变化');
+                  return esc('未知');
+                }
+                function vbdNativeTriggerRecentSummary(type,t){
+                  if(type==='redstone_powered')return esc(t.lastTriggerResult||`${labelRuntimeBool(t.lastPowered)} · ${t.lastPowerLevel??0}`);
+                  if(type==='blockstate')return esc(t.lastConditionResult||labelRuntimeBool(t.lastConditionMatched));
+                  if(type==='right_click')return esc(t.lastInteractionResult||t.lastInteractionPlayerName||'暂无');
+                  if(type==='container_open')return esc(t.lastContainerResult||nativeTriggerTime(t.lastContainerOpenWallTimeMillis));
+                  if(type==='container_close')return esc(t.lastContainerResult||nativeTriggerTime(t.lastContainerCloseWallTimeMillis));
+                  if(type==='container_change')return esc(t.lastContainerResult||nativeTriggerTime(t.lastContainerChangeWallTimeMillis));
+                  return esc('暂无');
+                }
+                function vbdNativeTriggerShortSummary(type,t){
+                  if(type==='redstone_powered')return esc(t.offChannel?`断电频道：${t.offChannel}`:'红石 / 受电状态触发');
+                  if(type==='blockstate')return esc(`${t.supportedPropertyCount??(t.supportedProperties||[]).length} 个当前方块属性可读`);
+                  if(type==='right_click'){const matcher=t.interactionItemMatcherLayer||{};return esc(matcher.enabled||matcher.configured?'含交互物品匹配条件':'玩家右键交互触发');}
+                  if(type==='container_change')return esc(`物品条件数：${t.itemConditionCount??(t.itemConditions||[]).length}`);
+                  if(type==='container_open'||type==='container_close')return esc('容器 open / close 共用 containerEnabled');
+                  return esc('');
+                }
+                function openVbdNativeTriggerReadonlyModal(deviceId,type){
+                  const detail=appState.currentDeviceDetail&&sameDeviceRef(appState.currentDeviceDetail.id,deviceId)?appState.currentDeviceDetail:null;
+                  if(!detail){toast('当前设备详情已变化，请刷新后重试。');return;}
+                  const title=`${labelNativeTriggerType(type)} · 原生触发详情`;
+                  const body=`<section class="edit-form" data-vbd-native-trigger-readonly-modal="true" data-vbd-native-trigger-readonly-detail="true" data-vbd-native-trigger-detail-modal-body="true" data-vbd-native-trigger-detail-type="${esc(type)}" data-vbd-native-trigger-readonly-no-save="true" data-vbd-native-trigger-readonly-no-edit-lock="true" data-vbd-native-trigger-detail-no-dirty-guard="true" data-vbd-native-trigger-detail-no-write-request="true">${vbdNativeTriggerReadonlyDetail(detail,type)}<p class="muted">该弹窗只读展示，不获取编辑锁、不发送写请求；7.9 P2 才支持原生触发配置保存。</p></section>`;
+                  openWebAdminModal(title,body,waButton('关闭','close','onclick="closeWebAdminModal()"','ghost'),{className:'wa-config-modal'});
+                }
+                function vbdNativeTriggerReadonlyDetail(detail,type){
+                  const trigger=vbdNativeTriggerMap(detail)[type]||{};
+                  if(type==='redstone_powered')return vbdRedstoneSummary(trigger);
+                  if(type==='blockstate')return vbdBlockStateSummary(detail,trigger);
+                  if(type==='right_click')return vbdInteractionTriggerSummary(detail,trigger);
+                  if(type==='container_open')return vbdContainerOpenSummary(trigger);
+                  if(type==='container_close')return vbdContainerCloseSummary(trigger);
+                  if(type==='container_change')return vbdContainerChangeSummary(trigger);
+                  return empty('未知触发方式。');
                 }
                 function vbdRedstoneSummary(t){
                   return `<div class="identity-grid">${row('模式',esc(t.modeDisplayName||t.mode||'redstone_rising'))}${row('通电频道',channelCell(t.channel))}${row('断电频道',channelCell(t.offChannel))}${row('当前通电',esc(labelRuntimeBool(t.currentPowered)))}${row('当前红石强度',esc(t.currentPowerLevel??'未知'))}${row('BlockState powered',esc(labelRuntimeBool(t.blockStatePowered)))}${row('上次通电',esc(labelRuntimeBool(t.lastPowered)))}${row('上次红石强度',esc(t.lastPowerLevel??0))}${row('最近结果',esc(t.lastTriggerResult||'暂无'))}</div>`;
@@ -1676,7 +1698,19 @@ public final class WebAdminFrontendScripts {
                 }
                 function vbdInteractionTriggerSummary(detail,t){
                   const matcher=t.interactionItemMatcherLayer||{};
-                  return `<div class="identity-grid">${row('交互启用',esc(labelBool(!!t.interactionEnabled)))}${row('交互频道',channelCell(t.interactChannel))}${row('冷却时间',esc(formatTicks(t.interactionCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastInteractionPlayerName||'暂无'))}${row('最近手 / 面',esc([t.lastInteractionHand,t.lastInteractionSide].filter(Boolean).join(' / ')||'暂无'))}${row('最近结果',esc(t.lastInteractionResult||'暂无'))}${row('matcher 条件层',esc((matcher.enabled||matcher.configured)?(matcher.summary||matcher.templateItemId||'已配置'):'未配置'))}</div><p class="muted">交互物品匹配沿用 7.8 独立编辑入口；它不是新的原生触发源。</p>`;
+                  const configured=!!(matcher.enabled||matcher.configured);
+                  const inactiveConfigured=configured&&!t.interactionEnabled;
+                  const matcherState=configured?(inactiveConfigured?'已配置，但右键交互触发尚未启用，当前不生效':(matcher.summary||matcher.templateItemId||'已配置')):'未配置';
+                  const matcherDetail=configured?`${matcher.templateItemId||matcher.summary||'已配置'}${matcher.countMode?` · ${labelCountMode(matcher.countMode)} ${matcher.requiredCount||1}`:''}${matcher.source||matcher.interactionItemSource?` · ${labelInteractionSource(matcher.source||matcher.interactionItemSource)}`:''}`:'尚未要求特定交互物品';
+                  const warning=inactiveConfigured?`<p class="readonly-note warning" data-vbd-native-trigger-matcher-disabled-warning="true">已配置交互物品匹配，但右键交互触发尚未启用；matcher 是右键触发后的条件层，当前不会参与触发判定。</p>`:'';
+                  return `<div class="identity-grid" data-vbd-native-trigger-interaction-matcher-summary="true">${row('交互启用',esc(labelBool(!!t.interactionEnabled)))}${row('交互频道',channelCell(t.interactChannel))}${row('冷却时间',esc(formatTicks(t.interactionCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastInteractionPlayerName||'暂无'))}${row('最近手 / 面',esc([t.lastInteractionHand,t.lastInteractionSide].filter(Boolean).join(' / ')||'暂无'))}${row('最近结果',esc(t.lastInteractionResult||'暂无'))}${row('matcher 条件层',esc(matcherState))}${row('matcher 摘要',esc(matcherDetail))}</div>${warning}<div class="inline-actions wa-native-trigger-inline-actions" data-vbd-native-trigger-interaction-matcher-entry="true">${interactionItemMatcherInlineAction(detail)}</div><p class="muted">交互物品匹配是右键触发之后的条件 / 判定层，不是新的原生触发源。</p>`;
+                }
+                function interactionItemMatcherInlineAction(detail){
+                  if(!isVirtualBlockDevice(detail))return '';
+                  const data=detail.interactionItemMatcher||{}, locked=lockHeldByOther(data.lockStatus);
+                  const canEdit=canEditInteractionItemMatcher()&&data.matcherEditable!==false;
+                  if(locked)return waButton('只读查看交互物品匹配','virtual-block-device',htmlHandler(`openInteractionItemMatcherReadonlyModal(${jsString(detail.id)})`),'ghost');
+                  return waButton(canEdit?'编辑交互物品匹配':'查看交互物品匹配','virtual-block-device',htmlHandler(`openInteractionItemMatcherModal(${jsString(detail.id)})`),canEdit?'primary':'ghost');
                 }
                 function vbdContainerOpenSummary(t){
                   return `<div class="identity-grid">${row('容器总开关',esc(labelBool(!!t.containerEnabled)))}${row('打开频道',channelCell(t.containerOpenChannel))}${row('容器冷却',esc(formatTicks(t.containerCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastContainerPlayerName||'暂无'))}${row('最近打开时间',esc(nativeTriggerTime(t.lastContainerOpenWallTimeMillis)))}${row('最近事件类型',esc(t.lastContainerEventType||'暂无'))}${row('最近结果',esc(t.lastContainerResult||'暂无'))}</div><p class="muted">容器打开、关闭和内容变化共用 containerEnabled。</p>`;
@@ -1697,23 +1731,7 @@ public final class WebAdminFrontendScripts {
                 }
                 function nativeBlockRuntimeStatus(value){return {ready:'ready / 当前方块可读取',world_unavailable:'世界不可用',chunk_unloaded:'区块未加载',air:'当前位置为空气',block_mismatch:'当前方块与绑定方块不一致'}[String(value||'')]||value||'未知';}
                 function nativeTriggerTime(value){const n=Number(value||0);return n>0?formatDateTime(n):'暂无';}
-                function interactionItemMatcherSummaryHtml(detail){
-                  const data=detail.interactionItemMatcher||{}, matcher=data.matcher||detail.configSummary?.interactionItem||{}, state=matcher.enabled||matcher.configured?'已配置':'未配置';
-                  const count=matcher.countMode==='ignore'?'不检查数量':`${labelCountMode(matcher.countMode)} ${matcher.requiredCount||1}`;
-                  return `<section class="wa-config-card wa-vbd-matcher-config-card" data-vbd-matcher-summary-card="true"><h3>交互物品匹配</h3><div class="identity-grid">${row('状态',esc(data.itemSubmitEnabled?'itemSubmit 已启用，普通 matcher 只读':state))}${row('启用要求',esc(labelBool(!!matcher.enabled)))}${row('物品 ID',esc(matcher.templateItemId||'未设置'))}${row('数量规则',esc(count))}${row('物品来源',esc(matcher.interactionItemSourceDisplayName||labelInteractionSource(matcher.interactionItemSource||matcher.source)))}${row('原版交互',esc(matcher.interactionItemVanillaPolicyDisplayName||labelVanillaPolicy(matcher.interactionItemVanillaPolicy||matcher.vanillaPolicy)))}${row('模板摘要',esc(matcher.templateSummary||'未配置模板'))}</div><p class="muted">7.8 只编辑普通 interaction item matcher；success / fail / interact channel 与 cooldown 仍在类型专属配置中编辑。</p></section>`;
-                }
                 function labelCountMode(value){return {ignore:'不检查数量',at_least:'至少',exactly:'等于',at_most:'至多'}[String(value||'').toLowerCase()]||value||'至少';}
-                function interactionItemMatcherReadonlyCard(detail){
-                  if(detail.interactionItemMatcherError)return errorBlock(detail.interactionItemMatcherError.message||'交互物品匹配加载失败');
-                  const data=detail.interactionItemMatcher||{}, matcher=data.matcher||detail.configSummary?.interactionItem||{};
-                  const locked=lockHeldByOther(data.lockStatus), unsupported=data.matcherEditable===false&&data.unsupportedReason;
-                  const notes=[locked?lockMessage(data.lockStatus,'交互物品匹配'):'',unsupported||'',data.itemSubmitEnabled?'itemSubmit 已启用；普通 interaction item matcher 不参与最终匹配。':''].filter(Boolean);
-                  return `<div class="wa-action-readonly-card" data-vbd-matcher-summary-card="true" data-interaction-item-matcher-card="true">
-                    ${interactionItemMatcherSummaryHtml(detail)}
-                    ${notes.length?`<div class="readonly-note ${unsupported?'danger':''}">${notes.map(esc).join('<br>')}</div>`:''}
-                    <p class="muted">不显示成功 / 失败路径图，不创建 itemSubmit、consume、inventory/equipment matcher 或 ConditionEngine。</p>
-                  </div>`;
-                }
                 function deviceFlowPanel(detail){
                   const cfg=detail.configSummary||{}, item=cfg.interactionItem||{};
                   const nodes=[
@@ -1739,7 +1757,6 @@ public final class WebAdminFrontendScripts {
                   if(appState.deviceBasicConfigEdit&&appState.deviceBasicConfigEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="basic"><header><h3>基础配置</h3><span class="pill warning">enabled / channel</span></header>${stripEditFormShell(deviceBasicConfigForm(detail,appState.deviceBasicConfigEdit))}</section>`);
                   if(appState.deviceExtendedConfigEdit&&appState.deviceExtendedConfigEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="extended"><header><h3>类型专属配置</h3><span class="pill info">extended config</span></header>${stripEditFormShell(deviceExtendedConfigForm(detail,appState.deviceExtendedConfigEdit))}</section>`);
                   if(isVirtualBlockDevice(detail))sections.push(vbdNativeTriggerConfigModalSection(detail));
-                  if(isVirtualBlockDevice(detail)&&appState.interactionItemMatcherEdit&&sameDeviceRef(appState.interactionItemMatcherEdit.deviceId,detail.id))sections.push(interactionItemMatcherForm(detail,appState.interactionItemMatcherEdit,true));
                   if(appState.actionRelayActionsEdit&&appState.actionRelayActionsEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="action-relay-actions" data-action-relay-config-modal-section="true"><header><h3>Action 列表</h3><span class="pill warning">action_relay only</span></header>${actionRelayActionsForm(detail,appState.actionRelayActionsEdit,true)}</section>`);
                   const body=sections.length?sections.join(''):'<div class="readonly-note">当前没有可编辑配置区，可能权限不足或该设备类型不支持编辑。</div>';
                   return `<form class="edit-form wa-unified-config-form" data-unified-device-config="true" onsubmit='event.preventDefault();saveDeviceConfig(${jsString(detail.id)})'>${errors}${body}<p class="muted">保存会按已有安全写链路分别提交有变更的显示信息、基础配置、类型专属配置、virtual_block_device 交互物品匹配和 action_relay Action 列表；不会创建或删除真实方块，也不会创建 itemSubmit、consume、ConditionEngine 或逻辑链图。</p></form>`;
@@ -1841,12 +1858,14 @@ public final class WebAdminFrontendScripts {
                     if(basic&&basic.deviceId===deviceId){
                       const result=await api(`/api/webadmin/device-basic-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:basic.enabled,channel:basic.channel,expectedFingerprint:basic.expectedFingerprint,lockId:basic.lockId})});
                       if(!result.success)return deviceConfigSaveFailed(deviceId,basic,result,'basic');
+                      markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'device_basic_config'}});
                       changed=changed||!!result.changed;appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();
                     }
                     const ext=appState.deviceExtendedConfigEdit;
                     if(ext&&ext.deviceId===deviceId&&ext.lockId){
                       const result=await api(`/api/webadmin/device-extended-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(deviceExtendedConfigPatchBody(ext))});
                       if(!result.success)return deviceConfigSaveFailed(deviceId,ext,result,'extended');
+                      markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'device_extended_config'}});
                       changed=changed||!!result.changed;appState.deviceExtendedConfigEdit=null;stopDeviceExtendedConfigLockHeartbeat();
                     }else if(ext&&ext.deviceId===deviceId){
                       appState.deviceExtendedConfigEdit=null;
@@ -1856,6 +1875,7 @@ public final class WebAdminFrontendScripts {
                       if(actionRelayActionsDirty(actionDraft)){
                         const result=await patchActionRelayActionsDraft(deviceId,actionDraft);
                         if(!result.success)return deviceConfigSaveFailed(deviceId,actionDraft,result,'actionRelayActions');
+                        markChannelOptionsDirty({type:'action_changed',payload:{targetType:'action_relay_actions'}});
                         changed=changed||!!result.changed;
                       }else{
                         await releaseActionRelayActionsLock(actionDraft,true);
@@ -1872,6 +1892,7 @@ public final class WebAdminFrontendScripts {
                         if(interactionItemMatcherDirty(matcherDraft)){
                           const result=await patchInteractionItemMatcherDraft(deviceId,matcherDraft);
                           if(!result.success)return deviceConfigSaveFailed(deviceId,matcherDraft,result,'interactionItemMatcher');
+                          markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'interaction_item_matcher'}});
                           changed=changed||!!result.changed;
                         }else{
                           await releaseInteractionItemMatcherLock(matcherDraft,true);
@@ -1944,27 +1965,23 @@ public final class WebAdminFrontendScripts {
                   const policyAdvanced=!['allow','require_item_match'].includes(String(values.interactionItemVanillaPolicy||'allow'));
                   const sourceControl=sourceAdvanced?`<label>物品来源<input id="matcher-source-readonly" class="input" value="${esc(labelInteractionSource(values.interactionItemSource))}" disabled data-matcher-source-readonly="true"></label>`:`<label>物品来源<select id="matcher-source" data-matcher-source="true" class="select" ${disabled?'disabled':''} onchange='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'>${(draft.allowedSources||[]).map(source=>`<option value="${esc(source)}" ${source===values.interactionItemSource?'selected':''}>${esc(labelInteractionSource(source))}</option>`).join('')}</select></label>`;
                   const policyControl=policyAdvanced?`<label>原版交互策略<input id="matcher-vanilla-policy-readonly" class="input" value="${esc(labelVanillaPolicy(values.interactionItemVanillaPolicy))}" disabled data-matcher-vanilla-policy-readonly="true"></label>`:`<label>原版交互策略<select id="matcher-vanilla-policy" data-matcher-vanilla-policy="true" class="select" ${disabled?'disabled':''} onchange='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'>${(draft.allowedVanillaPolicies||[]).map(policy=>`<option value="${esc(policy)}" ${policy===values.interactionItemVanillaPolicy?'selected':''}>${esc(labelVanillaPolicy(policy))}</option>`).join('')}</select></label>`;
-                  const fields=`<section class="wa-edit-section" data-edit-section="interaction-item-matcher" data-interaction-item-matcher-section="true" data-interaction-item-matcher-config-modal-section="true"><header><h3>交互物品匹配</h3><span class="pill warning">virtual_block_device only</span></header>
+                  const matcherEnabled=!!values.enabled;
+                  const countValueRow=matcherEnabled&&values.countMode!=='ignore'?`<label data-matcher-count-value-row="true" data-visible-when="countMode:not-ignore">数量<input id="matcher-required-count" data-matcher-required-count="true" class="input" type="number" min="1" max="64" step="1" value="${esc(values.requiredCount||1)}" ${disabled?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>`:`<div class="readonly-note" data-matcher-count-ignore-hides-count="true">当前数量规则不检查数量，数量输入已收起。</div>`;
+                  const detailFields=matcherEnabled?`<div class="wa-matcher-detail-fields" data-matcher-enabled-item-id-shown="true">
+                    <label>物品 ID<input id="matcher-template-item-id" data-matcher-template-item-id="true" class="input" maxlength="128" value="${esc(values.templateItemId||'')}" ${disabled?'disabled':''} placeholder="minecraft:diamond" oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
+                    <section class="wa-matcher-option" data-matcher-count-section="true"><header><strong>数量规则</strong><span class="pill ${values.countMode==='ignore'?'info':'ok'}">${esc(labelCountMode(values.countMode))}</span></header><div class="wa-action-editor-grid"><label>数量规则<select id="matcher-count-mode" data-matcher-count-mode="true" class="select" ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'>${(draft.allowedCountModes||[]).map(mode=>`<option value="${esc(mode)}" ${mode===values.countMode?'selected':''}>${esc(labelCountMode(mode))}</option>`).join('')}</select></label>${countValueRow}</div></section>
+                    <section class="wa-matcher-option" data-matcher-damage-section="true"><header><label class="switch-row"><span>匹配 damage</span><input id="matcher-match-damage" data-matcher-match-damage="true" type="checkbox" ${values.matchDamage?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label><span class="pill ${values.matchDamage?'ok':'info'}">${values.matchDamage?'已启用':'未启用'}</span></header>${values.matchDamage?`<label data-matcher-damage-value-row="true" data-visible-when="matchDamage">damage 值<input id="matcher-template-damage" data-matcher-template-damage="true" class="input" type="number" min="0" step="1" value="${esc(values.templateDamage||0)}" ${disabled?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>`:`<p class="muted" data-matcher-damage-value-hidden="true">未启用时不参与匹配，已保存的草稿值会保留。</p>`}</section>
+                    <section class="wa-matcher-option" data-matcher-custom-name-section="true"><header><label class="switch-row"><span>匹配自定义名称</span><input id="matcher-match-custom-name" data-matcher-match-custom-name="true" type="checkbox" ${values.matchCustomName?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label><span class="pill ${values.matchCustomName?'ok':'info'}">${values.matchCustomName?'已启用':'未启用'}</span></header>${values.matchCustomName?`<label data-matcher-custom-name-value-row="true" data-visible-when="matchCustomName">自定义名称<input id="matcher-template-custom-name" data-matcher-template-custom-name="true" class="input" maxlength="128" value="${esc(values.templateCustomName||'')}" ${disabled?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>`:`<p class="muted" data-matcher-custom-name-value-hidden="true">未启用时不检查自定义名称，草稿值保留。</p>`}</section>
+                    <section class="wa-matcher-option" data-matcher-lore-section="true"><header><label class="switch-row"><span>匹配 Lore</span><input id="matcher-match-lore" data-matcher-match-lore="true" type="checkbox" ${values.matchLore?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label><span class="pill ${values.matchLore?'ok':'info'}">${values.matchLore?'已启用':'未启用'}</span></header>${values.matchLore?`<label data-matcher-lore-value-row="true" data-visible-when="matchLore">Lore（每行一条）<textarea id="matcher-template-lore" data-matcher-template-lore="true" data-matcher-match-lore-value="true" maxlength="3000" ${disabled?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'>${esc(lore)}</textarea></label>`:`<p class="muted" data-matcher-lore-value-hidden="true">未启用时不检查 Lore，草稿行会保留。</p>`}</section>
+                    <section class="wa-matcher-option" data-matcher-source-policy-section="true"><header><strong>来源与原版交互</strong><span class="pill info">普通 matcher</span></header><div class="wa-action-editor-grid">${sourceControl}${policyControl}</div></section>
+                  </div>`:`<div class="readonly-note" data-matcher-disabled-fields-collapsed="true">未要求交互物品匹配。详细配置已收起；已有草稿值会保留，重新启用后可继续编辑。</div>`;
+                  const fields=`<section class="wa-edit-section" data-edit-section="interaction-item-matcher" data-interaction-item-matcher-section="true" data-interaction-item-matcher-config-modal-section="true" data-matcher-toggle-preserves-scroll="true"><header><h3>交互物品匹配</h3><span class="pill warning">virtual_block_device only</span></header>
                     ${lockLine}
                     ${draft.itemSubmitEnabled?'<div class="readonly-note danger">当前设备已启用 itemSubmit；7.8 不编辑 itemSubmit 或多物品提交，普通 matcher 只读。</div>':''}
-                    <label class="switch-row"><span>要求交互物品匹配</span><input id="matcher-enabled" data-matcher-enabled="true" type="checkbox" ${values.enabled?'checked':''} ${disabled?'disabled':''} onchange='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
-                    <label>物品 ID<input id="matcher-template-item-id" data-matcher-template-item-id="true" class="input" maxlength="128" value="${esc(values.templateItemId||'')}" ${disabled?'disabled':''} placeholder="minecraft:diamond" oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
-                    <div class="wa-action-editor-grid">
-                      <label>数量规则<select id="matcher-count-mode" data-matcher-count-mode="true" class="select" ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'>${(draft.allowedCountModes||[]).map(mode=>`<option value="${esc(mode)}" ${mode===values.countMode?'selected':''}>${esc(labelCountMode(mode))}</option>`).join('')}</select></label>
-                      <label>数量<input id="matcher-required-count" data-matcher-required-count="true" class="input" type="number" min="1" max="64" step="1" value="${esc(values.requiredCount||1)}" ${disabled||values.countMode==='ignore'?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
-                    </div>
-                    <label class="switch-row"><span>匹配 damage</span><input id="matcher-match-damage" data-matcher-match-damage="true" type="checkbox" ${values.matchDamage?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label>
-                    <label>damage 值<input id="matcher-template-damage" class="input" type="number" min="0" step="1" value="${esc(values.templateDamage||0)}" ${disabled||!values.matchDamage?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
-                    <label class="switch-row"><span>匹配自定义名称</span><input id="matcher-match-custom-name" data-matcher-match-custom-name="true" type="checkbox" ${values.matchCustomName?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label>
-                    <label>自定义名称<input id="matcher-template-custom-name" class="input" maxlength="128" value="${esc(values.templateCustomName||'')}" ${disabled||!values.matchCustomName?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'></label>
-                    <label class="switch-row"><span>匹配 Lore</span><input id="matcher-match-lore" data-matcher-match-lore="true" type="checkbox" ${values.matchLore?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label>
-                    <label>Lore（每行一条）<textarea id="matcher-template-lore" data-matcher-match-lore-value="true" maxlength="3000" ${disabled||!values.matchLore?'disabled':''} oninput='syncInteractionItemMatcherDraftFromForm(${jsString(draft.deviceId)})'>${esc(lore)}</textarea></label>
-                    <div class="wa-action-editor-grid">
-                      ${sourceControl}
-                      ${policyControl}
-                    </div>
+                    <label class="switch-row"><span>要求交互物品匹配</span><input id="matcher-enabled" data-matcher-enabled="true" type="checkbox" ${values.enabled?'checked':''} ${disabled?'disabled':''} onchange='rerenderInteractionItemMatcherEditor(${jsString(draft.deviceId)})'></label>
+                    ${detailFields}
                     ${sourceAdvanced||policyAdvanced?`<p class="readonly-note danger">当前 matcher 使用 7.8 暂不编辑的来源或原版策略，只能只读查看，避免覆盖存量高级配置。</p>`:''}
-                    <div class="identity-grid">${row('交互频道',channelCell(draft.interactChannel))}${row('成功频道',channelCell(draft.matcher?.successChannel))}${row('失败频道',channelCell(draft.matcher?.failChannel))}${row('交互冷却',esc(`${draft.interactionCooldownTicks||0} ticks`))}${row('consume',esc(draft.matcher?.consumeEnabled?'已配置（只读）':'未启用'))}${row('raw component',esc(draft.matcher?.templateComponentsPresent?'存在（只读）':'无'))}</div>
+                    <div class="identity-grid" data-matcher-advanced-readonly-section="true">${row('交互频道',channelCell(draft.interactChannel))}${row('成功频道',channelCell(draft.matcher?.successChannel))}${row('失败频道',channelCell(draft.matcher?.failChannel))}${row('交互冷却',esc(`${draft.interactionCooldownTicks||0} ticks`))}${row('consume',esc(draft.matcher?.consumeEnabled?'已配置（只读）':'未启用'))}${row('raw component',esc(draft.matcher?.templateComponentsPresent?'存在（只读）':'无'))}</div>
                     ${errors}${conflict}
                     <p class="muted" data-interaction-item-matcher-no-raw-json="true">本阶段不会打开 raw JSON / NBT / data component 编辑器，不会创建 itemSubmit、consume、inventory/equipment matcher、ConditionEngine 或成功/失败路径图。</p>
                   </section>`;
@@ -1976,23 +1993,27 @@ public final class WebAdminFrontendScripts {
                   if(!document.getElementById('matcher-enabled'))return;
                   const v=draft.values||{};
                   v.enabled=!!document.getElementById('matcher-enabled')?.checked;
-                  v.templateItemId=document.getElementById('matcher-template-item-id')?.value||'';
-                  v.countMode=document.getElementById('matcher-count-mode')?.value||'at_least';
-                  v.requiredCount=Number(document.getElementById('matcher-required-count')?.value||1);
+                  v.templateItemId=document.getElementById('matcher-template-item-id')?.value ?? v.templateItemId ?? '';
+                  v.countMode=document.getElementById('matcher-count-mode')?.value||v.countMode||'at_least';
+                  v.requiredCount=Number(document.getElementById('matcher-required-count')?.value ?? v.requiredCount ?? 1);
                   v.matchDamage=!!document.getElementById('matcher-match-damage')?.checked;
-                  v.templateDamage=Number(document.getElementById('matcher-template-damage')?.value||0);
+                  v.templateDamage=Number(document.getElementById('matcher-template-damage')?.value ?? v.templateDamage ?? 0);
                   v.matchCustomName=!!document.getElementById('matcher-match-custom-name')?.checked;
-                  v.templateCustomName=document.getElementById('matcher-template-custom-name')?.value||'';
+                  v.templateCustomName=document.getElementById('matcher-template-custom-name')?.value ?? v.templateCustomName ?? '';
                   v.matchLore=!!document.getElementById('matcher-match-lore')?.checked;
-                  v.templateLore=String(document.getElementById('matcher-template-lore')?.value||'').split('\\n').map(line=>line.trim()).filter(Boolean);
+                  if(document.getElementById('matcher-template-lore'))v.templateLore=String(document.getElementById('matcher-template-lore')?.value||'').split('\\n').map(line=>line.trim()).filter(Boolean);
+                  else v.templateLore=Array.isArray(v.templateLore)?v.templateLore:[];
                   v.interactionItemSource=document.getElementById('matcher-source')?.value||v.interactionItemSource||'main_hand';
                   v.interactionItemVanillaPolicy=document.getElementById('matcher-vanilla-policy')?.value||v.interactionItemVanillaPolicy||'allow';
                   draft.values=v;appState.interactionItemMatcherEdit=draft;
                 }
                 function interactionItemMatcherPatchBody(draft){const v=normalizeInteractionItemMatcherDraftData(draft.values||{});return {enabled:v.enabled,templateItemId:v.templateItemId,countMode:v.countMode,requiredCount:v.requiredCount,matchDamage:v.matchDamage,templateDamage:v.templateDamage,matchCustomName:v.matchCustomName,templateCustomName:v.templateCustomName,matchLore:v.matchLore,templateLore:v.templateLore,interactionItemSource:v.interactionItemSource,interactionItemVanillaPolicy:v.interactionItemVanillaPolicy,expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''};}
                 async function patchInteractionItemMatcherDraft(deviceId,draft){return await api(`/api/webadmin/interaction-item-matcher/${encodeURIComponent(deviceApiRef(deviceId))}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify(interactionItemMatcherPatchBody(draft))});}
-                async function saveInteractionItemMatcher(deviceId){const draft=appState.interactionItemMatcherEdit;if(!draft||!draft.lockId){toast('当前交互物品匹配只读。');return;}syncInteractionItemMatcherDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.interactionItemMatcherEdit=draft;rerenderInteractionItemMatcherEditor(deviceId);try{const result=await patchInteractionItemMatcherDraft(deviceId,draft);if(result.success){appState.interactionItemMatcherEdit=null;stopInteractionItemMatcherLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'交互物品匹配已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code)){draft.lockId='';draft.lock=null;stopInteractionItemMatcherLockHeartbeat();}appState.interactionItemMatcherEdit=draft;toast(result.message||'保存失败');rerenderInteractionItemMatcherEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.interactionItemMatcherEdit=draft;toast(err.message||'保存失败');rerenderInteractionItemMatcherEditor(deviceId);}}
-                function rerenderInteractionItemMatcherEditor(deviceId){const draft=appState.interactionItemMatcherEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;syncInteractionItemMatcherDraftFromForm(deviceId);if(appState.deviceConfigEdit&&sameDeviceRef(appState.deviceConfigEdit.deviceId,deviceId))showDeviceConfigEditModal(draft.deviceId);else showInteractionItemMatcherModal(draft.deviceId);}
+                async function saveInteractionItemMatcher(deviceId){const draft=appState.interactionItemMatcherEdit;if(!draft||!draft.lockId){toast('当前交互物品匹配只读。');return;}syncInteractionItemMatcherDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.interactionItemMatcherEdit=draft;rerenderInteractionItemMatcherEditor(deviceId);try{const result=await patchInteractionItemMatcherDraft(deviceId,draft);if(result.success){markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'interaction_item_matcher'}});appState.interactionItemMatcherEdit=null;stopInteractionItemMatcherLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'交互物品匹配已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code)){draft.lockId='';draft.lock=null;stopInteractionItemMatcherLockHeartbeat();}appState.interactionItemMatcherEdit=draft;toast(result.message||'保存失败');rerenderInteractionItemMatcherEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.interactionItemMatcherEdit=draft;toast(err.message||'保存失败');rerenderInteractionItemMatcherEditor(deviceId);}}
+                function captureModalScrollState(){const body=document.querySelector('#wa-modal-root .wa-modal-body'), active=document.activeElement;return {scrollTop:body?body.scrollTop:0,activeId:active&&active.id?active.id:'',selectionStart:active&&typeof active.selectionStart==='number'?active.selectionStart:null,selectionEnd:active&&typeof active.selectionEnd==='number'?active.selectionEnd:null};}
+                function restoreModalScrollState(state){requestAnimationFrame(()=>{const body=document.querySelector('#wa-modal-root .wa-modal-body');if(body&&state)body.scrollTop=state.scrollTop||0;const active=state&&state.activeId?document.getElementById(state.activeId):null;if(active&&typeof active.focus==='function'){active.focus({preventScroll:true});if(state.selectionStart!==null&&typeof active.setSelectionRange==='function')active.setSelectionRange(state.selectionStart,state.selectionEnd);}});}
+                function withPreservedModalScroll(work){const state=captureModalScrollState();work();restoreModalScrollState(state);}
+                function rerenderInteractionItemMatcherEditor(deviceId){const draft=appState.interactionItemMatcherEdit;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;withPreservedModalScroll(()=>{syncInteractionItemMatcherDraftFromForm(deviceId);if(appState.deviceConfigEdit&&sameDeviceRef(appState.deviceConfigEdit.deviceId,deviceId)){applyDeviceConfigDraftsFromForm(deviceId);showDeviceConfigEditModal(draft.deviceId);}else showInteractionItemMatcherModal(draft.deviceId);});}
                 async function reloadInteractionItemMatcherAfterConflict(deviceId){try{await releaseInteractionItemMatcherLock(appState.interactionItemMatcherEdit,true);await prepareInteractionItemMatcherDraft(deviceId,true);rerenderInteractionItemMatcherEditor(deviceId);}catch(err){toast(err.message||'交互物品匹配重新加载失败');}}
                 function scheduleInteractionItemMatcherLockHeartbeat(){stopInteractionItemMatcherLockHeartbeat();appState.interactionItemMatcherLockTimer=setTimeout(async()=>{await heartbeatInteractionItemMatcherLock();if(appState.interactionItemMatcherEdit?.lockId)scheduleInteractionItemMatcherLockHeartbeat();},30000);}
                 function stopInteractionItemMatcherLockHeartbeat(){if(appState.interactionItemMatcherLockTimer){clearTimeout(appState.interactionItemMatcherLockTimer);appState.interactionItemMatcherLockTimer=null;}}
@@ -2112,7 +2133,7 @@ public final class WebAdminFrontendScripts {
                 function selectActionRelayActionChannel(deviceId,index,channel){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;syncActionRelayActionsDraftFromForm(deviceId);draft.actions[index].value=channel||'';draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};draft.channelComboOpen[index]=false;draft.channelComboIndex[index]=0;resetChannelComboQuery(draft,index);const input=document.getElementById(`ara-${index}-value`);if(input)input.value=draft.actions[index].value;const hint=document.getElementById(`ara-${index}-channel-hint`);if(hint)hint.innerHTML=channelHintHtml(draft.actions[index].value,draft.channelOptions||appState.channelOptions||[],draft.channelOptionsError||appState.channelOptionsError);syncActionRelayChannelCombo(deviceId,index);}
                 function handleActionRelayActionChannelKey(event,deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId)return;draft.channelComboOpen=draft.channelComboOpen||{};draft.channelComboIndex=draft.channelComboIndex||{};const options=filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,index));if(event.key==='Escape'){event.preventDefault();event.stopPropagation();draft.channelComboOpen[index]=false;syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();draft.channelComboOpen[index]=true;const max=Math.max(0,options.length-1), next=event.key==='ArrowDown'?Number((draft.channelComboIndex||{})[index]||0)+1:Number((draft.channelComboIndex||{})[index]||0)-1;draft.channelComboIndex[index]=Math.min(max,Math.max(0,next));syncActionRelayChannelCombo(deviceId,index);return;}if(event.key==='Enter'&&draft.channelComboOpen[index]&&options.length>0){event.preventDefault();selectActionRelayActionChannel(deviceId,index,options[Math.min(options.length-1,Number(draft.channelComboIndex[index]||0))].channel);}}
                 function syncActionRelayChannelCombo(deviceId,index){const draft=appState.actionRelayActionsEdit;if(!draft||draft.deviceId!==deviceId||index===null||index===undefined)return;const combo=document.getElementById(`ara-${index}-channel-combo`), menu=document.getElementById(`ara-${index}-channel-menu`), input=document.getElementById(`ara-${index}-value`);if(combo)combo.classList.toggle('open',!!(draft.channelComboOpen||{})[index]);if(input)input.setAttribute('aria-expanded',(draft.channelComboOpen||{})[index]?'true':'false');if(menu)menu.innerHTML=actionRelayChannelOptionsHtml(deviceId,index,draft);}
-                async function saveActionRelayActions(deviceId){const draft=appState.actionRelayActionsEdit||{deviceId,errors:[]};syncActionRelayActionsDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.actionRelayActionsEdit=draft;rerenderActionRelayActionsEditor(deviceId);try{const result=await patchActionRelayActionsDraft(deviceId,draft);if(result.success){appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'Action 列表已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();toast(result.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];draft.conflict=null;appState.actionRelayActionsEdit=draft;toast(err.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}}
+                async function saveActionRelayActions(deviceId){const draft=appState.actionRelayActionsEdit||{deviceId,errors:[]};syncActionRelayActionsDraftFromForm(deviceId);draft.saving=true;draft.errors=[];draft.conflict=null;appState.actionRelayActionsEdit=draft;rerenderActionRelayActionsEditor(deviceId);try{const result=await patchActionRelayActionsDraft(deviceId,draft);if(result.success){markChannelOptionsDirty({type:'action_changed',payload:{targetType:'action_relay_actions'}});appState.actionRelayActionsEdit=null;stopActionRelayActionsLockHeartbeat();appState.modalCloseHandler=null;await dismissWebAdminModal();toast(result.changed?(result.message||'Action 列表已保存。'):'没有变更。');await refreshCurrentDeviceContext(deviceId);return;}draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.code==='conflict_detected'?result.conflict||{remote:true}:null;appState.actionRelayActionsEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopActionRelayActionsLockHeartbeat();toast(result.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];draft.conflict=null;appState.actionRelayActionsEdit=draft;toast(err.message||'保存失败');rerenderActionRelayActionsEditor(deviceId);}}
                 async function patchActionRelayActionsDraft(deviceId,draft){return await api(`/api/webadmin/action-relay-actions/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({deviceId,actions:(draft.actions||[]).map(normalizeActionRelayDraftAction),expectedFingerprint:draft.expectedFingerprint||'',lockId:draft.lockId||''})});}
                 async function reloadActionRelayActionsAfterConflict(deviceId){try{await releaseActionRelayActionsLock(appState.actionRelayActionsEdit,true);await prepareActionRelayActionsDraft(deviceId,true);rerenderActionRelayActionsEditor(deviceId);}catch(err){toast(err.message||'Action 列表重新加载失败');}}
                 function scheduleActionRelayActionsLockHeartbeat(){stopActionRelayActionsLockHeartbeat();appState.actionRelayActionsLockTimer=setTimeout(async()=>{await heartbeatActionRelayActionsLock();if(appState.actionRelayActionsEdit)scheduleActionRelayActionsLockHeartbeat();},30000);}
@@ -2403,7 +2424,7 @@ public final class WebAdminFrontendScripts {
                   draft.saving=true;draft.errors=[];draft.conflict=null;appState.deviceBasicConfigEdit=draft;renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});
                   try{
                     const result=await api(`/api/webadmin/device-basic-config/${encodeURIComponent(deviceId)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
-                    if(result.success){appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备基础配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
+                    if(result.success){markChannelOptionsDirty({type:'device_config_changed',payload:{targetType:'device_basic_config'}});appState.deviceBasicConfigEdit=null;stopDeviceBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'设备基础配置已保存。'):'没有变更。');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});return;}
                     draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.deviceBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopDeviceBasicConfigLockHeartbeat();toast(result.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceBasicConfigEditModal(deviceId);
                   }catch(err){
                     draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.deviceBasicConfigEdit=draft;toast(err.message||'保存失败');await renderDeviceDetail(currentDeviceRouteArg(deviceId),{silent:true});showDeviceBasicConfigEditModal(deviceId);
@@ -2778,6 +2799,7 @@ public final class WebAdminFrontendScripts {
                 async function renderSignals(options={}){
                   if(!options.silent)setView(loading('正在加载 Signal 频道...'));
                   let channels;try{channels=await api('/api/signals/channels')}catch(err){if(options.silent){toast('Signal 频道实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  storeSignalChannelOptions(channels);
                   appState.signals=channels||[];
                   renderSignalList('',options);
                 }
@@ -3030,7 +3052,7 @@ public final class WebAdminFrontendScripts {
                   draft.saving=true;draft.errors=[];draft.conflict=null;appState.signalListenerBasicConfigEdit=draft;route({silent:true});
                   try{
                     const result=await api(`/api/webadmin/signal-listener-basic-config/${encodeURIComponent(ref)}`,{method:'PATCH',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({enabled:draft.enabled,channel:draft.channel,cooldownTicks:Number(draft.cooldownTicks),expectedFingerprint:draft.expectedFingerprint,lockId:draft.lockId})});
-                    if(result.success){appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'Signal Listener 基础配置已保存。'):'没有变更。');await route({silent:true});return;}
+                    if(result.success){markChannelOptionsDirty({type:'signal_listener_config_changed'});appState.signalListenerBasicConfigEdit=null;stopSignalListenerBasicConfigLockHeartbeat();await dismissWebAdminModal();toast(result.changed?(result.message||'Signal Listener 基础配置已保存。'):'没有变更。');await route({silent:true});return;}
                     draft.saving=false;draft.errors=result.validationErrors&&result.validationErrors.length?result.validationErrors:[{message:result.message||'保存失败'}];draft.conflict=result.conflict||null;appState.signalListenerBasicConfigEdit=draft;if(['edit_lock_expired','edit_lock_conflict','edit_lock_required'].includes(result.code))stopSignalListenerBasicConfigLockHeartbeat();toast(result.message||'保存失败');await route({silent:true});showSignalListenerBasicConfigEditModal(ref,routeChannel||draft.routeChannel||draft.channel||'');
                   }catch(err){draft.saving=false;draft.errors=[{message:err.message||'保存失败'}];appState.signalListenerBasicConfigEdit=draft;toast(err.message||'保存失败');await route({silent:true});showSignalListenerBasicConfigEditModal(ref,routeChannel||draft.routeChannel||draft.channel||'');}
                 }
@@ -3061,7 +3083,6 @@ public final class WebAdminFrontendScripts {
                   appState.regionFilters=appState.regionFilters||{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};
                   appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
                   appState.advancedDetailOpen=appState.advancedDetailOpen||{};
-                  appState.vbdNativeTriggerFilters=appState.vbdNativeTriggerFilters||{};
                   if(appState.selectionCreateVirtualBlock===undefined)appState.selectionCreateVirtualBlock=null;
                   if(appState.virtualBlockDelete===undefined)appState.virtualBlockDelete=null;
                   if(appState.signalListenerCreate===undefined)appState.signalListenerCreate=null;
@@ -3398,6 +3419,7 @@ public final class WebAdminFrontendScripts {
                 async function renderSignals(options={}){
                   if(!options.silent)setView(loading('正在加载 SignalBridge...'));
                   let channels;try{channels=await api('/api/signals/channels')}catch(err){if(options.silent){toast('SignalBridge 实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message));return;}
+                  storeSignalChannelOptions(channels);
                   appState.signals=channels||[];
                   renderSignalList('',options);
                 }

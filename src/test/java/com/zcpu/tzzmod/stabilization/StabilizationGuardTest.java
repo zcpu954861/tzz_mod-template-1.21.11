@@ -1162,7 +1162,7 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/selection/cancel')) return { success:true, targetType:'OBJECT_SELECTION', targetId:'sel-1', changed:true, message:'选择已取消。', data:{ selection:{ selectionId:'sel-1', targetPlayerName:'Owner', status:'cancelled', channel:'test.channel' } } };
                   if (url.startsWith('/api/webadmin/selection/status')) return { active:true, selectionId:'sel-1', status:'active', purpose:'create_virtual_block_device', targetPlayerName:'Owner', channel:'test.channel' };
                   if (url.startsWith('/api/webadmin/online-players')) return [{ name:'Owner', uuid:'00000000-0000-0000-0000-000000000001' }, { name:'Builder', uuid:'00000000-0000-0000-0000-000000000002' }];
-                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:true, writeApiEnabled:false, p1NoNativeTriggerWriteApi:true, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], defaultSelectedTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / powered 状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP1:['nativeTriggerWriteApi','itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea'] };
+                  if (url.startsWith('/api/webadmin/virtual-block-devices/') && url.endsWith('/native-triggers')) return { deviceId:'vdev-1', deviceType:'VIRTUAL_BLOCK_DEVICE', displayName:'Virtual', supported:true, readOnly:true, writeApiEnabled:false, p1NoNativeTriggerWriteApi:true, availableTriggerTypes:['redstone_powered','blockstate','right_click','container_open','container_close','container_change'], activeTriggerTypes:['redstone_powered','blockstate','right_click'], boundBlock:{dimension:'minecraft:overworld', pos:{x:3,y:64,z:4}, expectedBlockId:'minecraft:lever', actualBlockId:'minecraft:lever', status:'ready', worldAvailable:true, chunkLoaded:true, supportedPropertyCount:2}, triggers:{ redstone_powered:{type:'redstone_powered',label:'红石 / 受电状态',enabled:true,configured:true,mode:'redstone_both',modeDisplayName:'通电和断电都触发（redstone_both）',channel:'test.channel',offChannel:'off.channel',lastPowered:true,lastPowerLevel:15,currentPowered:true,currentPowerLevel:15,blockStatePowered:true,lastTriggerResult:'SUCCESS'}, blockstate:{type:'blockstate',label:'BlockState 条件',enabled:true,configured:true,conditionEnabled:true,conditionBlockId:'minecraft:lever',conditionProperties:{powered:'true'},conditionRaw:'powered=true',conditionMode:'condition_enter',conditionModeDisplayName:'进入条件时触发（condition_enter）',lastConditionMatched:true,lastConditionResult:'SUCCESS',runtimeState:'ready',supportedPropertyCount:2,propertiesFromBoundBlock:true,allowedValuesFromBoundBlock:true,currentMatched:true,supportedProperties:[{name:'powered',kind:'boolean',currentValue:'true',allowedValues:['true','false'],targetValue:'true',targetMatched:true,selectedInCondition:true},{name:'face',kind:'enum',currentValue:'wall',allowedValues:['floor','wall','ceiling'],targetValue:'',targetMatched:false,selectedInCondition:false}],validationIssues:[]}, right_click:{type:'right_click',label:'玩家右键交互',enabled:true,configured:true,interactionEnabled:true,interactChannel:'test.channel',interactionCooldownTicks:5,lastInteractionPlayerName:'Owner',lastInteractionResult:'SUCCESS',interactionItemMatcherLayer:{enabled:true,configured:true,templateItemId:'minecraft:stick',summary:'minecraft:stick x1'},conditionLayerNote:'interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。'}, container_open:{type:'container_open',label:'容器打开',enabled:false,configured:false,containerEnabled:false,containerOpenChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_close:{type:'container_close',label:'容器关闭',enabled:false,configured:false,containerEnabled:false,containerCloseChannel:'',containerCooldownTicks:0,lastContainerResult:''}, container_change:{type:'container_change',label:'容器内容变化',enabled:false,configured:false,containerEnabled:false,containerChangeChannel:'',containerCooldownTicks:0,containerChangeCheckIntervalTicks:10,itemConditionCount:0,itemConditions:[],templateEditorPhase:'7.9 P3',lastContainerResult:''} }, forbiddenInP1:['nativeTriggerWriteApi','itemSubmit','consume','conditionEngine','successFailPathGraph','scratchLikeEditor','rawJsonTextarea'] };
                   if (url.startsWith('/api/webadmin/virtual-block-devices/')) return { success:true, targetType:'VIRTUAL_BLOCK_DEVICE', targetId:'vdev-1', changed:true, message:'虚拟方块设备已删除 / 解绑，世界方块未被破坏。', data:{ deviceId:'vdev-1', routeTarget:'#/virtual-block-devices' } };
                   if (url === '/api/webadmin/signal-listeners') return { success:true, targetType:'SIGNAL_LISTENER', targetId:'new-listener', changed:true, message:'Signal Listener 已创建。', data:{ listenerId:'new-listener', routeTarget:'#/listeners/new-listener?returnTo=%23%2Flisteners' } };
                   if (url.startsWith('/api/webadmin/signal-listeners/')) return { success:true, targetType:'SIGNAL_LISTENER', targetId:'test-listener', changed:true, message:'Signal Listener 已删除。', data:{ listenerId:'test-listener', routeTarget:'#/listeners' } };
@@ -2483,26 +2483,37 @@ public final class StabilizationGuardTest {
         requireContains(writeFoundation, "interactionItemMatcherWriteEnabled", "7.8 write foundation exposes matcher capability");
 
         for (String marker : List.of(
-                "data-vbd-matcher-summary-card=\"true\"",
-                "data-vbd-matcher-side-card=\"true\"",
-                "data-detail-side-card=\"interaction-item-matcher\"",
                 "data-vbd-config-summary=\"true\"",
-                "wa-vbd-matcher-config-card",
                 "openInteractionItemMatcherModal",
                 "openInteractionItemMatcherReadonlyModal",
                 "data-interaction-item-matcher-modal=\"true\"",
                 "data-interaction-item-matcher-config-modal-section=\"true\"",
                 "data-matcher-enabled=\"true\"",
+                "data-matcher-disabled-fields-collapsed=\"true\"",
+                "data-matcher-enabled-item-id-shown=\"true\"",
                 "data-matcher-template-item-id=\"true\"",
+                "data-matcher-count-section=\"true\"",
                 "data-matcher-count-mode=\"true\"",
                 "data-matcher-required-count=\"true\"",
+                "data-matcher-count-ignore-hides-count=\"true\"",
                 "data-matcher-match-damage=\"true\"",
+                "data-matcher-damage-value-row=\"true\"",
+                "data-matcher-damage-value-hidden=\"true\"",
+                "data-matcher-template-damage=\"true\"",
                 "data-matcher-match-custom-name=\"true\"",
+                "data-matcher-custom-name-value-row=\"true\"",
+                "data-matcher-custom-name-value-hidden=\"true\"",
+                "data-matcher-template-custom-name=\"true\"",
                 "data-matcher-match-lore=\"true\"",
+                "data-matcher-lore-value-row=\"true\"",
+                "data-matcher-lore-value-hidden=\"true\"",
+                "data-matcher-template-lore=\"true\"",
                 "data-matcher-source=\"true\"",
                 "data-matcher-source-readonly=\"true\"",
                 "data-matcher-vanilla-policy=\"true\"",
                 "data-matcher-vanilla-policy-readonly=\"true\"",
+                "data-matcher-source-policy-section=\"true\"",
+                "data-matcher-advanced-readonly-section=\"true\"",
                 "saveInteractionItemMatcher",
                 "interactionItemMatcherDirty",
                 "modalSnapshot(kind,draft)",
@@ -2514,6 +2525,24 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(js + matcherService, marker, "7.8 matcher frontend/security marker present: " + marker);
         }
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-summary=\"true\"", "7.8 matcher summary is nested inside the 7.9 right-click native trigger summary");
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"", "unified config modal opens matcher editing from the native trigger interaction context");
+        requireContains(js, "data-vbd-native-trigger-matcher-disabled-warning=\"true\"", "matcher configured while right-click trigger disabled is warned inside interaction summary");
+        requireContains(js, "data-vbd-native-trigger-interaction-matcher-entry=\"true\"", "7.8 matcher entry remains available from the 7.9 right-click trigger context");
+        requireContains(js, "interactionItemMatcherForm(detail,appState.interactionItemMatcherEdit,true)", "unified device config modal reuses the same conditional matcher UI");
+        requireContains(js, "document.getElementById('matcher-template-item-id')?.value ?? v.templateItemId", "hidden matcher fields preserve draft values when collapsed");
+        requireContains(js, "document.getElementById('matcher-template-lore'))v.templateLore", "hidden matcher lore preserves draft values when collapsed");
+        requireContains(js, "interactionItemMatcherPatchBody(draft)", "matcher patch body stays scoped to ordinary editable fields");
+        requireContains(js, "withPreservedModalScroll", "unified config modal preserves scroll when matcher sections rerender");
+        requireContains(js, "restoreModalScrollState", "modal scroll state is restored after matcher expand/collapse");
+        requireContains(js, "data-matcher-toggle-preserves-scroll=\"true\"", "matcher toggle scroll preservation marker exists");
+        requireFalse(js.contains("data-vbd-matcher-side-card=\"true\"") || js.contains("data-detail-side-card=\"interaction-item-matcher\"")
+                        || js.contains("wa-vbd-matcher-config-card") || js.contains("data-vbd-matcher-summary-card=\"true\""),
+                "VBD detail no longer renders a standalone interaction item matcher card");
+        requireFalse(js.contains("successChannel:v.") || js.contains("failChannel:v.") || js.contains("consumeEnabled:v.")
+                        || js.contains("templateCustomData:v.") || js.contains("templateComponents:v.")
+                        || js.contains("itemSubmitRequirements:v."),
+                "matcher patch body does not send preserved advanced/itemSubmit/consume fields");
         requireFalse(js.contains("itemSubmitEditor") || js.contains("saveItemSubmit") || js.contains("consumeEditor")
                         || js.contains("inventoryMatcherEditor") || js.contains("equipmentMatcherEditor")
                         || js.contains("conditionEngineEditor") || js.contains("successFailPathGraph"),
@@ -2528,6 +2557,7 @@ public final class StabilizationGuardTest {
         String manual = Files.readString(root.resolve("docs/test/测试_7.9_WebAdmin虚拟方块设备原生触发配置P1验收.md"), StandardCharsets.UTF_8);
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
         String js = WebAdminFrontendAssets.appJs();
         String css = WebAdminFrontendStyles.appCss();
 
@@ -2536,7 +2566,7 @@ public final class StabilizationGuardTest {
                 "7.9 P1",
                 "7.9 P2",
                 "7.9 P3",
-                "红石 / powered 状态",
+                "红石 / 受电状态",
                 "BlockState 条件",
                 "玩家右键交互",
                 "容器打开",
@@ -2554,8 +2584,10 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "触发方式选择器",
-                "只显示选中触发摘要",
+                "无手动触发方式选择器",
+                "只显示 active 触发摘要",
+                "右侧 detail / secondary column",
+                "channel catalog 与 combobox 来源一致",
                 "红石摘要",
                 "BlockState 属性读取",
                 "容器 open / close / change 摘要",
@@ -2564,6 +2596,23 @@ public final class StabilizationGuardTest {
                 "Console / Network"
         )) {
             requireContains(manual, marker, "7.9 P1 manual acceptance marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "native trigger compact cards",
+                "readonly native trigger detail modal",
+                "matcher toggle preserves modal scroll",
+                "详情页直接展开长篇完整字段",
+                "只读详情出现保存按钮 / edit lock",
+                "滚动位置跳回顶部或底部"
+        )) {
+            requireContains(manual, marker, "7.9 P1 compact trigger / scroll acceptance marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "interaction item matcher 必须完全隐藏，除非右键交互触发已启用或已选中",
+                "matcher 必须纳入“玩家右键交互”配置区域内",
+                "P1 暂时允许保留现有 matcher 编辑入口"
+        )) {
+            requireContains(context, marker, "7.9 P2 matcher hidden-until-interaction rule recorded: " + marker);
         }
 
         for (String marker : List.of(
@@ -2580,6 +2629,15 @@ public final class StabilizationGuardTest {
                 "7.9 P1 does not add native trigger write request or write handler");
 
         for (String marker : List.of(
+                "knownChannels(server, devices, listeners, regions)",
+                "addActionRelayActionChannels",
+                "SignalDeviceStore.getLoadedActionRelay",
+                "countSignalActionsTo(relay.actions(), channel)"
+        )) {
+            requireContains(signalService, marker, "signal channel catalog includes loaded action relay signal action target: " + marker);
+        }
+
+        for (String marker : List.of(
                 "SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE",
                 "writeApiEnabled\", false",
                 "p1NoNativeTriggerWriteApi",
@@ -2589,6 +2647,7 @@ public final class StabilizationGuardTest {
                 "container_open",
                 "container_close",
                 "container_change",
+                "activeTriggerTypes",
                 "VirtualBlockDeviceSupport.powerState",
                 "world.isChunkLoaded(pos)",
                 "state.getProperties()",
@@ -2604,8 +2663,8 @@ public final class StabilizationGuardTest {
         for (String marker : List.of(
                 "/api/webadmin/virtual-block-devices/${canonicalEncoded}/native-triggers",
                 "data-vbd-native-trigger-area=\"true\"",
-                "data-vbd-native-trigger-selector=\"true\"",
-                "data-vbd-native-trigger-option=\"",
+                "data-vbd-native-trigger-side-card=\"true\"",
+                "data-detail-side-card=\"vbd-native-triggers\"",
                 "redstone_powered",
                 "blockstate",
                 "right_click",
@@ -2613,14 +2672,35 @@ public final class StabilizationGuardTest {
                 "container_close",
                 "container_change",
                 "data-vbd-native-trigger-summary-selected=\"true\"",
-                "data-vbd-native-trigger-summary-active=\"",
+                "data-vbd-native-trigger-summary-active=\"true\"",
+                "data-vbd-native-trigger-compact-card=\"true\"",
+                "data-vbd-native-trigger-card-summary=\"true\"",
+                "data-vbd-native-trigger-card-type=\"",
+                "data-vbd-native-trigger-card-click=\"readonly-detail\"",
+                "openVbdNativeTriggerReadonlyModal",
+                "vbdNativeTriggerCompactCard",
+                "vbdNativeTriggerReadonlyDetail",
+                "data-vbd-native-trigger-readonly-modal=\"true\"",
+                "data-vbd-native-trigger-readonly-detail=\"true\"",
+                "data-vbd-native-trigger-detail-modal-body=\"true\"",
+                "data-vbd-native-trigger-readonly-no-save=\"true\"",
+                "data-vbd-native-trigger-readonly-no-edit-lock=\"true\"",
+                "data-vbd-native-trigger-detail-no-dirty-guard=\"true\"",
+                "data-vbd-native-trigger-detail-no-write-request=\"true\"",
+                "data-vbd-native-trigger-compact-empty-state=\"true\"",
+                "data-vbd-native-trigger-summary-data-driven=\"true\"",
+                "data-vbd-native-trigger-no-manual-selector=\"true\"",
+                "data-vbd-native-trigger-empty-state=\"true\"",
                 "data-vbd-native-blockstate-properties-from-bound-block=\"true\"",
                 "data-vbd-native-blockstate-allowed-values=\"true\"",
                 "data-vbd-native-trigger-config-modal-section=\"true\"",
                 "data-vbd-native-trigger-readonly=\"true\"",
                 "data-vbd-native-trigger-no-write-api=\"true\"",
                 "data-vbd-native-trigger-no-raw-json=\"true\"",
-                "vbdNativeTriggerSelector",
+                "data-vbd-native-trigger-interaction-matcher-summary=\"true\"",
+                "data-vbd-native-trigger-interaction-matcher-inline-edit=\"true\"",
+                "data-vbd-native-trigger-matcher-disabled-warning=\"true\"",
+                "activeVbdNativeTriggerTypes",
                 "vbdNativeTriggerConfigModalSection",
                 "vbdBlockStatePropertyList",
                 "vbdInteractionTriggerSummary"
@@ -2628,18 +2708,30 @@ public final class StabilizationGuardTest {
             requireContains(js, marker, "7.9 P1 native trigger frontend marker present: " + marker);
         }
         for (String marker : List.of(
-                ".wa-native-trigger-selector",
                 ".wa-native-trigger-grid",
+                ".wa-native-trigger-compact-card",
                 ".wa-native-trigger-summary",
-                ".wa-native-property-list",
-                ".wa-native-trigger-chip"
+                ".wa-native-property-list"
         )) {
             requireContains(css, marker, "7.9 P1 native trigger responsive style marker present: " + marker);
         }
-        requireFalse(js.contains("saveVbdNativeTrigger") || js.contains("nativeTriggerPatchBody") || js.contains("native-trigger-json"),
+        requireFalse(js.contains("data-vbd-native-trigger-selector") || js.contains("data-vbd-native-trigger-option")
+                        || js.contains("vbdNativeTriggerSelector") || js.contains("vbdNativeTriggerFilters")
+                        || css.contains(".wa-native-trigger-selector") || css.contains(".wa-native-trigger-chip"),
+                "7.9 P1 does not render manual native trigger selector/filter controls");
+        requireFalse(js.contains("data-vbd-native-trigger-summary-active=\"false\"") || js.contains("请选择要查看的触发方式"),
+                "7.9 P1 hides unconfigured native trigger cards and uses empty state instead");
+        requireFalse(js.contains("data-vbd-native-trigger-summary-active=\"true\"><header") && js.contains("vbdRedstoneSummary(trigger)"),
+                "VBD detail should not inline fully expanded native trigger detail fields");
+        requireFalse(css.contains(".wa-vbd-matcher-config-card"),
+                "7.9 P1 no longer keeps standalone interaction matcher summary card styling");
+        requireFalse(js.contains("saveVbdNativeTrigger") || js.contains("nativeTriggerPatchBody") || js.contains("native-trigger-json")
+                        || js.contains("startVbdNativeTriggerEdit") || js.contains("acquireVbdNativeTriggerEditLock")
+                        || js.contains("virtual_block_device_triggers") || js.contains("data-vbd-native-trigger-save"),
                 "7.9 P1 frontend does not expose native trigger save or raw JSON editing");
         requireFalse(js.contains("itemSubmitEditor") || js.contains("consumeEditor") || js.contains("conditionEngineEditor")
-                        || js.contains("scratchLikeNativeTriggerEditor"),
+                        || js.contains("scratchLikeNativeTriggerEditor") || js.contains("successFailPathGraph")
+                        || js.contains("pathVisualization") || js.contains("nativeTriggerGraph") || js.contains("mindMap"),
                 "7.9 P1 does not expose itemSubmit/consume/ConditionEngine/Scratch-like native trigger editors");
     }
 
@@ -3312,6 +3404,12 @@ public final class StabilizationGuardTest {
         requireContains(js, "resetChannelComboQuery", "channel combobox resets search query when opening from a prefilled value");
         requireContains(js, "markChannelOptionsDirty(data)", "realtime channel/device changes invalidate the channel option cache");
         requireContains(js, "appState.channelOptionsDirty=true", "channel option cache marks dirty after related realtime events");
+        requireContains(js, "storeSignalChannelOptions(await api('/api/signals/channels'))", "channel combobox and Signal page share the same channel catalog loader");
+        requireContains(js, "storeSignalChannelOptions(channels)", "Signal page refresh updates combobox channel option cache");
+        requireContains(js, "selection_completed", "VBD selection completion invalidates channel option cache");
+        requireContains(js, "virtual_block_device", "virtual block device channel events invalidate channel option cache");
+        requireContains(js, "device_extended_config", "extended config channel writes invalidate channel option cache");
+        requireContains(js, "interaction_item_matcher", "interaction matcher success/fail channel writes invalidate channel option cache");
         requireContains(js, "if(!force&&!appState.channelOptionsDirty&&Array.isArray(appState.channelOptions))return appState.channelOptions;",
                 "channel options reload after dirty realtime events but remain cached otherwise");
         requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft))",

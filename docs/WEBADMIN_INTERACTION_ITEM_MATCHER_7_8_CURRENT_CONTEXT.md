@@ -57,6 +57,7 @@
 - 保存链路接入 EDITOR / OWNER 权限、CSRF / same-origin、edit lock、expected fingerprint、validation、audit、realtime 和 `WebAdminWriteResult`。
 - 当前可编辑字段只覆盖 7.8 安全表单字段：启用匹配、物品 ID、数量规则、damage、自定义名称、Lore、主手 / 副手来源、原版交互策略。
 - 当前高级来源或策略、raw custom data / data component、consume、itemSubmit、inventory / equipment matcher 均保持只读或禁止。
+- 7.9 P1 返修后，matcher 编辑 UI 采用“启用后展开”规则：总开关关闭时只显示开关和说明；启用后显示物品 ID、数量规则、source / vanilla policy；数量为 ignore 时收起数量输入；damage / 自定义名称 / Lore 的值输入只在对应匹配开关开启后显示。隐藏字段不等于清空字段，draft 和后端字段保留策略不回退。
 
 ## 待验收内容
 

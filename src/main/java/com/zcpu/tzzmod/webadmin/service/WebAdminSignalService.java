@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.webadmin.service;
 
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.region.RegionControllerData;
@@ -31,14 +32,14 @@ public final class WebAdminSignalService {
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        LinkedHashSet<String> channels = knownChannels(devices, listeners, regions);
+        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions);
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<WebAdminDtos.SignalChannelListEntryDto> result = new ArrayList<>();
         for (String channel : channels) {
             if (result.size() >= limit) {
                 break;
             }
-            ChannelCounts counts = counts(channel, devices, listeners, regions);
+            ChannelCounts counts = counts(server, channel, devices, listeners, regions);
             SignalEventRecord latest = latest(channel);
             String fallbackIcon = counts.doctorStatus().equals("OK") ? "signal" : "warning";
             WebAdminChannelMetadataStore.MetadataEntry metadata = metadataFile.channels.get(channel);
@@ -72,7 +73,7 @@ public final class WebAdminSignalService {
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        ChannelCounts counts = counts(channel, devices, listeners, regions);
+        ChannelCounts counts = counts(server, channel, devices, listeners, regions);
         SignalEventRecord latest = latest(channel);
         WebAdminDtos.SignalChannelStatsDto stats = new WebAdminDtos.SignalChannelStatsDto(
                 latest == null ? "" : WebAdminReadonlySupport.isoTime(latest.wallTimeMillis()),
@@ -87,7 +88,7 @@ public final class WebAdminSignalService {
         List<WebAdminDtos.SignalChannelEndpointDto> listenerEndpoints = listenerEndpoints(channel, listeners);
         List<WebAdminDtos.SignalChannelEndpointDto> receivers = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         List<WebAdminDtos.SignalChannelEndpointDto> relays = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_ACTION_RELAY);
-        List<WebAdminDtos.ActionListEntryDto> actions = actionsForChannel(channel, listeners, regions);
+        List<WebAdminDtos.ActionListEntryDto> actions = actionsForChannel(server, channel, devices, listeners, regions);
         List<String> downstream = downstreamSignals(actions);
         List<WebAdminDtos.DoctorIssueDto> issues = new ArrayList<>();
         if (counts.listenerCount() == 0 && counts.receiverCount() == 0 && counts.actionRelayCount() == 0) {
@@ -137,7 +138,7 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
-        return knownChannels(devices, listeners, regions).contains(channel);
+        return knownChannels(server, devices, listeners, regions).contains(channel);
     }
 
     public List<WebAdminDtos.SignalHistoryEntryDto> history(MinecraftServer server, String channel, int requestedLimit) {
@@ -149,6 +150,7 @@ public final class WebAdminSignalService {
     }
 
     private LinkedHashSet<String> knownChannels(
+            MinecraftServer server,
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
             List<RegionControllerData> regions
@@ -156,6 +158,7 @@ public final class WebAdminSignalService {
         LinkedHashSet<String> channels = new LinkedHashSet<>();
         for (SignalDeviceData device : devices) {
             addDeviceChannels(channels, device.normalized());
+            addActionRelayActionChannels(server, channels, device.normalized());
         }
         for (SignalListenerData listener : listeners) {
             add(channels, listener.channel());
@@ -191,6 +194,7 @@ public final class WebAdminSignalService {
     }
 
     private ChannelCounts counts(
+            MinecraftServer server,
             String channel,
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
@@ -218,6 +222,10 @@ public final class WebAdminSignalService {
                 } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
                     relayCount++;
                 }
+            }
+            ActionRelayBlockEntity relay = loadedActionRelay(server, device);
+            if (relay != null) {
+                downstreamCount += countSignalActionsTo(relay.actions(), channel);
             }
         }
         for (RegionControllerData region : regions) {
@@ -301,7 +309,9 @@ public final class WebAdminSignalService {
     }
 
     private List<WebAdminDtos.ActionListEntryDto> actionsForChannel(
+            MinecraftServer server,
             String channel,
+            List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
             List<RegionControllerData> regions
     ) {
@@ -316,6 +326,12 @@ public final class WebAdminSignalService {
             addActions(actions, region.enterActions(), "REGION_ENTER", region.id(), region.name(), channel);
             addActions(actions, region.exitActions(), "REGION_EXIT", region.id(), region.name(), channel);
             addActions(actions, region.stayActions(), "REGION_STAY", region.id(), region.name(), channel);
+        }
+        for (SignalDeviceData device : devices) {
+            ActionRelayBlockEntity relay = loadedActionRelay(server, device);
+            if (relay != null && SignalChannel.normalize(device.channel()).equals(channel)) {
+                addActions(actions, relay.actions(), "ACTION_RELAY", device.id(), WebAdminReadonlySupport.deviceDisplayName(device), channel);
+            }
         }
         return List.copyOf(actions);
     }
@@ -402,6 +418,20 @@ public final class WebAdminSignalService {
         if (action != null && action.type() == ActionType.SIGNAL) {
             add(channels, action.value());
         }
+    }
+
+    private void addActionRelayActionChannels(MinecraftServer server, Set<String> channels, SignalDeviceData device) {
+        ActionRelayBlockEntity relay = loadedActionRelay(server, device);
+        if (relay != null) {
+            addActionChannels(channels, relay.actions());
+        }
+    }
+
+    private ActionRelayBlockEntity loadedActionRelay(MinecraftServer server, SignalDeviceData device) {
+        if (server == null || device == null || !SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
+            return null;
+        }
+        return SignalDeviceStore.getLoadedActionRelay(server, device);
     }
 
     private int countSignalActionsTo(List<ActionConfig> actions, String channel) {
