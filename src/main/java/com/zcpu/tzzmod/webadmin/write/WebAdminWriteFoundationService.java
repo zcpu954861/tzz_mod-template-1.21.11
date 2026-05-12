@@ -25,12 +25,13 @@ public final class WebAdminWriteFoundationService {
         data.put("actionRelayActionListWriteEnabled", true);
         data.put("vbdNativeTriggerWriteEnabled", true);
         data.put("interactionItemMatcherWriteEnabled", true);
+        data.put("singleItemSubmitTemplateWriteEnabled", true);
         data.put("channelMetadataWriteEnabled", true);
         data.put("signalListenerBasicConfigWriteEnabled", true);
         data.put("objectSelectionEnabled", true);
         data.put("virtualBlockDeviceLifecycleEnabled", true);
         data.put("signalListenerLifecycleWriteEnabled", true);
-        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、频道显示信息、Signal Listener 基础配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
+        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、VBD 单物品 itemSubmit 模板、频道显示信息、Signal Listener 基础配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
         data.put("permissions", permissionService.capabilitySummary(user == null ? null : user.roleEnum()));
         Map<String, Object> csrf = new LinkedHashMap<>();
         csrf.put("requiredForFutureWrites", true);
@@ -50,6 +51,10 @@ public final class WebAdminWriteFoundationService {
                     && operation != WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS
                     && operation != WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS
                     && operation != WebAdminOperationType.EDIT_ITEM_MATCHER
+                    && operation != WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION
+                    && operation != WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT
+                    && operation != WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION
+                    && operation != WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION
                     && operation != WebAdminOperationType.EDIT_CHANNEL_METADATA
                     && operation != WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG
                     && operation != WebAdminOperationType.START_OBJECT_SELECTION

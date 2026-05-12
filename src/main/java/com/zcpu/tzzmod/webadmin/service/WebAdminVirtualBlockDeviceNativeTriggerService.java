@@ -722,18 +722,26 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         data.put("lastInteractionHand", device.lastInteractionHand());
         data.put("lastInteractionSide", device.lastInteractionSide());
         ItemStackMatcherData matcher = device.interactionItemMatcher().normalized();
-        data.put("interactionItemMatcherLayer", Map.of(
-                "enabled", device.interactionItemMatcherEnabled(),
-                "configured", matcher.enabled(),
-                "templateItemId", matcher.templateItemId(),
-                "countMode", matcher.countMode(),
-                "requiredCount", matcher.requiredCount(),
-                "source", matcher.interactionItemSource(),
-                "matchCustomName", matcher.matchCustomName(),
-                "matchLore", matcher.matchLore(),
-                "summary", matcher.templateSummary()
-        ));
-        data.put("conditionLayerNote", "interaction item matcher 是右键交互之后的条件/判定层，不是新的原生触发源。");
+        Map<String, Object> matcherLayer = new LinkedHashMap<>();
+        matcherLayer.put("enabled", device.interactionItemMatcherEnabled());
+        matcherLayer.put("configured", matcher.enabled());
+        matcherLayer.put("templateItemId", matcher.templateItemId());
+        matcherLayer.put("countMode", matcher.countMode());
+        matcherLayer.put("requiredCount", matcher.requiredCount());
+        matcherLayer.put("source", matcher.interactionItemSource());
+        matcherLayer.put("interactionItemVanillaPolicy", matcher.interactionItemVanillaPolicy());
+        matcherLayer.put("vanillaPolicyDisplayName", com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy.displayName(matcher.interactionItemVanillaPolicy()));
+        matcherLayer.put("matchCustomName", matcher.matchCustomName());
+        matcherLayer.put("matchLore", matcher.matchLore());
+        matcherLayer.put("summary", matcher.templateSummary());
+        data.put("interactionItemMatcherLayer", matcherLayer);
+        Map<String, Object> itemSubmitLayer = new LinkedHashMap<>(WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService.singleRequirementDto(device));
+        itemSubmitLayer.put("enabled", device.itemSubmitEnabled());
+        itemSubmitLayer.put("configured", device.itemSubmitEnabled() || !device.itemSubmitRequirements().isEmpty());
+        itemSubmitLayer.put("singleRequirementOnly", device.itemSubmitRequirements().size() <= 1);
+        itemSubmitLayer.put("vanillaPolicyDisplayName", itemSubmitLayer.get("interactionItemVanillaPolicyDisplayName"));
+        data.put("itemSubmitLayer", itemSubmitLayer);
+        data.put("conditionLayerNote", "interaction item matcher 是右键交互之后的条件/判定层；single itemSubmit 是右键交互之后的提交层，不是新的原生触发源。");
         return data;
     }
 

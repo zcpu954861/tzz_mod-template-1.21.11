@@ -968,6 +968,86 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData updateVirtualItemSubmitForWebAdmin(
+            MinecraftServer server,
+            String deviceId,
+            boolean enabled,
+            List<ItemSubmitRequirementData> requirements,
+            boolean disableInteractionItemMatcher
+    ) {
+        return updateVirtualItemSubmitForWebAdmin(
+                server,
+                deviceId,
+                enabled,
+                null,
+                null,
+                requirements,
+                disableInteractionItemMatcher,
+                ""
+        );
+    }
+
+    public static synchronized SignalDeviceData updateVirtualItemSubmitForWebAdmin(
+            MinecraftServer server,
+            String deviceId,
+            boolean enabled,
+            Boolean consumeEnabled,
+            String consumeOrder,
+            List<ItemSubmitRequirementData> requirements,
+            boolean disableInteractionItemMatcher,
+            String interactionItemVanillaPolicy
+    ) {
+        if (server == null || deviceId == null || deviceId.isBlank() || requirements == null) {
+            return null;
+        }
+        State state = getState(server);
+        refreshLoadedDevices(server, state);
+        SignalDeviceData existing = findById(state, cleanUserText(deviceId));
+        if (existing == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(existing.type())) {
+            return null;
+        }
+        List<ItemSubmitRequirementData> normalizedRequirements = new ArrayList<>();
+        for (ItemSubmitRequirementData requirement : requirements) {
+            if (requirement != null) {
+                normalizedRequirements.add(requirement.normalized());
+            }
+        }
+        SignalDeviceData updated = withItemSubmit(
+                existing,
+                enabled,
+                consumeEnabled == null ? existing.itemSubmitConsumeEnabled() : consumeEnabled,
+                consumeOrder == null || consumeOrder.isBlank() ? existing.itemSubmitConsumeOrder() : consumeOrder,
+                normalizedRequirements,
+                existing.lastItemSubmitMatched(),
+                existing.lastItemSubmitFailureReason(),
+                existing.lastItemSubmitConsumedSummary(),
+                existing.lastItemSubmitResult()
+        );
+        if (interactionItemVanillaPolicy != null && !interactionItemVanillaPolicy.isBlank()) {
+            updated = withInteractionItemMatcher(
+                    updated,
+                    updated.interactionItemMatcherEnabled(),
+                    ItemStackMatcherSupport.withVanillaPolicy(updated.interactionItemMatcher(), interactionItemVanillaPolicy),
+                    updated.lastInteractionItemMatched(),
+                    updated.lastInteractionItemResult()
+            );
+        }
+        if (disableInteractionItemMatcher && updated.interactionItemMatcherEnabled()) {
+            updated = withInteractionItemMatcher(
+                    updated,
+                    false,
+                    updated.interactionItemMatcher(),
+                    updated.lastInteractionItemMatched(),
+                    updated.lastInteractionItemResult()
+            );
+        }
+        replaceOrAdd(state, updated);
+        state.markDirty();
+        state.flushDirty(true, currentGameTime(server));
+        publishDeviceChange(WebAdminRealtimeEventType.VIRTUAL_BLOCK_DEVICE_CHANGED, updated);
+        return updated.normalized();
+    }
+
     public static synchronized void recordVirtualItemSubmitResult(
             ServerWorld world,
             SignalDeviceData device,
