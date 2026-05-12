@@ -129,6 +129,7 @@ public final class WebAdminInteractionItemMatcherService {
                 "templateSummary",
                 "templateCustomData",
                 "templateComponents",
+                "templateDisplayStack",
                 "successChannel",
                 "failChannel",
                 "successMessage",
@@ -480,6 +481,7 @@ public final class WebAdminInteractionItemMatcherService {
         long created = previous.createdWallTimeMillis() <= 0L ? now : previous.createdWallTimeMillis();
         String templateCustomData = previous.templateCustomData();
         String templateComponents = previous.templateComponents();
+        String templateDisplayStack = previous.templateDisplayStack();
         boolean matchCustomData = previous.matchCustomData();
         boolean matchComponents = previous.matchComponents();
         ItemStackMatcherData data = new ItemStackMatcherData(
@@ -499,6 +501,7 @@ public final class WebAdminInteractionItemMatcherService {
                 lore,
                 templateCustomData,
                 templateComponents,
+                templateDisplayStack,
                 "",
                 previous.successChannel(),
                 previous.failChannel(),
@@ -543,6 +546,7 @@ public final class WebAdminInteractionItemMatcherService {
                 data.templateLore(),
                 data.templateCustomData(),
                 data.templateComponents(),
+                data.templateDisplayStack(),
                 ItemStackMatcherSupport.summary(data),
                 data.successChannel(),
                 data.failChannel(),

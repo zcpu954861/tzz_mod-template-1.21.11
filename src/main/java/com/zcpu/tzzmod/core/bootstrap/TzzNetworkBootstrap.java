@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.network.PhoneChatPayloads;
 import com.zcpu.tzzmod.network.TaskPayloads;
 import com.zcpu.tzzmod.network.WebAdminContainerTemplatePayloads;
 import com.zcpu.tzzmod.network.WebAdminSelectionPayloads;
+import com.zcpu.tzzmod.network.WebAdminSingleItemSubmitTemplatePayloads;
 
 public final class TzzNetworkBootstrap {
     private TzzNetworkBootstrap() {
@@ -28,5 +29,6 @@ public final class TzzNetworkBootstrap {
         AdminPayloads.register();
         WebAdminSelectionPayloads.register();
         WebAdminContainerTemplatePayloads.register();
+        WebAdminSingleItemSubmitTemplatePayloads.register();
     }
 }

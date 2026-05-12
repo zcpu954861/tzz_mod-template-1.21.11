@@ -2679,6 +2679,7 @@ public final class StabilizationGuardTest {
     private static void testWebAdminVbdNativeTriggerOverview() throws Exception {
         Path root = Path.of("").toAbsolutePath();
         String context = Files.readString(root.resolve("docs/WEBADMIN_VBD_NATIVE_TRIGGER_CONFIG_7_9_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String itemSubmitContext = Files.readString(root.resolve("docs/WEBADMIN_SINGLE_ITEM_SUBMIT_7_10_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
         String manual = Files.readString(root.resolve("docs/test/测试_7.9_WebAdmin虚拟方块设备原生触发配置P1验收.md"), StandardCharsets.UTF_8);
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
@@ -2691,6 +2692,15 @@ public final class StabilizationGuardTest {
         String containerTemplatePayloads = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplatePayloads.java"), StandardCharsets.UTF_8)
                 + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateS2CPayload.java"), StandardCharsets.UTF_8)
                 + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminContainerTemplateC2SPayload.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/itemsubmit/WebAdminSingleItemSubmitTemplateSessions.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitClient = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminSingleItemSubmitTemplateClient.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitScreen = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminSingleItemSubmitTemplateScreen.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/itemsubmit/WebAdminSingleItemSubmitTemplateServer.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitPayloads = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSingleItemSubmitTemplatePayloads.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSingleItemSubmitTemplateS2CPayload.java"), StandardCharsets.UTF_8)
+                + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/network/WebAdminSingleItemSubmitTemplateC2SPayload.java"), StandardCharsets.UTF_8);
+        String signalDeviceStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceStore.java"), StandardCharsets.UTF_8);
         String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
         String itemConditionSupport = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/ContainerItemConditionSupport.java"), StandardCharsets.UTF_8);
         String vbdContainerHandler = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceContainerHandler.java"), StandardCharsets.UTF_8);
@@ -3009,6 +3019,230 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
+                "7.10 WebAdmin Single ItemSubmit Template Editing",
+                "itemSubmit 不是新的触发源",
+                "只有启用右键交互后才显示 itemSubmit",
+                "7.10 只支持单个 itemSubmit requirement",
+                "当前已有多个 requirements：7.10 不覆盖",
+                "原版交互策略",
+                "`itemSubmitEnabled` 启用 / 禁用",
+                "`at_least`、`exactly`、`at_most`、`ignore`",
+                "`matchDamage`、`matchCustomName`、`matchLore`、`matchCustomData`、`matchComponents`",
+                "`itemSubmitConsumeEnabled`",
+                "`hotbar_first`、`main_inventory_first`",
+                "`consumeCount`",
+                "display template 使用内部 `ItemStack` 快照持久化",
+                "`matchComponents=false` 时组件只用于回显，不参与匹配",
+                "`matchComponents=true` 时继续按现有 `templateComponents` / `ItemStackMatcher` 语义参与匹配",
+                "不做多 requirement",
+                "不做复杂 consume 策略编辑",
+                "不做 inventory / equipment / armor 来源编辑",
+                "不做 ConditionEngine",
+                "不做成功 / 失败路径可视化",
+                "不使用 raw JSON"
+        )) {
+            requireContains(itemSubmitContext, marker, "7.10 single itemSubmit context marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "/single-item-submit",
+                "/single-item-submit-session/start",
+                "/single-item-submit-session/status",
+                "/single-item-submit-session/cancel",
+                "WebAdminSingleItemSubmitTemplateSessionStartRequest",
+                "WebAdminSingleItemSubmitTemplateSessionCancelRequest"
+        )) {
+            requireContains(webServer, marker, "7.10 single itemSubmit WebAdmin API marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION",
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT",
+                "expectedFingerprint",
+                "fingerprintFor(device)",
+                "singleRequirementDto(device)",
+                "rightClickConditionLayer",
+                "singleRequirementOnly",
+                "multiRequirementEditable",
+                "consumeEditor",
+                "noRawJson",
+                "noConditionEngine",
+                "requireValidCsrf",
+                "sameOrigin",
+                "InteractionItemVanillaPolicy.displayName",
+                "itemSubmitRequirements().size() > 1",
+                "advancedMatcherEditable",
+                "countModeValues",
+                "consumeOrderValues",
+                "vanillaPolicyValues",
+                "matchDamage",
+                "matchCustomName",
+                "matchLore",
+                "matchCustomData",
+                "matchComponents",
+                "templateDisplayStack",
+                "displayTemplateComponentsPreserved",
+                "targetPlayerName"
+        )) {
+            requireContains(singleItemSubmitService, marker, "7.10 single itemSubmit service marker present: " + marker);
+        }
+        requireContains(signalDeviceStore, "updateVirtualItemSubmitForWebAdmin", "7.10 saves itemSubmit through scoped WebAdmin store update");
+        for (String marker : List.of(
+                "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT",
+                "SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_STARTED",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_OPENED",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_SAVED",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_CANCELLED",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_FAILED",
+                "SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_EXPIRED",
+                "sendOpen(targetPlayer, session)",
+                "saveFromClient",
+                "saveSession",
+                "lockService.validateLock",
+                "session.lockId",
+                "ItemSubmitSaveDraft",
+                "itemSubmitConsumeEnabled",
+                "itemSubmitConsumeOrder",
+                "consumeCount",
+                "InteractionItemVanillaPolicy.normalize",
+                "InventoryConsumeOrder.normalize",
+                "matchDamage",
+                "matchCustomName",
+                "matchLore",
+                "matchCustomData",
+                "matchComponents",
+                "templateDisplayStack",
+                "updateVirtualItemSubmitForWebAdmin",
+                "publishConfigChangedAfterSave",
+                "cancelFromWebAdmin",
+                "cancelFromClient",
+                "sendEnd(player, \"cancelled\"",
+                "sendEnd(player, \"saved\"",
+                "alreadyTerminal",
+                "idempotentNoOp"
+        )) {
+            requireContains(singleItemSubmitSessions, marker, "7.10 single itemSubmit session marker present: " + marker);
+        }
+        requireContains(singleItemSubmitService, "itemSubmitConsumeEnabled", "7.10 single itemSubmit fingerprint includes consume enabled");
+        requireContains(singleItemSubmitService, "itemSubmitConsumeOrder", "7.10 single itemSubmit fingerprint includes consume order");
+        requireContains(signalDeviceStore, "consumeEnabled == null ? existing.itemSubmitConsumeEnabled() : consumeEnabled", "7.10 scoped itemSubmit save preserves consume enabled unless explicitly edited");
+        requireContains(signalDeviceStore, "consumeOrder == null || consumeOrder.isBlank() ? existing.itemSubmitConsumeOrder() : consumeOrder", "7.10 scoped itemSubmit save preserves consume order unless explicitly edited");
+        for (String marker : List.of(
+                "extends Screen",
+                "保存模板",
+                "提交物品模板",
+                "player.currentScreenHandler.getCursorStack",
+                "SlotActionType.PICKUP",
+                "clickPlayerInventorySlot",
+                "copyCursorToTemplate",
+                "clearTemplate",
+                "adjustCount",
+                "ctrlDown",
+                "stack.getMaxCount()",
+                "drawItemTooltip",
+                "copyCursorToTemplate()",
+                "clearTemplate()",
+                "itemSubmitEnabled",
+                "requirementEnabled",
+                "countMode",
+                "consumeCount",
+                "matchDamage",
+                "matchCustomName",
+                "matchLore",
+                "matchCustomData",
+                "matchComponents",
+                "templateDisplayStack",
+                "ItemStackDisplaySnapshot.encode",
+                "ItemStackDisplaySnapshot.decode",
+                "stackFromDisplaySnapshot",
+                "data-single-item-submit-gui-no-overlap",
+                "InteractionItemVanillaPolicy.REQUIRE_ITEM_MATCH",
+                "InventoryConsumeOrder.MAIN_INVENTORY_FIRST",
+                "ContainerItemCountMode.AT_LEAST",
+                "ContainerItemCountMode.EXACTLY",
+                "ContainerItemCountMode.AT_MOST",
+                "ContainerItemCountMode.IGNORE",
+                "sendSave(sessionId, nonce, deviceId, expectedFingerprint",
+                "WebAdminSingleItemSubmitTemplateClient.sendCancel",
+                "sessionClosing",
+                "cancelSent",
+                "ItemStack.EMPTY"
+        )) {
+            requireContains(singleItemSubmitScreen, marker, "7.10 single itemSubmit GUI marker present: " + marker);
+        }
+        requireFalse(singleItemSubmitScreen.contains("HandledScreen") || singleItemSubmitScreen.contains("extends ScreenHandler")
+                        || singleItemSubmitScreen.contains("quickMove") || singleItemSubmitScreen.contains("insertItem")
+                        || singleItemSubmitScreen.contains("dropSlot") || singleItemSubmitScreen.contains("onSlotClick"),
+                "7.10 single itemSubmit screen must not expose real template transfer paths");
+        for (String marker : List.of(
+                "registerGlobalReceiver(WebAdminSingleItemSubmitTemplateC2SPayload.ID",
+                "ServerPlayConnectionEvents.DISCONNECT",
+                "openedFromClient",
+                "saveFromClient",
+                "cancelFromClient"
+        )) {
+            requireContains(singleItemSubmitServer, marker, "7.10 single itemSubmit server payload marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "webadmin_single_item_submit_template_s2c",
+                "webadmin_single_item_submit_template_c2s",
+                "PayloadTypeRegistry.playC2S()",
+                "PayloadTypeRegistry.playS2C()"
+        )) {
+            requireContains(singleItemSubmitPayloads, marker, "7.10 single itemSubmit payload marker present: " + marker);
+        }
+        requireContains(singleItemSubmitClient, "WebAdminSingleItemSubmitTemplateScreen.fromJson", "7.10 client opens single itemSubmit template screen");
+        requireContains(singleItemSubmitClient, "sendSave", "7.10 client sends save payload for single itemSubmit");
+        requireContains(singleItemSubmitClient, "sendCancel", "7.10 client sends cancel payload for single itemSubmit");
+        requireFalse(singleItemSubmitClient.contains("sendMessage("), "7.10 terminal player feedback must not be duplicated by client chat");
+        for (String marker : List.of(
+                "itemSubmitLayer",
+                "singleRequirementOnly",
+                "singleItemSubmitInlineSummary",
+                "data-single-item-submit-under-right-click=\"true\"",
+                "data-single-item-submit-hidden-when-interaction-disabled=\"true\"",
+                "data-single-item-submit-disabled-warning=\"true\"",
+                "data-single-item-submit-no-multi-editor=\"true\"",
+                "data-single-item-submit-advanced-editable=\"true\"",
+                "data-single-item-submit-consume-editor=\"true\"",
+                "data-single-item-submit-vanilla-policy-existing-field=\"true\"",
+                "data-single-item-submit-single-slot-gui=\"true\"",
+                "data-single-item-submit-display-template-preserved=\"true\"",
+                "data-single-item-submit-lock-target=\"virtual_block_device_single_item_submit\"",
+                "singleItemSubmitResultSession",
+                "deviceDetailRouteKeys(draft.deviceId,'virtual_block_device')",
+                "single-item-submit-open",
+                "single-item-submit-open-unified",
+                "single-item-submit-start",
+                "single-item-submit-cancel",
+                "openSingleItemSubmitSessionModal",
+                "openSingleItemSubmitSessionModalFromUnified",
+                "handleSingleItemSubmitAction",
+                "refreshSingleItemSubmitSessionOverview",
+                "single_item_submit_template_session_started",
+                "single_item_submit_template_session_saved",
+                "virtual_block_device_single_item_submit"
+        )) {
+            requireContains(js, marker, "7.10 single itemSubmit frontend marker present: " + marker);
+        }
+        requireFalse(js.contains("multiItemSubmitEditor") || js.contains("consumeItemSubmitEditor")
+                        || js.contains("inventoryItemSubmitEditor") || js.contains("equipmentItemSubmitEditor")
+                        || js.contains("itemSubmitConditionEngine") || js.contains("itemSubmitPathGraph")
+                        || js.contains("itemSubmitRawJson"),
+                "7.10 frontend must not expose multi itemSubmit, consume, inventory/equipment, ConditionEngine, path graph or raw JSON editors");
+        int singleSubmitCancelStart = singleItemSubmitSessions.indexOf("private static WebAdminWriteResult cancelSession");
+        int singleSubmitSaveStart = singleItemSubmitSessions.indexOf("private static WebAdminWriteResult saveSession");
+        requireTrue(singleSubmitCancelStart >= 0 && singleSubmitSaveStart > singleSubmitCancelStart, "7.10 single itemSubmit cancel/save sections are locatable");
+        String singleSubmitCancelBlock = singleItemSubmitSessions.substring(singleSubmitCancelStart, singleSubmitSaveStart);
+        requireFalse(singleSubmitCancelBlock.contains("publishConfigChangedAfterSave") || singleSubmitCancelBlock.contains("CONFIG_CHANGED") || singleSubmitCancelBlock.contains("config_changed"),
+                "7.10 single itemSubmit cancel must not publish config_changed");
+        requireContains(singleItemSubmitService, "singleRequirementFingerprintDto", "7.10 single itemSubmit fingerprint uses runtime-free requirement DTO");
+        requireFalse(singleItemSubmitSessions.contains("multiItemSubmit") || singleItemSubmitSessions.contains("consumeItemSubmitEditor")
+                        || singleItemSubmitSessions.contains("inventoryItemSubmit") || singleItemSubmitSessions.contains("equipmentItemSubmit")
+                        || singleItemSubmitSessions.contains("itemSubmitConditionEngine") || singleItemSubmitSessions.contains("itemSubmitPathGraph")
+                        || singleItemSubmitSessions.contains("itemSubmitRawJson"),
+                "7.10 single itemSubmit session must not expose multi/consume/inventory/equipment/ConditionEngine/path/raw JSON save paths");
+
+        for (String marker : List.of(
                 "/api/webadmin/virtual-block-devices/${canonicalEncoded}/native-triggers",
                 "data-vbd-native-trigger-area=\"true\"",
                 "data-vbd-native-trigger-side-card=\"true\"",
@@ -3201,6 +3435,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
+        requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.VIEWER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -3219,6 +3457,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
+        requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_CHANNEL_METADATA, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, false);
         requirePermission(permissions, WebAdminRole.TESTER, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, false);
@@ -3238,6 +3480,10 @@ public final class StabilizationGuardTest {
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, true);
+        requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_CHANNEL_METADATA, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, true);
         requirePermission(permissions, WebAdminRole.EDITOR, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, true);
@@ -3830,11 +4076,16 @@ public final class StabilizationGuardTest {
         requireContains(capabilitiesJson, "signalListenerBasicConfigWriteEnabled", "capabilities describe signal listener write stage");
         requireContains(capabilitiesJson, "objectSelectionEnabled", "capabilities describe object selection write stage");
         requireContains(capabilitiesJson, "virtualBlockDeviceLifecycleEnabled", "capabilities describe VBD lifecycle stage");
+        requireContains(capabilitiesJson, "singleItemSubmitTemplateWriteEnabled", "capabilities describe 7.10 single itemSubmit template write stage");
         requireContains(capabilitiesJson, "signalListenerLifecycleWriteEnabled", "capabilities describe signal listener lifecycle stage");
         requireContains(capabilitiesJson, "DELETE_VIRTUAL_BLOCK_DEVICE", "capabilities expose VBD delete operation");
         requireContains(capabilitiesJson, "EDIT_ACTION_RELAY_ACTIONS", "capabilities expose action relay action list operation");
         requireContains(capabilitiesJson, "CREATE_SIGNAL_LISTENER", "capabilities expose listener create operation");
         requireContains(capabilitiesJson, "DELETE_SIGNAL_LISTENER", "capabilities expose listener delete operation");
+        requireContains(capabilitiesJson, "START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION", "capabilities expose 7.10 single itemSubmit start operation");
+        requireContains(capabilitiesJson, "SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT", "capabilities expose 7.10 single itemSubmit save operation");
+        requireContains(capabilitiesJson, "CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION", "capabilities expose 7.10 single itemSubmit cancel operation");
+        requireContains(capabilitiesJson, "FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION", "capabilities expose 7.10 single itemSubmit fail operation");
         requireContains(capabilitiesJson, "X-TZZ-WebAdmin-CSRF", "capabilities expose csrf header name");
         requireFalse(capabilitiesJson.contains(owner.passwordHash), "capabilities omit password hash value");
         requireFalse(capabilitiesJson.contains(owner.passwordSalt), "capabilities omit password salt value");
