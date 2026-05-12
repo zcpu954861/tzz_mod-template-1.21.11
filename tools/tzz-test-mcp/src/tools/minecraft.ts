@@ -5,6 +5,7 @@ import type { JsonObject, ToolDefinition, TzzTestMcpConfig } from "../types.js";
 import { fail, ok } from "../results.js";
 import { ensureAllowedUrl, ensureDirectory, redactSecrets, resolveRepoOutputDir, tailText, timestamp } from "../safety.js";
 import { buildGradleSpawnCommand } from "../gradleSpawn.js";
+import { testBridgeTools } from "./testbridge.js";
 
 type RuntimeState = {
   child?: ChildProcessWithoutNullStreams;
@@ -25,7 +26,8 @@ export function minecraftTools(): ToolDefinition[] {
     minecraftStartClientTool(),
     minecraftStatusTool(),
     minecraftWaitWebAdminTool(),
-    minecraftStopTool()
+    minecraftStopTool(),
+    ...testBridgeTools()
   ];
 }
 

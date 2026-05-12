@@ -25,7 +25,20 @@ async function main(): Promise<void> {
     "minecraft.start_client",
     "minecraft.status",
     "minecraft.wait_webadmin",
-    "minecraft.stop"
+    "minecraft.stop",
+    "minecraft.testbridge_status",
+    "minecraft.players",
+    "minecraft.command",
+    "minecraft.set_block",
+    "minecraft.clear_area",
+    "minecraft.give_item",
+    "minecraft.clear_inventory",
+    "minecraft.set_main_hand",
+    "minecraft.use_block",
+    "minecraft.inspect_device",
+    "minecraft.signal_history",
+    "minecraft.doctor_issues",
+    "minecraft.wait_testbridge"
   ];
   for (const name of required) {
     assert(tools.includes(name), `missing tool ${name}`);

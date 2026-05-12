@@ -42,6 +42,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
+import com.zcpu.tzzmod.webadmin.testbridge.WebAdminTestBridgeRoutes;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
@@ -90,6 +91,7 @@ public final class WebAdminServer {
     private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService singleItemSubmitTemplateSessionService = new WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
+    private final WebAdminTestBridgeRoutes testBridgeRoutes = new WebAdminTestBridgeRoutes();
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -167,6 +169,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/auth/login") && method.equalsIgnoreCase("POST")) {
                 handleLogin(exchange);
+                return;
+            }
+            if (path.startsWith("/api/testbridge/")) {
+                runOnServerThread(() -> testBridgeRoutes.handle(exchange, minecraftServer, path, method));
                 return;
             }
 

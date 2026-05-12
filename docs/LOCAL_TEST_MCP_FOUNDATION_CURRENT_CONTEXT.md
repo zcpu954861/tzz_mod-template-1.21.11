@@ -133,15 +133,71 @@ Credentials must be supplied with environment variables such as:
 
 The example config must not contain real credentials.
 
-## Step 2 Planning
+## Step 2.5 Scope: Minecraft TestBridge Foundation
 
-Future Minecraft TestBridge work may add in-mod test APIs for controlled game-state checks and scenario orchestration. That future stage must be designed separately and must not be implemented by Step 1.
+Step 2.5 adds a dev-only Minecraft TestBridge foundation so local Codex MCP tools can perform controlled game-state setup and inspection after the Fabric dev client has started and the integrated server/world is loaded.
 
-Step 2 is not allowed to inherit unsafe primitives from Step 1. It must still avoid arbitrary shell, arbitrary file access, public network automation, and raw OS mouse/keyboard control unless a later explicit scope permits otherwise.
+The TestBridge is intentionally narrow:
 
-Recommended later work should use a dev-only Minecraft TestBridge instead of OS coordinate clicking:
+- It is hosted under WebAdmin as `/api/testbridge/*`.
+- It is default disabled.
+- It requires loopback / localhost access.
+- It requires `TZZ_TESTBRIDGE_ENABLED=true` for operational endpoints.
+- It requires `TZZ_TESTBRIDGE_TOKEN` and request header `X-TZZ-TestBridge-Token` for operational endpoints.
+- The token is never returned, logged, or written into reports.
+- It writes TestBridge audit entries without secrets.
+- It does not provide arbitrary shell, git mutation, external host access, or OS-level Minecraft GUI coordinate clicking.
+
+Server-side P0 endpoints:
+
+- `GET /api/testbridge/status`
+- `GET /api/testbridge/players`
+- `POST /api/testbridge/command`
+- `POST /api/testbridge/world/set-block`
+- `POST /api/testbridge/world/clear-area`
+- `POST /api/testbridge/player/give`
+- `POST /api/testbridge/player/clear-inventory`
+- `POST /api/testbridge/player/set-main-hand`
+- `POST /api/testbridge/player/use-block`
+- `GET|POST /api/testbridge/device/inspect`
+- `GET /api/testbridge/signal/history`
+- `GET /api/testbridge/doctor/issues`
+
+MCP P0 tools:
+
+- `minecraft.testbridge_status`
+- `minecraft.players`
+- `minecraft.command`
+- `minecraft.set_block`
+- `minecraft.clear_area`
+- `minecraft.give_item`
+- `minecraft.clear_inventory`
+- `minecraft.set_main_hand`
+- `minecraft.use_block`
+- `minecraft.inspect_device`
+- `minecraft.signal_history`
+- `minecraft.doctor_issues`
+- `minecraft.wait_testbridge`
+
+Safety restrictions:
+
+- `minecraft.command` is allowlisted and denies dangerous roots such as `stop`, `op`, `deop`, `ban`, `kick`, `whitelist`, `save-off`, `save-on`, `pardon`, and `reload`.
+- World mutation tools are restricted to the default test area `x=-128..128`, `y=-64..320`, `z=-128..128`.
+- `minecraft.clear_area` also enforces `maxClearVolume=4096`.
+- `minecraft.give_item` is count-limited and does not accept raw NBT or arbitrary component path editing.
+- `minecraft.clear_inventory` only affects the specified online player.
+- `minecraft.set_main_hand` sets only the specified player's main hand.
+- `minecraft.use_block` invokes Minecraft's `UseBlockCallback` production path, so VBD right-click tests reuse the same handler chain as real player interaction.
+- `minecraft.inspect_device`, `minecraft.signal_history`, and `minecraft.doctor_issues` are read-only inspection endpoints.
+
+Step 2.5 still does not automatically enter a Minecraft world. Future work should add a separate dev-only auto-enter-world helper or in-mod test world bootstrap. It must not use OS mouse coordinate clicking.
+
+## Later Planning
+
+Recommended later work should build on the dev-only TestBridge instead of OS coordinate clicking:
 
 - Open or create a named test world through controlled in-mod hooks.
 - Execute approved `/tzz` setup commands.
 - Read game state through structured test APIs.
 - Drive in-game GUI abstractions by semantic slot/action rather than screen coordinates.
+- Add Step 3 semantic GUI tools such as `mc.gui.current`, `mc.gui.slot`, `mc.gui.click_template_slot`, `mc.gui.save`, and `mc.gui.cancel`.

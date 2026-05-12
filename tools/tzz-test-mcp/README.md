@@ -39,7 +39,9 @@ npm run start
     "TZZ_WEBADMIN_USERNAME": "your-local-user",
     "TZZ_WEBADMIN_PASSWORD": "your-local-password",
     "TZZ_WEBADMIN_TEST_USERNAME": "mcp_test",
-    "TZZ_WEBADMIN_TEST_PASSWORD": "your-local-test-password"
+    "TZZ_WEBADMIN_TEST_PASSWORD": "your-local-test-password",
+    "TZZ_TESTBRIDGE_ENABLED": "true",
+    "TZZ_TESTBRIDGE_TOKEN": "your-local-random-token"
   }
 }
 ```
@@ -67,6 +69,7 @@ $env:TZZ_WEBADMIN_PASSWORD = "your-local-password"
 - 通过固定 Gradle `runClient` preset 启动 Minecraft dev client。
 - 等待本机 WebAdmin URL 可访问。
 - 通过已登录的 localhost WebAdmin 会话修改当前用户密码或 OWNER 设置指定用户密码。
+- 在显式启用 dev-only TestBridge 后，执行受控 Minecraft 测试操作，例如读取玩家、放置测试区块、设置玩家物品、模拟右键方块、读取设备 / Signal history / Doctor issues。
 
 这个工具包不会：
 
@@ -76,7 +79,6 @@ $env:TZZ_WEBADMIN_PASSWORD = "your-local-password"
 - 删除或移动文件。
 - 通过 Playwright 访问公网目标。
 - 在仓库里保存密码。
-- 实现 Minecraft TestBridge。
 - 自动化 Minecraft GUI 的鼠标键盘坐标操作。
 - 自动选择 / 进入 Minecraft 世界。
 
@@ -152,6 +154,9 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `TZZ_WEBADMIN_NEW_PASSWORD`
 - `TZZ_WEBADMIN_TEST_USERNAME`
 - `TZZ_WEBADMIN_TEST_PASSWORD`
+- `TZZ_TESTBRIDGE_ENABLED`
+- `TZZ_TESTBRIDGE_TOKEN`
+- `TZZ_TESTBRIDGE_URL`
 
 ## 工具清单
 
@@ -174,6 +179,19 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `minecraft.status`：查看 MCP 管理的 dev client 进程、日志尾部和 WebAdmin ready 状态。
 - `minecraft.wait_webadmin`：等待本机 WebAdmin URL 可访问。
 - `minecraft.stop`：只停止当前 MCP server 启动的 managed process。
+- `minecraft.testbridge_status`：读取 TestBridge 启用 / ready / world / player / 安全状态。
+- `minecraft.players`：读取在线玩家摘要。
+- `minecraft.command`：执行 TestBridge allowlist 内的 Minecraft 命令；危险命令会被拒绝。
+- `minecraft.set_block`：在受限测试区域内放置方块。
+- `minecraft.clear_area`：在受限测试区域内清理小范围方块。
+- `minecraft.give_item`：给指定在线玩家普通物品。
+- `minecraft.clear_inventory`：清理指定在线玩家背包。
+- `minecraft.set_main_hand`：设置指定在线玩家主手物品。
+- `minecraft.use_block`：通过生产 `UseBlockCallback` 路径模拟玩家右键方块。
+- `minecraft.inspect_device`：只读检查设备状态。
+- `minecraft.signal_history`：只读读取 Signal history。
+- `minecraft.doctor_issues`：只读读取 Doctor issues。
+- `minecraft.wait_testbridge`：等待 TestBridge ready。
 
 ## WebAdmin 密码 / 测试账号
 
@@ -236,7 +254,7 @@ MCP 自动化建议使用固定测试账号。首次创建测试账号仍走现�
 
 ## Minecraft Dev Runtime Launcher
 
-本阶段只提供受控 dev runtime launcher，不做 Minecraft TestBridge，也不做 GUI 坐标点击。
+本阶段提供受控 dev runtime launcher，并提供 dev-only TestBridge Foundation。仍然不做 GUI 坐标点击。
 
 可用工具：
 
@@ -266,7 +284,67 @@ MCP 自动化建议使用固定测试账号。首次创建测试账号仍走现�
 - 如果 dev client 未正常退出，会提示手动关闭，不会扩展为任意进程管理。
 - WebAdmin ready 检测只访问 `http://127.0.0.1:18080/`、`localhost` 或 `::1` 这类 loopback 地址。
 
-注意：Fabric `runClient` 启动后，WebAdmin 通常需要进入世界 / integrated server 后才会出现。本阶段不会自动选择世界；后续应通过 dev-only Minecraft TestBridge 做结构化世界启动，而不是 OS 鼠标坐标点击。
+注意：Fabric `runClient` 启动后，WebAdmin / TestBridge 通常需要进入世界 / integrated server 后才会出现。本阶段不会自动选择世界；后续应通过 dev-only 自动进测试世界能力做结构化世界启动，而不是 OS 鼠标坐标点击。
+
+## Minecraft TestBridge Foundation
+
+TestBridge 是本地开发测试桥，只用于本机自动化测试，不用于生产。
+
+### 启用方式
+
+默认关闭。需要同时设置：
+
+```powershell
+$env:TZZ_TESTBRIDGE_ENABLED = "true"
+$env:TZZ_TESTBRIDGE_TOKEN = "your-local-random-token"
+```
+
+Codex MCP 配置里也要给 `tools/tzz-test-mcp` 进程设置同样的 `TZZ_TESTBRIDGE_TOKEN`。MCP 调用 TestBridge 时会通过 HTTP header `X-TZZ-TestBridge-Token` 发送 token。不要把 token 写进仓库、报告、截图或日志。
+
+如果 WebAdmin URL 不是默认值，可设置：
+
+```powershell
+$env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
+```
+
+`TZZ_TESTBRIDGE_URL` 仍必须是 `127.0.0.1` / `localhost` / `::1` 这类 loopback 地址。
+
+### Server endpoints
+
+- `GET /api/testbridge/status`
+- `GET /api/testbridge/players`
+- `POST /api/testbridge/command`
+- `POST /api/testbridge/world/set-block`
+- `POST /api/testbridge/world/clear-area`
+- `POST /api/testbridge/player/give`
+- `POST /api/testbridge/player/clear-inventory`
+- `POST /api/testbridge/player/set-main-hand`
+- `POST /api/testbridge/player/use-block`
+- `GET|POST /api/testbridge/device/inspect`
+- `GET /api/testbridge/signal/history`
+- `GET /api/testbridge/doctor/issues`
+
+### 安全边界
+
+- TestBridge default disabled。
+- TestBridge loopback-only。
+- TestBridge token required。
+- No token logged。
+- `minecraft.command` 有 allowlist / denylist；`stop`、`op`、`deop`、`ban`、`kick`、`whitelist`、`save-off`、`save-on`、`pardon`、`reload` 等危险命令会被拒绝。
+- `minecraft.set_block` 只能在默认测试区域 `x=-128..128`、`y=-64..320`、`z=-128..128` 内操作。
+- `minecraft.clear_area` 也有最大体积限制 `4096`。
+- `minecraft.give_item` 有数量限制，不支持 raw NBT / components 路径编辑。
+- `minecraft.clear_inventory` 只作用于指定在线玩家。
+- `minecraft.inspect_device`、`minecraft.signal_history`、`minecraft.doctor_issues` 是只读。
+- `minecraft.use_block` 复用生产 `UseBlockCallback`，用于测试 VBD 右键交互时走真实 handler 链路。
+
+### 本轮仍不做
+
+- 不自动点击 Minecraft 主菜单坐标。
+- 不做 OS 级鼠标键盘操作。
+- 不做图像识别点击。
+- 不做 P3b / 7.10 游戏内 GUI 语义操作。
+- 不自动进入世界；后续计划单独实现 Minecraft Auto Enter Test World。
 
 ## 安全边界
 
@@ -277,7 +355,7 @@ MCP 自动化建议使用固定测试账号。首次创建测试账号仍走现�
 - `reports/mcp` 是报告输出目录。
 - `reports/mcp/screenshots` 是截图输出目录。
 - `reports/mcp/runtime` 是 Minecraft dev runtime 日志输出目录。
-- 工具输出会脱敏常见 password、cookie、token、CSRF、authorization、session 字段。
+- 工具输出会脱敏常见 password、cookie、token、CSRF、authorization、session 字段，包括 `X-TZZ-TestBridge-Token` / `TZZ_TESTBRIDGE_TOKEN`。
 - 不处理、不删除、不提交仓库根目录下未跟踪的 `logs/`。
 
 ## 最小 Smoke
@@ -306,6 +384,17 @@ Minecraft dev runtime 本地手工 smoke：
 5. `webadmin.screenshot`
 6. `minecraft.status`
 7. `minecraft.stop`，如果 dev client 未退出则按提示手动关闭。
+
+TestBridge 本地手工 smoke：
+
+1. 设置 `TZZ_TESTBRIDGE_ENABLED=true` 和 `TZZ_TESTBRIDGE_TOKEN`。
+2. `minecraft.start_client`
+3. 手动进入测试世界。
+4. `minecraft.wait_webadmin`
+5. `minecraft.testbridge_status`
+6. `minecraft.players`
+7. 在测试区域内调用 `minecraft.set_block`
+8. 调用 `minecraft.inspect_device` / `minecraft.signal_history` / `minecraft.doctor_issues` 做只读检查。
 
 ## 输出文件
 

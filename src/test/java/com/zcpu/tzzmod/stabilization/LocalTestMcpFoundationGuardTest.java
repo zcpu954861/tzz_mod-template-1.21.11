@@ -39,10 +39,13 @@ public final class LocalTestMcpFoundationGuardTest {
                 "tools/tzz-test-mcp/src/tools/gradle.ts",
                 "tools/tzz-test-mcp/src/tools/logs.ts",
                 "tools/tzz-test-mcp/src/tools/minecraft.ts",
+                "tools/tzz-test-mcp/src/tools/testbridge.ts",
                 "tools/tzz-test-mcp/src/tools/webadmin.ts",
                 "tools/tzz-test-mcp/src/tools/report.ts",
                 "tools/tzz-test-mcp/src/tools/repo.ts",
-                "tools/tzz-test-mcp/src/smoke.ts"
+                "tools/tzz-test-mcp/src/smoke.ts",
+                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeRoutes.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java"
         );
         for (String file : required) {
             requireTrue(Files.isRegularFile(ROOT.resolve(file)), "required file exists: " + file);
@@ -59,6 +62,14 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "Step 1.5 Scope: WebAdmin Password / Test Account Foundation", "context documents password foundation");
         requireContains(context, "Step 2 Scope: Minecraft Dev Runtime Launcher Foundation", "context documents runtime launcher foundation");
         requireContains(context, "does not click Minecraft GUI coordinates", "context forbids coordinate clicking for launcher");
+        requireContains(context, "Step 2.5 Scope: Minecraft TestBridge Foundation", "context documents TestBridge foundation");
+        requireContains(context, "It is default disabled", "context documents TestBridge default disabled");
+        requireContains(context, "It requires loopback / localhost access", "context documents TestBridge loopback-only");
+        requireContains(context, "It requires `TZZ_TESTBRIDGE_TOKEN`", "context documents TestBridge token requirement");
+        requireContains(context, "`minecraft.command` is allowlisted", "context documents Minecraft command allowlist");
+        requireContains(context, "`minecraft.clear_area` also enforces `maxClearVolume=4096`", "context documents clear area volume limit");
+        requireContains(context, "`minecraft.use_block` invokes Minecraft's `UseBlockCallback` production path", "context documents use_block production path");
+        requireContains(context, "Step 2.5 still does not automatically enter a Minecraft world", "context documents no auto world entry");
         requireContains(context, "WebAdmin UI exposes a current-user password change entry", "context documents WebAdmin password UI");
         requireContains(context, "not written to WebAdmin state, browser storage, logs, reports, or URLs", "context documents password UI secret boundary");
         requireContains(context, "`webadmin.login` must verify real authentication state before returning success", "context documents login auth verification");
@@ -111,6 +122,8 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(safety, "redactSecrets", "secret redaction helper exists");
         requireContains(safety, "authorization", "authorization redaction marker");
         requireContains(safety, "x-tzz-webadmin-csrf", "CSRF redaction marker");
+        requireContains(safety, "x-tzz-testbridge-token", "TestBridge token header redaction marker");
+        requireContains(safety, "TZZ_TESTBRIDGE_TOKEN", "TestBridge token env redaction marker");
 
         String gradle = read("tools/tzz-test-mcp/src/tools/gradle.ts");
         String gradleSpawn = read("tools/tzz-test-mcp/src/gradleSpawn.ts");
@@ -175,6 +188,54 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(minecraft, "reportsDir, \"runtime\"", "runtime logs under reports/mcp marker");
         requireFalse(minecraft.contains("`\"${gradlew}\"`"), "minecraft launcher does not pass quoted wrapper literal");
 
+        String testbridge = read("tools/tzz-test-mcp/src/tools/testbridge.ts");
+        requireContains(testbridge, "minecraft.testbridge_status", "minecraft.testbridge_status tool marker");
+        requireContains(testbridge, "minecraft.players", "minecraft.players tool marker");
+        requireContains(testbridge, "minecraft.command", "minecraft.command tool marker");
+        requireContains(testbridge, "minecraft.set_block", "minecraft.set_block tool marker");
+        requireContains(testbridge, "minecraft.clear_area", "minecraft.clear_area tool marker");
+        requireContains(testbridge, "minecraft.give_item", "minecraft.give_item tool marker");
+        requireContains(testbridge, "minecraft.clear_inventory", "minecraft.clear_inventory tool marker");
+        requireContains(testbridge, "minecraft.set_main_hand", "minecraft.set_main_hand tool marker");
+        requireContains(testbridge, "minecraft.use_block", "minecraft.use_block tool marker");
+        requireContains(testbridge, "minecraft.inspect_device", "minecraft.inspect_device tool marker");
+        requireContains(testbridge, "minecraft.signal_history", "minecraft.signal_history tool marker");
+        requireContains(testbridge, "minecraft.doctor_issues", "minecraft.doctor_issues tool marker");
+        requireContains(testbridge, "minecraft.wait_testbridge", "minecraft.wait_testbridge tool marker");
+        requireContains(testbridge, "TZZ_TESTBRIDGE_TOKEN", "MCP TestBridge token env marker");
+        requireContains(testbridge, "X-TZZ-TestBridge-Token", "MCP TestBridge token header marker");
+        requireContains(testbridge, "ensureAllowedUrl", "MCP TestBridge localhost allowlist marker");
+        requireContains(testbridge, "isDangerousCommand", "MCP dangerous command deny marker");
+        requireContains(testbridge, "stop\", \"op\", \"deop\", \"ban\", \"kick\", \"whitelist\"", "MCP dangerous command denylist marker");
+        requireContains(testbridge, "UseBlockCallback", "MCP use_block production-path description marker");
+
+        String testbridgeSecurity = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java");
+        requireContains(testbridgeSecurity, "TZZ_TESTBRIDGE_ENABLED", "server TestBridge default disabled env marker");
+        requireContains(testbridgeSecurity, "TZZ_TESTBRIDGE_TOKEN", "server TestBridge token env marker");
+        requireContains(testbridgeSecurity, "X-TZZ-TestBridge-Token", "server TestBridge token header marker");
+        requireContains(testbridgeSecurity, "isLoopbackAddress", "server TestBridge loopback-only marker");
+        requireContains(testbridgeSecurity, "MessageDigest.isEqual", "server TestBridge constant-time token compare marker");
+
+        String testbridgeRoutes = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeRoutes.java");
+        requireContains(testbridgeRoutes, "/api/testbridge/status", "server TestBridge status route marker");
+        requireContains(testbridgeRoutes, "COMMAND_ALLOWLIST", "server Minecraft command allowlist marker");
+        requireContains(testbridgeRoutes, "COMMAND_DENYLIST", "server Minecraft dangerous command deny marker");
+        requireContains(testbridgeRoutes, "MAX_CLEAR_VOLUME = 4096", "server clear_area max volume marker");
+        requireContains(testbridgeRoutes, "MIN_TEST_X = -128", "server set_block test area min marker");
+        requireContains(testbridgeRoutes, "MAX_TEST_X = 128", "server set_block test area max marker");
+        requireContains(testbridgeRoutes, "MAX_GIVE_COUNT", "server give_item count limit marker");
+        requireContains(testbridgeRoutes, "clearInventory", "server clear_inventory player-scoped marker");
+        requireContains(testbridgeRoutes, "setMainHand", "server set_main_hand marker");
+        requireContains(testbridgeRoutes, "UseBlockCallback.EVENT.invoker().interact", "server use_block reuses production callback marker");
+        requireContains(testbridgeRoutes, "inspectDevice", "server inspect_device read-only marker");
+        requireContains(testbridgeRoutes, "signalHistory", "server signal_history read-only marker");
+        requireContains(testbridgeRoutes, "doctorIssues", "server doctor_issues read-only marker");
+        requireContains(testbridgeRoutes, "WebAdminAuditLogger.testBridge", "server TestBridge audit marker");
+
+        String webAdminServer = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java");
+        requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/\")", "WebAdminServer TestBridge route marker");
+        requireContains(webAdminServer, "testBridgeRoutes.handle", "WebAdminServer delegates TestBridge routes marker");
+
         String readme = read("tools/tzz-test-mcp/README.md");
         requireContains(readme, "## 中文快速开始", "README has Chinese quick start");
         requireContains(readme, "启动后不会输出普通日志", "README documents stdio no stdout guidance");
@@ -188,8 +249,16 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "不要把真实密码", "README forbids committed plaintext passwords");
         requireContains(readme, "Minecraft Dev Runtime Launcher", "README documents runtime launcher");
         requireContains(readme, "没有外网访问", "README documents no external host");
-        requireContains(readme, "不做 Minecraft TestBridge", "README documents no TestBridge");
         requireContains(readme, "不做 GUI 坐标点击", "README documents no coordinate clicking");
+        requireContains(readme, "Minecraft TestBridge Foundation", "README documents TestBridge foundation");
+        requireContains(readme, "TZZ_TESTBRIDGE_ENABLED", "README documents TestBridge enable env");
+        requireContains(readme, "TZZ_TESTBRIDGE_TOKEN", "README documents TestBridge token env");
+        requireContains(readme, "TestBridge default disabled", "README documents TestBridge default disabled");
+        requireContains(readme, "TestBridge loopback-only", "README documents TestBridge loopback-only");
+        requireContains(readme, "TestBridge token required", "README documents TestBridge token required");
+        requireContains(readme, "No token logged", "README documents no token logging");
+        requireContains(readme, "minecraft.use_block", "README documents use_block tool");
+        requireContains(readme, "UseBlockCallback", "README documents use_block production callback");
 
         String userService = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminUserService.java");
         requireContains(userService, "changeOwnPassword", "WebAdmin self password change service marker");
@@ -198,7 +267,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(userService, "WebAdminAuditLogger.userChanged", "password changes write audit marker");
         requireFalse(userService.contains("plainPassword"), "password service does not store plaintext password marker");
 
-        String webAdminServer = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java");
+        webAdminServer = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java");
         requireContains(webAdminServer, "/api/webadmin/users/me/password", "self password API route marker");
         requireContains(webAdminServer, "password-reset", "owner password API route marker");
         requireContains(webAdminServer, "X-TZZ-WebAdmin-CSRF", "password APIs require CSRF marker");
@@ -246,7 +315,6 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("run_command"), "MCP source does not expose arbitrary run_command");
         requireFalse(source.contains("mouse_move"), "MCP source does not expose OS mouse automation");
         requireFalse(source.contains("keyboard"), "MCP source does not expose OS keyboard automation");
-        requireFalse(source.contains("TestBridge"), "MCP source does not implement Minecraft TestBridge");
         requireFalse(source.contains("ConditionEngine"), "MCP source does not enter ConditionEngine");
     }
 

@@ -28,6 +28,9 @@ export function redactSecrets(input: string): string {
     .replace(/(cookie\s*[:=]\s*)([^\n]+)/gi, "$1[redacted]")
     .replace(/(set-cookie\s*[:=]\s*)([^\n]+)/gi, "$1[redacted]")
     .replace(/(x-tzz-webadmin-csrf\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]")
+    .replace(/(x-tzz-testbridge-token\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]")
+    .replace(/(TZZ_TESTBRIDGE_TOKEN\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]")
+    .replace(/(testBridgeToken\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]")
     .replace(/(tzz_webadmin_session\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]")
     .replace(/((?:password|passwd|pwd|token|secret|csrf|sessionId|session)\s*[:=]\s*)([^\s,;]+)/gi, "$1[redacted]");
 }

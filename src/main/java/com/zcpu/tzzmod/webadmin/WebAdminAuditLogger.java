@@ -60,6 +60,20 @@ public final class WebAdminAuditLogger {
         append("write event=" + WebAdminJsonResponse.GSON.toJson(event));
     }
 
+    public static void testBridge(String action, String result, String sourceIp, String detail) {
+        Tzz_mod.LOGGER.info(
+                "[WebAdminAudit] testbridge action={} result={} sourceIp={} detail={}",
+                safe(action),
+                safe(result),
+                safe(sourceIp),
+                safe(detail)
+        );
+        append("testbridge action=" + safe(action)
+                + " result=" + safe(result)
+                + " sourceIp=" + safe(sourceIp)
+                + " detail=" + safe(detail));
+    }
+
     private static synchronized void append(String line) {
         if (!auditEnabled || storagePaths == null) {
             return;
