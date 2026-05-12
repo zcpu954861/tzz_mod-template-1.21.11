@@ -117,6 +117,7 @@ public final class WebAdminFrontendShell {
                           <span id="topbar-clock" class="topbar-clock">--:--:--</span>
                           <span id="current-user" class="topbar-user-name">用户：-</span>
                           <span id="current-role" class="role-badge">角色：-</span>
+                          <button id="change-password" class="wa-btn ghost topbar-password-button" type="button" data-change-password-entry="true"><span data-icon="key"></span><span>修改密码</span></button>
                           <button id="logout" class="wa-btn ghost" type="button"><span data-icon="logout"></span><span>退出登录</span></button>
                         </div>
                       </header>

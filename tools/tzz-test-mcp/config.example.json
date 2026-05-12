@@ -1,0 +1,13 @@
+{
+  "repoRoot": ".",
+  "webAdminUrl": "http://127.0.0.1:18080/",
+  "reportsDir": "reports/mcp",
+  "screenshotsDir": "reports/mcp/screenshots",
+  "allowedHosts": [
+    "127.0.0.1",
+    "localhost",
+    "::1"
+  ],
+  "gradleTimeoutSeconds": 900,
+  "playwrightHeadless": true
+}

@@ -48,6 +48,24 @@ public final class WebAdminSessionService {
         sessionsByHash.remove(WebAdminPasswordHasher.sha256Base64Url(token));
     }
 
+    public synchronized int invalidateUsername(String username, String keepSessionIdHash) {
+        if (username == null || username.isBlank()) {
+            return 0;
+        }
+        int removed = 0;
+        Iterator<Map.Entry<String, WebAdminSession>> iterator = sessionsByHash.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, WebAdminSession> entry = iterator.next();
+            WebAdminSession session = entry.getValue();
+            if (session.username.equalsIgnoreCase(username)
+                    && (keepSessionIdHash == null || keepSessionIdHash.isBlank() || !entry.getKey().equals(keepSessionIdHash))) {
+                iterator.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
     public synchronized int sessionCount() {
         cleanupExpired();
         return sessionsByHash.size();
