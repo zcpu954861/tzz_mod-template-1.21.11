@@ -872,6 +872,171 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
         return Math.max(1, Math.min(64_000, rawCount));
     }
 
+    public JsonObject testBridgeSnapshot(boolean includeSlots, boolean includeInventory) {
+        JsonObject data = testBridgeBaseSnapshot();
+        data.addProperty("itemSubmitEnabled", template.itemSubmitEnabled);
+        data.addProperty("requirementEnabled", template.requirementEnabled);
+        data.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+        data.addProperty("count", template.hasItem() ? template.count : 0);
+        data.addProperty("consumeEnabled", template.consumeEnabled);
+        data.addProperty("consumeOrder", InventoryConsumeOrder.normalize(template.consumeOrder));
+        data.addProperty("consumeCount", template.consumeCount);
+        data.addProperty("vanillaPolicy", InteractionItemVanillaPolicy.normalize(template.vanillaPolicy));
+        JsonObject matcher = new JsonObject();
+        matcher.addProperty("matchDamage", template.matchDamage);
+        matcher.addProperty("matchCustomName", template.matchCustomName);
+        matcher.addProperty("matchLore", template.matchLore);
+        matcher.addProperty("matchCustomData", template.matchCustomData);
+        matcher.addProperty("matchComponents", template.matchComponents);
+        data.add("matcherOptions", matcher);
+        data.add("template", testBridgeTemplateSummary());
+        if (includeSlots) {
+            JsonArray slots = new JsonArray();
+            JsonObject slot = new JsonObject();
+            slot.addProperty("slot", 0);
+            slot.addProperty("slotId", "submit_template");
+            slot.addProperty("editable", true);
+            slot.addProperty("empty", !template.hasItem());
+            slot.add("item", testBridgeStackSummary(template.stack()));
+            slot.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+            slot.addProperty("count", template.hasItem() ? template.count : 0);
+            slot.addProperty("displayStackCount", template.hasItem() ? template.stack().getCount() : 0);
+            slots.add(slot);
+            data.add("slots", slots);
+        }
+        if (includeInventory) {
+            data.add("cursor", testBridgeStackSummary(cursorStack()));
+        }
+        return data;
+    }
+
+    public JsonObject testBridgePutItem(String itemId, int count) {
+        ItemStack displaySource = testBridgeStack(itemId, count);
+        template.replaceWith(displaySource);
+        template.count = clampOperationalCount(count);
+        template.syncStackCount();
+        template.templateDisplayStack = ItemStackDisplaySnapshot.encode(template.displayStack, registryLookup());
+        markTemplateDirty();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "put_item");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeClearSlot() {
+        clearTemplate();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "clear_slot");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSetCount(int count) {
+        if (!template.hasItem()) {
+            throw new IllegalArgumentException("提交模板为空，无法设置数量。");
+        }
+        template.count = clampOperationalCount(count);
+        template.syncStackCount();
+        template.templateDisplayStack = ItemStackDisplaySnapshot.encode(template.displayStack, registryLookup());
+        markTemplateDirty();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "set_count");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("requirementCount", template.count);
+        data.addProperty("displayStackCount", template.stack().getCount());
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSave() {
+        requestSave();
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "save");
+        data.addProperty("saveRequested", saveSent);
+        data.addProperty("usesExistingSessionSavePath", true);
+        return data;
+    }
+
+    public JsonObject testBridgeCancel(String reason) {
+        requestCancel(safe(reason).isBlank() ? "testbridge_cancel" : reason);
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "cancel");
+        data.addProperty("cancelRequested", cancelSent);
+        data.addProperty("usesExistingCancelPath", true);
+        return data;
+    }
+
+    private JsonObject testBridgeBaseSnapshot() {
+        JsonObject data = new JsonObject();
+        data.addProperty("open", true);
+        data.addProperty("supported", true);
+        data.addProperty("type", "single_item_submit");
+        data.addProperty("sessionId", sessionId);
+        data.addProperty("deviceId", deviceId);
+        data.addProperty("targetPlayer", client == null || client.player == null ? "" : client.player.getName().getString());
+        data.addProperty("title", title.getString());
+        data.addProperty("displayName", displayName);
+        data.addProperty("dimension", dimension);
+        data.addProperty("x", x);
+        data.addProperty("y", y);
+        data.addProperty("z", z);
+        data.addProperty("blockId", blockId);
+        data.addProperty("dirty", dirty);
+        data.addProperty("sessionClosing", sessionClosing);
+        data.addProperty("saveSent", saveSent);
+        data.addProperty("cancelSent", cancelSent);
+        data.addProperty("cancelConfirmOpen", cancelConfirmOpen);
+        data.addProperty("notice", noticeMessage);
+        data.addProperty("realInventoryModified", false);
+        JsonArray capabilities = new JsonArray();
+        capabilities.add("current");
+        capabilities.add("slots");
+        capabilities.add("put_item");
+        capabilities.add("clear_slot");
+        capabilities.add("set_count");
+        capabilities.add("save");
+        capabilities.add("cancel");
+        data.add("capabilities", capabilities);
+        return data;
+    }
+
+    private JsonObject testBridgeTemplateSummary() {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", !template.hasItem());
+        data.addProperty("itemId", safe(template.itemId));
+        data.addProperty("count", template.hasItem() ? template.count : 0);
+        data.addProperty("displayStackCount", template.hasItem() ? template.stack().getCount() : 0);
+        data.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+        data.addProperty("hasDisplaySnapshot", !safe(template.templateDisplayStack).isBlank());
+        data.add("item", testBridgeStackSummary(template.stack()));
+        return data;
+    }
+
+    private ItemStack testBridgeStack(String rawItemId, int rawCount) {
+        Identifier id = Identifier.tryParse(safe(rawItemId));
+        if (id == null || !Registries.ITEM.containsId(id)) {
+            throw new IllegalArgumentException("物品 ID 无效或不存在：" + safe(rawItemId));
+        }
+        ItemStack stack = new ItemStack(Registries.ITEM.get(id), 1);
+        stack.setCount(SubmitTemplate.clampStackCount(stack, rawCount));
+        return stack;
+    }
+
+    private JsonObject testBridgeStackSummary(ItemStack stack) {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", stack == null || stack.isEmpty());
+        if (stack == null || stack.isEmpty()) {
+            return data;
+        }
+        data.addProperty("itemId", Registries.ITEM.getId(stack.getItem()).toString());
+        data.addProperty("count", stack.getCount());
+        data.addProperty("maxCount", Math.max(1, stack.getMaxCount()));
+        data.addProperty("displayName", stack.getName().getString());
+        return data;
+    }
+
     private static String nextCountMode(String mode) {
         String clean = ContainerItemCountMode.normalize(mode);
         if (ContainerItemCountMode.AT_LEAST.id().equals(clean)) {

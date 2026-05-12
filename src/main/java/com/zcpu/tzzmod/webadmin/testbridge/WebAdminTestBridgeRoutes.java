@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.webadmin.testbridge;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.sun.net.httpserver.HttpExchange;
@@ -95,6 +96,41 @@ public final class WebAdminTestBridgeRoutes {
             if (path.equals("/api/testbridge/players")) {
                 requireMethod(exchange, method, "GET");
                 WebAdminJsonResponse.ok(exchange, players(server));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/current")) {
+                requireMethod(exchange, method, "GET");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "current", GuiOperationRequest.fromQuery(queryParams(exchange)), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/slots")) {
+                requireMethod(exchange, method, "GET");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "slots", GuiOperationRequest.fromQuery(queryParams(exchange)), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/put-item")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "put_item", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/clear-slot")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "clear_slot", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-count")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_count", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/save")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "save", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/cancel")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "cancel", readJson(exchange, GuiOperationRequest.class), exchange));
                 return;
             }
             if (path.equals("/api/testbridge/command")) {
@@ -248,6 +284,35 @@ public final class WebAdminTestBridgeRoutes {
             WebAdminAuditLogger.testBridge("command", "FAILED", security.sourceIp(exchange), "root=" + root);
             throw new TestBridgeException(400, "COMMAND_FAILED", exception.getMessage());
         }
+    }
+
+    private JsonObject guiOperation(MinecraftServer server, String operation, GuiOperationRequest request, HttpExchange exchange) {
+        GuiOperationRequest safeRequest = request == null ? new GuiOperationRequest("", "", null, null, "", 0, "") : request;
+        if (safe(safeRequest.player).isBlank()) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "GUI 操作需要 player。");
+        }
+        JsonObject body = WebAdminJsonResponse.GSON.toJsonTree(safeRequest).getAsJsonObject();
+        WebAdminTestBridgeClientGuiBridge.Result result = WebAdminTestBridgeClientGuiBridge.request(server, safeRequest.player, operation, body);
+        WebAdminAuditLogger.testBridge("gui_" + operation, result.ok() ? "OK" : "FAILED", security.sourceIp(exchange), "player=" + safe(safeRequest.player) + " code=" + result.code());
+        if (!result.ok()) {
+            throw new TestBridgeException(statusForGuiCode(result.code()), result.code(), result.message());
+        }
+        JsonObject data = result.data() == null ? new JsonObject() : result.data();
+        data.addProperty("testbridgeGuiOperation", operation);
+        data.addProperty("usesClientScreenAbstraction", true);
+        data.addProperty("rawSignalDeviceDataWrite", false);
+        return data;
+    }
+
+    private static int statusForGuiCode(String code) {
+        return switch (safe(code)) {
+            case "NOT_FOUND" -> 404;
+            case "VALIDATION_FAILED" -> 400;
+            case "CLIENT_TIMEOUT" -> 504;
+            case "GUI_NOT_OPEN", "UNSUPPORTED_GUI", "SCREEN_MISMATCH", "CLIENT_TESTBRIDGE_UNAVAILABLE" -> 409;
+            case "SESSION_DENIED", "SESSION_EXPIRED" -> 403;
+            default -> 400;
+        };
     }
 
     private Map<String, Object> setBlock(MinecraftServer server, SetBlockRequest request, HttpExchange exchange) {
@@ -943,6 +1008,20 @@ public final class WebAdminTestBridgeRoutes {
     }
 
     private record UseBlockRequest(String player, String dimension, int x, int y, int z, String hand, String side) {
+    }
+
+    private record GuiOperationRequest(String player, String target, Integer slot, Integer slotIndex, String itemId, int count, String reason) {
+        private static GuiOperationRequest fromQuery(Map<String, String> query) {
+            return new GuiOperationRequest(
+                    query.getOrDefault("player", ""),
+                    query.getOrDefault("target", ""),
+                    null,
+                    null,
+                    "",
+                    0,
+                    ""
+            );
+        }
     }
 
     private record InspectDeviceRequest(String deviceId, String dimension, int x, int y, int z) {

@@ -661,6 +661,174 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
         return Math.max(1, stack.getMaxCount());
     }
 
+    public JsonObject testBridgeSnapshot(boolean includeSlots, boolean includeInventory) {
+        JsonObject data = testBridgeBaseSnapshot();
+        if (includeSlots) {
+            JsonArray slots = new JsonArray();
+            for (int slot = 0; slot < slotCount; slot++) {
+                TemplateCondition condition = conditionForSlot(slot);
+                JsonObject entry = new JsonObject();
+                entry.addProperty("slot", slot);
+                entry.addProperty("slotId", slot);
+                entry.addProperty("editable", true);
+                entry.addProperty("empty", condition == null || condition.stack().isEmpty());
+                if (condition != null) {
+                    entry.add("item", testBridgeStackSummary(condition.stack()));
+                    entry.addProperty("countMode", safe(condition.countMode).isBlank() ? ContainerItemCountMode.AT_LEAST.id() : safe(condition.countMode));
+                    entry.addProperty("count", Math.max(0, condition.count));
+                    entry.add("condition", GSON.toJsonTree(condition.toPayload()));
+                }
+                slots.add(entry);
+            }
+            data.add("slots", slots);
+
+            JsonArray total = new JsonArray();
+            for (TemplateCondition condition : conditions) {
+                if (condition.totalCondition()) {
+                    JsonObject entry = new JsonObject();
+                    entry.addProperty("editable", false);
+                    entry.addProperty("reason", "total_* 条件当前只读保留，不通过 GUI 抽象编辑。");
+                    entry.add("condition", GSON.toJsonTree(condition.toPayload()));
+                    total.add(entry);
+                }
+            }
+            data.add("totalTemplates", total);
+        }
+        if (includeInventory) {
+            data.add("cursor", testBridgeStackSummary(cursorStack()));
+        }
+        return data;
+    }
+
+    public JsonObject testBridgePutItem(int slot, String itemId, int count) {
+        requireEditableSlot(slot);
+        ItemStack source = testBridgeStack(itemId, count);
+        TemplateCondition condition = conditionForSlot(slot);
+        if (condition == null) {
+            condition = TemplateCondition.newSlotItem(slot, source);
+            conditions.add(condition);
+        } else {
+            condition.replaceWith(source);
+        }
+        dirty = true;
+        syncButtons();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "put_item");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeClearSlot(int slot) {
+        requireEditableSlot(slot);
+        clearTemplateSlot(slot);
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "clear_slot");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSetCount(int slot, int count) {
+        requireEditableSlot(slot);
+        TemplateCondition condition = conditionForSlot(slot);
+        if (condition == null || condition.stack().isEmpty()) {
+            throw new IllegalArgumentException("目标模板槽为空，无法设置数量。");
+        }
+        int max = maxCountFor(condition.stack());
+        condition.count = Math.max(1, Math.min(max, count));
+        condition.syncStackCount();
+        dirty = true;
+        syncButtons();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "set_count");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("clampedCount", condition.count);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSave() {
+        requestSave();
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "save");
+        data.addProperty("saveRequested", saveSent);
+        data.addProperty("usesExistingSessionSavePath", true);
+        return data;
+    }
+
+    public JsonObject testBridgeCancel(String reason) {
+        requestCancel(safe(reason).isBlank() ? "testbridge_cancel" : reason);
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "cancel");
+        data.addProperty("cancelRequested", cancelSent);
+        data.addProperty("usesExistingCancelPath", true);
+        return data;
+    }
+
+    private JsonObject testBridgeBaseSnapshot() {
+        JsonObject data = new JsonObject();
+        data.addProperty("open", true);
+        data.addProperty("supported", true);
+        data.addProperty("type", "container_template");
+        data.addProperty("sessionId", sessionId);
+        data.addProperty("deviceId", deviceId);
+        data.addProperty("targetPlayer", client == null || client.player == null ? "" : client.player.getName().getString());
+        data.addProperty("title", title.getString());
+        data.addProperty("displayName", displayName);
+        data.addProperty("dimension", dimension);
+        data.addProperty("x", x);
+        data.addProperty("y", y);
+        data.addProperty("z", z);
+        data.addProperty("blockId", blockId);
+        data.addProperty("dirty", dirty);
+        data.addProperty("sessionClosing", sessionClosing);
+        data.addProperty("saveSent", saveSent);
+        data.addProperty("cancelSent", cancelSent);
+        data.addProperty("cancelConfirmOpen", cancelConfirmOpen);
+        data.addProperty("slotCount", slotCount);
+        data.addProperty("realInventoryModified", false);
+        JsonArray capabilities = new JsonArray();
+        capabilities.add("current");
+        capabilities.add("slots");
+        capabilities.add("put_item");
+        capabilities.add("clear_slot");
+        capabilities.add("set_count");
+        capabilities.add("save");
+        capabilities.add("cancel");
+        data.add("capabilities", capabilities);
+        return data;
+    }
+
+    private void requireEditableSlot(int slot) {
+        if (slot < 0 || slot >= slotCount) {
+            throw new IllegalArgumentException("模板槽越界：" + slot);
+        }
+    }
+
+    private ItemStack testBridgeStack(String rawItemId, int rawCount) {
+        Identifier id = Identifier.tryParse(safe(rawItemId));
+        if (id == null || !Registries.ITEM.containsId(id)) {
+            throw new IllegalArgumentException("物品 ID 无效或不存在：" + safe(rawItemId));
+        }
+        ItemStack stack = new ItemStack(Registries.ITEM.get(id), 1);
+        stack.setCount(Math.max(1, Math.min(maxCountFor(stack), rawCount)));
+        return stack;
+    }
+
+    private JsonObject testBridgeStackSummary(ItemStack stack) {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", stack == null || stack.isEmpty());
+        if (stack == null || stack.isEmpty()) {
+            return data;
+        }
+        data.addProperty("itemId", Registries.ITEM.getId(stack.getItem()).toString());
+        data.addProperty("count", stack.getCount());
+        data.addProperty("maxCount", maxCountFor(stack));
+        data.addProperty("displayName", stack.getName().getString());
+        return data;
+    }
+
     private static final class TemplateCondition {
         private String id;
         private String name;

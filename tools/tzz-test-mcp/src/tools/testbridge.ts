@@ -23,7 +23,14 @@ export function testBridgeTools(): ToolDefinition[] {
     testBridgePrepareTestAreaTool(),
     testBridgePrepareTestPlayerTool(),
     testBridgePrepareTestWorldTool(),
-    testBridgeWaitTool()
+    testBridgeWaitTool(),
+    testBridgeGuiCurrentTool(),
+    testBridgeGuiSlotsTool(),
+    testBridgeGuiPutItemTool(),
+    testBridgeGuiClearSlotTool(),
+    testBridgeGuiSetCountTool(),
+    testBridgeGuiSaveTool(),
+    testBridgeGuiCancelTool()
   ];
 }
 
@@ -494,6 +501,116 @@ function testBridgeWaitTool(): ToolDefinition {
   };
 }
 
+function testBridgeGuiCurrentTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_current",
+    description: "Read the supported Minecraft WebAdmin template GUI currently open on one player. This never uses OS input automation or screen coordinates.",
+    inputSchema: guiPlayerSchema(),
+    readOnlyHint: true,
+    async handler(args, context) {
+      return await requestTool(context.config, "GET", `gui/current?player=${encodeURIComponent(stringArg(args, "player") ?? "")}`, undefined, "Current GUI state returned.");
+    }
+  };
+}
+
+function testBridgeGuiSlotsTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_slots",
+    description: "Read template slots for supported WebAdmin Minecraft GUIs without touching real inventory.",
+    inputSchema: guiPlayerSchema(),
+    readOnlyHint: true,
+    async handler(args, context) {
+      return await requestTool(context.config, "GET", `gui/slots?player=${encodeURIComponent(stringArg(args, "player") ?? "")}`, undefined, "GUI slot state returned.");
+    }
+  };
+}
+
+function testBridgeGuiPutItemTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_put_item",
+    description: "Put a ghost/template item into a supported WebAdmin Minecraft GUI slot. This does not modify real player inventory.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["container_template", "single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        itemId: { type: "string" },
+        count: { type: "number", minimum: 1, maximum: 64000 }
+      },
+      required: ["player", "itemId", "count"]
+    },
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/put-item", guiSlotBody(args), "GUI template item set.");
+    }
+  };
+}
+
+function testBridgeGuiClearSlotTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_clear_slot",
+    description: "Clear one template slot in a supported WebAdmin Minecraft GUI. This does not touch real inventory.",
+    inputSchema: guiSlotSchema(),
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/clear-slot", guiSlotBody(args), "GUI template slot cleared.");
+    }
+  };
+}
+
+function testBridgeGuiSetCountTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_count",
+    description: "Set the template count for a supported WebAdmin Minecraft GUI. Existing GUI clamp rules are applied by the client screen.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["container_template", "single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        count: { type: "number", minimum: 1, maximum: 64000 }
+      },
+      required: ["player", "count"]
+    },
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/set-count", guiSlotBody(args), "GUI template count set.");
+    }
+  };
+}
+
+function testBridgeGuiSaveTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_save",
+    description: "Save the supported WebAdmin Minecraft GUI through its existing session save path.",
+    inputSchema: guiPlayerSchema(),
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/save", guiSlotBody(args), "GUI save requested.");
+    }
+  };
+}
+
+function testBridgeGuiCancelTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_cancel",
+    description: "Cancel the supported WebAdmin Minecraft GUI through its existing cancel path.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        reason: { type: "string" }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/cancel", guiSlotBody(args), "GUI cancel requested.");
+    }
+  };
+}
+
 async function requestTool(
   config: TzzTestMcpConfig,
   method: "GET" | "POST",
@@ -584,6 +701,17 @@ function normalizeCode(code: string): Exclude<ToolErrorCode, "OK"> {
       return "TESTBRIDGE_DISABLED";
     case "TESTBRIDGE_NOT_READY":
       return "TESTBRIDGE_NOT_READY";
+    case "GUI_NOT_OPEN":
+      return "GUI_NOT_OPEN";
+    case "UNSUPPORTED_GUI":
+      return "UNSUPPORTED_GUI";
+    case "SCREEN_MISMATCH":
+      return "VALIDATION_ERROR";
+    case "CLIENT_TIMEOUT":
+      return "TIMEOUT";
+    case "CLIENT_TESTBRIDGE_UNAVAILABLE":
+    case "SCREEN_OPERATION_FAILED":
+      return "COMMAND_FAILED";
     case "COMMAND_DENIED":
       return "COMMAND_DENIED";
     case "NOT_FOUND":
@@ -628,6 +756,48 @@ function playerItemBody(args: JsonObject): JsonObject {
     itemId: stringArg(args, "itemId") ?? "",
     count: intArg(args, "count")
   };
+}
+
+function guiPlayerSchema(): JsonObject {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: { player: { type: "string" } },
+    required: ["player"]
+  };
+}
+
+function guiSlotSchema(): JsonObject {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      player: { type: "string" },
+      target: { type: "string", enum: ["container_template", "single_item_submit"] },
+      slot: { type: "number", minimum: 0 },
+      slotIndex: { type: "number", minimum: 0 }
+    },
+    required: ["player"]
+  };
+}
+
+function guiSlotBody(args: JsonObject): JsonObject {
+  const body: JsonObject = {
+    player: stringArg(args, "player") ?? "",
+    target: stringArg(args, "target") ?? "",
+    itemId: stringArg(args, "itemId") ?? "",
+    count: optionalIntArg(args, "count") ?? 0,
+    reason: stringArg(args, "reason") ?? ""
+  };
+  const slot = optionalIntArg(args, "slot");
+  if (slot !== undefined) {
+    body.slot = slot;
+  }
+  const slotIndex = optionalIntArg(args, "slotIndex");
+  if (slotIndex !== undefined) {
+    body.slotIndex = slotIndex;
+  }
+  return body;
 }
 
 function positionSchema(): JsonObject {

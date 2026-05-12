@@ -311,7 +311,7 @@ $env:TZZ_TEST_WORLD_NAME = "TZZ_MCP_TEST_WORLD"
 - stdout / stderr 写到 `reports/mcp/runtime/*.log`，不写 MCP stdout。
 - 如果当前 MCP session 已启动 dev client，再次调用只返回当前状态。
 - `minecraft.stop` 只停止当前 MCP server session 自己启动的进程；不会扫描或杀掉任意 Java / Minecraft 进程。
-- 如果 dev client 未正常退出，会提示手动关闭，不会扩展为任意进程管理。
+- Windows 下会先请求 managed `runClient` 启动进程优雅退出；如果最初的 `cmd.exe` / Gradle wrapper pid 已经消失但 Java 子进程仍在运行，会执行固定的本机进程查询。查询只匹配当前 repo root、managed world name、启动时间之后的 `runClient` 进程标记（`gradle-wrapper.jar` / `devlaunchinjector.Main`），然后仅对这些候选 pid 使用固定 `taskkill.exe /pid <candidatePid> /t /f`，并短暂等待候选进程全部消失后再返回成功。工具不接受用户输入 pid，不杀任意 Java / Minecraft 进程，也不开放任意 shell。
 - WebAdmin ready 检测只访问 `http://127.0.0.1:18080/`、`localhost` 或 `::1` 这类 loopback 地址。
 
 注意：quick play 只能打开已经存在的测试世界。首次创建 `TZZ_MCP_TEST_WORLD` 仍需要用户在本地手动创建一次，或等待后续 dev-only 世界创建 helper。本工具不会点击 Minecraft 主菜单坐标。
@@ -397,6 +397,50 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 `minecraft.prepare_test_area` 默认清理一个小的已加载测试空间并铺设 `minecraft:stone` 地面；自定义 `min/max` 仍必须位于 TestBridge 测试区域内，且体积不能超过 `4096`。`minecraft.prepare_test_player` 默认只影响指定玩家，不影响其它玩家。
 
 这些准备工具都是结构化 TestBridge endpoint，不依赖 `minecraft.command setblock/give/clear/tp` 拼接测试准备步骤。
+
+## Minecraft GUI Operation Abstraction Foundation
+
+Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打开的 WebAdmin 测试 GUI。它不点击屏幕坐标，不使用 OS 鼠标键盘控制，也不支持任意 Minecraft GUI。
+
+当前支持的 GUI：
+
+- `container_template`：7.9 P3b 容器内容变化模板 GUI。
+- `single_item_submit`：7.10 单物品 itemSubmit 模板 GUI。
+
+新增 MCP 工具：
+
+- `minecraft.gui_current`：读取指定玩家当前 GUI 类型、标题、sessionId、deviceId、dirty/session 状态。
+- `minecraft.gui_slots`：读取受支持 GUI 的模板槽状态。
+- `minecraft.gui_put_item`：把 `itemId/count` 放入 ghost/template 槽，不修改真实玩家物品。
+- `minecraft.gui_clear_slot`：清空模板槽，不影响真实背包。
+- `minecraft.gui_set_count`：设置模板数量，沿用 GUI 现有 clamp 规则。
+- `minecraft.gui_save`：走当前 GUI 的既有 session 保存路径。
+- `minecraft.gui_cancel`：走当前 GUI 的既有取消路径。
+
+示例：
+
+```json
+{"tool":"minecraft.gui_current","arguments":{"player":"Steve"}}
+{"tool":"minecraft.gui_slots","arguments":{"player":"Steve"}}
+{"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","target":"single_item_submit","itemId":"minecraft:diamond","count":3}}
+{"tool":"minecraft.gui_set_count","arguments":{"player":"Steve","target":"single_item_submit","count":3}}
+{"tool":"minecraft.gui_save","arguments":{"player":"Steve"}}
+```
+
+容器模板 GUI 使用 `slot` 或 `slotIndex` 指定模板槽：
+
+```json
+{"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","target":"container_template","slot":0,"itemId":"minecraft:diamond","count":1}}
+```
+
+安全边界：
+
+- GUI 工具仍走 `/api/testbridge/gui/*`，必须 loopback + `X-TZZ-TestBridge-Token`。
+- TestBridge token 不会发给客户端 payload。
+- 只对当前打开的受支持 GUI 生效；其它屏幕返回 `UNSUPPORTED_GUI`，没有屏幕返回 `GUI_NOT_OPEN`。
+- `gui_put_item` 只写 GUI draft 的 ghost/template 数据，不改真实玩家背包，不改真实世界容器。
+- `gui_save` / `gui_cancel` 复用 GUI 已有保存/取消路径，不直接写 `SignalDeviceData` JSON。
+- 本阶段不自动打开 P3b / 7.10 GUI；请先通过 WebAdmin 或现有 session 入口打开目标 GUI，再调用这些工具。
 
 ## 安全边界
 

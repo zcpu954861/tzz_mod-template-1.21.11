@@ -45,7 +45,13 @@ public final class LocalTestMcpFoundationGuardTest {
                 "tools/tzz-test-mcp/src/tools/repo.ts",
                 "tools/tzz-test-mcp/src/smoke.ts",
                 "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeRoutes.java",
-                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java"
+                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeClientGuiBridge.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeGuiServer.java",
+                "src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminTestBridgeGuiClient.java",
+                "src/main/java/com/zcpu/tzzmod/network/WebAdminTestBridgeGuiPayloads.java",
+                "src/main/java/com/zcpu/tzzmod/network/WebAdminTestBridgeGuiS2CPayload.java",
+                "src/main/java/com/zcpu/tzzmod/network/WebAdminTestBridgeGuiC2SPayload.java"
         );
         for (String file : required) {
             requireTrue(Files.isRegularFile(ROOT.resolve(file)), "required file exists: " + file);
@@ -80,6 +86,23 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "`minecraft.prepare_test_world`", "context documents prepare_test_world tool");
         requireContains(context, "Step 3 still does not:", "context documents Step 3 forbidden scope");
         requireContains(context, "Click Minecraft GUI coordinates", "context forbids GUI coordinate click in Step 3");
+        requireContains(context, "Step 4 Scope: Minecraft GUI Operation Abstraction Foundation", "context documents Step 4 foundation");
+        requireContains(context, "`container_template`: the 7.9 P3b container content-change template GUI", "context documents container template GUI support");
+        requireContains(context, "`single_item_submit`: the 7.10 single itemSubmit template GUI", "context documents single itemSubmit GUI support");
+        requireContains(context, "server sends a nonce-bound S2C GUI operation request", "context documents client-side GUI payload architecture");
+        requireContains(context, "TestBridge token is never sent to the client payload", "context documents token not sent to client payload");
+        requireContains(context, "`minecraft.gui_current`", "context documents gui_current tool");
+        requireContains(context, "`minecraft.gui_slots`", "context documents gui_slots tool");
+        requireContains(context, "`minecraft.gui_put_item`", "context documents gui_put_item tool");
+        requireContains(context, "`minecraft.gui_clear_slot`", "context documents gui_clear_slot tool");
+        requireContains(context, "`minecraft.gui_set_count`", "context documents gui_set_count tool");
+        requireContains(context, "`minecraft.gui_save`", "context documents gui_save tool");
+        requireContains(context, "`minecraft.gui_cancel`", "context documents gui_cancel tool");
+        requireContains(context, "does not modify real player inventory or real world containers", "context documents ghost item safety");
+        requireContains(context, "does not directly write `SignalDeviceData`", "context documents no raw SignalDeviceData write");
+        requireContains(context, "Unsupported screens return `UNSUPPORTED_GUI`; no screen returns `GUI_NOT_OPEN`", "context documents unsupported GUI errors");
+        requireContains(context, "Step 4 still does not:", "context documents Step 4 forbidden scope");
+        requireContains(context, "Support arbitrary Minecraft screens", "context forbids arbitrary GUI support");
         requireContains(context, "WebAdmin UI exposes a current-user password change entry", "context documents WebAdmin password UI");
         requireContains(context, "not written to WebAdmin state, browser storage, logs, reports, or URLs", "context documents password UI secret boundary");
         requireContains(context, "`webadmin.login` must verify real authentication state before returning success", "context documents login auth verification");
@@ -206,6 +229,18 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(minecraft, "windowsHide: false", "minecraft client window is visible marker");
         requireContains(minecraft, "ensureAllowedUrl", "minecraft wait_webadmin uses URL allowlist");
         requireContains(minecraft, "only the runClient process started by this MCP session", "stop only managed process marker");
+        requireContains(minecraft, "WINDOWS_MANAGED_PROCESS_TREE_STOP", "Windows managed process tree stop marker");
+        requireContains(minecraft, "\"taskkill.exe\"", "Windows taskkill fixed command marker");
+        requireContains(minecraft, "[\"/pid\", pidText, \"/t\", \"/f\"]", "Windows taskkill uses managed pid argv marker");
+        requireContains(minecraft, "runtime.pid", "stop fallback uses recorded managed pid marker");
+        requireContains(minecraft, "WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY", "Windows fixed runClient process query marker");
+        requireContains(minecraft, "\"powershell.exe\"", "Windows process query uses fixed PowerShell executable marker");
+        requireContains(minecraft, "$name -ne 'java.exe' -and $name -ne 'java'", "Windows process query only matches Java processes marker");
+        requireContains(minecraft, "gradle-wrapper.jar", "Windows process query limited to Gradle wrapper runClient marker");
+        requireContains(minecraft, "devlaunchinjector.Main", "Windows process query limited to Minecraft dev client marker");
+        requireContains(minecraft, "config.repoRoot", "Windows process query filters by repo root marker");
+        requireContains(minecraft, "runtime.worldName", "Windows process query filters by managed world marker");
+        requireContains(minecraft, "waitForNoWindowsManagedRunClientProcesses", "Windows stop waits for managed runClient processes to disappear marker");
         requireContains(minecraft, "reportsDir, \"runtime\"", "runtime logs under reports/mcp marker");
         requireFalse(minecraft.contains("`\"${gradlew}\"`"), "minecraft launcher does not pass quoted wrapper literal");
 
@@ -227,6 +262,21 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "minecraft.prepare_test_player", "minecraft.prepare_test_player tool marker");
         requireContains(testbridge, "minecraft.prepare_test_world", "minecraft.prepare_test_world tool marker");
         requireContains(testbridge, "minecraft.wait_testbridge", "minecraft.wait_testbridge tool marker");
+        requireContains(testbridge, "minecraft.gui_current", "minecraft.gui_current tool marker");
+        requireContains(testbridge, "minecraft.gui_slots", "minecraft.gui_slots tool marker");
+        requireContains(testbridge, "minecraft.gui_put_item", "minecraft.gui_put_item tool marker");
+        requireContains(testbridge, "minecraft.gui_clear_slot", "minecraft.gui_clear_slot tool marker");
+        requireContains(testbridge, "minecraft.gui_set_count", "minecraft.gui_set_count tool marker");
+        requireContains(testbridge, "minecraft.gui_save", "minecraft.gui_save tool marker");
+        requireContains(testbridge, "minecraft.gui_cancel", "minecraft.gui_cancel tool marker");
+        requireContains(testbridge, "gui/current", "MCP gui_current endpoint marker");
+        requireContains(testbridge, "gui/slots", "MCP gui_slots endpoint marker");
+        requireContains(testbridge, "gui/put-item", "MCP gui_put_item endpoint marker");
+        requireContains(testbridge, "gui/clear-slot", "MCP gui_clear_slot endpoint marker");
+        requireContains(testbridge, "gui/set-count", "MCP gui_set_count endpoint marker");
+        requireContains(testbridge, "gui/save", "MCP gui_save endpoint marker");
+        requireContains(testbridge, "gui/cancel", "MCP gui_cancel endpoint marker");
+        requireContains(testbridge, "This does not modify real player inventory", "MCP gui_put_item real inventory safety marker");
         requireContains(testbridge, "TZZ_TESTBRIDGE_TOKEN", "MCP TestBridge token env marker");
         requireContains(testbridge, "X-TZZ-TestBridge-Token", "MCP TestBridge token header marker");
         requireContains(testbridge, "ensureAllowedUrl", "MCP TestBridge localhost allowlist marker");
@@ -269,10 +319,54 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridgeRoutes, "signalHistory", "server signal_history read-only marker");
         requireContains(testbridgeRoutes, "doctorIssues", "server doctor_issues read-only marker");
         requireContains(testbridgeRoutes, "WebAdminAuditLogger.testBridge", "server TestBridge audit marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/current", "server gui_current route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/slots", "server gui_slots route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/put-item", "server gui_put_item route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/clear-slot", "server gui_clear_slot route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-count", "server gui_set_count route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/save", "server gui_save route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/cancel", "server gui_cancel route marker");
+        requireContains(testbridgeRoutes, "WebAdminTestBridgeClientGuiBridge.request", "server gui route uses client screen bridge marker");
+        requireContains(testbridgeRoutes, "rawSignalDeviceDataWrite", "server gui route raw SignalDeviceData write false marker");
 
         String webAdminServer = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java");
+        requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/gui/\")", "WebAdminServer direct GUI TestBridge route marker");
         requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/\")", "WebAdminServer TestBridge route marker");
         requireContains(webAdminServer, "testBridgeRoutes.handle", "WebAdminServer delegates TestBridge routes marker");
+
+        String guiBridge = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeClientGuiBridge.java");
+        requireContains(guiBridge, "WebAdminTestBridgeGuiS2CPayload", "server GUI bridge sends S2C marker");
+        requireContains(guiBridge, "WebAdminTestBridgeGuiC2SPayload", "server GUI bridge receives C2S marker");
+        requireContains(guiBridge, "SESSION_DENIED", "server GUI bridge nonce/player validation marker");
+        requireContains(guiBridge, "CLIENT_TIMEOUT", "server GUI bridge timeout marker");
+        requireContains(guiBridge, "put_item\", \"clear_slot\", \"set_count\", \"save\", \"cancel", "server GUI bridge allowlisted operations marker");
+
+        String guiClient = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminTestBridgeGuiClient.java");
+        requireContains(guiClient, "client.currentScreen", "client GUI bridge reads current screen marker");
+        requireContains(guiClient, "WebAdminContainerTemplatePreviewScreen", "client GUI bridge supports container template marker");
+        requireContains(guiClient, "WebAdminSingleItemSubmitTemplateScreen", "client GUI bridge supports single itemSubmit marker");
+        requireContains(guiClient, "UNSUPPORTED_GUI", "client GUI bridge unsupported GUI marker");
+        requireContains(guiClient, "GUI_NOT_OPEN", "client GUI bridge no GUI marker");
+
+        String containerScreen = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplatePreviewScreen.java");
+        requireContains(containerScreen, "testBridgePutItem", "container GUI testbridge put item marker");
+        requireContains(containerScreen, "testBridgeClearSlot", "container GUI testbridge clear slot marker");
+        requireContains(containerScreen, "testBridgeSetCount", "container GUI testbridge set count marker");
+        requireContains(containerScreen, "testBridgeSave", "container GUI testbridge save marker");
+        requireContains(containerScreen, "testBridgeCancel", "container GUI testbridge cancel marker");
+        requireContains(containerScreen, "requestSave();", "container GUI testbridge save uses existing save path marker");
+        requireContains(containerScreen, "requestCancel", "container GUI testbridge cancel uses existing cancel path marker");
+        requireContains(containerScreen, "realInventoryModified", "container GUI testbridge no real inventory modification marker");
+
+        String singleSubmitScreen = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminSingleItemSubmitTemplateScreen.java");
+        requireContains(singleSubmitScreen, "testBridgePutItem", "single itemSubmit GUI testbridge put item marker");
+        requireContains(singleSubmitScreen, "testBridgeClearSlot", "single itemSubmit GUI testbridge clear slot marker");
+        requireContains(singleSubmitScreen, "testBridgeSetCount", "single itemSubmit GUI testbridge set count marker");
+        requireContains(singleSubmitScreen, "testBridgeSave", "single itemSubmit GUI testbridge save marker");
+        requireContains(singleSubmitScreen, "testBridgeCancel", "single itemSubmit GUI testbridge cancel marker");
+        requireContains(singleSubmitScreen, "requestSave();", "single itemSubmit GUI testbridge save uses existing save path marker");
+        requireContains(singleSubmitScreen, "requestCancel", "single itemSubmit GUI testbridge cancel uses existing cancel path marker");
+        requireContains(singleSubmitScreen, "realInventoryModified", "single itemSubmit GUI testbridge no real inventory modification marker");
 
         String readme = read("tools/tzz-test-mcp/README.md");
         requireContains(readme, "## 中文快速开始", "README has Chinese quick start");
@@ -307,6 +401,18 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "minecraft.prepare_test_world", "README documents prepare_test_world marker");
         requireContains(readme, "Auto Enter Test World / Prepare Tools", "README documents Step 3 section marker");
         requireContains(readme, "不会点击 Minecraft 主菜单坐标", "README documents no GUI coordinate click for auto-enter");
+        requireContains(readme, "Minecraft GUI Operation Abstraction Foundation", "README documents Step 4 GUI abstraction section");
+        requireContains(readme, "minecraft.gui_current", "README documents gui_current tool");
+        requireContains(readme, "minecraft.gui_slots", "README documents gui_slots tool");
+        requireContains(readme, "minecraft.gui_put_item", "README documents gui_put_item tool");
+        requireContains(readme, "minecraft.gui_clear_slot", "README documents gui_clear_slot tool");
+        requireContains(readme, "minecraft.gui_set_count", "README documents gui_set_count tool");
+        requireContains(readme, "minecraft.gui_save", "README documents gui_save tool");
+        requireContains(readme, "minecraft.gui_cancel", "README documents gui_cancel tool");
+        requireContains(readme, "不改真实玩家背包", "README documents GUI real inventory safety");
+        requireContains(readme, "不直接写 `SignalDeviceData` JSON", "README documents no raw SignalDeviceData write");
+        requireContains(readme, "UNSUPPORTED_GUI", "README documents unsupported GUI error");
+        requireContains(readme, "GUI_NOT_OPEN", "README documents no GUI error");
 
         String userService = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminUserService.java");
         requireContains(userService, "changeOwnPassword", "WebAdmin self password change service marker");
@@ -362,6 +468,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("Remove-Item"), "MCP source does not expose PowerShell deletion");
         requireFalse(source.contains("run_command"), "MCP source does not expose arbitrary run_command");
         requireFalse(source.contains("mouse_move"), "MCP source does not expose OS mouse automation");
+        requireFalse(source.contains("page.mouse"), "MCP source does not expose Playwright mouse automation");
+        requireFalse(source.contains("mouse.click"), "MCP source does not expose mouse coordinate clicking");
+        requireFalse(source.contains("SendInput"), "MCP source does not expose OS SendInput automation");
+        requireFalse(source.contains("robotjs"), "MCP source does not expose robotjs automation");
+        requireFalse(source.contains("nutjs"), "MCP source does not expose nutjs automation");
+        requireFalse(source.contains("pyautogui"), "MCP source does not expose pyautogui automation");
         requireFalse(source.contains("keyboard"), "MCP source does not expose OS keyboard automation");
         requireFalse(source.contains("ConditionEngine"), "MCP source does not enter ConditionEngine");
     }

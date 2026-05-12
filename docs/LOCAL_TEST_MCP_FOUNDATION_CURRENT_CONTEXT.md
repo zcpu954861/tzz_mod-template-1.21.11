@@ -89,6 +89,7 @@ Step 2 adds a local launcher foundation for the Fabric dev client so a local Cod
 - Runtime stdout/stderr are written under `reports/mcp/runtime`.
 - `minecraft.wait_webadmin` only polls the configured localhost / loopback WebAdmin URL.
 - `minecraft.stop` only stops the process started by the current MCP server session and never kills arbitrary Java processes.
+- On Windows, `minecraft.stop` first requests a graceful stop for the managed `cmd.exe` / Gradle wrapper process. If that launcher pid has already disappeared while Gradle / Minecraft Java children continue running, it runs a fixed local process query that is constrained by the repo root, managed world name, launch time, and `runClient` command markers (`gradle-wrapper.jar` / `devlaunchinjector.Main`). It then uses fixed `taskkill.exe /pid <candidatePid> /t /f` only for those MCP-managed candidates and waits briefly for the candidates to disappear before reporting success. It does not accept a user-provided pid, does not kill arbitrary Java processes, and does not expose shell execution.
 - This step does not enter a Minecraft world automatically.
 - This step does not implement Minecraft TestBridge.
 - This step does not click Minecraft GUI coordinates or use OS mouse / keyboard automation.
@@ -237,6 +238,69 @@ Step 3 still does not:
 - Automate P3b / 7.10 in-game GUI interactions.
 - Add arbitrary shell, git mutation, external host access, or dangerous Minecraft commands.
 
+## Step 4 Scope: Minecraft GUI Operation Abstraction Foundation
+
+Step 4 adds a dev-only semantic GUI operation layer for supported WebAdmin Minecraft test GUIs. It lets local Codex MCP tools inspect and operate the current supported in-game screen by screen type, slot id, and action name. It still does not use OS mouse / keyboard automation, image recognition, or coordinate clicking.
+
+Supported GUI types:
+
+- `container_template`: the 7.9 P3b container content-change template GUI.
+- `single_item_submit`: the 7.10 single itemSubmit template GUI.
+- `unsupported`: any other currently open screen.
+- `none`: no current screen.
+
+Architecture:
+
+- HTTP endpoints stay under `/api/testbridge/gui/*`.
+- The HTTP TestBridge route remains loopback-only and token-protected.
+- Server-side TestBridge does not directly access `MinecraftClient.currentScreen`.
+- GUI operations use a dev-only client screen payload round trip:
+  - server sends a nonce-bound S2C GUI operation request to the target player;
+  - the target client executes the operation on the current supported screen;
+  - the client returns a nonce-bound C2S result;
+  - the HTTP request returns the structured result or a clear error.
+- The TestBridge token is never sent to the client payload.
+- Unsupported screens return `UNSUPPORTED_GUI`; no screen returns `GUI_NOT_OPEN`.
+
+Step 4 endpoints:
+
+- `GET /api/testbridge/gui/current`
+- `GET /api/testbridge/gui/slots`
+- `POST /api/testbridge/gui/put-item`
+- `POST /api/testbridge/gui/clear-slot`
+- `POST /api/testbridge/gui/set-count`
+- `POST /api/testbridge/gui/save`
+- `POST /api/testbridge/gui/cancel`
+
+Step 4 MCP tools:
+
+- `minecraft.gui_current`
+- `minecraft.gui_slots`
+- `minecraft.gui_put_item`
+- `minecraft.gui_clear_slot`
+- `minecraft.gui_set_count`
+- `minecraft.gui_save`
+- `minecraft.gui_cancel`
+
+GUI operation semantics:
+
+- `minecraft.gui_current` returns current GUI type, title, target player, session id, device id, dirty state, and terminal/session flags.
+- `minecraft.gui_slots` returns editable template slots for supported GUIs. Container template slots are indexed by slot number; single itemSubmit exposes one `submit_template` slot.
+- `minecraft.gui_put_item` creates or replaces a ghost/template item from an item id/count spec and does not modify real player inventory or real world containers.
+- `minecraft.gui_clear_slot` clears only the ghost/template slot.
+- `minecraft.gui_set_count` uses the existing GUI count rules. Container template stack counts clamp to the item max stack count. Single itemSubmit keeps requirement count separate from display stack count.
+- `minecraft.gui_save` calls the existing GUI session save path and does not directly write `SignalDeviceData`.
+- `minecraft.gui_cancel` calls the existing GUI cancel path and releases the existing session/lock lifecycle.
+
+Step 4 still does not:
+
+- Support arbitrary Minecraft screens.
+- Click Minecraft GUI coordinates.
+- Use OS-level input control or image-recognition clicking.
+- Directly write `SignalDeviceData` JSON.
+- Bypass existing WebAdmin session save / cancel validation.
+- Automate full P3b / 7.10 GUI opening flows; use existing WebAdmin or session tools to open the supported GUI first.
+
 ## Later Planning
 
 Recommended later work should build on the dev-only TestBridge instead of OS coordinate clicking:
@@ -244,5 +308,5 @@ Recommended later work should build on the dev-only TestBridge instead of OS coo
 - Create a missing named test world through controlled in-mod hooks if quick play existing-world startup is not enough.
 - Execute approved `/tzz` setup commands.
 - Read game state through structured test APIs.
-- Drive in-game GUI abstractions by semantic slot/action rather than screen coordinates.
-- Add Step 4 semantic GUI tools such as `mc.gui.current`, `mc.gui.slot`, `mc.gui.click_template_slot`, `mc.gui.save`, and `mc.gui.cancel`.
+- Add higher-level scenario suites that open the target WebAdmin GUI, operate it through Step 4 semantic tools, inspect device state, run `minecraft.use_block`, check signal history, and write a report.
+- Add later GUI field operations for single itemSubmit count mode / consume / matcher options / vanilla policy if needed.

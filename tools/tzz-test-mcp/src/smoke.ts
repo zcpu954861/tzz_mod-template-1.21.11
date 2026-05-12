@@ -42,7 +42,14 @@ async function main(): Promise<void> {
     "minecraft.prepare_test_area",
     "minecraft.prepare_test_player",
     "minecraft.prepare_test_world",
-    "minecraft.wait_testbridge"
+    "minecraft.wait_testbridge",
+    "minecraft.gui_current",
+    "minecraft.gui_slots",
+    "minecraft.gui_put_item",
+    "minecraft.gui_clear_slot",
+    "minecraft.gui_set_count",
+    "minecraft.gui_save",
+    "minecraft.gui_cancel"
   ];
   for (const name of required) {
     assert(tools.includes(name), `missing tool ${name}`);

@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { JsonObject, ToolDefinition, TzzTestMcpConfig } from "../types.js";
@@ -11,7 +11,10 @@ type RuntimeState = {
   child?: ChildProcessWithoutNullStreams;
   pid?: number;
   startedAt?: string;
+  startedAtMs?: number;
   preset?: string;
+  worldName?: string;
+  autoEnterWorld?: boolean;
   logFile?: string;
   lastExitCode?: number | null;
   lastSignal?: string;
@@ -22,6 +25,41 @@ const runtime: RuntimeState = {};
 const RUN_CLIENT_ARGS = ["--no-daemon", "runClient"] as const;
 const QUICK_PLAY_SINGLEPLAYER_FLAG = "--quickPlaySingleplayer";
 const DEFAULT_TEST_WORLD_NAME = "TZZ_MCP_TEST_WORLD";
+const WINDOWS_MANAGED_PROCESS_TREE_STOP = "taskkill.exe";
+const WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY = "powershell.exe";
+const WINDOWS_RUNCLIENT_PROCESS_QUERY_SCRIPT = `
+& {
+param(
+  [string]$repo,
+  [string]$world,
+  [Int64]$startedMs
+)
+$ErrorActionPreference = 'Stop'
+$started = [DateTimeOffset]::FromUnixTimeMilliseconds($startedMs).UtcDateTime.AddSeconds(-60)
+$comparison = [System.StringComparison]::OrdinalIgnoreCase
+$items = @()
+Get-CimInstance Win32_Process | ForEach-Object {
+  $cmd = [string]$_.CommandLine
+  if ([string]::IsNullOrWhiteSpace($cmd)) { return }
+  $name = [string]$_.Name
+  if ($name -ne 'java.exe' -and $name -ne 'java') { return }
+  if ($cmd.IndexOf($repo, $comparison) -lt 0) { return }
+  $isWrapper = $cmd.IndexOf('gradle-wrapper.jar', $comparison) -ge 0 -and $cmd.IndexOf('runClient', $comparison) -ge 0
+  $isClient = $cmd.IndexOf('devlaunchinjector.Main', $comparison) -ge 0 -and $cmd.IndexOf('runClient', $comparison) -ge 0
+  if (-not ($isWrapper -or $isClient)) { return }
+  if ($world -and $cmd.IndexOf($world, $comparison) -lt 0) { return }
+  $created = $_.CreationDate
+  if ($created -and $created.ToUniversalTime() -lt $started) { return }
+  $items += [pscustomobject]@{
+    pid = [int]$_.ProcessId
+    parentPid = [int]$_.ParentProcessId
+    name = $name
+    kind = $(if ($isWrapper) { 'gradle-wrapper' } else { 'minecraft-client' })
+  }
+}
+@($items) | ConvertTo-Json -Compress
+}
+`;
 
 export function minecraftTools(): ToolDefinition[] {
   return [
@@ -151,6 +189,21 @@ function minecraftStopTool(): ToolDefinition {
       if (stopped) {
         return ok("MCP-managed Minecraft dev client stopped.", await statusData(context.config));
       }
+      if (process.platform === "win32" && runtime.pid && runtime.pid > 0) {
+        const forced = await stopWindowsManagedProcessTree(context.config, child, Math.min(45000, Math.max(15000, timeoutMs)));
+        if (forced.ok) {
+          markRuntimeStoppedAfterFallback("windows-managed-process-tree");
+          return ok("MCP-managed Minecraft dev client stopped after Windows managed process tree fallback.", {
+            ...(await statusData(context.config)),
+            stopFallback: forced
+          });
+        }
+        runtime.lastError = forced.error;
+        return fail("COMMAND_FAILED", "Managed process did not exit after SIGTERM or Windows managed process tree fallback; close the Minecraft dev client manually.", {
+          ...(await statusData(context.config)),
+          stopFallback: forced
+        });
+      }
       return fail("COMMAND_FAILED", "Managed process did not exit after SIGTERM; close the Minecraft dev client manually.", await statusData(context.config));
     }
   };
@@ -177,8 +230,11 @@ function startRunClient(config: TzzTestMcpConfig, options: { autoEnterWorld: boo
 
   runtime.child = child;
   runtime.pid = child.pid ?? 0;
-  runtime.startedAt = new Date().toISOString();
+  runtime.startedAtMs = Date.now();
+  runtime.startedAt = new Date(runtime.startedAtMs).toISOString();
   runtime.preset = "runClient";
+  runtime.worldName = launch.worldName;
+  runtime.autoEnterWorld = launch.autoEnterWorld;
   runtime.logFile = logFile;
   delete runtime.lastExitCode;
   delete runtime.lastSignal;
@@ -252,6 +308,8 @@ async function statusData(config: TzzTestMcpConfig, logLines = 80): Promise<Json
     pid: runtime.pid ?? 0,
     startedAt: runtime.startedAt ?? "",
     preset: runtime.preset ?? "",
+    worldName: runtime.worldName ?? "",
+    autoEnterWorld: runtime.autoEnterWorld === true,
     logFile: runtime.logFile ?? "",
     lastExitCode: runtime.lastExitCode ?? null,
     lastSignal: runtime.lastSignal ?? "",
@@ -323,9 +381,27 @@ function readRuntimeLogTail(lines: number): string {
   return tailText(selected, 32768).text;
 }
 
+function appendRuntimeLog(line: string): void {
+  const file = runtime.logFile;
+  if (!file) {
+    return;
+  }
+  try {
+    appendFileSync(file, `${line}\n`, "utf8");
+  } catch {
+    // Runtime log append failures should not mask stop results.
+  }
+}
+
 function isManagedProcessRunning(): boolean {
   const child = runtime.child;
   return Boolean(child && child.exitCode === null && runtime.lastExitCode === undefined);
+}
+
+function markRuntimeStoppedAfterFallback(signal: string): void {
+  runtime.lastExitCode = runtime.lastExitCode ?? null;
+  runtime.lastSignal = runtime.lastSignal || signal;
+  delete runtime.child;
 }
 
 function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
@@ -333,12 +409,213 @@ function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): 
     return Promise.resolve(true);
   }
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(false), timeoutMs);
-    child.once("close", () => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       clearTimeout(timer);
-      resolve(true);
-    });
+      child.off("close", onClose);
+      resolve(value);
+    };
+    const onClose = () => finish(true);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    child.once("close", onClose);
   });
+}
+
+async function stopWindowsManagedProcessTree(config: TzzTestMcpConfig, child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<{ ok: boolean; command: string; pid: number; exitCode: number | null; signal: string; error: string; discoveredPids: number[]; remainingPids: number[]; attempts: JsonObject[] }> {
+  const attempts: JsonObject[] = [];
+  const managedPid = runtime.pid ?? 0;
+  let firstError = "";
+  if (managedPid > 0) {
+    const initial = await taskkillWindowsPid(managedPid, timeoutMs);
+    attempts.push(initial);
+    if (!initial.ok && initial.error) {
+      firstError = initial.error;
+    }
+  }
+  if (await waitForExit(child, 3000)) {
+    return {
+      ok: true,
+      command: WINDOWS_MANAGED_PROCESS_TREE_STOP,
+      pid: managedPid,
+      exitCode: null,
+      signal: "",
+      error: "",
+      discoveredPids: [],
+      remainingPids: [],
+      attempts
+    };
+  }
+  const discovered = await findWindowsManagedRunClientProcesses(config);
+  const discoveredPids = discovered.map((item) => item.pid);
+  for (const candidate of discovered) {
+    if (candidate.pid === managedPid) {
+      continue;
+    }
+    attempts.push(await taskkillWindowsPid(candidate.pid, timeoutMs));
+  }
+  const childStopped = await waitForExit(child, 3000);
+  const remaining = await waitForNoWindowsManagedRunClientProcesses(config, Math.max(20000, timeoutMs));
+  const remainingPids = remaining.map((item) => item.pid);
+  const stoppedByCandidates = discoveredPids.length > 0 && remainingPids.length === 0;
+  return {
+    ok: childStopped || stoppedByCandidates,
+    command: WINDOWS_MANAGED_PROCESS_TREE_STOP,
+    pid: managedPid,
+    exitCode: null,
+    signal: childStopped ? "child-close" : (stoppedByCandidates ? "safe-candidate-stop" : ""),
+    error: remainingPids.length ? `managed runClient processes still running: ${remainingPids.join(", ")}` : firstError,
+    discoveredPids,
+    remainingPids,
+    attempts
+  };
+}
+
+function taskkillWindowsPid(pid: number, timeoutMs: number): Promise<JsonObject & { ok: boolean; error: string }> {
+  return new Promise((resolve) => {
+    const pidText = String(pid);
+    appendRuntimeLog(`[mcp stop fallback] ${WINDOWS_MANAGED_PROCESS_TREE_STOP} /pid ${pidText} /t /f`);
+    const killer = spawn(WINDOWS_MANAGED_PROCESS_TREE_STOP, ["/pid", pidText, "/t", "/f"], {
+      shell: false,
+      windowsHide: true,
+      env: process.env
+    });
+    let stderr = "";
+    let exitCode: number | null = null;
+    let signal = "";
+    let settled = false;
+    const finish = (okValue: boolean, error = "") => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      killer.off("close", onKillerClose);
+      killer.off("error", onKillerError);
+      resolve({
+        ok: okValue,
+        command: WINDOWS_MANAGED_PROCESS_TREE_STOP,
+        pid,
+        exitCode,
+        signal,
+        error: redactSecrets(error || stderr.trim())
+      });
+    };
+    const onKillerClose = (code: number | null, closeSignal: NodeJS.Signals | null) => {
+      exitCode = code;
+      signal = closeSignal ?? "";
+      finish(code === 0);
+    };
+    const onKillerError = (error: Error) => {
+      stderr += `${error.name}: ${error.message}\n`;
+      finish(false, error.message);
+    };
+    const timer = setTimeout(() => {
+      finish(false, `${WINDOWS_MANAGED_PROCESS_TREE_STOP} timed out`);
+    }, timeoutMs);
+    killer.stdout.on("data", (chunk: Buffer) => appendRuntimeLog(`[mcp stop fallback stdout] ${redactSecrets(chunk.toString("utf8").trim())}`));
+    killer.stderr.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      stderr += text;
+      appendRuntimeLog(`[mcp stop fallback stderr] ${redactSecrets(text.trim())}`);
+    });
+    killer.once("close", onKillerClose);
+    killer.once("error", onKillerError);
+  });
+}
+
+function findWindowsManagedRunClientProcesses(config: TzzTestMcpConfig): Promise<Array<{ pid: number; parentPid: number; name: string; kind: string }>> {
+  return new Promise((resolve) => {
+    const startedAtMs = runtime.startedAtMs ?? Date.now();
+    appendRuntimeLog(`[mcp stop fallback] ${WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY} fixed runClient process query`);
+    const query = spawn(WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY, [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      WINDOWS_RUNCLIENT_PROCESS_QUERY_SCRIPT,
+      config.repoRoot,
+      runtime.worldName ?? "",
+      String(startedAtMs)
+    ], {
+      shell: false,
+      windowsHide: true,
+      env: process.env
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      query.off("close", finish);
+      query.off("error", onError);
+      if (stderr.trim()) {
+        appendRuntimeLog(`[mcp stop fallback query stderr] ${redactSecrets(stderr.trim())}`);
+      }
+      resolve(parseWindowsRunClientProcessQuery(stdout));
+    };
+    const onError = (error: Error) => {
+      stderr += `${error.name}: ${error.message}\n`;
+      finish();
+    };
+    const timer = setTimeout(() => {
+      stderr += `${WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY} timed out\n`;
+      query.kill("SIGTERM");
+      finish();
+    }, 5000);
+    query.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    query.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    query.once("close", finish);
+    query.once("error", onError);
+  });
+}
+
+async function waitForNoWindowsManagedRunClientProcesses(config: TzzTestMcpConfig, timeoutMs: number): Promise<Array<{ pid: number; parentPid: number; name: string; kind: string }>> {
+  const deadline = Date.now() + Math.max(1000, timeoutMs);
+  let remaining: Array<{ pid: number; parentPid: number; name: string; kind: string }> = [];
+  while (Date.now() < deadline) {
+    remaining = await findWindowsManagedRunClientProcesses(config);
+    if (remaining.length === 0) {
+      return [];
+    }
+    await delay(500);
+  }
+  return remaining;
+}
+
+function parseWindowsRunClientProcessQuery(stdout: string): Array<{ pid: number; parentPid: number; name: string; kind: string }> {
+  const text = stdout.trim();
+  if (!text) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    return items.map((item) => {
+      const data = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        pid: Number(data.pid ?? 0),
+        parentPid: Number(data.parentPid ?? 0),
+        name: String(data.name ?? ""),
+        kind: String(data.kind ?? "")
+      };
+    }).filter((item) => Number.isInteger(item.pid) && item.pid > 0);
+  } catch (error) {
+    appendRuntimeLog(`[mcp stop fallback query parse error] ${errorMessage(error)}`);
+    return [];
+  }
 }
 
 function delay(ms: number): Promise<void> {
