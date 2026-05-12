@@ -41,7 +41,8 @@ npm run start
     "TZZ_WEBADMIN_TEST_USERNAME": "mcp_test",
     "TZZ_WEBADMIN_TEST_PASSWORD": "your-local-test-password",
     "TZZ_TESTBRIDGE_ENABLED": "true",
-    "TZZ_TESTBRIDGE_TOKEN": "your-local-random-token"
+    "TZZ_TESTBRIDGE_TOKEN": "your-local-random-token",
+    "TZZ_TEST_WORLD_NAME": "TZZ_MCP_TEST_WORLD"
   }
 }
 ```
@@ -157,6 +158,7 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `TZZ_TESTBRIDGE_ENABLED`
 - `TZZ_TESTBRIDGE_TOKEN`
 - `TZZ_TESTBRIDGE_URL`
+- `TZZ_TEST_WORLD_NAME`
 
 ## 工具清单
 
@@ -180,10 +182,14 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `minecraft.wait_webadmin`：等待本机 WebAdmin URL 可访问。
 - `minecraft.stop`：只停止当前 MCP server 启动的 managed process。
 - `minecraft.testbridge_status`：读取 TestBridge 启用 / ready / world / player / 安全状态。
+- `minecraft.wait_world`：等待 TestBridge 报告 server/world ready。
 - `minecraft.players`：读取在线玩家摘要。
 - `minecraft.command`：执行 TestBridge allowlist 内的 Minecraft 命令；危险命令会被拒绝。
 - `minecraft.set_block`：在受限测试区域内放置方块。
 - `minecraft.clear_area`：在受限测试区域内清理小范围方块。
+- `minecraft.prepare_test_area`：结构化清理并铺设受限测试区域。
+- `minecraft.prepare_test_player`：结构化准备指定在线玩家。
+- `minecraft.prepare_test_world`：幂等准备测试世界 / 区域 / 玩家。
 - `minecraft.give_item`：给指定在线玩家普通物品。
 - `minecraft.clear_inventory`：清理指定在线玩家背包。
 - `minecraft.set_main_hand`：设置指定在线玩家主手物品。
@@ -263,7 +269,7 @@ MCP 自动化建议使用固定测试账号。首次创建测试账号仍走现�
 - `minecraft.wait_webadmin`
 - `minecraft.stop`
 
-`minecraft.start_client` 固定执行：
+`minecraft.start_client` 默认固定执行：
 
 ```powershell
 .\gradlew.bat --no-daemon runClient
@@ -275,16 +281,40 @@ MCP 自动化建议使用固定测试账号。首次创建测试账号仍走现�
 ./gradlew --no-daemon runClient
 ```
 
+如果要尽量自动进入既有测试世界，可调用：
+
+```json
+{
+  "autoEnterWorld": true,
+  "worldName": "TZZ_MCP_TEST_WORLD"
+}
+```
+
+这会执行固定白名单 preset，并通过 Gradle `runClient --args=...` 传入 Minecraft 原生 quick play 参数：
+
+```powershell
+.\gradlew.bat --no-daemon runClient --args="--quickPlaySingleplayer TZZ_MCP_TEST_WORLD"
+```
+
+也可以在 MCP 环境变量中设置默认世界名：
+
+```powershell
+$env:TZZ_TEST_WORLD_NAME = "TZZ_MCP_TEST_WORLD"
+```
+
+`worldName` 是 `run/saves/<worldName>` 的存档目录名，不是世界显示标题。它只允许英文字母、数字、点、下划线、短横线；路径分隔符、`..`、空格、控制字符、绝对路径都会被拒绝。启动前会检查 `run/saves/<worldName>/level.dat`，如果不存在会返回 `NOT_FOUND`，不会误打开其它世界，也不会创建或删除世界。
+
 限制：
 
 - 只支持固定 `runClient` preset，不接收任意 Gradle 参数。
+- auto-enter 只允许固定 `--quickPlaySingleplayer <worldName>`，不开放任意 runClient args。
 - stdout / stderr 写到 `reports/mcp/runtime/*.log`，不写 MCP stdout。
 - 如果当前 MCP session 已启动 dev client，再次调用只返回当前状态。
 - `minecraft.stop` 只停止当前 MCP server session 自己启动的进程；不会扫描或杀掉任意 Java / Minecraft 进程。
 - 如果 dev client 未正常退出，会提示手动关闭，不会扩展为任意进程管理。
 - WebAdmin ready 检测只访问 `http://127.0.0.1:18080/`、`localhost` 或 `::1` 这类 loopback 地址。
 
-注意：Fabric `runClient` 启动后，WebAdmin / TestBridge 通常需要进入世界 / integrated server 后才会出现。本阶段不会自动选择世界；后续应通过 dev-only 自动进测试世界能力做结构化世界启动，而不是 OS 鼠标坐标点击。
+注意：quick play 只能打开已经存在的测试世界。首次创建 `TZZ_MCP_TEST_WORLD` 仍需要用户在本地手动创建一次，或等待后续 dev-only 世界创建 helper。本工具不会点击 Minecraft 主菜单坐标。
 
 ## Minecraft TestBridge Foundation
 
@@ -316,6 +346,9 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 - `POST /api/testbridge/command`
 - `POST /api/testbridge/world/set-block`
 - `POST /api/testbridge/world/clear-area`
+- `POST /api/testbridge/world/prepare-area`
+- `POST /api/testbridge/world/prepare-player`
+- `POST /api/testbridge/world/prepare`
 - `POST /api/testbridge/player/give`
 - `POST /api/testbridge/player/clear-inventory`
 - `POST /api/testbridge/player/set-main-hand`
@@ -333,6 +366,9 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 - `minecraft.command` 有 allowlist / denylist；`stop`、`op`、`deop`、`ban`、`kick`、`whitelist`、`save-off`、`save-on`、`pardon`、`reload` 等危险命令会被拒绝。
 - `minecraft.set_block` 只能在默认测试区域 `x=-128..128`、`y=-64..320`、`z=-128..128` 内操作。
 - `minecraft.clear_area` 也有最大体积限制 `4096`。
+- `minecraft.prepare_test_area` 复用同样的测试区域边界和 `4096` 最大体积限制，不会强制加载区块。
+- `minecraft.prepare_test_player` 只作用于指定在线玩家。
+- `minecraft.prepare_test_world` 是幂等组合工具，不删除世界，不影响测试区域外内容。
 - `minecraft.give_item` 有数量限制，不支持 raw NBT / components 路径编辑。
 - `minecraft.clear_inventory` 只作用于指定在线玩家。
 - `minecraft.inspect_device`、`minecraft.signal_history`、`minecraft.doctor_issues` 是只读。
@@ -344,7 +380,23 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 - 不做 OS 级鼠标键盘操作。
 - 不做图像识别点击。
 - 不做 P3b / 7.10 游戏内 GUI 语义操作。
-- 不自动进入世界；后续计划单独实现 Minecraft Auto Enter Test World。
+- 不创建或删除 Minecraft 世界；auto-enter 只打开已存在的测试世界。
+
+## Auto Enter Test World / Prepare Tools
+
+推荐本地流程：
+
+1. 确认本地已存在 `run/saves/TZZ_MCP_TEST_WORLD/level.dat`。
+2. 在 Codex App MCP 环境变量中设置 `TZZ_TEST_WORLD_NAME=TZZ_MCP_TEST_WORLD`。
+3. 调用 `minecraft.start_client`，参数 `autoEnterWorld=true`。
+4. 调用 `minecraft.wait_webadmin`。
+5. 调用 `minecraft.wait_world`，需要玩家在线时可传 `requirePlayer=true`。
+6. 调用 `minecraft.wait_testbridge`。
+7. 调用 `minecraft.prepare_test_world`，可传 `player` 来同时清理背包、清空副手并传送到测试区。
+
+`minecraft.prepare_test_area` 默认清理一个小的已加载测试空间并铺设 `minecraft:stone` 地面；自定义 `min/max` 仍必须位于 TestBridge 测试区域内，且体积不能超过 `4096`。`minecraft.prepare_test_player` 默认只影响指定玩家，不影响其它玩家。
+
+这些准备工具都是结构化 TestBridge endpoint，不依赖 `minecraft.command setblock/give/clear/tp` 拼接测试准备步骤。
 
 ## 安全边界
 
@@ -378,7 +430,7 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 Minecraft dev runtime 本地手工 smoke：
 
 1. `minecraft.start_client`
-2. 手动在 Minecraft dev client 中进入测试世界。
+2. 如已有 `TZZ_MCP_TEST_WORLD`，可传 `autoEnterWorld=true`；否则手动在 Minecraft dev client 中进入测试世界。
 3. `minecraft.wait_webadmin`
 4. `webadmin.open`
 5. `webadmin.screenshot`
@@ -388,13 +440,14 @@ Minecraft dev runtime 本地手工 smoke：
 TestBridge 本地手工 smoke：
 
 1. 设置 `TZZ_TESTBRIDGE_ENABLED=true` 和 `TZZ_TESTBRIDGE_TOKEN`。
-2. `minecraft.start_client`
-3. 手动进入测试世界。
+2. `minecraft.start_client`，可传 `autoEnterWorld=true` 和 `worldName="TZZ_MCP_TEST_WORLD"`。
+3. `minecraft.wait_world`
 4. `minecraft.wait_webadmin`
 5. `minecraft.testbridge_status`
 6. `minecraft.players`
-7. 在测试区域内调用 `minecraft.set_block`
-8. 调用 `minecraft.inspect_device` / `minecraft.signal_history` / `minecraft.doctor_issues` 做只读检查。
+7. `minecraft.prepare_test_world`，可传 `player`。
+8. 在测试区域内调用 `minecraft.set_block`
+9. 调用 `minecraft.inspect_device` / `minecraft.signal_history` / `minecraft.doctor_issues` 做只读检查。
 
 ## 输出文件
 

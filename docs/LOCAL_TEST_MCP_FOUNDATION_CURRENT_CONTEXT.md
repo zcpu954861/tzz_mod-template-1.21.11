@@ -192,12 +192,57 @@ Safety restrictions:
 
 Step 2.5 still does not automatically enter a Minecraft world. Future work should add a separate dev-only auto-enter-world helper or in-mod test world bootstrap. It must not use OS mouse coordinate clicking.
 
+## Step 3 Scope: Auto Enter Test World + Scenario Preparation Foundation
+
+Step 3 reduces the remaining manual world setup step without adding OS-level UI automation. It uses Minecraft's native quick play singleplayer argument for an existing local test world and structured TestBridge preparation endpoints after the integrated server is loaded.
+
+Auto-enter strategy:
+
+- `minecraft.start_client` accepts `autoEnterWorld=true` and `worldName`.
+- `worldName` defaults to `TZZ_TEST_WORLD_NAME` or `TZZ_MCP_TEST_WORLD`.
+- The world name is a save-folder id, not a display title.
+- `worldName` is sanitized: only ASCII letters, digits, `.`, `_`, and `-`; path separators, `..`, NUL, absolute paths, spaces, and control characters are rejected.
+- The launcher checks `run/saves/<worldName>/level.dat` before starting. If the world does not exist, it returns `NOT_FOUND` with a clear message and does not open another world.
+- Auto-enter appends only the fixed quick play argument `--quickPlaySingleplayer <worldName>` through the Gradle `runClient --args=...` path. It does not expose arbitrary runClient args.
+- The Minecraft client window remains visible (`windowsHide=false`).
+
+Step 3 server-side TestBridge endpoints:
+
+- `POST /api/testbridge/world/prepare-area`
+- `POST /api/testbridge/world/prepare-player`
+- `POST /api/testbridge/world/prepare`
+
+Step 3 MCP tools:
+
+- `minecraft.wait_world`
+- `minecraft.prepare_test_area`
+- `minecraft.prepare_test_player`
+- `minecraft.prepare_test_world`
+
+Preparation semantics:
+
+- `minecraft.wait_world` waits for TestBridge status to report enabled, token configured, server loaded, world loaded, and optionally at least one player.
+- `minecraft.prepare_test_area` clears a bounded loaded test area and can lay a simple floor. It still uses the TestBridge test bounds `x=-128..128`, `y=-64..320`, `z=-128..128` and the `maxClearVolume=4096` limit.
+- `minecraft.prepare_test_player` is scoped to one online player. It can clear that player's inventory/offhand and teleport the player to a coordinate inside the test area.
+- `minecraft.prepare_test_world` is idempotent and composes world readiness, area preparation, optional player preparation, day time, and clear weather. It does not delete worlds and does not affect blocks outside the bounded test area.
+- Preparation endpoints are still loopback-only, token-protected, audited, and do not log the token.
+
+Step 3 still does not:
+
+- Create a missing Minecraft world.
+- Delete or overwrite user worlds.
+- Click Minecraft GUI coordinates.
+- Use OS-level mouse / keyboard control.
+- Use image-recognition clicking.
+- Automate P3b / 7.10 in-game GUI interactions.
+- Add arbitrary shell, git mutation, external host access, or dangerous Minecraft commands.
+
 ## Later Planning
 
 Recommended later work should build on the dev-only TestBridge instead of OS coordinate clicking:
 
-- Open or create a named test world through controlled in-mod hooks.
+- Create a missing named test world through controlled in-mod hooks if quick play existing-world startup is not enough.
 - Execute approved `/tzz` setup commands.
 - Read game state through structured test APIs.
 - Drive in-game GUI abstractions by semantic slot/action rather than screen coordinates.
-- Add Step 3 semantic GUI tools such as `mc.gui.current`, `mc.gui.slot`, `mc.gui.click_template_slot`, `mc.gui.save`, and `mc.gui.cancel`.
+- Add Step 4 semantic GUI tools such as `mc.gui.current`, `mc.gui.slot`, `mc.gui.click_template_slot`, `mc.gui.save`, and `mc.gui.cancel`.

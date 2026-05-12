@@ -70,6 +70,16 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "`minecraft.clear_area` also enforces `maxClearVolume=4096`", "context documents clear area volume limit");
         requireContains(context, "`minecraft.use_block` invokes Minecraft's `UseBlockCallback` production path", "context documents use_block production path");
         requireContains(context, "Step 2.5 still does not automatically enter a Minecraft world", "context documents no auto world entry");
+        requireContains(context, "Step 3 Scope: Auto Enter Test World + Scenario Preparation Foundation", "context documents Step 3 foundation");
+        requireContains(context, "`minecraft.start_client` accepts `autoEnterWorld=true` and `worldName`", "context documents start_client autoEnterWorld option");
+        requireContains(context, "The launcher checks `run/saves/<worldName>/level.dat`", "context documents existing world check");
+        requireContains(context, "Auto-enter appends only the fixed quick play argument `--quickPlaySingleplayer <worldName>`", "context documents fixed quick play args");
+        requireContains(context, "`minecraft.wait_world`", "context documents wait_world tool");
+        requireContains(context, "`minecraft.prepare_test_area`", "context documents prepare_test_area tool");
+        requireContains(context, "`minecraft.prepare_test_player`", "context documents prepare_test_player tool");
+        requireContains(context, "`minecraft.prepare_test_world`", "context documents prepare_test_world tool");
+        requireContains(context, "Step 3 still does not:", "context documents Step 3 forbidden scope");
+        requireContains(context, "Click Minecraft GUI coordinates", "context forbids GUI coordinate click in Step 3");
         requireContains(context, "WebAdmin UI exposes a current-user password change entry", "context documents WebAdmin password UI");
         requireContains(context, "not written to WebAdmin state, browser storage, logs, reports, or URLs", "context documents password UI secret boundary");
         requireContains(context, "`webadmin.login` must verify real authentication state before returning success", "context documents login auth verification");
@@ -181,7 +191,18 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(minecraft, "minecraft.stop", "minecraft stop tool marker");
         requireContains(minecraft, "RUN_CLIENT_ARGS", "minecraft launcher uses fixed Gradle whitelist args");
         requireContains(minecraft, "\"--no-daemon\", \"runClient\"", "runClient whitelist marker");
-        requireContains(minecraft, "buildGradleSpawnCommand(config.repoRoot, RUN_CLIENT_ARGS)", "minecraft launcher reuses shared Gradle spawn helper");
+        requireContains(minecraft, "autoEnterWorld", "minecraft start_client supports autoEnterWorld option marker");
+        requireContains(minecraft, "worldName", "minecraft start_client supports worldName marker");
+        requireContains(minecraft, "QUICK_PLAY_SINGLEPLAYER_FLAG", "minecraft quick play fixed flag marker");
+        requireContains(minecraft, "\"--quickPlaySingleplayer\"", "minecraft quick play singleplayer marker");
+        requireContains(minecraft, "TZZ_TEST_WORLD_NAME", "minecraft test world env marker");
+        requireContains(minecraft, "DEFAULT_TEST_WORLD_NAME", "minecraft default test world marker");
+        requireContains(minecraft, "\"run\", \"saves\", worldName, \"level.dat\"", "minecraft existing world level.dat check marker");
+        requireContains(minecraft, "path.isAbsolute(worldName)", "worldName absolute path rejection marker");
+        requireContains(minecraft, "worldName.includes(\"..\")", "worldName traversal rejection marker");
+        requireContains(minecraft, "worldName 只能包含英文字母、数字、点、下划线和短横线", "worldName safe charset marker");
+        requireContains(minecraft, "`--args=${QUICK_PLAY_SINGLEPLAYER_FLAG} ${worldName}`", "minecraft fixed Gradle --args marker");
+        requireContains(minecraft, "buildGradleSpawnCommand(config.repoRoot, launch.gradleArgs)", "minecraft launcher reuses shared Gradle spawn helper");
         requireContains(minecraft, "windowsHide: false", "minecraft client window is visible marker");
         requireContains(minecraft, "ensureAllowedUrl", "minecraft wait_webadmin uses URL allowlist");
         requireContains(minecraft, "only the runClient process started by this MCP session", "stop only managed process marker");
@@ -201,6 +222,10 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "minecraft.inspect_device", "minecraft.inspect_device tool marker");
         requireContains(testbridge, "minecraft.signal_history", "minecraft.signal_history tool marker");
         requireContains(testbridge, "minecraft.doctor_issues", "minecraft.doctor_issues tool marker");
+        requireContains(testbridge, "minecraft.wait_world", "minecraft.wait_world tool marker");
+        requireContains(testbridge, "minecraft.prepare_test_area", "minecraft.prepare_test_area tool marker");
+        requireContains(testbridge, "minecraft.prepare_test_player", "minecraft.prepare_test_player tool marker");
+        requireContains(testbridge, "minecraft.prepare_test_world", "minecraft.prepare_test_world tool marker");
         requireContains(testbridge, "minecraft.wait_testbridge", "minecraft.wait_testbridge tool marker");
         requireContains(testbridge, "TZZ_TESTBRIDGE_TOKEN", "MCP TestBridge token env marker");
         requireContains(testbridge, "X-TZZ-TestBridge-Token", "MCP TestBridge token header marker");
@@ -208,6 +233,10 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "isDangerousCommand", "MCP dangerous command deny marker");
         requireContains(testbridge, "stop\", \"op\", \"deop\", \"ban\", \"kick\", \"whitelist\"", "MCP dangerous command denylist marker");
         requireContains(testbridge, "UseBlockCallback", "MCP use_block production-path description marker");
+        requireContains(testbridge, "world/prepare-area", "MCP prepare_test_area endpoint marker");
+        requireContains(testbridge, "world/prepare-player", "MCP prepare_test_player endpoint marker");
+        requireContains(testbridge, "world/prepare", "MCP prepare_test_world endpoint marker");
+        requireContains(testbridge, "Idempotently prepare", "MCP prepare_test_world idempotent marker");
 
         String testbridgeSecurity = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java");
         requireContains(testbridgeSecurity, "TZZ_TESTBRIDGE_ENABLED", "server TestBridge default disabled env marker");
@@ -218,9 +247,18 @@ public final class LocalTestMcpFoundationGuardTest {
 
         String testbridgeRoutes = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeRoutes.java");
         requireContains(testbridgeRoutes, "/api/testbridge/status", "server TestBridge status route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/world/prepare-area", "server prepare_test_area route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/world/prepare-player", "server prepare_test_player route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/world/prepare", "server prepare_test_world route marker");
         requireContains(testbridgeRoutes, "COMMAND_ALLOWLIST", "server Minecraft command allowlist marker");
         requireContains(testbridgeRoutes, "COMMAND_DENYLIST", "server Minecraft dangerous command deny marker");
         requireContains(testbridgeRoutes, "MAX_CLEAR_VOLUME = 4096", "server clear_area max volume marker");
+        requireContains(testbridgeRoutes, "DEFAULT_PREPARE_MIN", "server default prepare area marker");
+        requireContains(testbridgeRoutes, "prepareArea", "server prepare_test_area implementation marker");
+        requireContains(testbridgeRoutes, "preparePlayer", "server prepare_test_player implementation marker");
+        requireContains(testbridgeRoutes, "prepareWorld", "server prepare_test_world implementation marker");
+        requireContains(testbridgeRoutes, "prepare_test_world", "server prepare_test_world audit marker");
+        requireContains(testbridgeRoutes, "player.teleport", "server prepare player teleport marker");
         requireContains(testbridgeRoutes, "MIN_TEST_X = -128", "server set_block test area min marker");
         requireContains(testbridgeRoutes, "MAX_TEST_X = 128", "server set_block test area max marker");
         requireContains(testbridgeRoutes, "MAX_GIVE_COUNT", "server give_item count limit marker");
@@ -259,6 +297,16 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "No token logged", "README documents no token logging");
         requireContains(readme, "minecraft.use_block", "README documents use_block tool");
         requireContains(readme, "UseBlockCallback", "README documents use_block production callback");
+        requireContains(readme, "TZZ_TEST_WORLD_NAME", "README documents test world env marker");
+        requireContains(readme, "autoEnterWorld=true", "README documents autoEnterWorld marker");
+        requireContains(readme, "--quickPlaySingleplayer TZZ_MCP_TEST_WORLD", "README documents fixed quick play marker");
+        requireContains(readme, "run/saves/<worldName>/level.dat", "README documents existing world check marker");
+        requireContains(readme, "minecraft.wait_world", "README documents wait_world marker");
+        requireContains(readme, "minecraft.prepare_test_area", "README documents prepare_test_area marker");
+        requireContains(readme, "minecraft.prepare_test_player", "README documents prepare_test_player marker");
+        requireContains(readme, "minecraft.prepare_test_world", "README documents prepare_test_world marker");
+        requireContains(readme, "Auto Enter Test World / Prepare Tools", "README documents Step 3 section marker");
+        requireContains(readme, "不会点击 Minecraft 主菜单坐标", "README documents no GUI coordinate click for auto-enter");
 
         String userService = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminUserService.java");
         requireContains(userService, "changeOwnPassword", "WebAdmin self password change service marker");

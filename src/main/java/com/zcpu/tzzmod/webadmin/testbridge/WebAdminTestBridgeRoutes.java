@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Block;
@@ -29,6 +30,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
@@ -53,6 +55,9 @@ public final class WebAdminTestBridgeRoutes {
     private static final int MAX_CLEAR_VOLUME = 4096;
     private static final int MAX_GIVE_COUNT = 2304;
     private static final int MAX_SIGNAL_HISTORY_LIMIT = 200;
+    private static final PositionRequest DEFAULT_PREPARE_MIN = new PositionRequest(-16, -60, -16);
+    private static final PositionRequest DEFAULT_PREPARE_MAX = new PositionRequest(16, -58, 16);
+    private static final PositionRequest DEFAULT_PLAYER_POS = new PositionRequest(0, -57, 0);
     private static final List<String> COMMAND_ALLOWLIST = List.of("tzz", "setblock", "give", "clear", "tp", "time", "weather", "say");
     private static final List<String> COMMAND_DENYLIST = List.of("stop", "op", "deop", "ban", "kick", "whitelist", "save-off", "save-on", "pardon", "reload");
 
@@ -108,6 +113,24 @@ public final class WebAdminTestBridgeRoutes {
                 requireMethod(exchange, method, "POST");
                 ClearAreaRequest request = readJson(exchange, ClearAreaRequest.class);
                 WebAdminJsonResponse.ok(exchange, clearArea(server, request, exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/world/prepare-area")) {
+                requireMethod(exchange, method, "POST");
+                PrepareAreaRequest request = readJson(exchange, PrepareAreaRequest.class);
+                WebAdminJsonResponse.ok(exchange, prepareArea(server, request, exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/world/prepare-player")) {
+                requireMethod(exchange, method, "POST");
+                PreparePlayerRequest request = readJson(exchange, PreparePlayerRequest.class);
+                WebAdminJsonResponse.ok(exchange, preparePlayer(server, request, exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/world/prepare")) {
+                requireMethod(exchange, method, "POST");
+                PrepareWorldRequest request = readJson(exchange, PrepareWorldRequest.class);
+                WebAdminJsonResponse.ok(exchange, prepareWorld(server, request, exchange));
                 return;
             }
             if (path.equals("/api/testbridge/player/give")) {
@@ -253,36 +276,118 @@ public final class WebAdminTestBridgeRoutes {
             throw new TestBridgeException(400, "VALIDATION_FAILED", "clear_area 需要 min/max 坐标。");
         }
         ServerWorld world = worldByDimension(server, request.dimension);
-        BlockPos min = pos(Math.min(request.min.x, request.max.x), Math.min(request.min.y, request.max.y), Math.min(request.min.z, request.max.z));
-        BlockPos max = pos(Math.max(request.min.x, request.max.x), Math.max(request.min.y, request.max.y), Math.max(request.min.z, request.max.z));
-        requireInsideTestArea(min);
-        requireInsideTestArea(max);
-        long volume = (long) (max.getX() - min.getX() + 1) * (max.getY() - min.getY() + 1) * (max.getZ() - min.getZ() + 1);
-        if (volume > MAX_CLEAR_VOLUME) {
-            throw new TestBridgeException(400, "BOUNDS_DENIED", "clear_area 超出最大体积限制：" + MAX_CLEAR_VOLUME);
-        }
-        int changed = 0;
-        BlockState air = Registries.BLOCK.get(Identifier.of("minecraft:air")).getDefaultState();
-        for (int x = min.getX(); x <= max.getX(); x++) {
-            for (int y = min.getY(); y <= max.getY(); y++) {
-                for (int z = min.getZ(); z <= max.getZ(); z++) {
-                    BlockPos current = new BlockPos(x, y, z);
-                    if (!world.isChunkLoaded(current)) {
-                        continue;
-                    }
-                    if (!world.getBlockState(current).isAir() && world.setBlockState(current, air, Block.NOTIFY_ALL)) {
-                        changed++;
-                    }
-                }
-            }
-        }
-        WebAdminAuditLogger.testBridge("clear_area", "OK", security.sourceIp(exchange), dimension(world) + " volume=" + volume + " changed=" + changed);
+        AreaBounds bounds = bounds(request.min, request.max, "clear_area");
+        AreaEditResult result = clearAreaBlocks(world, bounds);
+        WebAdminAuditLogger.testBridge("clear_area", "OK", security.sourceIp(exchange), dimension(world) + " volume=" + bounds.volume + " changed=" + result.changed);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("dimension", dimension(world));
-        data.put("min", posDto(min));
-        data.put("max", posDto(max));
-        data.put("volume", volume);
-        data.put("changedBlocks", changed);
+        data.put("min", posDto(bounds.min));
+        data.put("max", posDto(bounds.max));
+        data.put("volume", bounds.volume);
+        data.put("changedBlocks", result.changed);
+        data.put("skippedUnloadedBlocks", result.skippedUnloaded);
+        return data;
+    }
+
+    private Map<String, Object> prepareArea(MinecraftServer server, PrepareAreaRequest request, HttpExchange exchange) {
+        requireServerReady(server);
+        PrepareAreaRequest safeRequest = request == null ? new PrepareAreaRequest("", null, null, "", null) : request;
+        ServerWorld world = worldByDimension(server, safeRequest.dimension);
+        PositionRequest minRequest = safeRequest.min == null ? DEFAULT_PREPARE_MIN : safeRequest.min;
+        PositionRequest maxRequest = safeRequest.max == null ? DEFAULT_PREPARE_MAX : safeRequest.max;
+        AreaBounds bounds = bounds(minRequest, maxRequest, "prepare_test_area");
+        AreaEditResult cleared = clearAreaBlocks(world, bounds);
+        String floorBlockId = safe(safeRequest.floorBlockId).isBlank() ? "minecraft:stone" : safeRequest.floorBlockId;
+        int floorBlocks = 0;
+        if (bool(safeRequest.placeFloor, true)) {
+            floorBlocks = placeFloor(world, bounds, blockState(floorBlockId, Map.of()));
+        }
+        WebAdminAuditLogger.testBridge("prepare_test_area", "OK", security.sourceIp(exchange), dimension(world) + " volume=" + bounds.volume + " changed=" + cleared.changed + " floor=" + floorBlocks);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("dimension", dimension(world));
+        data.put("min", posDto(bounds.min));
+        data.put("max", posDto(bounds.max));
+        data.put("volume", bounds.volume);
+        data.put("changedBlocks", cleared.changed);
+        data.put("skippedUnloadedBlocks", cleared.skippedUnloaded);
+        data.put("floorBlocks", floorBlocks);
+        data.put("floorBlockId", floorBlockId);
+        data.put("testArea", testArea());
+        return data;
+    }
+
+    private Map<String, Object> preparePlayer(MinecraftServer server, PreparePlayerRequest request, HttpExchange exchange) {
+        if (request == null) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "prepare_test_player 需要 player。");
+        }
+        ServerPlayerEntity player = requirePlayer(server, request.player);
+        ServerWorld world = worldByDimension(server, safe(request.dimension).isBlank() ? dimension(player.getCommandSource().getWorld()) : request.dimension);
+        PositionRequest target = request.position == null ? DEFAULT_PLAYER_POS : request.position;
+        BlockPos targetBlock = pos(target.x, target.y, target.z);
+        requireInsideTestArea(targetBlock);
+        requireChunkLoaded(world, targetBlock);
+        Map<String, Object> clearSummary = Map.of("skipped", true);
+        if (bool(request.clearInventory, true)) {
+            clearSummary = clearPlayerInventory(player);
+        }
+        boolean offhandCleared = false;
+        if (bool(request.clearOffhand, true)) {
+            offhandCleared = !player.getOffHandStack().isEmpty();
+            player.setStackInHand(Hand.OFF_HAND, ItemStack.EMPTY);
+        }
+        boolean teleported = false;
+        if (bool(request.teleport, true)) {
+            teleported = player.teleport(world, target.x + 0.5D, target.y, target.z + 0.5D, Set.of(), player.getYaw(), player.getPitch(), false);
+        }
+        syncInventory(player);
+        WebAdminAuditLogger.testBridge("prepare_test_player", "OK", security.sourceIp(exchange), player.getName().getString() + " teleported=" + teleported);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("player", player.getName().getString());
+        data.put("dimension", dimension(player.getCommandSource().getWorld()));
+        data.put("target", posDto(targetBlock));
+        data.put("teleported", teleported);
+        data.put("clearInventory", clearSummary);
+        data.put("offhandCleared", offhandCleared);
+        data.put("mainHand", itemStackSummary(player.getMainHandStack()));
+        data.put("position", Map.of("x", player.getX(), "y", player.getY(), "z", player.getZ()));
+        return data;
+    }
+
+    private Map<String, Object> prepareWorld(MinecraftServer server, PrepareWorldRequest request, HttpExchange exchange) {
+        requireServerReady(server);
+        PrepareWorldRequest safeRequest = request == null ? new PrepareWorldRequest("", "", null, null, null, null, null, null, null) : request;
+        ServerWorld world = worldByDimension(server, safeRequest.dimension);
+        Map<String, Object> area = Map.of("skipped", true);
+        if (bool(safeRequest.prepareArea, true)) {
+            area = prepareArea(server, safeRequest.area == null ? new PrepareAreaRequest(dimension(world), null, null, "", null) : withDimension(safeRequest.area, dimension(world)), exchange);
+        }
+        Map<String, Object> player = Map.of("skipped", true);
+        if (!safe(safeRequest.player).isBlank() && bool(safeRequest.preparePlayer, true)) {
+            PreparePlayerRequest playerRequest = safeRequest.playerSetup == null
+                    ? new PreparePlayerRequest(safeRequest.player, dimension(world), DEFAULT_PLAYER_POS, true, true, true)
+                    : withPlayerAndDimension(safeRequest.playerSetup, safeRequest.player, dimension(world));
+            player = preparePlayer(server, playerRequest, exchange);
+        }
+        boolean timeSet = false;
+        boolean weatherCleared = false;
+        if (bool(safeRequest.setDayTime, true)) {
+            world.setTimeOfDay(1000L);
+            timeSet = true;
+        }
+        if (bool(safeRequest.clearWeather, true)) {
+            world.setWeather(6000, 0, false, false);
+            weatherCleared = true;
+        }
+        WebAdminAuditLogger.testBridge("prepare_test_world", "OK", security.sourceIp(exchange), dimension(world) + " player=" + safe(safeRequest.player));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("dimension", dimension(world));
+        data.put("worldLoaded", true);
+        data.put("area", area);
+        data.put("player", player);
+        data.put("timeSet", timeSet);
+        data.put("weatherCleared", weatherCleared);
+        data.put("idempotent", true);
+        data.put("testArea", testArea());
         return data;
     }
 
@@ -317,6 +422,13 @@ public final class WebAdminTestBridgeRoutes {
 
     private Map<String, Object> clearInventory(MinecraftServer server, PlayerRequest request, HttpExchange exchange) {
         ServerPlayerEntity player = requirePlayer(server, request == null ? "" : request.player);
+        Map<String, Object> cleared = clearPlayerInventory(player);
+        syncInventory(player);
+        WebAdminAuditLogger.testBridge("clear_inventory", "OK", security.sourceIp(exchange), player.getName().getString() + " stacks=" + cleared.get("clearedStacks"));
+        return cleared;
+    }
+
+    private Map<String, Object> clearPlayerInventory(ServerPlayerEntity player) {
         int clearedStacks = 0;
         int clearedItems = 0;
         var stacks = player.getInventory().getMainStacks();
@@ -328,8 +440,6 @@ public final class WebAdminTestBridgeRoutes {
                 stacks.set(index, ItemStack.EMPTY);
             }
         }
-        syncInventory(player);
-        WebAdminAuditLogger.testBridge("clear_inventory", "OK", security.sourceIp(exchange), player.getName().getString() + " stacks=" + clearedStacks);
         return Map.of(
                 "player", player.getName().getString(),
                 "clearedStacks", clearedStacks,
@@ -538,6 +648,64 @@ public final class WebAdminTestBridgeRoutes {
         );
     }
 
+    private static AreaBounds bounds(PositionRequest first, PositionRequest second, String operation) {
+        BlockPos min = pos(Math.min(first.x, second.x), Math.min(first.y, second.y), Math.min(first.z, second.z));
+        BlockPos max = pos(Math.max(first.x, second.x), Math.max(first.y, second.y), Math.max(first.z, second.z));
+        requireInsideTestArea(min);
+        requireInsideTestArea(max);
+        long volume = (long) (max.getX() - min.getX() + 1) * (max.getY() - min.getY() + 1) * (max.getZ() - min.getZ() + 1);
+        if (volume > MAX_CLEAR_VOLUME) {
+            throw new TestBridgeException(400, "BOUNDS_DENIED", operation + " 超出最大体积限制：" + MAX_CLEAR_VOLUME);
+        }
+        return new AreaBounds(min, max, volume);
+    }
+
+    private static AreaEditResult clearAreaBlocks(ServerWorld world, AreaBounds bounds) {
+        int changed = 0;
+        int skipped = 0;
+        BlockState air = Registries.BLOCK.get(Identifier.of("minecraft:air")).getDefaultState();
+        for (int x = bounds.min.getX(); x <= bounds.max.getX(); x++) {
+            for (int y = bounds.min.getY(); y <= bounds.max.getY(); y++) {
+                for (int z = bounds.min.getZ(); z <= bounds.max.getZ(); z++) {
+                    BlockPos current = new BlockPos(x, y, z);
+                    if (!world.isChunkLoaded(current)) {
+                        skipped++;
+                        continue;
+                    }
+                    if (!world.getBlockState(current).isAir() && world.setBlockState(current, air, Block.NOTIFY_ALL)) {
+                        changed++;
+                    }
+                }
+            }
+        }
+        return new AreaEditResult(changed, skipped);
+    }
+
+    private static int placeFloor(ServerWorld world, AreaBounds bounds, BlockState floorState) {
+        int changed = 0;
+        int y = bounds.min.getY();
+        for (int x = bounds.min.getX(); x <= bounds.max.getX(); x++) {
+            for (int z = bounds.min.getZ(); z <= bounds.max.getZ(); z++) {
+                BlockPos current = new BlockPos(x, y, z);
+                if (!world.isChunkLoaded(current)) {
+                    continue;
+                }
+                if (!world.getBlockState(current).equals(floorState) && world.setBlockState(current, floorState, Block.NOTIFY_ALL)) {
+                    changed++;
+                }
+            }
+        }
+        return changed;
+    }
+
+    private static PrepareAreaRequest withDimension(PrepareAreaRequest request, String dimension) {
+        return new PrepareAreaRequest(dimension, request.min, request.max, request.floorBlockId, request.placeFloor);
+    }
+
+    private static PreparePlayerRequest withPlayerAndDimension(PreparePlayerRequest request, String player, String dimension) {
+        return new PreparePlayerRequest(player, dimension, request.position, request.clearInventory, request.clearOffhand, request.teleport);
+    }
+
     private static BlockState blockState(String blockId, Map<String, String> properties) {
         Identifier id = Identifier.tryParse(safe(blockId));
         if (id == null || !Registries.BLOCK.containsId(id)) {
@@ -710,6 +878,10 @@ public final class WebAdminTestBridgeRoutes {
         return raw == null ? "" : raw.trim();
     }
 
+    private static boolean bool(Boolean value, boolean fallback) {
+        return value == null ? fallback : value;
+    }
+
     private static <T> T readJson(HttpExchange exchange, Class<T> type) throws IOException {
         byte[] bytes = exchange.getRequestBody().readAllBytes();
         if (bytes.length == 0) {
@@ -752,10 +924,19 @@ public final class WebAdminTestBridgeRoutes {
     private record ClearAreaRequest(String dimension, PositionRequest min, PositionRequest max) {
     }
 
+    private record PrepareAreaRequest(String dimension, PositionRequest min, PositionRequest max, String floorBlockId, Boolean placeFloor) {
+    }
+
     private record PositionRequest(int x, int y, int z) {
     }
 
     private record PlayerRequest(String player) {
+    }
+
+    private record PreparePlayerRequest(String player, String dimension, PositionRequest position, Boolean clearInventory, Boolean clearOffhand, Boolean teleport) {
+    }
+
+    private record PrepareWorldRequest(String dimension, String player, PrepareAreaRequest area, PreparePlayerRequest playerSetup, Boolean prepareArea, Boolean preparePlayer, Boolean setDayTime, Boolean clearWeather, Boolean idempotent) {
     }
 
     private record PlayerItemRequest(String player, String itemId, int count) {
@@ -774,6 +955,12 @@ public final class WebAdminTestBridgeRoutes {
                     parseInt(query.get("z"), 0)
             );
         }
+    }
+
+    private record AreaBounds(BlockPos min, BlockPos max, long volume) {
+    }
+
+    private record AreaEditResult(int changed, int skippedUnloaded) {
     }
 
     private static final class TestBridgeException extends RuntimeException {

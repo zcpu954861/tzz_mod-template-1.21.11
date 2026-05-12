@@ -19,6 +19,10 @@ export function testBridgeTools(): ToolDefinition[] {
     testBridgeInspectDeviceTool(),
     testBridgeSignalHistoryTool(),
     testBridgeDoctorIssuesTool(),
+    testBridgeWaitWorldTool(),
+    testBridgePrepareTestAreaTool(),
+    testBridgePrepareTestPlayerTool(),
+    testBridgePrepareTestWorldTool(),
     testBridgeWaitTool()
   ];
 }
@@ -271,6 +275,187 @@ function testBridgeDoctorIssuesTool(): ToolDefinition {
   };
 }
 
+function testBridgeWaitWorldTool(): ToolDefinition {
+  return {
+    name: "minecraft.wait_world",
+    description: "Wait until the localhost TestBridge reports a loaded Minecraft world. This does not click Minecraft GUI coordinates.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        timeoutSeconds: { type: "number", minimum: 1, maximum: 900 },
+        requirePlayer: { type: "boolean" }
+      }
+    },
+    async handler(args, context) {
+      const timeoutSeconds = optionalIntArg(args, "timeoutSeconds") ?? 180;
+      const requirePlayer = boolArg(args, "requirePlayer", false);
+      const started = Date.now();
+      let last: JsonObject = {};
+      while (Date.now() - started < timeoutSeconds * 1000) {
+        const response = await testBridgeFetch(context.config, "GET", "status", undefined, false);
+        if (response.ok === true) {
+          last = response.data;
+          const players = Array.isArray(last.onlinePlayers) ? last.onlinePlayers : [];
+          const worldReady = last.enabled === true
+            && last.tokenConfigured === true
+            && last.serverLoaded === true
+            && last.worldLoaded === true
+            && last.ready === true
+            && (!requirePlayer || players.length > 0);
+          if (worldReady) {
+            return ok("Minecraft world is ready through TestBridge.", {
+              durationMs: Date.now() - started,
+              status: last
+            });
+          }
+        } else {
+          last = { code: response.code, message: response.message };
+        }
+        await delay(1000);
+      }
+      return fail("TIMEOUT", "Timed out waiting for Minecraft world readiness.", {
+        durationMs: Date.now() - started,
+        lastStatus: last
+      });
+    }
+  };
+}
+
+function testBridgePrepareTestAreaTool(): ToolDefinition {
+  return {
+    name: "minecraft.prepare_test_area",
+    description: "Clear and optionally floor a bounded loaded test area through TestBridge. It enforces test bounds and max volume.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        dimension: { type: "string" },
+        min: positionSchema(),
+        max: positionSchema(),
+        floorBlockId: { type: "string" },
+        placeFloor: { type: "boolean" }
+      }
+    },
+    async handler(args, context) {
+      const body: JsonObject = {
+        dimension: stringArg(args, "dimension") ?? "",
+        floorBlockId: stringArg(args, "floorBlockId") ?? "",
+        placeFloor: boolArg(args, "placeFloor", true)
+      };
+      const min = optionalPositionArg(args, "min");
+      const max = optionalPositionArg(args, "max");
+      if (min !== undefined) {
+        body.min = min;
+      }
+      if (max !== undefined) {
+        body.max = max;
+      }
+      return await requestTool(context.config, "POST", "world/prepare-area", body, "Test area prepared through TestBridge.");
+    }
+  };
+}
+
+function testBridgePrepareTestPlayerTool(): ToolDefinition {
+  return {
+    name: "minecraft.prepare_test_player",
+    description: "Prepare one online player for local tests by clearing inventory/offhand and teleporting inside the test area.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        dimension: { type: "string" },
+        position: positionSchema(),
+        clearInventory: { type: "boolean" },
+        clearOffhand: { type: "boolean" },
+        teleport: { type: "boolean" }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      const body: JsonObject = {
+        player: stringArg(args, "player") ?? "",
+        dimension: stringArg(args, "dimension") ?? "",
+        clearInventory: boolArg(args, "clearInventory", true),
+        clearOffhand: boolArg(args, "clearOffhand", true),
+        teleport: boolArg(args, "teleport", true)
+      };
+      const position = optionalPositionArg(args, "position");
+      if (position !== undefined) {
+        body.position = position;
+      }
+      return await requestTool(context.config, "POST", "world/prepare-player", body, "Test player prepared through TestBridge.");
+    }
+  };
+}
+
+function testBridgePrepareTestWorldTool(): ToolDefinition {
+  return {
+    name: "minecraft.prepare_test_world",
+    description: "Idempotently prepare the loaded local test world, bounded test area, and one optional player through structured TestBridge endpoints.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        dimension: { type: "string" },
+        player: { type: "string" },
+        area: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            min: positionSchema(),
+            max: positionSchema(),
+            floorBlockId: { type: "string" },
+            placeFloor: { type: "boolean" }
+          }
+        },
+        playerPosition: positionSchema(),
+        prepareArea: { type: "boolean" },
+        preparePlayer: { type: "boolean" },
+        setDayTime: { type: "boolean" },
+        clearWeather: { type: "boolean" }
+      }
+    },
+    async handler(args, context) {
+      const areaValue = args.area;
+      const area = isObject(areaValue) ? areaValue : {};
+      const areaBody: JsonObject = {
+        floorBlockId: stringArg(area, "floorBlockId") ?? "",
+        placeFloor: boolArg(area, "placeFloor", true)
+      };
+      const areaMin = optionalPositionArg(area, "min");
+      const areaMax = optionalPositionArg(area, "max");
+      if (areaMin !== undefined) {
+        areaBody.min = areaMin;
+      }
+      if (areaMax !== undefined) {
+        areaBody.max = areaMax;
+      }
+      const playerSetup: JsonObject = {
+        clearInventory: true,
+        clearOffhand: true,
+        teleport: true
+      };
+      const playerPosition = optionalPositionArg(args, "playerPosition");
+      if (playerPosition !== undefined) {
+        playerSetup.position = playerPosition;
+      }
+      return await requestTool(context.config, "POST", "world/prepare", {
+        dimension: stringArg(args, "dimension") ?? "",
+        player: stringArg(args, "player") ?? "",
+        area: areaBody,
+        playerSetup,
+        prepareArea: boolArg(args, "prepareArea", true),
+        preparePlayer: boolArg(args, "preparePlayer", Boolean(stringArg(args, "player"))),
+        setDayTime: boolArg(args, "setDayTime", true),
+        clearWeather: boolArg(args, "clearWeather", true),
+        idempotent: true
+      }, "Test world prepared through TestBridge.");
+    }
+  };
+}
+
 function testBridgeWaitTool(): ToolDefinition {
   return {
     name: "minecraft.wait_testbridge",
@@ -470,6 +655,18 @@ function positionArg(args: JsonObject, key: string): JsonObject {
   };
 }
 
+function optionalPositionArg(args: JsonObject, key: string): JsonObject | undefined {
+  const value = args[key];
+  if (!isObject(value)) {
+    return undefined;
+  }
+  return {
+    x: intArg(value, "x"),
+    y: intArg(value, "y"),
+    z: intArg(value, "z")
+  };
+}
+
 function objectArg(args: JsonObject, key: string): JsonObject {
   const value = args[key];
   if (!isObject(value)) {
@@ -482,6 +679,11 @@ function objectArg(args: JsonObject, key: string): JsonObject {
     }
   }
   return output;
+}
+
+function boolArg(args: JsonObject, key: string, fallback: boolean): boolean {
+  const value = args[key];
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function stringArg(args: JsonObject, key: string): string | undefined {

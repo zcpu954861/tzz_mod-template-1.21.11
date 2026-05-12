@@ -38,6 +38,10 @@ async function main(): Promise<void> {
     "minecraft.inspect_device",
     "minecraft.signal_history",
     "minecraft.doctor_issues",
+    "minecraft.wait_world",
+    "minecraft.prepare_test_area",
+    "minecraft.prepare_test_player",
+    "minecraft.prepare_test_world",
     "minecraft.wait_testbridge"
   ];
   for (const name of required) {
