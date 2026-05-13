@@ -99,6 +99,9 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "`minecraft.gui_set_count`", "context documents gui_set_count tool");
         requireContains(context, "`minecraft.gui_save`", "context documents gui_save tool");
         requireContains(context, "`minecraft.gui_cancel`", "context documents gui_cancel tool");
+        requireContains(context, "`minecraft.client_screenshot`", "context documents Minecraft client screenshot tool");
+        requireContains(context, "does not use OS screenshots", "context documents no OS screenshot");
+        requireContains(context, "reports/mcp/screenshots", "context documents client screenshot output path");
         requireContains(context, "does not modify real player inventory or real world containers", "context documents ghost item safety");
         requireContains(context, "does not directly write `SignalDeviceData`", "context documents no raw SignalDeviceData write");
         requireContains(context, "Unsupported screens return `UNSUPPORTED_GUI`; no screen returns `GUI_NOT_OPEN`", "context documents unsupported GUI errors");
@@ -286,6 +289,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "minecraft.gui_set_count", "minecraft.gui_set_count tool marker");
         requireContains(testbridge, "minecraft.gui_save", "minecraft.gui_save tool marker");
         requireContains(testbridge, "minecraft.gui_cancel", "minecraft.gui_cancel tool marker");
+        requireContains(testbridge, "minecraft.client_screenshot", "minecraft.client_screenshot tool marker");
+        requireContains(testbridge, "client/screenshot", "MCP client screenshot endpoint marker");
+        requireContains(testbridge, "safeName", "MCP client screenshot name sanitized marker");
+        requireContains(testbridge, "noOsScreenshot", "MCP client screenshot no OS screenshot marker");
+        requireContains(testbridge, "noCoordinateClicking", "MCP client screenshot no coordinate clicking marker");
+        requireContains(testbridge, "reportCanReferenceScreenshotPath", "MCP report can reference client screenshot path marker");
         requireContains(testbridge, "gui/current", "MCP gui_current endpoint marker");
         requireContains(testbridge, "gui/slots", "MCP gui_slots endpoint marker");
         requireContains(testbridge, "gui/put-item", "MCP gui_put_item endpoint marker");
@@ -367,6 +376,11 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridgeRoutes, "/api/testbridge/gui/set-count", "server gui_set_count route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/save", "server gui_save route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/cancel", "server gui_cancel route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/client/screenshot", "server client screenshot route marker");
+        requireContains(testbridgeRoutes, "client_screenshot", "server client screenshot payload operation marker");
+        requireContains(testbridgeRoutes, "screenshotsDir", "server client screenshot output directory marker");
+        requireContains(testbridgeRoutes, "reportsMcpScreenshotsOutputOnly", "server screenshot output restricted marker");
+        requireContains(testbridgeRoutes, "tokenInClientPayload", "server screenshot token not in client payload marker");
         requireContains(testbridgeRoutes, "WebAdminTestBridgeClientGuiBridge.request", "server gui route uses client screen bridge marker");
         requireContains(testbridgeRoutes, "rawSignalDeviceDataWrite", "server gui route raw SignalDeviceData write false marker");
 
@@ -381,6 +395,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiBridge, "SESSION_DENIED", "server GUI bridge nonce/player validation marker");
         requireContains(guiBridge, "CLIENT_TIMEOUT", "server GUI bridge timeout marker");
         requireContains(guiBridge, "put_item\", \"clear_slot\", \"set_count\", \"save\", \"cancel", "server GUI bridge allowlisted operations marker");
+        requireContains(guiBridge, "client_screenshot", "server GUI bridge client screenshot operation marker");
 
         String guiClient = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminTestBridgeGuiClient.java");
         requireContains(guiClient, "client.currentScreen", "client GUI bridge reads current screen marker");
@@ -388,6 +403,10 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiClient, "WebAdminSingleItemSubmitTemplateScreen", "client GUI bridge supports single itemSubmit marker");
         requireContains(guiClient, "UNSUPPORTED_GUI", "client GUI bridge unsupported GUI marker");
         requireContains(guiClient, "GUI_NOT_OPEN", "client GUI bridge no GUI marker");
+        requireContains(guiClient, "usesMinecraftClientFramebuffer", "client screenshot uses Minecraft client framebuffer marker");
+        requireContains(guiClient, "usesOsScreenshot", "client screenshot no OS screenshot marker");
+        requireContains(guiClient, "usesCoordinateClicking", "client screenshot no coordinate clicking marker");
+        requireContains(guiClient, "usesClientScreenshotPayload", "client screenshot payload marker");
 
         String containerScreen = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplatePreviewScreen.java");
         requireContains(containerScreen, "testBridgePutItem", "container GUI testbridge put item marker");
@@ -450,6 +469,9 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "minecraft.gui_set_count", "README documents gui_set_count tool");
         requireContains(readme, "minecraft.gui_save", "README documents gui_save tool");
         requireContains(readme, "minecraft.gui_cancel", "README documents gui_cancel tool");
+        requireContains(readme, "minecraft.client_screenshot", "README documents Minecraft client screenshot tool");
+        requireContains(readme, "不是 OS 截屏", "README documents no OS screenshot");
+        requireContains(readme, "reports/mcp/screenshots", "README documents client screenshot output path");
         requireContains(readme, "不改真实玩家背包", "README documents GUI real inventory safety");
         requireContains(readme, "不直接写 `SignalDeviceData` JSON", "README documents no raw SignalDeviceData write");
         requireContains(readme, "UNSUPPORTED_GUI", "README documents unsupported GUI error");

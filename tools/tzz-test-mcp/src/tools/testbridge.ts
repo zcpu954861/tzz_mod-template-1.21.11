@@ -1,6 +1,6 @@
 import type { Json, JsonObject, ToolDefinition, TzzTestMcpConfig } from "../types.js";
 import { fail, ok, type ToolErrorCode } from "../results.js";
-import { ensureAllowedUrl, redactSecrets } from "../safety.js";
+import { ensureAllowedUrl, redactSecrets, safeName } from "../safety.js";
 
 const TOKEN_HEADER = "X-TZZ-TestBridge-Token";
 const TESTBRIDGE_TOKEN_ENV = "TZZ_TESTBRIDGE_TOKEN";
@@ -30,7 +30,8 @@ export function testBridgeTools(): ToolDefinition[] {
     testBridgeGuiClearSlotTool(),
     testBridgeGuiSetCountTool(),
     testBridgeGuiSaveTool(),
-    testBridgeGuiCancelTool()
+    testBridgeGuiCancelTool(),
+    testBridgeClientScreenshotTool()
   ];
 }
 
@@ -607,6 +608,49 @@ function testBridgeGuiCancelTool(): ToolDefinition {
     },
     async handler(args, context) {
       return await requestTool(context.config, "POST", "gui/cancel", guiSlotBody(args), "GUI cancel requested.");
+    }
+  };
+}
+
+function testBridgeClientScreenshotTool(): ToolDefinition {
+  return {
+    name: "minecraft.client_screenshot",
+    description: "Ask the Minecraft client to save its current framebuffer under reports/mcp/screenshots through the token-protected TestBridge payload. This is not an OS screenshot and never clicks coordinates.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        name: { type: "string" },
+        fullWindow: { type: "boolean" },
+        timeoutMs: { type: "number", minimum: 1000, maximum: 120000 }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      const player = stringArg(args, "player") ?? "";
+      if (!player.trim()) {
+        return fail("VALIDATION_ERROR", "player is required.");
+      }
+      const response = await testBridgeFetch(context.config, "POST", "client/screenshot", {
+        player,
+        name: safeName(stringArg(args, "name") ?? "minecraft-client", "minecraft-client"),
+        fullWindow: boolArg(args, "fullWindow", true),
+        timeoutMs: optionalIntArg(args, "timeoutMs") ?? 60000,
+        noOsScreenshot: true,
+        noCoordinateClicking: true
+      }, true);
+      if (!response.ok) {
+        return fail(response.code, response.message, response.data ?? {});
+      }
+      const data = response.data ?? {};
+      if (typeof data.path === "string" && data.path.trim()) {
+        context.webAdmin.screenshots.push(data.path);
+      }
+      return ok("Minecraft client screenshot saved.", {
+        ...data,
+        reportCanReferenceScreenshotPath: true
+      });
     }
   };
 }

@@ -16,7 +16,10 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDoctorService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalService;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -131,6 +134,11 @@ public final class WebAdminTestBridgeRoutes {
             if (path.equals("/api/testbridge/gui/cancel")) {
                 requireMethod(exchange, method, "POST");
                 WebAdminJsonResponse.ok(exchange, guiOperation(server, "cancel", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/client/screenshot")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, clientScreenshot(server, readJson(exchange, ClientScreenshotRequest.class), exchange));
                 return;
             }
             if (path.equals("/api/testbridge/command")) {
@@ -304,6 +312,51 @@ public final class WebAdminTestBridgeRoutes {
         return data;
     }
 
+    private JsonObject clientScreenshot(MinecraftServer server, ClientScreenshotRequest request, HttpExchange exchange) {
+        ClientScreenshotRequest safeRequest = request == null ? new ClientScreenshotRequest("", "", true, 0) : request;
+        if (safe(safeRequest.player).isBlank()) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "客户端截图需要 player。");
+        }
+        requireServerReady(server);
+        if (resolveOptionalPlayer(server, safeRequest.player) == null) {
+            throw new TestBridgeException(404, "PLAYER_NOT_FOUND", "在线玩家不存在：" + safe(safeRequest.player));
+        }
+        String fileName = screenshotFileName(safeRequest.name);
+        Path output = screenshotsDir().resolve(fileName).normalize();
+        if (!output.startsWith(screenshotsDir())) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "截图输出路径无效。");
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("player", safe(safeRequest.player));
+        body.addProperty("name", safe(safeRequest.name));
+        body.addProperty("fileName", fileName);
+        body.addProperty("gameDirectory", Path.of("").toAbsolutePath().normalize().resolve("reports").resolve("mcp").normalize().toString());
+        body.addProperty("outputPath", output.toString());
+        body.addProperty("fullWindow", safeRequest.fullWindow);
+        body.addProperty("reportsMcpScreenshotsOutputOnly", true);
+        body.addProperty("tokenInClientPayload", false);
+        long timeoutMillis = clamp(safeRequest.timeoutMs, 1000, 120000);
+        WebAdminTestBridgeClientGuiBridge.Result result = WebAdminTestBridgeClientGuiBridge.send(server, safeRequest.player, "client_screenshot", body);
+        WebAdminAuditLogger.testBridge("client_screenshot", result.ok() ? "OK" : "FAILED", security.sourceIp(exchange), "player=" + safe(safeRequest.player) + " code=" + result.code());
+        if (!result.ok()) {
+            throw new TestBridgeException(statusForScreenshotCode(result.code()), result.code(), result.message());
+        }
+        if (!waitForScreenshotFile(output, timeoutMillis)) {
+            WebAdminAuditLogger.testBridge("client_screenshot", "FAILED", security.sourceIp(exchange), "player=" + safe(safeRequest.player) + " code=TIMEOUT");
+            throw new TestBridgeException(504, "TIMEOUT", "等待 Minecraft 客户端截图文件写入超时。");
+        }
+        JsonObject data = result.data() == null ? new JsonObject() : result.data();
+        data.addProperty("player", safe(safeRequest.player));
+        data.addProperty("path", output.toString());
+        data.addProperty("fileName", fileName);
+        data.addProperty("testbridgeClientScreenshot", true);
+        data.addProperty("usesClientScreenshotPayload", true);
+        data.addProperty("usesOsScreenshot", false);
+        data.addProperty("usesCoordinateClicking", false);
+        data.addProperty("tokenInClientPayload", false);
+        return data;
+    }
+
     private static int statusForGuiCode(String code) {
         return switch (safe(code)) {
             case "NOT_FOUND" -> 404;
@@ -311,6 +364,16 @@ public final class WebAdminTestBridgeRoutes {
             case "CLIENT_TIMEOUT" -> 504;
             case "GUI_NOT_OPEN", "UNSUPPORTED_GUI", "SCREEN_MISMATCH", "CLIENT_TESTBRIDGE_UNAVAILABLE" -> 409;
             case "SESSION_DENIED", "SESSION_EXPIRED" -> 403;
+            default -> 400;
+        };
+    }
+
+    private static int statusForScreenshotCode(String code) {
+        return switch (safe(code)) {
+            case "NOT_FOUND", "PLAYER_NOT_FOUND" -> 404;
+            case "VALIDATION_FAILED", "VALIDATION_ERROR" -> 400;
+            case "CLIENT_TIMEOUT", "TIMEOUT" -> 504;
+            case "TESTBRIDGE_NOT_READY", "CLIENT_NOT_READY", "UNSUPPORTED_ENVIRONMENT" -> 503;
             default -> 400;
         };
     }
@@ -902,6 +965,69 @@ public final class WebAdminTestBridgeRoutes {
         }
     }
 
+    private static int clamp(int value, int min, int max) {
+        if (value <= 0) {
+            return 20000;
+        }
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static Path screenshotsDir() {
+        String repoRoot = safe(System.getenv("TZZ_REPO_ROOT"));
+        Path root = repoRoot.isBlank() ? Path.of("").toAbsolutePath().normalize() : Path.of(repoRoot).toAbsolutePath().normalize();
+        Path dir = root.resolve("reports").resolve("mcp").resolve("screenshots").normalize();
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException exception) {
+            throw new TestBridgeException(500, "SCREENSHOT_FAILED", "无法创建 Minecraft 客户端截图目录。");
+        }
+        return dir;
+    }
+
+    private static String screenshotFileName(String rawName) {
+        String base = safe(rawName)
+                .replaceAll("[<>:\"/\\\\|?*\\x00-\\x1f]", "-")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+        if (base.isBlank()) {
+            base = "minecraft-client";
+        }
+        if (base.length() > 80) {
+            base = base.substring(0, 80);
+        }
+        String stamp = Instant.now().toString().replace(':', '-').replace('.', '-');
+        String prefix = stamp + "-" + base;
+        Path dir = screenshotsDir();
+        String candidate = prefix + ".png";
+        int counter = 1;
+        while (Files.exists(dir.resolve(candidate))) {
+            candidate = prefix + "-" + counter + ".png";
+            counter++;
+        }
+        return candidate;
+    }
+
+    private static boolean waitForScreenshotFile(Path output, long timeoutMillis) {
+        long deadline = System.currentTimeMillis() + Math.max(1000L, timeoutMillis);
+        while (System.currentTimeMillis() <= deadline) {
+            try {
+                if (Files.isRegularFile(output) && Files.size(output) > 0L) {
+                    return true;
+                }
+            } catch (IOException ignored) {
+                // Keep polling until timeout.
+            }
+            try {
+                Thread.sleep(100L);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
     private static Hand parseHand(String raw) {
         return "off_hand".equalsIgnoreCase(safe(raw)) ? Hand.OFF_HAND : Hand.MAIN_HAND;
     }
@@ -1022,6 +1148,9 @@ public final class WebAdminTestBridgeRoutes {
                     ""
             );
         }
+    }
+
+    private record ClientScreenshotRequest(String player, String name, boolean fullWindow, int timeoutMs) {
     }
 
     private record InspectDeviceRequest(String deviceId, String dimension, int x, int y, int z) {

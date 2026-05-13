@@ -28,6 +28,38 @@ public final class WebAdminTestBridgeClientGuiBridge {
         return request(server, playerName, operation, body, DEFAULT_TIMEOUT_MILLIS);
     }
 
+    public static Result send(MinecraftServer server, String playerName, String operation, JsonObject body) {
+        if (server == null) {
+            return Result.failed("TESTBRIDGE_NOT_READY", "Minecraft server/world 尚未就绪。");
+        }
+        String cleanOperation = safe(operation);
+        if (!isAllowedOperation(cleanOperation)) {
+            return Result.failed("VALIDATION_FAILED", "不支持的 GUI TestBridge 操作：" + cleanOperation);
+        }
+        Runnable dispatch = () -> {
+            ServerPlayerEntity player = resolvePlayer(server, playerName);
+            if (player == null) {
+                return;
+            }
+            try {
+                ServerPlayNetworking.send(player, new WebAdminTestBridgeGuiS2CPayload(
+                        UUID.randomUUID().toString(),
+                        nonce(),
+                        cleanOperation,
+                        body == null ? "{}" : body.toString()
+                ));
+            } catch (Exception ignored) {
+                // The caller observes fire-and-poll operations through their side effects.
+            }
+        };
+        if (server.isOnThread()) {
+            dispatch.run();
+        } else {
+            server.execute(dispatch);
+        }
+        return Result.ok(new JsonObject());
+    }
+
     public static Result request(MinecraftServer server, String playerName, String operation, JsonObject body, long timeoutMillis) {
         if (server == null) {
             return Result.failed("TESTBRIDGE_NOT_READY", "Minecraft server/world 尚未就绪。");
@@ -37,7 +69,7 @@ public final class WebAdminTestBridgeClientGuiBridge {
             return Result.failed("VALIDATION_FAILED", "不支持的 GUI TestBridge 操作：" + cleanOperation);
         }
         CompletableFuture<Result> future = new CompletableFuture<>();
-        server.execute(() -> {
+        Runnable dispatch = () -> {
             ServerPlayerEntity player = resolvePlayer(server, playerName);
             if (player == null) {
                 future.complete(Result.failed("NOT_FOUND", "在线玩家不存在：" + safe(playerName)));
@@ -64,7 +96,12 @@ public final class WebAdminTestBridgeClientGuiBridge {
                 PENDING.remove(requestId);
                 future.complete(Result.failed("CLIENT_TESTBRIDGE_UNAVAILABLE", "目标客户端无法接收 GUI TestBridge payload。"));
             }
-        });
+        };
+        if (server.isOnThread()) {
+            dispatch.run();
+        } else {
+            server.execute(dispatch);
+        }
         try {
             return future.get(Math.max(1000L, timeoutMillis + 500L), TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
@@ -131,7 +168,7 @@ public final class WebAdminTestBridgeClientGuiBridge {
 
     private static boolean isAllowedOperation(String operation) {
         return switch (operation) {
-            case "current", "slots", "put_item", "clear_slot", "set_count", "save", "cancel" -> true;
+            case "current", "slots", "put_item", "clear_slot", "set_count", "save", "cancel", "client_screenshot" -> true;
             default -> false;
         };
     }

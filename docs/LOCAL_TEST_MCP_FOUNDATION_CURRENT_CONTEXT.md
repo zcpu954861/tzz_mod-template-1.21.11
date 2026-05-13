@@ -271,6 +271,7 @@ Step 4 endpoints:
 - `POST /api/testbridge/gui/set-count`
 - `POST /api/testbridge/gui/save`
 - `POST /api/testbridge/gui/cancel`
+- `POST /api/testbridge/client/screenshot`
 
 Step 4 MCP tools:
 
@@ -281,6 +282,7 @@ Step 4 MCP tools:
 - `minecraft.gui_set_count`
 - `minecraft.gui_save`
 - `minecraft.gui_cancel`
+- `minecraft.client_screenshot`
 
 GUI operation semantics:
 
@@ -291,12 +293,16 @@ GUI operation semantics:
 - `minecraft.gui_set_count` uses the existing GUI count rules. Container template stack counts clamp to the item max stack count. Single itemSubmit keeps requirement count separate from display stack count.
 - `minecraft.gui_save` calls the existing GUI session save path and does not directly write `SignalDeviceData`.
 - `minecraft.gui_cancel` calls the existing GUI cancel path and releases the existing session/lock lifecycle.
+- `minecraft.client_screenshot` asks the target Minecraft client to capture its current framebuffer through the same nonce-bound client payload bridge. It is intended for GUI and visual validation, including compact-layout checks and GUI scale compatibility.
+- Client screenshots are saved under `reports/mcp/screenshots` with sanitized timestamped file names. Reports can reference the returned path, but screenshot files remain local test output and should not be committed.
+- The screenshot tool does not use OS screenshots, does not capture other windows, does not click screen coordinates, and does not send the TestBridge token to the client payload.
 
 Step 4 still does not:
 
 - Support arbitrary Minecraft screens.
 - Click Minecraft GUI coordinates.
 - Use OS-level input control or image-recognition clicking.
+- Use OS screenshots.
 - Directly write `SignalDeviceData` JSON.
 - Bypass existing WebAdmin session save / cancel validation.
 - Automate full P3b / 7.10 GUI opening flows; use existing WebAdmin or session tools to open the supported GUI first.

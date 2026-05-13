@@ -51,6 +51,7 @@ async function main(): Promise<void> {
     "minecraft.gui_set_count",
     "minecraft.gui_save",
     "minecraft.gui_cancel",
+    "minecraft.client_screenshot",
     "scenario.list",
     "scenario.run",
     "scenario.report",

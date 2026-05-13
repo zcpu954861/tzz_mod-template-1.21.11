@@ -417,6 +417,7 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `minecraft.gui_set_count`：设置模板数量，沿用 GUI 现有 clamp 规则。
 - `minecraft.gui_save`：走当前 GUI 的既有 session 保存路径。
 - `minecraft.gui_cancel`：走当前 GUI 的既有取消路径。
+- `minecraft.client_screenshot`：请求 Minecraft 客户端自己保存当前 framebuffer 截图到 `reports/mcp/screenshots`，不是 OS 截屏，不点击坐标。
 - `scenario.list`：列出内置场景 smoke。
 - `scenario.run`：运行一个固定白名单内的本地测试场景。
 - `scenario.report`：读取最近的场景报告摘要。
@@ -430,6 +431,7 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 {"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","target":"single_item_submit","itemId":"minecraft:diamond","count":3}}
 {"tool":"minecraft.gui_set_count","arguments":{"player":"Steve","target":"single_item_submit","count":3}}
 {"tool":"minecraft.gui_save","arguments":{"player":"Steve"}}
+{"tool":"minecraft.client_screenshot","arguments":{"player":"Steve","name":"single-item-submit-compact-layout"}}
 ```
 
 容器模板 GUI 使用 `slot` 或 `slotIndex` 指定模板槽：
@@ -446,6 +448,33 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `gui_put_item` 只写 GUI draft 的 ghost/template 数据，不改真实玩家背包，不改真实世界容器。
 - `gui_save` / `gui_cancel` 复用 GUI 已有保存/取消路径，不直接写 `SignalDeviceData` JSON。
 - 本阶段不自动打开 P3b / 7.10 GUI；请先通过 WebAdmin 或现有 session 入口打开目标 GUI，再调用这些工具。
+
+### Minecraft 客户端截图
+
+`minecraft.client_screenshot` 用于游戏内 GUI / 视觉验收。它走 TestBridge 的 loopback + token HTTP endpoint，再通过 nonce-bound client payload 让目标 Minecraft 客户端调用原版客户端截图 API 捕获当前 framebuffer。它不是 OS 截屏，不截其它窗口，不使用鼠标键盘坐标点击，也不做图像识别点击。
+
+示例：打开 7.10 single itemSubmit GUI 后截图：
+
+```json
+{"tool":"minecraft.client_screenshot","arguments":{"player":"Steve","name":"single-item-submit-compact-layout","timeoutMs":8000}}
+```
+
+示例：打开 7.9 container template GUI 后截图：
+
+```json
+{"tool":"minecraft.client_screenshot","arguments":{"player":"Steve","name":"container-template-compact-layout"}}
+```
+
+返回值会包含截图路径，例如：
+
+```json
+{
+  "path": "E:\\minecraftserver\\fabricmod\\tzz_mod-template-1.21.11\\reports\\mcp\\screenshots\\2026-xx-xxTxx-xx-xx-single-item-submit-compact-layout.png",
+  "screenType": "single_item_submit"
+}
+```
+
+截图文件统一写入 `reports/mcp/screenshots`，文件名会安全化并加时间戳，不覆盖旧文件。报告可以引用返回的路径，但这些截图属于本地测试输出，提交前不要把 `reports/mcp` 或 screenshots 加入 git。
 
 ## Scenario Test Orchestration Foundation
 
