@@ -15,7 +15,10 @@ async function main(): Promise<void> {
     "webadmin.change_password",
     "webadmin.owner_set_password",
     "webadmin.goto",
+    "webadmin.set_viewport",
     "webadmin.screenshot",
+    "webadmin.responsive_screenshot",
+    "webadmin.responsive_matrix",
     "webadmin.console_errors",
     "webadmin.close",
     "webadmin.click",
@@ -52,6 +55,9 @@ async function main(): Promise<void> {
     "minecraft.gui_save",
     "minecraft.gui_cancel",
     "minecraft.client_screenshot",
+    "minecraft.client_set_window_size",
+    "minecraft.client_set_gui_scale",
+    "minecraft.client_screenshot_matrix",
     "scenario.list",
     "scenario.run",
     "scenario.report",
@@ -59,6 +65,23 @@ async function main(): Promise<void> {
   ];
   for (const name of required) {
     assert(tools.includes(name), `missing tool ${name}`);
+  }
+  const forbidden = [
+    ["shell", "run"],
+    ["run", "command"],
+    ["git", "add"],
+    ["git", "commit"],
+    ["git", "push"],
+    ["git", "merge"],
+    ["git", "tag"],
+    ["git", "reset"],
+    ["git", "checkout"],
+    ["git", "switch"],
+    ["os", "screenshot"],
+    ["minecraft", "coordinate_click"]
+  ].map(([prefix, suffix]) => prefix === "run" ? `${prefix}_${suffix}` : `${prefix}.${suffix}`);
+  for (const name of forbidden) {
+    assert(!tools.includes(name), `forbidden tool exposed ${name}`);
   }
   const config = loadConfig();
   assert(existsSync(path.join(config.repoRoot, "gradlew.bat")), "repo root has gradlew.bat");
@@ -71,6 +94,7 @@ async function main(): Promise<void> {
       context: undefined,
       page: undefined,
       baseUrl: undefined,
+      viewportProfile: undefined,
       consoleErrors: [],
       pageErrors: [],
       failedRequests: [],

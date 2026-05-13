@@ -141,6 +141,16 @@ public final class WebAdminTestBridgeRoutes {
                 WebAdminJsonResponse.ok(exchange, clientScreenshot(server, readJson(exchange, ClientScreenshotRequest.class), exchange));
                 return;
             }
+            if (path.equals("/api/testbridge/client/window-size")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, clientWindowSize(server, readJson(exchange, ClientWindowSizeRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/client/gui-scale")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, clientGuiScale(server, readJson(exchange, ClientGuiScaleRequest.class), exchange));
+                return;
+            }
             if (path.equals("/api/testbridge/command")) {
                 requireMethod(exchange, method, "POST");
                 CommandRequest request = readJson(exchange, CommandRequest.class);
@@ -357,6 +367,75 @@ public final class WebAdminTestBridgeRoutes {
         return data;
     }
 
+    private JsonObject clientWindowSize(MinecraftServer server, ClientWindowSizeRequest request, HttpExchange exchange) {
+        ClientWindowSizeRequest safeRequest = request == null ? new ClientWindowSizeRequest("", 0, 0, 0) : request;
+        if (safe(safeRequest.player).isBlank()) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "客户端窗口尺寸操作需要 player。");
+        }
+        requireServerReady(server);
+        if (resolveOptionalPlayer(server, safeRequest.player) == null) {
+            throw new TestBridgeException(404, "PLAYER_NOT_FOUND", "在线玩家不存在：" + safe(safeRequest.player));
+        }
+        if (safeRequest.width < 320 || safeRequest.width > 7680 || safeRequest.height < 240 || safeRequest.height > 4320) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "客户端窗口尺寸超出允许范围。");
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("player", safe(safeRequest.player));
+        body.addProperty("width", safeRequest.width);
+        body.addProperty("height", safeRequest.height);
+        body.addProperty("noOsMouseKeyboard", true);
+        body.addProperty("noCoordinateClicking", true);
+        body.addProperty("tokenInClientPayload", false);
+        long timeoutMillis = clamp(safeRequest.timeoutMs, 1000, 120000);
+        WebAdminTestBridgeClientGuiBridge.Result result = WebAdminTestBridgeClientGuiBridge.request(server, safeRequest.player, "client_set_window_size", body, timeoutMillis);
+        WebAdminAuditLogger.testBridge("client_window_size", result.ok() ? "OK" : "FAILED", security.sourceIp(exchange), "player=" + safe(safeRequest.player) + " code=" + result.code());
+        if (!result.ok()) {
+            throw new TestBridgeException(statusForClientCode(result.code()), result.code(), result.message());
+        }
+        JsonObject data = result.data() == null ? new JsonObject() : result.data();
+        data.addProperty("player", safe(safeRequest.player));
+        data.addProperty("testbridgeClientWindowSize", true);
+        data.addProperty("usesClientPayload", true);
+        data.addProperty("usesOsMouseKeyboard", false);
+        data.addProperty("usesCoordinateClicking", false);
+        data.addProperty("tokenInClientPayload", false);
+        return data;
+    }
+
+    private JsonObject clientGuiScale(MinecraftServer server, ClientGuiScaleRequest request, HttpExchange exchange) {
+        ClientGuiScaleRequest safeRequest = request == null ? new ClientGuiScaleRequest("", 0, false, 0) : request;
+        if (safe(safeRequest.player).isBlank()) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "客户端 GUI scale 操作需要 player。");
+        }
+        requireServerReady(server);
+        if (resolveOptionalPlayer(server, safeRequest.player) == null) {
+            throw new TestBridgeException(404, "PLAYER_NOT_FOUND", "在线玩家不存在：" + safe(safeRequest.player));
+        }
+        if (!safeRequest.restoreOriginal && (safeRequest.guiScale < 0 || safeRequest.guiScale > 4)) {
+            throw new TestBridgeException(400, "VALIDATION_FAILED", "GUI scale 必须在 0..4 范围内。");
+        }
+        JsonObject body = new JsonObject();
+        body.addProperty("player", safe(safeRequest.player));
+        body.addProperty("guiScale", safeRequest.guiScale);
+        body.addProperty("restoreOriginal", safeRequest.restoreOriginal);
+        body.addProperty("doesNotWriteOptionsFile", true);
+        body.addProperty("tokenInClientPayload", false);
+        long timeoutMillis = clamp(safeRequest.timeoutMs, 1000, 120000);
+        WebAdminTestBridgeClientGuiBridge.Result result = WebAdminTestBridgeClientGuiBridge.request(server, safeRequest.player, "client_set_gui_scale", body, timeoutMillis);
+        WebAdminAuditLogger.testBridge("client_gui_scale", result.ok() ? "OK" : "FAILED", security.sourceIp(exchange), "player=" + safe(safeRequest.player) + " code=" + result.code());
+        if (!result.ok()) {
+            throw new TestBridgeException(statusForClientCode(result.code()), result.code(), result.message());
+        }
+        JsonObject data = result.data() == null ? new JsonObject() : result.data();
+        data.addProperty("player", safe(safeRequest.player));
+        data.addProperty("testbridgeClientGuiScale", true);
+        data.addProperty("usesClientPayload", true);
+        data.addProperty("doesNotWriteOptionsFile", true);
+        data.addProperty("guiScaleRestoreOrWarning", true);
+        data.addProperty("tokenInClientPayload", false);
+        return data;
+    }
+
     private static int statusForGuiCode(String code) {
         return switch (safe(code)) {
             case "NOT_FOUND" -> 404;
@@ -377,6 +456,18 @@ public final class WebAdminTestBridgeRoutes {
             default -> 400;
         };
     }
+
+    private static int statusForClientCode(String code) {
+        return switch (safe(code)) {
+            case "NOT_FOUND", "PLAYER_NOT_FOUND" -> 404;
+            case "VALIDATION_FAILED", "VALIDATION_ERROR" -> 400;
+            case "CLIENT_TIMEOUT", "TIMEOUT" -> 504;
+            case "TESTBRIDGE_NOT_READY", "CLIENT_NOT_READY", "CLIENT_WINDOW_NOT_READY", "UNSUPPORTED_ENVIRONMENT" -> 503;
+            case "SESSION_DENIED", "SESSION_EXPIRED" -> 403;
+            default -> 400;
+        };
+    }
+
 
     private Map<String, Object> setBlock(MinecraftServer server, SetBlockRequest request, HttpExchange exchange) {
         requireServerReady(server);
@@ -1151,6 +1242,12 @@ public final class WebAdminTestBridgeRoutes {
     }
 
     private record ClientScreenshotRequest(String player, String name, boolean fullWindow, int timeoutMs) {
+    }
+
+    private record ClientWindowSizeRequest(String player, int width, int height, int timeoutMs) {
+    }
+
+    private record ClientGuiScaleRequest(String player, int guiScale, boolean restoreOriginal, int timeoutMs) {
     }
 
     private record InspectDeviceRequest(String deviceId, String dimension, int x, int y, int z) {

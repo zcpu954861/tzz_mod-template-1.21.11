@@ -1,6 +1,7 @@
+import { writeFileSync } from "node:fs";
 import type { Json, JsonObject, ToolDefinition, TzzTestMcpConfig } from "../types.js";
 import { fail, ok, type ToolErrorCode } from "../results.js";
-import { ensureAllowedUrl, redactSecrets, safeName } from "../safety.js";
+import { ensureAllowedUrl, ensureResponsiveReportPath, redactSecrets, safeName } from "../safety.js";
 
 const TOKEN_HEADER = "X-TZZ-TestBridge-Token";
 const TESTBRIDGE_TOKEN_ENV = "TZZ_TESTBRIDGE_TOKEN";
@@ -31,7 +32,10 @@ export function testBridgeTools(): ToolDefinition[] {
     testBridgeGuiSetCountTool(),
     testBridgeGuiSaveTool(),
     testBridgeGuiCancelTool(),
-    testBridgeClientScreenshotTool()
+    testBridgeClientScreenshotTool(),
+    testBridgeClientSetWindowSizeTool(),
+    testBridgeClientSetGuiScaleTool(),
+    testBridgeClientScreenshotMatrixTool()
   ];
 }
 
@@ -655,6 +659,269 @@ function testBridgeClientScreenshotTool(): ToolDefinition {
   };
 }
 
+function testBridgeClientSetWindowSizeTool(): ToolDefinition {
+  return {
+    name: "minecraft.client_set_window_size",
+    description: "Resize the Minecraft client window through the TestBridge client payload. This does not use OS input automation.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        width: { type: "number", minimum: 320, maximum: 7680 },
+        height: { type: "number", minimum: 240, maximum: 4320 },
+        timeoutMs: { type: "number", minimum: 1000, maximum: 120000 }
+      },
+      required: ["player", "width", "height"]
+    },
+    async handler(args, context) {
+      const player = stringArg(args, "player") ?? "";
+      if (!player.trim()) {
+        return fail("VALIDATION_ERROR", "player is required.");
+      }
+      const width = intArg(args, "width");
+      const height = intArg(args, "height");
+      if (width < 320 || width > 7680 || height < 240 || height > 4320) {
+        return fail("VALIDATION_ERROR", "width/height are outside the allowed Minecraft client window range.");
+      }
+      return await requestTool(context.config, "POST", "client/window-size", {
+        player,
+        width,
+        height,
+        timeoutMs: optionalIntArg(args, "timeoutMs") ?? 15000,
+        noOsMouseKeyboard: true,
+        noCoordinateClicking: true
+      }, "Minecraft client window size set.");
+    }
+  };
+}
+
+function testBridgeClientSetGuiScaleTool(): ToolDefinition {
+  return {
+    name: "minecraft.client_set_gui_scale",
+    description: "Set or restore Minecraft GUI scale through the TestBridge client payload. This does not write options.txt.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        guiScale: { type: "number", minimum: 0, maximum: 4 },
+        restoreOriginal: { type: "boolean" },
+        timeoutMs: { type: "number", minimum: 1000, maximum: 120000 }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      const player = stringArg(args, "player") ?? "";
+      if (!player.trim()) {
+        return fail("VALIDATION_ERROR", "player is required.");
+      }
+      const restoreOriginal = boolArg(args, "restoreOriginal", false);
+      const guiScale = optionalIntArg(args, "guiScale");
+      if (!restoreOriginal && (guiScale === undefined || guiScale < 0 || guiScale > 4)) {
+        return fail("VALIDATION_ERROR", "guiScale must be 0..4 unless restoreOriginal=true.");
+      }
+      return await requestTool(context.config, "POST", "client/gui-scale", {
+        player,
+        guiScale: guiScale ?? 0,
+        restoreOriginal,
+        timeoutMs: optionalIntArg(args, "timeoutMs") ?? 15000,
+        doesNotWriteOptionsFile: true
+      }, restoreOriginal ? "Minecraft GUI scale restored." : "Minecraft GUI scale set.");
+    }
+  };
+}
+
+function testBridgeClientScreenshotMatrixTool(): ToolDefinition {
+  return {
+    name: "minecraft.client_screenshot_matrix",
+    description: "Capture Minecraft client screenshots across window sizes and GUI scales. It does not judge visuals; user review is required before checkpoint.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        name: { type: "string" },
+        targetGui: { type: "string", enum: ["current", "single_item_submit", "container_template"] },
+        sizes: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              width: { type: "number" },
+              height: { type: "number" },
+              label: { type: "string" }
+            },
+            required: ["width", "height"]
+          }
+        },
+        guiScales: { type: "array", items: { type: "number" } },
+        timeoutMs: { type: "number", minimum: 1000, maximum: 120000 },
+        settleMs: { type: "number", minimum: 100, maximum: 10000 },
+        restoreOriginal: { type: "boolean" }
+      }
+    },
+    async handler(args, context) {
+      const player = await resolvePlayerName(context.config, stringArg(args, "player"));
+      if (!player.ok) {
+        return fail(player.code, player.message, player.data ?? {});
+      }
+      const targetGui = stringArg(args, "targetGui") ?? "current";
+      const sizes = parseMatrixSizes(args.sizes);
+      const guiScales = parseGuiScales(args.guiScales);
+      const timeoutMs = optionalIntArg(args, "timeoutMs") ?? 60000;
+      const settleMs = optionalIntArg(args, "settleMs") ?? 1000;
+      const restoreOriginal = boolArg(args, "restoreOriginal", true);
+      const name = safeName(stringArg(args, "name") ?? `minecraft-${targetGui}-screenshot-matrix`, "minecraft-screenshot-matrix");
+      const started = new Date().toISOString();
+      const warnings: string[] = [];
+      const captures: JsonObject[] = [];
+      let originalWindow: JsonObject | undefined;
+      let originalGuiScale: JsonObject | undefined;
+
+      if (targetGui !== "current") {
+        const current = await testBridgeFetch(context.config, "GET", `gui/current?player=${encodeURIComponent(player.player)}`, undefined, true);
+        if (!current.ok) {
+          return fail(current.code, current.message, current.data ?? {});
+        }
+        if (current.data.type !== targetGui) {
+          warnings.push(`Target GUI ${targetGui} is not currently open; current type is ${String(current.data.type ?? "unknown")}.`);
+        }
+      }
+
+      for (const size of sizes) {
+        for (const guiScale of guiScales) {
+          const cell: JsonObject = {
+            ok: false,
+            player: player.player,
+            targetGui,
+            width: size.width,
+            height: size.height,
+            label: size.label ?? "",
+            guiScale,
+            manualVisualReviewRequired: true
+          };
+          const resize = await testBridgeFetch(context.config, "POST", "client/window-size", {
+            player: player.player,
+            width: size.width,
+            height: size.height,
+            timeoutMs: 15000,
+            noOsMouseKeyboard: true,
+            noCoordinateClicking: true
+          }, true);
+          if (resize.ok) {
+            originalWindow ??= resize.data.previousWindow as JsonObject | undefined;
+            cell.window = resize.data;
+          } else {
+            cell.code = resize.code;
+            cell.message = resize.message;
+            captures.push(cell);
+            continue;
+          }
+          const scale = await testBridgeFetch(context.config, "POST", "client/gui-scale", {
+            player: player.player,
+            guiScale,
+            timeoutMs: 15000,
+            doesNotWriteOptionsFile: true
+          }, true);
+          if (scale.ok) {
+            originalGuiScale ??= scale.data.originalGuiScaleState as JsonObject | undefined;
+            cell.guiScaleResult = scale.data;
+          } else {
+            cell.code = scale.code;
+            cell.message = scale.message;
+            captures.push(cell);
+            continue;
+          }
+          await delay(settleMs);
+          const screenshotName = `${name}-${targetGui}-${size.label ?? "window"}-${size.width}x${size.height}-scale${guiScale}`;
+          const shot = await testBridgeFetch(context.config, "POST", "client/screenshot", {
+            player: player.player,
+            name: screenshotName,
+            fullWindow: true,
+            timeoutMs,
+            noOsScreenshot: true,
+            noCoordinateClicking: true
+          }, true);
+          if (shot.ok) {
+            cell.ok = true;
+            cell.code = "OK";
+            cell.message = "OK";
+            cell.screenshotPath = shot.data.path ?? "";
+            cell.screenshot = shot.data;
+            if (typeof shot.data.path === "string" && shot.data.path.trim()) {
+              context.webAdmin.screenshots.push(shot.data.path);
+            }
+          } else {
+            cell.code = shot.code;
+            cell.message = shot.message;
+          }
+          captures.push(cell);
+        }
+      }
+
+      const restoreResults: JsonObject[] = [];
+      if (restoreOriginal) {
+        if (originalWindow && typeof originalWindow.width === "number" && typeof originalWindow.height === "number") {
+          const restored = await testBridgeFetch(context.config, "POST", "client/window-size", {
+            player: player.player,
+            width: originalWindow.width,
+            height: originalWindow.height,
+            timeoutMs: 15000,
+            noOsMouseKeyboard: true,
+            noCoordinateClicking: true
+          }, true);
+          restoreResults.push({ type: "window", ok: restored.ok, result: restored.ok ? restored.data : { code: restored.code, message: restored.message } });
+        } else {
+          warnings.push("Original Minecraft window size was not available; window restore skipped.");
+        }
+        const restoredScale = await testBridgeFetch(context.config, "POST", "client/gui-scale", {
+          player: player.player,
+          restoreOriginal: true,
+          timeoutMs: 15000,
+          doesNotWriteOptionsFile: true
+        }, true);
+        restoreResults.push({ type: "guiScale", ok: restoredScale.ok, result: restoredScale.ok ? restoredScale.data : { code: restoredScale.code, message: restoredScale.message } });
+        if (!originalGuiScale) {
+          warnings.push("Original GUI scale state was not captured before restore request.");
+        }
+      }
+
+      const passed = captures.filter((entry) => entry.ok === true).length;
+      const failed = captures.length - passed;
+      const reportPath = writeMinecraftMatrixReport(context.config, {
+        name,
+        started,
+        finished: new Date().toISOString(),
+        player: player.player,
+        targetGui,
+        sizes: sizes.map((size) => ({ width: size.width, height: size.height, label: size.label ?? "" })),
+        guiScales,
+        captures,
+        warnings,
+        restoreResults,
+        passed,
+        failed,
+        manualVisualReviewRequired: true,
+        userApprovalRequiredBeforeCheckpoint: true
+      });
+      return ok(failed > 0 ? "Minecraft client screenshot matrix completed with failures." : "Minecraft client screenshot matrix captured.", {
+        reportPath,
+        player: player.player,
+        targetGui,
+        screenshots: captures.map((entry) => entry.screenshotPath).filter((value): value is string => typeof value === "string" && value.length > 0),
+        passed,
+        failed,
+        warnings,
+        restoreResults,
+        manualVisualReviewRequired: true,
+        userApprovalRequiredBeforeCheckpoint: true
+      });
+    }
+  };
+}
+
 async function requestTool(
   config: TzzTestMcpConfig,
   method: "GET" | "POST",
@@ -753,6 +1020,10 @@ function normalizeCode(code: string): Exclude<ToolErrorCode, "OK"> {
       return "VALIDATION_ERROR";
     case "CLIENT_TIMEOUT":
       return "TIMEOUT";
+    case "CLIENT_WINDOW_NOT_READY":
+    case "SCREENSHOT_BUSY":
+    case "UNSUPPORTED_ENVIRONMENT":
+      return "COMMAND_FAILED";
     case "CLIENT_TESTBRIDGE_UNAVAILABLE":
     case "SCREEN_OPERATION_FAILED":
       return "COMMAND_FAILED";
@@ -920,6 +1191,113 @@ function optionalIntArg(args: JsonObject, key: string): number | undefined {
 
 function objectOrEmpty(value: Json | undefined): JsonObject {
   return isObject(value) ? value : {};
+}
+
+type MatrixSize = { width: number; height: number; label?: string };
+
+const DEFAULT_MINECRAFT_MATRIX_SIZES: MatrixSize[] = [
+  { width: 854, height: 480, label: "small" },
+  { width: 1280, height: 720, label: "720p" },
+  { width: 1920, height: 1080, label: "1080p" },
+  { width: 2560, height: 1440, label: "2k" },
+  { width: 3840, height: 2160, label: "4k" }
+];
+
+const DEFAULT_GUI_SCALES = [2, 3, 4];
+
+function parseMatrixSizes(value: Json | undefined): MatrixSize[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_MINECRAFT_MATRIX_SIZES;
+  }
+  const sizes = value
+    .map((entry) => isObject(entry) ? matrixSize(entry) : undefined)
+    .filter((entry): entry is MatrixSize => Boolean(entry));
+  return sizes.length > 0 ? sizes : DEFAULT_MINECRAFT_MATRIX_SIZES;
+}
+
+function matrixSize(value: JsonObject): MatrixSize | undefined {
+  const width = typeof value.width === "number" && Number.isFinite(value.width) ? Math.trunc(value.width) : 0;
+  const height = typeof value.height === "number" && Number.isFinite(value.height) ? Math.trunc(value.height) : 0;
+  if (width < 320 || width > 7680 || height < 240 || height > 4320) {
+    return undefined;
+  }
+  const label = typeof value.label === "string" ? safeName(value.label, "") : "";
+  return label ? { width, height, label } : { width, height };
+}
+
+function parseGuiScales(value: Json | undefined): number[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_GUI_SCALES;
+  }
+  const scales = value
+    .filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry))
+    .map((entry) => Math.trunc(entry))
+    .filter((entry) => entry >= 2 && entry <= 4);
+  return Array.from(new Set(scales.length > 0 ? scales : DEFAULT_GUI_SCALES));
+}
+
+async function resolvePlayerName(
+  config: TzzTestMcpConfig,
+  requested: string | undefined
+): Promise<{ ok: true; player: string } | { ok: false; code: Exclude<ToolErrorCode, "OK">; message: string; data?: JsonObject }> {
+  if (requested && requested.trim()) {
+    return { ok: true, player: requested.trim() };
+  }
+  const players = await testBridgeFetch(config, "GET", "players", undefined, true);
+  if (!players.ok) {
+    const failure: { ok: false; code: Exclude<ToolErrorCode, "OK">; message: string; data?: JsonObject } = {
+      ok: false,
+      code: players.code,
+      message: players.message
+    };
+    if (players.data !== undefined) {
+      failure.data = players.data;
+    }
+    return failure;
+  }
+  const online = Array.isArray(players.data.players) ? players.data.players : Array.isArray(players.data.onlinePlayers) ? players.data.onlinePlayers : [];
+  for (const entry of online) {
+    if (isObject(entry) && typeof entry.name === "string" && entry.name.trim()) {
+      return { ok: true, player: entry.name.trim() };
+    }
+  }
+  return { ok: false, code: "NOT_FOUND", message: "No online player is available for Minecraft screenshot matrix." };
+}
+
+function writeMinecraftMatrixReport(config: TzzTestMcpConfig, summary: JsonObject): string {
+  const reportPath = ensureResponsiveReportPath(config, summary.name ?? "minecraft-client-screenshot-matrix");
+  const captures = Array.isArray(summary.captures) ? summary.captures as JsonObject[] : [];
+  const lines = [
+    "# Minecraft Client Screenshot Matrix",
+    "",
+    `- Started: ${summary.started ?? ""}`,
+    `- Finished: ${summary.finished ?? ""}`,
+    `- Player: ${summary.player ?? ""}`,
+    `- Target GUI: ${summary.targetGui ?? ""}`,
+    `- Passed: ${summary.passed ?? 0}`,
+    `- Failed: ${summary.failed ?? 0}`,
+    "",
+    "本阶段不做自动图像识别，截图需要用户人工验收。用户确认前不得 checkpoint。",
+    "",
+    "## Screenshots",
+    "",
+    "| Window | GUI Scale | Result | Screenshot | Message |",
+    "|---:|---:|---|---|---|"
+  ];
+  for (const capture of captures) {
+    lines.push(`| ${capture.width ?? ""}x${capture.height ?? ""} | ${capture.guiScale ?? ""} | ${capture.ok === true ? "PASS" : `FAIL ${capture.code ?? ""}`} | ${capture.screenshotPath ?? ""} | ${capture.message ?? ""} |`);
+  }
+  const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+  if (warnings.length > 0) {
+    lines.push("", "## Warnings", "");
+    for (const warning of warnings) {
+      lines.push(`- ${redactSecrets(String(warning))}`);
+    }
+  }
+  lines.push("", "## Cleanup / Restore", "", "```json", JSON.stringify(summary.restoreResults ?? [], null, 2), "```");
+  lines.push("", "## Raw Summary", "", "```json", JSON.stringify(summary, null, 2), "```", "");
+  writeFileSync(reportPath, lines.join("\n"), "utf8");
+  return reportPath;
 }
 
 function isObject(value: Json | undefined): value is JsonObject {

@@ -168,7 +168,8 @@ public final class WebAdminTestBridgeClientGuiBridge {
 
     private static boolean isAllowedOperation(String operation) {
         return switch (operation) {
-            case "current", "slots", "put_item", "clear_slot", "set_count", "save", "cancel", "client_screenshot" -> true;
+            case "current", "slots", "put_item", "clear_slot", "set_count", "save", "cancel",
+                    "client_screenshot", "client_set_window_size", "client_set_gui_scale" -> true;
             default -> false;
         };
     }

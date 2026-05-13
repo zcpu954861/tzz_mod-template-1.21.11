@@ -171,7 +171,7 @@ public final class WebAdminServer {
                 handleLogin(exchange);
                 return;
             }
-            if (path.startsWith("/api/testbridge/gui/")) {
+            if (path.startsWith("/api/testbridge/gui/") || path.startsWith("/api/testbridge/client/")) {
                 testBridgeRoutes.handle(exchange, minecraftServer, path, method);
                 return;
             }

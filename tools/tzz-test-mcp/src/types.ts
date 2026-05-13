@@ -45,6 +45,7 @@ export type WebAdminState = {
   context: unknown | undefined;
   page: unknown | undefined;
   baseUrl: string | undefined;
+  viewportProfile: JsonObject | undefined;
   consoleErrors: string[];
   pageErrors: string[];
   failedRequests: JsonObject[];

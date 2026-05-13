@@ -296,6 +296,40 @@ GUI operation semantics:
 - `minecraft.client_screenshot` asks the target Minecraft client to capture its current framebuffer through the same nonce-bound client payload bridge. It is intended for GUI and visual validation, including compact-layout checks and GUI scale compatibility.
 - Client screenshots are saved under `reports/mcp/screenshots` with sanitized timestamped file names. Reports can reference the returned path, but screenshot files remain local test output and should not be committed.
 - The screenshot tool does not use OS screenshots, does not capture other windows, does not click screen coordinates, and does not send the TestBridge token to the client payload.
+- `minecraft.client_set_window_size` resizes the target Minecraft client window through the client payload bridge without OS mouse / keyboard automation.
+- `minecraft.client_set_gui_scale` sets or restores Minecraft GUI scale through the client payload bridge without writing `options.txt`.
+- `minecraft.client_screenshot_matrix` captures Minecraft client screenshots across window sizes and GUI scales, writes a responsive matrix report under `reports/mcp/responsive`, and requires user manual visual review before checkpoint.
+
+## Long-Term UI Screenshot Matrix Rule
+
+All new or modified Minecraft in-game UI must run a screenshot matrix before checkpoint / merge. The matrix must cover small resolution, 1080p, 2K, and 4K or the closest dimensions supported by the local machine, and it must cover multiple Minecraft GUI scale values, at least GUI scale 2 / 3 / 4 when supported.
+
+All new or modified WebAdmin WebUI must run a WebAdmin viewport screenshot matrix before checkpoint / merge. That matrix is now a WebAdmin responsive screenshot matrix: it must distinguish CSS viewport size, physical screenshot size, and Playwright `deviceScaleFactor` / DPI scaling profile. It is incorrect to treat `3840x2160` CSS viewport as the only "4K" check: real 4K Windows displays commonly run at 150% or 200% scaling, so their browser CSS viewport is smaller than the physical panel.
+
+The current default WebAdmin profiles are:
+
+- `small_854x480`: CSS `854x480`, `deviceScaleFactor=1`.
+- `hd_1280x720_100`: CSS `1280x720`, `deviceScaleFactor=1`.
+- `fhd_1920x1080_100`: CSS `1920x1080`, `deviceScaleFactor=1`.
+- `qhd_2560x1440_100`: CSS `2560x1440`, `deviceScaleFactor=1`.
+- `uhd_4k_150_scaled`: CSS `2560x1440`, `deviceScaleFactor=1.5`, expected physical screenshot `3840x2160`.
+- `uhd_4k_200_scaled`: CSS `1920x1080`, `deviceScaleFactor=2`, expected physical screenshot `3840x2160`.
+- `uhd_3840x2160_css_extreme`: CSS `3840x2160`, `deviceScaleFactor=1`; this is an extreme CSS workspace and must not be used as the only representation of normal 4K scaled visual review.
+
+WebAdmin 4K visual review must include at least one scaled 4K profile, preferably `2560x1440 @ 1.5` for a Windows 150% display and/or `1920x1080 @ 2` for a Windows 200% display. Responsive screenshot tools default to viewport screenshots, not full-page screenshots, so actual PNG dimensions can be compared to expected physical dimensions. The report must list profile name, CSS viewport, device scale factor, expected physical screenshot size, actual screenshot size, route, and screenshot path. If actual screenshot size differs from expected physical size, the report must show a warning.
+
+When WebAdmin responsive tools change `deviceScaleFactor`, Playwright must recreate the browser context. The tool preserves the existing WebAdmin `storageState` and captures the matrix profile-first to reduce repeated relogin and avoid long-running matrix timeouts.
+
+Codex is responsible for collecting screenshots, console diagnostics, Doctor / scenario context when relevant, and writing the report. Codex must not make the final visual acceptance decision. Screenshot matrix reports must state that manual visual review is required, and user approval is required before checkpoint. If 4K or a requested Minecraft window size cannot be applied by the local platform, the report must show a warning instead of pretending that the screenshot was captured at that size.
+
+Matrix outputs are local test artifacts only:
+
+- WebAdmin screenshots use `webadmin.set_viewport`, `webadmin.responsive_screenshot`, and `webadmin.responsive_matrix`.
+- Minecraft screenshots use `minecraft.client_set_window_size`, `minecraft.client_set_gui_scale`, `minecraft.client_screenshot`, and `minecraft.client_screenshot_matrix`.
+- Screenshot files are written under `reports/mcp/screenshots`.
+- Responsive matrix reports are written under `reports/mcp/responsive`.
+- Reports and screenshots must not be committed.
+- No OS screenshots, no coordinate clicking, no arbitrary shell, no git mutation, and no external host access are allowed.
 
 Step 4 still does not:
 

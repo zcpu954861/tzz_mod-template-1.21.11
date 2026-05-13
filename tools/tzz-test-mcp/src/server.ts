@@ -38,6 +38,7 @@ export async function runServer(): Promise<void> {
       context: undefined,
       page: undefined,
       baseUrl: undefined,
+      viewportProfile: undefined,
       consoleErrors: [],
       pageErrors: [],
       failedRequests: [],

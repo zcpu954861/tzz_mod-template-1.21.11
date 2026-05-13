@@ -19,10 +19,12 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.util.Util;
 import org.lwjgl.BufferUtils;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 
 public final class WebAdminTestBridgeGuiClient {
     private static final AtomicReference<PendingScreenshot> PENDING_SCREENSHOT = new AtomicReference<>();
+    private static Integer originalGuiScale;
 
     private WebAdminTestBridgeGuiClient() {
     }
@@ -42,6 +44,14 @@ public final class WebAdminTestBridgeGuiClient {
     private static void handlePayload(MinecraftClient client, WebAdminTestBridgeGuiS2CPayload payload) {
         if ("client_screenshot".equals(payload.operation())) {
             handleClientScreenshot(client, payload);
+            return;
+        }
+        if ("client_set_window_size".equals(payload.operation())) {
+            handleClientSetWindowSize(client, payload);
+            return;
+        }
+        if ("client_set_gui_scale".equals(payload.operation())) {
+            handleClientSetGuiScale(client, payload);
             return;
         }
         JsonObject envelope;
@@ -117,6 +127,89 @@ public final class WebAdminTestBridgeGuiClient {
         send(payload, ok(queued));
     }
 
+    private static void handleClientSetWindowSize(MinecraftClient client, WebAdminTestBridgeGuiS2CPayload payload) {
+        JsonObject body = parse(payload.bodyJson());
+        JsonObject base = clientDisplayBase(client);
+        if (client == null || client.getWindow() == null) {
+            send(payload, failed("CLIENT_NOT_READY", "Minecraft client 尚未准备好调整窗口尺寸。", base));
+            return;
+        }
+        int width = getInt(body, "width", 0);
+        int height = getInt(body, "height", 0);
+        if (width < 320 || width > 7680 || height < 240 || height > 4320) {
+            send(payload, failed("VALIDATION_FAILED", "窗口尺寸超出允许范围。", base));
+            return;
+        }
+        if (client.getWindow().isFullscreen()) {
+            JsonObject data = clientDisplayBase(client);
+            data.addProperty("fullscreen", true);
+            send(payload, failed("UNSUPPORTED_ENVIRONMENT", "当前为全屏模式，TestBridge 不会自动退出全屏。", data));
+            return;
+        }
+        if (client.getWindow().isMinimized()) {
+            JsonObject data = clientDisplayBase(client);
+            data.addProperty("minimized", true);
+            send(payload, failed("CLIENT_WINDOW_NOT_READY", "Minecraft 客户端窗口已最小化，无法可靠调整尺寸。", data));
+            return;
+        }
+        try {
+            JsonObject previous = windowState(client);
+            // Use the narrow GLFW resize call for the dev-only TestBridge path. Minecraft's
+            // Window#setWindowedSize also updates monitor/window mode state and can block long
+            // enough to make the HTTP bridge timeout on some Windows dev clients.
+            GLFW.glfwSetWindowSize(client.getWindow().getHandle(), width, height);
+            refreshGuiScaleOnly(client);
+            JsonObject data = clientDisplayBase(client);
+            data.add("previousWindow", previous);
+            data.addProperty("requestedWidth", width);
+            data.addProperty("requestedHeight", height);
+            data.addProperty("usesOsMouseKeyboard", false);
+            data.addProperty("usesCoordinateClicking", false);
+            data.addProperty("usesGlfwWindowResize", true);
+            data.addProperty("windowResizeSupported", true);
+            send(payload, ok(data));
+        } catch (Exception exception) {
+            send(payload, failed("SCREEN_OPERATION_FAILED", "调整 Minecraft 客户端窗口尺寸失败：" + exception.getMessage(), base));
+        }
+    }
+
+    private static void handleClientSetGuiScale(MinecraftClient client, WebAdminTestBridgeGuiS2CPayload payload) {
+        JsonObject body = parse(payload.bodyJson());
+        JsonObject base = clientDisplayBase(client);
+        if (client == null || client.options == null || client.getWindow() == null) {
+            send(payload, failed("CLIENT_NOT_READY", "Minecraft client 尚未准备好调整 GUI scale。", base));
+            return;
+        }
+        try {
+            int previous = client.options.getGuiScale().getValue();
+            if (originalGuiScale == null) {
+                originalGuiScale = previous;
+            }
+            boolean restoreOriginal = getBoolean(body, "restoreOriginal", false);
+            int target = restoreOriginal ? originalGuiScale : getInt(body, "guiScale", previous);
+            if (!restoreOriginal && (target < 0 || target > 4)) {
+                JsonObject data = clientDisplayBase(client);
+                data.addProperty("previousGuiScale", previous);
+                data.addProperty("maxAllowedGuiScale", 4);
+                send(payload, failed("VALIDATION_FAILED", "GUI scale 必须在 0..4 范围内。", data));
+                return;
+            }
+            JsonObject originalState = guiScaleState(client);
+            client.options.getGuiScale().setValue(target);
+            refreshGuiScaleOnly(client);
+            JsonObject data = clientDisplayBase(client);
+            data.add("originalGuiScaleState", originalState);
+            data.addProperty("previousGuiScale", previous);
+            data.addProperty("currentGuiScale", client.options.getGuiScale().getValue());
+            data.addProperty("restoreOriginal", restoreOriginal);
+            data.addProperty("doesNotWriteOptionsFile", true);
+            data.addProperty("guiScaleRestoreOrWarning", true);
+            send(payload, ok(data));
+        } catch (Exception exception) {
+            send(payload, failed("SCREEN_OPERATION_FAILED", "调整 Minecraft GUI scale 失败：" + exception.getMessage(), base));
+        }
+    }
+
     private static void capturePendingScreenshot(MinecraftClient client, boolean screenRenderPass) {
         PendingScreenshot pending = PENDING_SCREENSHOT.get();
         if (pending == null || client == null || client.getFramebuffer() == null) {
@@ -146,6 +239,17 @@ public final class WebAdminTestBridgeGuiClient {
             });
         } catch (Exception exception) {
             Tzz_mod.LOGGER.warn("TestBridge client screenshot capture failed", exception);
+        }
+    }
+
+    private static void refreshGuiScaleOnly(MinecraftClient client) {
+        if (client == null || client.getWindow() == null || client.options == null) {
+            return;
+        }
+        int scale = client.getWindow().calculateScaleFactor(client.options.getGuiScale().getValue(), client.forcesUnicodeFont());
+        client.getWindow().setScaleFactor(scale);
+        if (client.currentScreen != null) {
+            client.currentScreen.resize(client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
         }
     }
 
@@ -236,6 +340,42 @@ public final class WebAdminTestBridgeGuiClient {
         return data;
     }
 
+    private static JsonObject clientDisplayBase(MinecraftClient client) {
+        JsonObject data = currentBase(screenType(client == null ? null : client.currentScreen), client == null ? null : client.currentScreen);
+        if (client != null && client.getWindow() != null) {
+            data.add("window", windowState(client));
+        }
+        if (client != null && client.options != null) {
+            data.add("guiScale", guiScaleState(client));
+        }
+        return data;
+    }
+
+    private static JsonObject windowState(MinecraftClient client) {
+        JsonObject data = new JsonObject();
+        data.addProperty("width", client.getWindow().getWidth());
+        data.addProperty("height", client.getWindow().getHeight());
+        data.addProperty("framebufferWidth", client.getWindow().getFramebufferWidth());
+        data.addProperty("framebufferHeight", client.getWindow().getFramebufferHeight());
+        data.addProperty("scaledWidth", client.getWindow().getScaledWidth());
+        data.addProperty("scaledHeight", client.getWindow().getScaledHeight());
+        data.addProperty("scaleFactor", client.getWindow().getScaleFactor());
+        data.addProperty("fullscreen", client.getWindow().isFullscreen());
+        data.addProperty("minimized", client.getWindow().isMinimized());
+        return data;
+    }
+
+    private static JsonObject guiScaleState(MinecraftClient client) {
+        JsonObject data = new JsonObject();
+        data.addProperty("currentGuiScale", client.options.getGuiScale().getValue());
+        data.addProperty("originalGuiScale", originalGuiScale == null ? client.options.getGuiScale().getValue() : originalGuiScale);
+        data.addProperty("scaledWidth", client.getWindow().getScaledWidth());
+        data.addProperty("scaledHeight", client.getWindow().getScaledHeight());
+        data.addProperty("scaleFactor", client.getWindow().getScaleFactor());
+        data.addProperty("doesNotWriteOptionsFile", true);
+        return data;
+    }
+
     private static String screenType(Screen screen) {
         if (screen == null) {
             return "none";
@@ -304,6 +444,17 @@ public final class WebAdminTestBridgeGuiClient {
         }
         try {
             return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
+        if (object == null || !object.has(key)) {
+            return fallback;
+        }
+        try {
+            return object.get(key).getAsBoolean();
         } catch (Exception ignored) {
             return fallback;
         }

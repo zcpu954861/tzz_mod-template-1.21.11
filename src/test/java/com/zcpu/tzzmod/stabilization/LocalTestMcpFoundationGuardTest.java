@@ -102,6 +102,17 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "`minecraft.client_screenshot`", "context documents Minecraft client screenshot tool");
         requireContains(context, "does not use OS screenshots", "context documents no OS screenshot");
         requireContains(context, "reports/mcp/screenshots", "context documents client screenshot output path");
+        requireContains(context, "Long-Term UI Screenshot Matrix Rule", "context documents long-term screenshot matrix rule");
+        requireContains(context, "All new or modified Minecraft in-game UI must run a screenshot matrix", "context requires game UI screenshot matrix");
+        requireContains(context, "All new or modified WebAdmin WebUI must run a WebAdmin viewport screenshot matrix", "context requires WebAdmin screenshot matrix");
+        requireContains(context, "user approval is required before checkpoint", "context requires user approval before checkpoint");
+        requireContains(context, "`minecraft.client_screenshot_matrix`", "context documents Minecraft screenshot matrix tool");
+        requireContains(context, "`webadmin.responsive_matrix`", "context documents WebAdmin responsive matrix tool");
+        requireContains(context, "deviceScaleFactor", "context documents WebAdmin responsive deviceScaleFactor marker");
+        requireContains(context, "uhd_4k_150_scaled", "context documents WebAdmin 4K scaled 150 profile");
+        requireContains(context, "uhd_4k_200_scaled", "context documents WebAdmin 4K scaled 200 profile");
+        requireContains(context, "uhd_3840x2160_css_extreme", "context marks 3840 CSS viewport as extreme");
+        requireContains(context, "expected physical screenshot size", "context requires physical screenshot size report marker");
         requireContains(context, "does not modify real player inventory or real world containers", "context documents ghost item safety");
         requireContains(context, "does not directly write `SignalDeviceData`", "context documents no raw SignalDeviceData write");
         requireContains(context, "Unsupported screens return `UNSUPPORTED_GUI`; no screen returns `GUI_NOT_OPEN`", "context documents unsupported GUI errors");
@@ -221,7 +232,22 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(webadmin, "BUTTON_DISABLED", "WebAdmin login disabled button marker");
         requireContains(webadmin, "webadmin.change_password", "WebAdmin current-user password tool marker");
         requireContains(webadmin, "webadmin.owner_set_password", "WebAdmin owner password reset tool marker");
+        requireContains(webadmin, "deviceScaleFactor", "WebAdmin responsive profile includes deviceScaleFactor marker");
+        requireContains(webadmin, "uhd_4k_150_scaled", "WebAdmin responsive includes 4K 150 scaled profile");
+        requireContains(webadmin, "uhd_4k_200_scaled", "WebAdmin responsive includes 4K 200 scaled profile");
+        requireContains(webadmin, "uhd_3840x2160_css_extreme", "WebAdmin responsive marks 3840 CSS viewport as extreme");
+        requireContains(webadmin, "expectedPhysicalWidth", "WebAdmin responsive report includes expected physical width marker");
+        requireContains(webadmin, "screenshotActualWidth", "WebAdmin responsive report includes actual screenshot size marker");
+        requireContains(webadmin, "readPngDimensions", "WebAdmin responsive reads PNG dimensions marker");
+        requireContains(webadmin, "storageState", "WebAdmin responsive preserves storageState across deviceScaleFactor context rebuilds");
         requireContains(webadmin, "webadmin.close", "WebAdmin close tool marker");
+        requireContains(webadmin, "webadmin.set_viewport", "WebAdmin set_viewport tool marker");
+        requireContains(webadmin, "webadmin.responsive_screenshot", "WebAdmin responsive_screenshot tool marker");
+        requireContains(webadmin, "webadmin.responsive_matrix", "WebAdmin responsive_matrix tool marker");
+        requireContains(webadmin, "setViewportSize", "WebAdmin responsive tools use Playwright viewport marker");
+        requireContains(webadmin, "DEFAULT_WEBADMIN_VIEWPORTS", "WebAdmin default responsive viewport marker");
+        requireContains(webadmin, "manualVisualReviewRequired", "WebAdmin responsive matrix manual review marker");
+        requireContains(webadmin, "ensureResponsiveReportPath", "WebAdmin responsive report path marker");
         requireContains(webadmin, "closeBrowser(context)", "WebAdmin close uses browser cleanup marker");
         requireContains(webadmin, "baseUrl = undefined", "WebAdmin close clears base URL marker");
         requireContains(webadmin, "/api/webadmin/users/me/password", "WebAdmin password change API marker");
@@ -290,6 +316,15 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "minecraft.gui_save", "minecraft.gui_save tool marker");
         requireContains(testbridge, "minecraft.gui_cancel", "minecraft.gui_cancel tool marker");
         requireContains(testbridge, "minecraft.client_screenshot", "minecraft.client_screenshot tool marker");
+        requireContains(testbridge, "minecraft.client_set_window_size", "minecraft.client_set_window_size tool marker");
+        requireContains(testbridge, "minecraft.client_set_gui_scale", "minecraft.client_set_gui_scale tool marker");
+        requireContains(testbridge, "minecraft.client_screenshot_matrix", "minecraft.client_screenshot_matrix tool marker");
+        requireContains(testbridge, "client/window-size", "MCP client window size endpoint marker");
+        requireContains(testbridge, "client/gui-scale", "MCP client GUI scale endpoint marker");
+        requireContains(testbridge, "DEFAULT_MINECRAFT_MATRIX_SIZES", "MCP Minecraft default matrix size marker");
+        requireContains(testbridge, "DEFAULT_GUI_SCALES", "MCP Minecraft default GUI scale marker");
+        requireContains(testbridge, "manualVisualReviewRequired", "MCP screenshot matrix manual review marker");
+        requireContains(testbridge, "userApprovalRequiredBeforeCheckpoint", "MCP screenshot matrix user approval marker");
         requireContains(testbridge, "client/screenshot", "MCP client screenshot endpoint marker");
         requireContains(testbridge, "safeName", "MCP client screenshot name sanitized marker");
         requireContains(testbridge, "noOsScreenshot", "MCP client screenshot no OS screenshot marker");
@@ -377,7 +412,11 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridgeRoutes, "/api/testbridge/gui/save", "server gui_save route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/cancel", "server gui_cancel route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/client/screenshot", "server client screenshot route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/client/window-size", "server client window size route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/client/gui-scale", "server client GUI scale route marker");
         requireContains(testbridgeRoutes, "client_screenshot", "server client screenshot payload operation marker");
+        requireContains(testbridgeRoutes, "client_set_window_size", "server client window size payload operation marker");
+        requireContains(testbridgeRoutes, "client_set_gui_scale", "server client GUI scale payload operation marker");
         requireContains(testbridgeRoutes, "screenshotsDir", "server client screenshot output directory marker");
         requireContains(testbridgeRoutes, "reportsMcpScreenshotsOutputOnly", "server screenshot output restricted marker");
         requireContains(testbridgeRoutes, "tokenInClientPayload", "server screenshot token not in client payload marker");
@@ -386,6 +425,7 @@ public final class LocalTestMcpFoundationGuardTest {
 
         String webAdminServer = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java");
         requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/gui/\")", "WebAdminServer direct GUI TestBridge route marker");
+        requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/client/\")", "WebAdminServer direct client TestBridge route marker");
         requireContains(webAdminServer, "path.startsWith(\"/api/testbridge/\")", "WebAdminServer TestBridge route marker");
         requireContains(webAdminServer, "testBridgeRoutes.handle", "WebAdminServer delegates TestBridge routes marker");
 
@@ -396,6 +436,8 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiBridge, "CLIENT_TIMEOUT", "server GUI bridge timeout marker");
         requireContains(guiBridge, "put_item\", \"clear_slot\", \"set_count\", \"save\", \"cancel", "server GUI bridge allowlisted operations marker");
         requireContains(guiBridge, "client_screenshot", "server GUI bridge client screenshot operation marker");
+        requireContains(guiBridge, "client_set_window_size", "server GUI bridge client window size operation marker");
+        requireContains(guiBridge, "client_set_gui_scale", "server GUI bridge client GUI scale operation marker");
 
         String guiClient = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminTestBridgeGuiClient.java");
         requireContains(guiClient, "client.currentScreen", "client GUI bridge reads current screen marker");
@@ -407,6 +449,9 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiClient, "usesOsScreenshot", "client screenshot no OS screenshot marker");
         requireContains(guiClient, "usesCoordinateClicking", "client screenshot no coordinate clicking marker");
         requireContains(guiClient, "usesClientScreenshotPayload", "client screenshot payload marker");
+        requireContains(guiClient, "setWindowedSize", "client window size payload uses Minecraft window API marker");
+        requireContains(guiClient, "getGuiScale", "client GUI scale payload uses Minecraft options marker");
+        requireContains(guiClient, "doesNotWriteOptionsFile", "client GUI scale does not write options marker");
 
         String containerScreen = read("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminContainerTemplatePreviewScreen.java");
         requireContains(containerScreen, "testBridgePutItem", "container GUI testbridge put item marker");
@@ -470,6 +515,23 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "minecraft.gui_save", "README documents gui_save tool");
         requireContains(readme, "minecraft.gui_cancel", "README documents gui_cancel tool");
         requireContains(readme, "minecraft.client_screenshot", "README documents Minecraft client screenshot tool");
+        requireContains(readme, "webadmin.set_viewport", "README documents WebAdmin set_viewport tool");
+        requireContains(readme, "webadmin.responsive_screenshot", "README documents WebAdmin responsive_screenshot tool");
+        requireContains(readme, "webadmin.responsive_matrix", "README documents WebAdmin responsive_matrix tool");
+        requireContains(readme, "minecraft.client_set_window_size", "README documents Minecraft window size tool");
+        requireContains(readme, "minecraft.client_set_gui_scale", "README documents Minecraft GUI scale tool");
+        requireContains(readme, "minecraft.client_screenshot_matrix", "README documents Minecraft screenshot matrix tool");
+        requireContains(readme, "响应式 / 分辨率截图矩阵长期规则", "README documents long-term responsive matrix rule");
+        requireContains(readme, "以后新增或修改任何 Minecraft 游戏内 UI", "README requires game UI screenshot matrix");
+        requireContains(readme, "以后新增或修改任何 WebAdmin WebUI", "README requires WebAdmin screenshot matrix");
+        requireContains(readme, "deviceScaleFactor", "README documents WebAdmin DPI scaling profile marker");
+        requireContains(readme, "CSS viewport", "README documents CSS viewport marker");
+        requireContains(readme, "physical screenshot size", "README documents physical screenshot size marker");
+        requireContains(readme, "uhd_4k_150_scaled", "README documents WebAdmin 4K 150 scaled profile");
+        requireContains(readme, "uhd_4k_200_scaled", "README documents WebAdmin 4K 200 scaled profile");
+        requireContains(readme, "uhd_3840x2160_css_extreme", "README marks 3840 CSS viewport as extreme");
+        requireContains(readme, "用户确认前不得 checkpoint", "README requires user approval before checkpoint");
+        requireContains(readme, "reports/mcp/responsive", "README documents responsive report path");
         requireContains(readme, "不是 OS 截屏", "README documents no OS screenshot");
         requireContains(readme, "reports/mcp/screenshots", "README documents client screenshot output path");
         requireContains(readme, "不改真实玩家背包", "README documents GUI real inventory safety");

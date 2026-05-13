@@ -170,7 +170,10 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `webadmin.change_password`：通过已登录 WebAdmin 会话修改当前用户密码。
 - `webadmin.owner_set_password`：通过 OWNER 会话设置指定 WebAdmin 用户密码。
 - `webadmin.goto`：跳转到 WebAdmin hash route。
+- `webadmin.set_viewport`：设置当前 Playwright WebAdmin page CSS viewport 和可选 `deviceScaleFactor`，用于模拟 DPI / 系统缩放。
 - `webadmin.screenshot`：保存截图到 `reports/mcp/screenshots`。
+- `webadmin.responsive_screenshot`：对一个 WebAdmin route + responsive profile 截图并返回 CSS viewport、deviceScaleFactor、预期物理尺寸、实际截图尺寸和诊断。
+- `webadmin.responsive_matrix`：对多个 WebAdmin route / responsive profile 生成截图矩阵和报告。
 - `webadmin.console_errors`：返回 Console error、page error、失败请求和错误响应。
 - `webadmin.close`：关闭当前 Playwright page / browser / context；未打开时幂等返回。
 - `webadmin.click`：点击当前本地 WebAdmin 页面内可见且启用的 selector。
@@ -418,6 +421,9 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `minecraft.gui_save`：走当前 GUI 的既有 session 保存路径。
 - `minecraft.gui_cancel`：走当前 GUI 的既有取消路径。
 - `minecraft.client_screenshot`：请求 Minecraft 客户端自己保存当前 framebuffer 截图到 `reports/mcp/screenshots`，不是 OS 截屏，不点击坐标。
+- `minecraft.client_set_window_size`：通过 client payload 设置 Minecraft 客户端窗口尺寸，不使用 OS 鼠标拖拽。
+- `minecraft.client_set_gui_scale`：通过 client payload 设置或恢复 Minecraft GUI scale，不写 `options.txt`。
+- `minecraft.client_screenshot_matrix`：按窗口尺寸 / GUI scale 生成 Minecraft 客户端截图矩阵和报告。
 - `scenario.list`：列出内置场景 smoke。
 - `scenario.run`：运行一个固定白名单内的本地测试场景。
 - `scenario.report`：读取最近的场景报告摘要。
@@ -476,6 +482,46 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 
 截图文件统一写入 `reports/mcp/screenshots`，文件名会安全化并加时间戳，不覆盖旧文件。报告可以引用返回的路径，但这些截图属于本地测试输出，提交前不要把 `reports/mcp` 或 screenshots 加入 git。
 
+### 响应式 / 分辨率截图矩阵长期规则
+
+以后新增或修改任何 Minecraft 游戏内 UI，都必须先跑截图矩阵，再交给用户人工验收。截图矩阵至少覆盖小分辨率、1080p、2K、4K 或当前环境可用的等价尺寸；游戏内 UI 还必须覆盖多个 GUI scale，至少覆盖 GUI scale 2 / 3 / 4。Codex 负责自动截图、整理报告和指出明显 warning，但最终 UI 是否通过必须由用户确认。用户确认前不得 checkpoint / merge。
+
+以后新增或修改任何 WebAdmin WebUI，也必须先跑 WebAdmin responsive profile 截图矩阵。WebAdmin 截图矩阵必须区分：
+
+- CSS viewport size：浏览器布局实际看到的 CSS 像素。
+- physical screenshot size：截图 PNG 的物理像素。
+- `deviceScaleFactor`：模拟 Windows / 浏览器 DPI 缩放。
+
+不要只用 `3840x2160` CSS viewport 代表 4K。真实 4K 显示器常见缩放是 150% / 200%，浏览器 CSS viewport 通常小于 3840x2160。默认 WebAdmin profiles：
+
+- `small_854x480`：CSS `854x480`，`deviceScaleFactor=1`。
+- `hd_1280x720_100`：CSS `1280x720`，`deviceScaleFactor=1`。
+- `fhd_1920x1080_100`：CSS `1920x1080`，`deviceScaleFactor=1`。
+- `qhd_2560x1440_100`：CSS `2560x1440`，`deviceScaleFactor=1`。
+- `uhd_4k_150_scaled`：CSS `2560x1440`，`deviceScaleFactor=1.5`，模拟 Windows 4K 150% 推荐缩放，预期物理截图 `3840x2160`。
+- `uhd_4k_200_scaled`：CSS `1920x1080`，`deviceScaleFactor=2`，模拟 Windows 4K 200% 缩放，预期物理截图 `3840x2160`。
+- `uhd_3840x2160_css_extreme`：CSS `3840x2160`，`deviceScaleFactor=1`，只是极端 CSS 工作区，不等价于普通 4K 缩放视觉。
+
+WebAdmin 示例：
+
+```json
+{"tool":"webadmin.responsive_matrix","arguments":{"routes":["#/dashboard","#/devices","#/doctor"],"profiles":[{"name":"small_854x480","width":854,"height":480,"deviceScaleFactor":1},{"name":"hd_1280x720_100","width":1280,"height":720,"deviceScaleFactor":1},{"name":"fhd_1920x1080_100","width":1920,"height":1080,"deviceScaleFactor":1},{"name":"qhd_2560x1440_100","width":2560,"height":1440,"deviceScaleFactor":1},{"name":"uhd_4k_150_scaled","width":2560,"height":1440,"deviceScaleFactor":1.5,"screenshotScale":"device"},{"name":"uhd_4k_200_scaled","width":1920,"height":1080,"deviceScaleFactor":2,"screenshotScale":"device"},{"name":"uhd_3840x2160_css_extreme","width":3840,"height":2160,"deviceScaleFactor":1}],"name":"webadmin-ui-check"}}
+```
+
+WebAdmin responsive report 会列出 `profileName`、CSS viewport、`deviceScaleFactor`、预期物理截图尺寸、实际 PNG 尺寸、route 和截图路径。如果实际截图尺寸与预期物理尺寸不一致，报告会写 warning。4K 视觉验收必须至少包含一个 scaled profile，例如 `2560x1440 @ 1.5` 或 `1920x1080 @ 2`。
+
+`webadmin.responsive_screenshot` 和 `webadmin.responsive_matrix` 默认截当前 viewport，而不是整页截图，这样实际 PNG 尺寸才能和 expected physical size 对齐。需要整页截图时可以显式传 `fullPage=true`，但整页截图高度可能大于 viewport 高度。
+
+切换 `deviceScaleFactor` 时，Playwright 需要重建 browser context。工具会保留当前 WebAdmin `storageState`，并按 profile 优先顺序截图，减少重复登录和长矩阵超时。
+
+Minecraft 示例：
+
+```json
+{"tool":"minecraft.client_screenshot_matrix","arguments":{"player":"Steve","targetGui":"single_item_submit","sizes":[{"width":854,"height":480},{"width":1920,"height":1080},{"width":2560,"height":1440},{"width":3840,"height":2160}],"guiScales":[2,3,4],"name":"single-item-submit-layout"}}
+```
+
+矩阵报告写入 `reports/mcp/responsive/*.md`，截图仍写入 `reports/mcp/screenshots/*.png`。本阶段不做自动图像识别，截图需要用户人工验收。用户确认前不得 checkpoint。若本机无法真实设置 4K Minecraft 窗口，工具会在报告中写 warning，不会假装成功。
+
 ## Scenario Test Orchestration Foundation
 
 Step 5 增加一层场景编排工具，用来把已有安全 MCP / TestBridge / WebAdmin 工具组合成可重复的本地 smoke。场景工具不会执行任意 shell，不提供 git mutation，不访问外网，不点击 Minecraft GUI 坐标，也不直接写 `SignalDeviceData` JSON。
@@ -520,9 +566,11 @@ Step 5 增加一层场景编排工具，用来把已有安全 MCP / TestBridge /
 - 即使配置了 `allowedHosts`，非 loopback host 也会被拒绝。
 - `reports/mcp` 是报告输出目录。
 - `reports/mcp/screenshots` 是截图输出目录。
+- `reports/mcp/responsive` 是响应式 / 分辨率截图矩阵报告输出目录。
 - `reports/mcp/runtime` 是 Minecraft dev runtime 日志输出目录。
 - 工具输出会脱敏常见 password、cookie、token、CSRF、authorization、session 字段，包括 `X-TZZ-TestBridge-Token` / `TZZ_TESTBRIDGE_TOKEN`。
 - 不处理、不删除、不提交仓库根目录下未跟踪的 `logs/`。
+- 截图矩阵仍禁止 OS 截屏、Minecraft GUI 坐标点击、外网访问、任意 shell 和 git mutation。
 
 ## 最小 Smoke
 
