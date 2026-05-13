@@ -24,6 +24,7 @@ import com.zcpu.tzzmod.client.photo.CameraModeClient;
 import com.zcpu.tzzmod.client.webadmin.WebAdminContainerTemplateClient;
 import com.zcpu.tzzmod.client.webadmin.WebAdminSingleItemSubmitTemplateClient;
 import com.zcpu.tzzmod.client.webadmin.WebAdminSelectionClient;
+import com.zcpu.tzzmod.client.webadmin.WebAdminTestBridgeGuiClient;
 import com.zcpu.tzzmod.client.task.TaskClient;
 import com.zcpu.tzzmod.client.task.TaskHudOverlay;
 import com.zcpu.tzzmod.ModItem.ModItems;
@@ -167,6 +168,7 @@ public class Tzz_modClient implements ClientModInitializer {
         WebAdminSelectionClient.register();
         WebAdminContainerTemplateClient.register();
         WebAdminSingleItemSubmitTemplateClient.register();
+        WebAdminTestBridgeGuiClient.register();
         HudElementRegistry.attachElementAfter(VanillaHudElements.SUBTITLES, MAIN_HUD_LAYER_ID, (context, tickCounter) -> {
             // render the player's head and ID in the top-left
             com.zcpu.tzzmod.client.PlayerHeadHudOverlay.render(context);

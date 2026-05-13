@@ -540,6 +540,7 @@ public final class WebAdminFrontendScripts {
                   hydrateIcons();
                   document.querySelectorAll('.nav-item[data-route]').forEach(btn=>btn.onclick=()=>{location.hash=btn.dataset.route});
                   document.querySelectorAll('.nav-item[data-pending]').forEach(btn=>btn.onclick=()=>toast(btn.dataset.pending));
+                  document.getElementById('change-password')?.addEventListener('click',()=>showChangeOwnPasswordModal());
                   document.getElementById('logout').onclick=async()=>{try{closeRealtime();await api('/api/auth/logout',{method:'POST',body:'{}'});}finally{location.href='/login'}};
                 }
                 function renderTopbar(){
@@ -550,6 +551,56 @@ public final class WebAdminFrontendScripts {
                   document.getElementById('current-user').textContent=`${me?.displayName || me?.username || '-'}`;
                   document.getElementById('current-role').textContent=`${labelRole(me?.role)}`;
                   updateRealtimeStatus();
+                }
+                function showChangeOwnPasswordModal(){
+                  const body=`<form id="change-password-form" class="edit-form wa-password-form" data-change-password-modal="true" onsubmit="event.preventDefault();submitChangeOwnPassword()">
+                    <label>当前密码<input id="change-password-current" data-password-field="current" class="input" type="password" autocomplete="current-password" required></label>
+                    <label>新密码<input id="change-password-new" data-password-field="new" class="input" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+                    <label>确认新密码<input id="change-password-confirm" data-password-field="confirm" class="input" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+                    <div id="change-password-error" class="validation-list wa-password-error" hidden></div>
+                    <p class="readonly-note">修改成功后当前 session 会继续有效；下次登录请使用新密码。密码不会写入日志、URL 或浏览器存储。</p>
+                  </form>`;
+                  const footer=`<button class="wa-btn ghost" type="button" onclick="closeWebAdminModal()">${icon('close')}<span>取消</span></button><button id="change-password-save" class="wa-btn primary" type="button" data-change-password-save="true" onclick="document.getElementById('change-password-form')?.requestSubmit()">${icon('check-pass')}<span>保存修改</span></button>`;
+                  openWebAdminModal('修改我的密码',body,footer,{className:'wa-password-modal',dirtyCheck:changeOwnPasswordModalDirty});
+                  setTimeout(()=>document.getElementById('change-password-current')?.focus(),0);
+                }
+                function changeOwnPasswordModalDirty(){
+                  return ['change-password-current','change-password-new','change-password-confirm'].some(id=>!isBlank(document.getElementById(id)?.value||''));
+                }
+                function setChangePasswordError(message){
+                  const box=document.getElementById('change-password-error');
+                  if(!box)return;
+                  if(isBlank(message)){box.hidden=true;box.textContent='';return;}
+                  box.hidden=false;box.textContent=message;
+                }
+                async function submitChangeOwnPassword(){
+                  const form=document.getElementById('change-password-form');
+                  if(!form)return;
+                  const current=document.getElementById('change-password-current')?.value||'';
+                  const next=document.getElementById('change-password-new')?.value||'';
+                  const confirm=document.getElementById('change-password-confirm')?.value||'';
+                  if(isBlank(current)){setChangePasswordError('请输入当前密码。');return;}
+                  if(isBlank(next)){setChangePasswordError('请输入新密码。');return;}
+                  if(next!==confirm){setChangePasswordError('两次输入的新密码不一致。');return;}
+                  if(current===next){setChangePasswordError('新密码不能与当前密码相同。');return;}
+                  if(next.length<10){setChangePasswordError('新密码至少需要 10 个字符。');return;}
+                  if(next.length>128){setChangePasswordError('新密码不能超过 128 个字符。');return;}
+                  const save=document.getElementById('change-password-save');
+                  const oldText=save?save.innerHTML:'';
+                  if(save){save.disabled=true;save.innerHTML=`${icon('clock')}<span>保存中...</span>`;}
+                  setChangePasswordError('');
+                  try{
+                    const result=await api('/api/webadmin/users/me/password',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({oldPassword:current,newPassword:next,confirmPassword:confirm})});
+                    if(!result.success){setChangePasswordError(result.message||'密码修改失败。');return;}
+                    ['change-password-current','change-password-new','change-password-confirm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+                    await dismissWebAdminModal();
+                    toast(result.message||'密码已修改，下次登录请使用新密码。');
+                    appState.capabilities=await api('/api/webadmin/write/capabilities').catch(()=>appState.capabilities);
+                  }catch(err){
+                    setChangePasswordError(err.message||'密码修改失败。');
+                  }finally{
+                    if(save){save.disabled=false;save.innerHTML=oldText;}
+                  }
                 }
                 function startTopbarClock(){if(appState.topbarClockTimer)clearTimeout(appState.topbarClockTimer);const tick=()=>{updateTopbarClock();appState.topbarClockTimer=setTimeout(tick,1000);};tick();}
                 function updateTopbarClock(){const el=document.getElementById('topbar-clock');if(!el)return;const d=new Date();el.textContent=`${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;}

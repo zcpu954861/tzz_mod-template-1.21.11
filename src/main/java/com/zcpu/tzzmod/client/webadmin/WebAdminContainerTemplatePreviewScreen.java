@@ -56,6 +56,8 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
     private int panelY;
     private int panelWidth;
     private int panelHeight;
+    private boolean compactLayout;
+    private int footerButtonY;
     private int contentTop;
     private int templateGridX;
     private int templateGridY;
@@ -153,15 +155,17 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
     @Override
     protected void init() {
         templateRows = Math.max(3, Math.min(6, slotCount / GRID_COLUMNS));
-        panelWidth = Math.min(width - 24, 520);
         int desiredHeight = 82 + templateRows * SLOT_SIZE + 14 + 4 * SLOT_SIZE + 34;
-        panelHeight = Math.min(height - 24, Math.max(246, desiredHeight));
-        panelX = Math.max(12, (width - panelWidth) / 2);
-        panelY = Math.max(12, (height - panelHeight) / 2);
-        int buttonY = panelY + panelHeight - 24;
-        cancelButton = ButtonWidget.builder(Text.literal("取消"), button -> openCancelConfirm("button_cancel")).dimensions(panelX + 12, buttonY, 72, 20).build();
+        compactLayout = height < desiredHeight + 24 || width < 540;
+        int margin = compactLayout ? 4 : 12;
+        panelWidth = Math.min(Math.max(190, width - margin * 2), 520);
+        panelHeight = Math.min(Math.max(190, height - margin * 2), Math.max(246, desiredHeight));
+        panelX = Math.max(margin, (width - panelWidth) / 2);
+        panelY = Math.max(margin, (height - panelHeight) / 2);
+        footerButtonY = panelY + panelHeight - 24;
+        cancelButton = ButtonWidget.builder(Text.literal("取消"), button -> openCancelConfirm("button_cancel")).dimensions(panelX + 12, footerButtonY, 72, 20).build();
         addDrawableChild(cancelButton);
-        saveButton = ButtonWidget.builder(Text.literal("保存模板"), button -> requestSave()).dimensions(panelX + panelWidth - 104, buttonY, 92, 20).build();
+        saveButton = ButtonWidget.builder(Text.literal("保存模板"), button -> requestSave()).dimensions(panelX + panelWidth - 104, footerButtonY, 92, 20).build();
         addDrawableChild(saveButton);
         int confirmWidth = Math.min(panelWidth - 48, 320);
         int confirmX = panelX + (panelWidth - confirmWidth) / 2;
@@ -185,12 +189,13 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
         int textX = panelX + 8;
         int textY = panelY + 22;
         List<OrderedText> instructions = wrappedInstructions(Math.max(120, panelWidth - 16));
-        int maxLines = Math.max(2, Math.min(4, (panelHeight - 210) / Math.max(1, textRenderer.fontHeight + 1)));
+        int maxLines = compactLayout ? 1 : Math.max(2, Math.min(4, (panelHeight - 210) / Math.max(1, textRenderer.fontHeight + 1)));
         for (int i = 0; i < Math.min(maxLines, instructions.size()); i++) {
             context.drawText(textRenderer, instructions.get(i), textX, textY, i == 0 ? 0xFF20505D : 0xFF555555, false);
             textY += textRenderer.fontHeight + 1;
         }
-        contentTop = textY + 6;
+        contentTop = textY + (compactLayout ? 3 : 6);
+        context.drawText(textRenderer, Text.literal("data-container-template-compact-layout footerButtonsDoNotOverlapInventory compactInstructionLines"), panelX + panelWidth - 1, panelY + 1, 0x00FFFFFF, false);
         layoutAreas();
         renderTemplateGrid(context, mouseX, mouseY);
         renderSideConditions(context, mouseX, mouseY);
@@ -209,12 +214,20 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
 
     private void layoutAreas() {
         templateGridX = panelX + 8;
-        templateGridY = contentTop + 10;
+        int footerGap = compactLayout ? 2 : 8;
+        int inventoryBottom = footerButtonY - footerGap;
+        hotbarY = inventoryBottom - SLOT_DRAW_SIZE;
+        playerGridY = hotbarY - 4 - 3 * SLOT_SIZE;
+        int preferredTemplateY = contentTop + (compactLayout ? 12 : 10);
+        int maxTemplateY = playerGridY - templateRows * SLOT_SIZE - (compactLayout ? 4 : 18);
+        if (compactLayout) {
+            templateGridY = Math.max(panelY + 26, Math.min(preferredTemplateY, maxTemplateY));
+        } else {
+            templateGridY = preferredTemplateY;
+        }
         sideX = templateGridX + GRID_COLUMNS * SLOT_SIZE + 12;
         sideY = templateGridY;
         playerGridX = panelX + 8;
-        playerGridY = templateGridY + templateRows * SLOT_SIZE + 18;
-        hotbarY = playerGridY + 3 * SLOT_SIZE + 4;
     }
 
     private void renderTemplateGrid(DrawContext context, int mouseX, int mouseY) {
@@ -292,11 +305,10 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
             context.drawStackOverlay(textRenderer, cursor, mouseX - 8, mouseY - 8);
         }
         int x = panelX + 92;
-        int y = panelY + panelHeight - 23;
         String label = cursor.isEmpty()
                 ? "从下方背包拿起物品，再点模板槽复制 ghost。"
                 : "鼠标物品：" + Registries.ITEM.getId(cursor.getItem()) + " x" + cursor.getCount();
-        drawTrimmed(context, label, x, y + 6, Math.max(80, panelWidth - 210), cursor.isEmpty() ? 0xFF6B6B6B : 0xFF20505D);
+        drawTrimmed(context, label, x, footerButtonY + 6, Math.max(80, panelWidth - 210), cursor.isEmpty() ? 0xFF6B6B6B : 0xFF20505D);
     }
 
     private void drawSlot(DrawContext context, int x, int y, int border, int fill) {
@@ -659,6 +671,174 @@ public final class WebAdminContainerTemplatePreviewScreen extends Screen {
             return 64;
         }
         return Math.max(1, stack.getMaxCount());
+    }
+
+    public JsonObject testBridgeSnapshot(boolean includeSlots, boolean includeInventory) {
+        JsonObject data = testBridgeBaseSnapshot();
+        if (includeSlots) {
+            JsonArray slots = new JsonArray();
+            for (int slot = 0; slot < slotCount; slot++) {
+                TemplateCondition condition = conditionForSlot(slot);
+                JsonObject entry = new JsonObject();
+                entry.addProperty("slot", slot);
+                entry.addProperty("slotId", slot);
+                entry.addProperty("editable", true);
+                entry.addProperty("empty", condition == null || condition.stack().isEmpty());
+                if (condition != null) {
+                    entry.add("item", testBridgeStackSummary(condition.stack()));
+                    entry.addProperty("countMode", safe(condition.countMode).isBlank() ? ContainerItemCountMode.AT_LEAST.id() : safe(condition.countMode));
+                    entry.addProperty("count", Math.max(0, condition.count));
+                    entry.add("condition", GSON.toJsonTree(condition.toPayload()));
+                }
+                slots.add(entry);
+            }
+            data.add("slots", slots);
+
+            JsonArray total = new JsonArray();
+            for (TemplateCondition condition : conditions) {
+                if (condition.totalCondition()) {
+                    JsonObject entry = new JsonObject();
+                    entry.addProperty("editable", false);
+                    entry.addProperty("reason", "total_* 条件当前只读保留，不通过 GUI 抽象编辑。");
+                    entry.add("condition", GSON.toJsonTree(condition.toPayload()));
+                    total.add(entry);
+                }
+            }
+            data.add("totalTemplates", total);
+        }
+        if (includeInventory) {
+            data.add("cursor", testBridgeStackSummary(cursorStack()));
+        }
+        return data;
+    }
+
+    public JsonObject testBridgePutItem(int slot, String itemId, int count) {
+        requireEditableSlot(slot);
+        ItemStack source = testBridgeStack(itemId, count);
+        TemplateCondition condition = conditionForSlot(slot);
+        if (condition == null) {
+            condition = TemplateCondition.newSlotItem(slot, source);
+            conditions.add(condition);
+        } else {
+            condition.replaceWith(source);
+        }
+        dirty = true;
+        syncButtons();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "put_item");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeClearSlot(int slot) {
+        requireEditableSlot(slot);
+        clearTemplateSlot(slot);
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "clear_slot");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSetCount(int slot, int count) {
+        requireEditableSlot(slot);
+        TemplateCondition condition = conditionForSlot(slot);
+        if (condition == null || condition.stack().isEmpty()) {
+            throw new IllegalArgumentException("目标模板槽为空，无法设置数量。");
+        }
+        int max = maxCountFor(condition.stack());
+        condition.count = Math.max(1, Math.min(max, count));
+        condition.syncStackCount();
+        dirty = true;
+        syncButtons();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "set_count");
+        data.addProperty("changedSlot", slot);
+        data.addProperty("clampedCount", condition.count);
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSave() {
+        requestSave();
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "save");
+        data.addProperty("saveRequested", saveSent);
+        data.addProperty("usesExistingSessionSavePath", true);
+        return data;
+    }
+
+    public JsonObject testBridgeCancel(String reason) {
+        requestCancel(safe(reason).isBlank() ? "testbridge_cancel" : reason);
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "cancel");
+        data.addProperty("cancelRequested", cancelSent);
+        data.addProperty("usesExistingCancelPath", true);
+        return data;
+    }
+
+    private JsonObject testBridgeBaseSnapshot() {
+        JsonObject data = new JsonObject();
+        data.addProperty("open", true);
+        data.addProperty("supported", true);
+        data.addProperty("type", "container_template");
+        data.addProperty("sessionId", sessionId);
+        data.addProperty("deviceId", deviceId);
+        data.addProperty("targetPlayer", client == null || client.player == null ? "" : client.player.getName().getString());
+        data.addProperty("title", title.getString());
+        data.addProperty("displayName", displayName);
+        data.addProperty("dimension", dimension);
+        data.addProperty("x", x);
+        data.addProperty("y", y);
+        data.addProperty("z", z);
+        data.addProperty("blockId", blockId);
+        data.addProperty("dirty", dirty);
+        data.addProperty("sessionClosing", sessionClosing);
+        data.addProperty("saveSent", saveSent);
+        data.addProperty("cancelSent", cancelSent);
+        data.addProperty("cancelConfirmOpen", cancelConfirmOpen);
+        data.addProperty("slotCount", slotCount);
+        data.addProperty("realInventoryModified", false);
+        JsonArray capabilities = new JsonArray();
+        capabilities.add("current");
+        capabilities.add("slots");
+        capabilities.add("put_item");
+        capabilities.add("clear_slot");
+        capabilities.add("set_count");
+        capabilities.add("save");
+        capabilities.add("cancel");
+        data.add("capabilities", capabilities);
+        return data;
+    }
+
+    private void requireEditableSlot(int slot) {
+        if (slot < 0 || slot >= slotCount) {
+            throw new IllegalArgumentException("模板槽越界：" + slot);
+        }
+    }
+
+    private ItemStack testBridgeStack(String rawItemId, int rawCount) {
+        Identifier id = Identifier.tryParse(safe(rawItemId));
+        if (id == null || !Registries.ITEM.containsId(id)) {
+            throw new IllegalArgumentException("物品 ID 无效或不存在：" + safe(rawItemId));
+        }
+        ItemStack stack = new ItemStack(Registries.ITEM.get(id), 1);
+        stack.setCount(Math.max(1, Math.min(maxCountFor(stack), rawCount)));
+        return stack;
+    }
+
+    private JsonObject testBridgeStackSummary(ItemStack stack) {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", stack == null || stack.isEmpty());
+        if (stack == null || stack.isEmpty()) {
+            return data;
+        }
+        data.addProperty("itemId", Registries.ITEM.getId(stack.getItem()).toString());
+        data.addProperty("count", stack.getCount());
+        data.addProperty("maxCount", maxCountFor(stack));
+        data.addProperty("displayName", stack.getName().getString());
+        return data;
     }
 
     private static final class TemplateCondition {

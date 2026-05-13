@@ -25,6 +25,8 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
+import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -40,11 +42,14 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
+import com.zcpu.tzzmod.webadmin.testbridge.WebAdminTestBridgeRoutes;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResultCode;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
@@ -86,6 +91,7 @@ public final class WebAdminServer {
     private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService singleItemSubmitTemplateSessionService = new WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
+    private final WebAdminTestBridgeRoutes testBridgeRoutes = new WebAdminTestBridgeRoutes();
     private HttpServer httpServer;
     private ExecutorService executor;
 
@@ -165,6 +171,14 @@ public final class WebAdminServer {
                 handleLogin(exchange);
                 return;
             }
+            if (path.startsWith("/api/testbridge/gui/") || path.startsWith("/api/testbridge/client/")) {
+                testBridgeRoutes.handle(exchange, minecraftServer, path, method);
+                return;
+            }
+            if (path.startsWith("/api/testbridge/")) {
+                runOnServerThread(() -> testBridgeRoutes.handle(exchange, minecraftServer, path, method));
+                return;
+            }
 
             AuthContext auth = requireAuth(exchange);
             if (auth == null) {
@@ -212,6 +226,14 @@ public final class WebAdminServer {
                     return;
                 }
                 handleWebAdminWriteCapabilities(exchange, auth);
+                return;
+            }
+            if (path.equals("/api/webadmin/users/me/password")) {
+                handleWebAdminOwnPassword(exchange, auth, method);
+                return;
+            }
+            if (path.startsWith("/api/webadmin/users/") && path.endsWith("/password-reset")) {
+                handleWebAdminUserPasswordReset(exchange, auth, path, method);
                 return;
             }
             if (path.equals("/api/webadmin/online-players")) {
@@ -436,6 +458,100 @@ public final class WebAdminServer {
 
     private void handleWebAdminWriteCapabilities(HttpExchange exchange, AuthContext auth) throws IOException {
         WebAdminJsonResponse.ok(exchange, writeFoundationService.capabilities(auth.user, auth.session));
+    }
+
+    private void handleWebAdminOwnPassword(HttpExchange exchange, AuthContext auth, String method) throws IOException {
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        PasswordChangeRequest request = readJson(exchange, PasswordChangeRequest.class);
+        if (request == null) {
+            request = new PasswordChangeRequest();
+        }
+        WebAdminWriteResult security = requirePasswordWriteSecurity(exchange, auth);
+        if (!security.success()) {
+            WebAdminJsonResponse.ok(exchange, security);
+            return;
+        }
+        WebAdminWriteTarget target = userTarget(auth.user.username);
+        if (!safe(request.newPassword).equals(safe(request.confirmPassword))) {
+            WebAdminJsonResponse.ok(exchange, WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.VALIDATION_FAILED,
+                    target,
+                    "两次输入的新密码不一致。"
+            ));
+            return;
+        }
+        WebAdminUserService.PasswordUpdateResult update = userService.changeOwnPassword(
+                auth.user.username,
+                request.oldPassword,
+                request.newPassword
+        );
+        if (!update.success()) {
+            WebAdminJsonResponse.ok(exchange, WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.VALIDATION_FAILED,
+                    target,
+                    update.message()
+            ));
+            return;
+        }
+        int invalidated = update.changed() ? sessionService.invalidateUsername(auth.user.username, auth.session.sessionIdHash) : 0;
+        if (update.changed()) {
+            publishUserPasswordRealtime("password_changed", auth.user.username, auth.user.username);
+        }
+        WebAdminJsonResponse.ok(exchange, passwordWriteResult(target, update.changed(), update.message(), invalidated));
+    }
+
+    private void handleWebAdminUserPasswordReset(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        String prefix = "/api/webadmin/users/";
+        String suffix = "/password-reset";
+        String username = decodePathSegment(path.substring(prefix.length(), path.length() - suffix.length()));
+        PasswordResetRequest request = readJson(exchange, PasswordResetRequest.class);
+        if (request == null) {
+            request = new PasswordResetRequest();
+        }
+        WebAdminWriteResult security = requirePasswordWriteSecurity(exchange, auth);
+        if (!security.success()) {
+            WebAdminJsonResponse.ok(exchange, security);
+            return;
+        }
+        if (auth.user.roleEnum() != WebAdminRole.OWNER) {
+            WebAdminJsonResponse.ok(exchange, WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.PERMISSION_DENIED,
+                    userTarget(username),
+                    "权限不足：只有所有者可以重置 WebAdmin 用户密码。"
+            ));
+            return;
+        }
+        if (!safe(request.newPassword).equals(safe(request.confirmPassword))) {
+            WebAdminJsonResponse.ok(exchange, WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.VALIDATION_FAILED,
+                    userTarget(username),
+                    "两次输入的新密码不一致。"
+            ));
+            return;
+        }
+        WebAdminUserService.PasswordUpdateResult update = userService.setPassword(username, request.newPassword, auth.user.username);
+        if (!update.success() || update.user() == null) {
+            WebAdminWriteResultCode code = update.user() == null ? WebAdminWriteResultCode.TARGET_NOT_FOUND : WebAdminWriteResultCode.VALIDATION_FAILED;
+            WebAdminJsonResponse.ok(exchange, WebAdminWriteResult.failed(code, userTarget(username), update.message()));
+            return;
+        }
+        int invalidated = update.changed() ? sessionService.invalidateUsername(update.user().username, "") : 0;
+        if (update.changed()) {
+            publishUserPasswordRealtime("password_reset", update.user().username, auth.user.username);
+        }
+        WebAdminJsonResponse.ok(exchange, passwordWriteResult(
+                userTarget(update.user().username),
+                update.changed(),
+                update.message(),
+                invalidated
+        ));
     }
 
     private void handleEditLocks(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
@@ -1265,6 +1381,53 @@ public final class WebAdminServer {
         return new HostPort(config.host, config.port);
     }
 
+    private static WebAdminWriteTarget userTarget(String username) {
+        String safeUsername = safe(username);
+        return new WebAdminWriteTarget("webadmin_user", safeUsername, safeUsername);
+    }
+
+    private static WebAdminWriteResult passwordWriteResult(WebAdminWriteTarget target, boolean changed, String message, int invalidatedSessions) {
+        return new WebAdminWriteResult(
+                true,
+                changed ? WebAdminWriteResultCode.OK.id() : WebAdminWriteResultCode.NO_CHANGE.id(),
+                isBlank(message) ? (changed ? "密码已更新。" : "密码未变化。") : message,
+                target.targetType(),
+                target.targetId(),
+                changed,
+                List.of(),
+                "",
+                "",
+                false,
+                Map.of(),
+                Map.of("invalidatedSessions", Math.max(0, invalidatedSessions))
+        );
+    }
+
+    private static void publishUserPasswordRealtime(String action, String username, String actor) {
+        WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.USER_CHANGED)
+                .severity("INFO")
+                .summary("WebAdmin 用户密码已更新")
+                .routeTarget("#/users")
+                .payload("action", action)
+                .payload("username", safe(username))
+                .payload("actor", safe(actor)));
+    }
+
+    private WebAdminWriteResult requirePasswordWriteSecurity(HttpExchange exchange, AuthContext auth) {
+        if (!isWriteSameOrigin(exchange)) {
+            return WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.CSRF_INVALID,
+                    WebAdminWriteTarget.none(),
+                    "写操作必须来自同源 WebAdmin 页面。"
+            );
+        }
+        WebAdminWriteResult csrf = writeSecurityService.requireValidCsrf(auth.session, header(exchange, "X-TZZ-WebAdmin-CSRF"));
+        if (!csrf.success()) {
+            return csrf;
+        }
+        return WebAdminWriteResult.ok(WebAdminWriteTarget.none(), false, "密码写入安全校验通过。");
+    }
+
     private static String decodePathSegment(String value) {
         return URLDecoder.decode((value == null ? "" : value).replace("+", "%2B"), StandardCharsets.UTF_8);
     }
@@ -1308,10 +1471,25 @@ public final class WebAdminServer {
         return value == null || value.isBlank();
     }
 
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
     private static final class LoginRequest {
         String username;
         String password;
         boolean rememberMe;
+    }
+
+    private static final class PasswordChangeRequest {
+        String oldPassword;
+        String newPassword;
+        String confirmPassword;
+    }
+
+    private static final class PasswordResetRequest {
+        String newPassword;
+        String confirmPassword;
     }
 
     private record AuthContext(String rawToken, WebAdminSession session, WebAdminUser user) {

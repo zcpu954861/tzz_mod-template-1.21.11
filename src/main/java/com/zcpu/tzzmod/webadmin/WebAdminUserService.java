@@ -13,6 +13,9 @@ public final class WebAdminUserService {
     public record AuthResult(boolean success, String message, WebAdminUser user) {
     }
 
+    public record PasswordUpdateResult(boolean success, String message, WebAdminUser user, boolean changed) {
+    }
+
     private final MinecraftServer server;
     private WebAdminUserStore.UserFile userFile;
 
@@ -92,6 +95,51 @@ public final class WebAdminUserService {
         return new CreateResult(true, "已重置 WebAdmin 用户密码。", user, password);
     }
 
+    public synchronized PasswordUpdateResult changeOwnPassword(String username, String oldPassword, String newPassword) {
+        reload();
+        Optional<WebAdminUser> optional = findInternal(normalizeUsername(username));
+        if (optional.isEmpty()) {
+            return new PasswordUpdateResult(false, "找不到当前 WebAdmin 用户。", null, false);
+        }
+        WebAdminUser user = optional.get();
+        if (!WebAdminPasswordHasher.verify(oldPassword, user)) {
+            WebAdminAuditLogger.userChanged("changePasswordFailed", user.username, user.username);
+            return new PasswordUpdateResult(false, "旧密码不正确。", user, false);
+        }
+        PasswordUpdateResult validation = validateNewPassword(user, newPassword);
+        if (!validation.success()) {
+            return validation;
+        }
+        if (WebAdminPasswordHasher.verify(newPassword, user)) {
+            return new PasswordUpdateResult(false, "新密码不能与当前密码相同。", user, false);
+        }
+        applyPassword(user, newPassword, false);
+        save();
+        WebAdminAuditLogger.userChanged("changePassword", user.username, user.username);
+        return new PasswordUpdateResult(true, "密码已修改。", user, true);
+    }
+
+    public synchronized PasswordUpdateResult setPassword(String username, String newPassword, String actor) {
+        reload();
+        Optional<WebAdminUser> optional = findInternal(normalizeUsername(username));
+        if (optional.isEmpty()) {
+            return new PasswordUpdateResult(false, "找不到该 WebAdmin 用户。", null, false);
+        }
+        WebAdminUser user = optional.get();
+        PasswordUpdateResult validation = validateNewPassword(user, newPassword);
+        if (!validation.success()) {
+            return validation;
+        }
+        boolean changed = !WebAdminPasswordHasher.verify(newPassword, user);
+        if (!changed) {
+            return new PasswordUpdateResult(true, "密码未变化。", user, false);
+        }
+        applyPassword(user, newPassword, false);
+        save();
+        WebAdminAuditLogger.userChanged("setPassword", user.username, actor);
+        return new PasswordUpdateResult(true, "已更新 WebAdmin 用户密码。", user, true);
+    }
+
     public synchronized boolean setEnabled(String username, boolean enabled, String actor) {
         reload();
         Optional<WebAdminUser> optional = findInternal(normalizeUsername(username));
@@ -163,5 +211,32 @@ public final class WebAdminUserService {
 
     private static boolean isValidUsername(String username) {
         return username != null && username.matches("[a-z0-9_.-]{3,32}");
+    }
+
+    private static PasswordUpdateResult validateNewPassword(WebAdminUser user, String newPassword) {
+        String password = newPassword == null ? "" : newPassword;
+        if (password.length() < 10) {
+            return new PasswordUpdateResult(false, "新密码至少需要 10 个字符。", user, false);
+        }
+        if (password.length() > 128) {
+            return new PasswordUpdateResult(false, "新密码不能超过 128 个字符。", user, false);
+        }
+        String username = user == null ? "" : user.username;
+        if (!username.isBlank() && password.equalsIgnoreCase(username)) {
+            return new PasswordUpdateResult(false, "新密码不能与用户名相同。", user, false);
+        }
+        return new PasswordUpdateResult(true, "", user, false);
+    }
+
+    private static void applyPassword(WebAdminUser user, String password, boolean forcePasswordChange) {
+        WebAdminPasswordHasher.PasswordHash hash = WebAdminPasswordHasher.hash(password);
+        user.passwordSalt = hash.salt();
+        user.passwordHash = hash.hash();
+        user.passwordAlgorithm = hash.algorithm();
+        user.passwordIterations = hash.iterations();
+        user.forcePasswordChange = forcePasswordChange;
+        user.failedLoginCount = 0;
+        user.lockedUntil = 0L;
+        user.normalized();
     }
 }

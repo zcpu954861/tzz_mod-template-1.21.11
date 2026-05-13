@@ -16,6 +16,7 @@ import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateServer;
 import com.zcpu.tzzmod.webadmin.itemsubmit.WebAdminSingleItemSubmitTemplateServer;
 import com.zcpu.tzzmod.task.TaskServer;
 import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionServer;
+import com.zcpu.tzzmod.webadmin.testbridge.WebAdminTestBridgeGuiServer;
 
 public final class TzzServerBootstrap {
     private TzzServerBootstrap() {
@@ -38,5 +39,6 @@ public final class TzzServerBootstrap {
         WebAdminSelectionServer.register();
         WebAdminContainerTemplateServer.register();
         WebAdminSingleItemSubmitTemplateServer.register();
+        WebAdminTestBridgeGuiServer.register();
     }
 }

@@ -57,11 +57,15 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
     private int panelY;
     private int panelWidth;
     private int panelHeight;
+    private boolean compactLayout;
+    private int footerButtonY;
     private int templateSlotX;
     private int templateSlotY;
     private int playerGridX;
     private int playerGridY;
     private int hotbarY;
+    private int controlStartX;
+    private int controlStartY;
     private final List<ControlButton> controlButtons = new ArrayList<>();
     private ItemStack hoveredStack = ItemStack.EMPTY;
     private String hoveredHint = "";
@@ -139,14 +143,16 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
 
     @Override
     protected void init() {
-        panelWidth = Math.min(width - 24, 460);
-        panelHeight = Math.min(height - 24, 336);
-        panelX = Math.max(12, (width - panelWidth) / 2);
-        panelY = Math.max(12, (height - panelHeight) / 2);
-        int buttonY = panelY + panelHeight - 24;
-        cancelButton = ButtonWidget.builder(Text.literal("取消"), button -> openCancelConfirm("button_cancel")).dimensions(panelX + 12, buttonY, 72, 20).build();
+        compactLayout = height < 320 || width < 500;
+        int margin = compactLayout ? 4 : 12;
+        panelWidth = Math.min(Math.max(180, width - margin * 2), 460);
+        panelHeight = Math.min(Math.max(180, height - margin * 2), 336);
+        panelX = Math.max(margin, (width - panelWidth) / 2);
+        panelY = Math.max(margin, (height - panelHeight) / 2);
+        footerButtonY = panelY + panelHeight - 24;
+        cancelButton = ButtonWidget.builder(Text.literal("取消"), button -> openCancelConfirm("button_cancel")).dimensions(panelX + 12, footerButtonY, 72, 20).build();
         addDrawableChild(cancelButton);
-        saveButton = ButtonWidget.builder(Text.literal("保存模板"), button -> requestSave()).dimensions(panelX + panelWidth - 104, buttonY, 92, 20).build();
+        saveButton = ButtonWidget.builder(Text.literal("保存模板"), button -> requestSave()).dimensions(panelX + panelWidth - 104, footerButtonY, 92, 20).build();
         addDrawableChild(saveButton);
         int confirmWidth = Math.min(panelWidth - 48, 300);
         int confirmX = panelX + (panelWidth - confirmWidth) / 2;
@@ -167,27 +173,24 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
         context.fill(panelX + 2, panelY + 2, panelX + panelWidth - 2, panelY + panelHeight - 2, 0xFFE6E6E6);
         context.drawText(textRenderer, title, panelX + 8, panelY + 7, 0xFF303030, false);
         int textY = panelY + 22;
+        int maxInstructionLines = compactLayout ? 1 : 3;
+        int drawnInstructionLines = 0;
         for (OrderedText line : wrappedInstructions(Math.max(120, panelWidth - 16))) {
-            if (textY > panelY + 46) {
+            if (drawnInstructionLines >= maxInstructionLines || (!compactLayout && textY > panelY + 46)) {
                 break;
             }
             context.drawText(textRenderer, line, panelX + 8, textY, textY == panelY + 22 ? 0xFF20505D : 0xFF555555, false);
             textY += textRenderer.fontHeight + 1;
+            drawnInstructionLines++;
         }
+        layoutAreas(textY);
         context.drawText(textRenderer, Text.literal("data-single-item-submit-gui-no-overlap"), panelX + panelWidth - 1, panelY + 1, 0x00FFFFFF, false);
-        templateSlotX = panelX + 16;
-        templateSlotY = panelY + 72;
+        context.drawText(textRenderer, Text.literal("data-single-item-submit-compact-layout footerButtonsDoNotOverlapInventory compactInstructionLines"), panelX + panelWidth - 1, panelY + 2, 0x00FFFFFF, false);
         renderTemplateSlot(context, mouseX, mouseY);
         buildControlButtons();
         renderControlButtons(context, mouseX, mouseY);
-        playerGridX = panelX + 16;
-        playerGridY = Math.max(templateSlotY + 106, panelY + panelHeight - 104);
-        hotbarY = playerGridY + 3 * SLOT_SIZE + 4;
         renderPlayerInventory(context, mouseX, mouseY);
         renderCursorStack(context, mouseX, mouseY);
-        if (!noticeMessage.isBlank()) {
-            drawTrimmed(context, noticeMessage, panelX + 12, panelY + panelHeight - 46, panelWidth - 24, 0xFF9D4B00);
-        }
         if (cancelConfirmOpen) {
             renderCancelConfirmOverlay(context);
         }
@@ -197,6 +200,20 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
         } else if (!hoveredHint.isBlank()) {
             context.drawTooltip(textRenderer, Text.literal(hoveredHint), mouseX, mouseY);
         }
+    }
+
+    private void layoutAreas(int instructionBottomY) {
+        playerGridX = panelX + (compactLayout ? 8 : 16);
+        int footerGap = compactLayout ? 3 : 8;
+        int inventoryBottom = footerButtonY - footerGap;
+        hotbarY = inventoryBottom - SLOT_DRAW_SIZE;
+        playerGridY = hotbarY - 4 - 3 * SLOT_SIZE;
+        templateSlotX = panelX + (compactLayout ? 8 : 16);
+        int preferredTemplateY = compactLayout
+                ? Math.max(panelY + 46, instructionBottomY + 14)
+                : panelY + 72;
+        int maxTemplateY = Math.max(panelY + 38, playerGridY - (compactLayout ? 82 : 106));
+        templateSlotY = Math.max(panelY + (compactLayout ? 42 : 64), Math.min(preferredTemplateY, maxTemplateY));
     }
 
     private void renderTemplateSlot(DrawContext context, int mouseX, int mouseY) {
@@ -235,46 +252,60 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
 
     private void buildControlButtons() {
         controlButtons.clear();
-        int startX = panelX + Math.min(220, Math.max(184, panelWidth / 2));
-        int startY = templateSlotY - 4;
-        int w = Math.max(88, Math.min(112, (panelX + panelWidth - 12 - startX - 8) / 2));
-        int gap = 6;
-        int h = 16;
-        addControl(0, "提交 " + labelBool(template.itemSubmitEnabled), startX, startY, w, h, () -> {
+        int columns = compactLayout ? 3 : 2;
+        int gap = compactLayout ? 4 : 6;
+        int h = compactLayout ? 14 : 16;
+        int rowStep = compactLayout ? 15 : 18;
+        controlStartX = panelX + (compactLayout ? Math.min(188, Math.max(174, panelWidth / 2 - 12)) : Math.min(220, Math.max(184, panelWidth / 2)));
+        int available = Math.max(90, panelX + panelWidth - 8 - controlStartX);
+        int w = Math.max(compactLayout ? 62 : 88, Math.min(compactLayout ? 84 : 112, (available - gap * (columns - 1)) / columns));
+        int controlCount = 13;
+        int rows = (controlCount + columns - 1) / columns;
+        int controlsHeight = (rows - 1) * rowStep + h;
+        int naturalY = compactLayout ? templateSlotY - 2 : templateSlotY - 4;
+        int maxY = playerGridY - 12 - controlsHeight;
+        controlStartY = compactLayout ? Math.max(panelY + 34, Math.min(naturalY, maxY)) : naturalY;
+        addGridControl(0, columns, controlStartX, controlStartY, w, h, gap, rowStep, "提交 " + labelBool(template.itemSubmitEnabled), () -> {
             template.itemSubmitEnabled = !template.itemSubmitEnabled;
             markTemplateDirty();
         }, "itemSubmitEnabled：启用或禁用单物品 itemSubmit。");
-        addControl(1, "条件 " + labelBool(template.requirementEnabled), startX + w + gap, startY, w, h, () -> {
+        addGridControl(1, columns, controlStartX, controlStartY, w, h, gap, rowStep, "条件 " + labelBool(template.requirementEnabled), () -> {
             template.requirementEnabled = !template.requirementEnabled;
             markTemplateDirty();
         }, "requirement enabled：是否参与 itemSubmit 判断。");
-        addControl(2, "数量 " + countModeLabel(template.countMode), startX, startY + 18, w, h, () -> {
+        addGridControl(2, columns, controlStartX, controlStartY, w, h, gap, rowStep, "数量 " + countModeLabel(template.countMode), () -> {
             template.countMode = nextCountMode(template.countMode);
             markTemplateDirty();
         }, "countMode at_least / exactly / at_most / ignore。");
-        addControl(3, "原版 " + vanillaPolicyShort(template.vanillaPolicy), startX + w + gap, startY + 18, w, h, () -> {
+        addGridControl(3, columns, controlStartX, controlStartY, w, h, gap, rowStep, "原版 " + vanillaPolicyShort(template.vanillaPolicy), () -> {
             template.vanillaPolicy = InteractionItemVanillaPolicy.REQUIRE_ITEM_MATCH.equals(InteractionItemVanillaPolicy.normalize(template.vanillaPolicy))
                     ? InteractionItemVanillaPolicy.ALLOW
                     : InteractionItemVanillaPolicy.REQUIRE_ITEM_MATCH;
             markTemplateDirty();
         }, "原版交互策略：复用已有 InteractionItemVanillaPolicy，不改运行时语义。");
-        addControl(4, "消耗 " + labelBool(template.consumeEnabled), startX, startY + 36, w, h, () -> {
+        addGridControl(4, columns, controlStartX, controlStartY, w, h, gap, rowStep, "消耗 " + labelBool(template.consumeEnabled), () -> {
             template.consumeEnabled = !template.consumeEnabled;
             markTemplateDirty();
         }, "itemSubmitConsumeEnabled：提交成功后是否按旧逻辑消耗物品。");
-        addControl(5, consumeOrderLabel(template.consumeOrder), startX + w + gap, startY + 36, w, h, () -> {
+        addGridControl(5, columns, controlStartX, controlStartY, w, h, gap, rowStep, consumeOrderLabel(template.consumeOrder), () -> {
             template.consumeOrder = InventoryConsumeOrder.MAIN_INVENTORY_FIRST.equals(InventoryConsumeOrder.normalize(template.consumeOrder))
                     ? InventoryConsumeOrder.HOTBAR_FIRST
                     : InventoryConsumeOrder.MAIN_INVENTORY_FIRST;
             markTemplateDirty();
         }, "consumeOrder hotbar_first / main_inventory_first。");
-        addControl(6, "消耗-" , startX, startY + 54, w / 2 - 2, h, () -> adjustConsumeCount(-1), "consumeCount 减少。");
-        addControl(7, "消耗+" , startX + w / 2 + 2, startY + 54, w / 2 - 2, h, () -> adjustConsumeCount(1), "consumeCount 增加。");
-        addControl(8, "damage " + labelBool(template.matchDamage), startX + w + gap, startY + 54, w, h, () -> toggleMatcherOption("damage"), "matchDamage。");
-        addControl(9, "名称 " + labelBool(template.matchCustomName), startX, startY + 72, w, h, () -> toggleMatcherOption("name"), "matchCustomName。");
-        addControl(10, "Lore " + labelBool(template.matchLore), startX + w + gap, startY + 72, w, h, () -> toggleMatcherOption("lore"), "matchLore。");
-        addControl(11, "customData " + labelBool(template.matchCustomData), startX, startY + 90, w, h, () -> toggleMatcherOption("customData"), "matchCustomData。");
-        addControl(12, "components " + labelBool(template.matchComponents), startX + w + gap, startY + 90, w, h, () -> toggleMatcherOption("components"), "matchComponents。");
+        addGridControl(6, columns, controlStartX, controlStartY, w, h, gap, rowStep, "消耗-", () -> adjustConsumeCount(-1), "consumeCount 减少。");
+        addGridControl(7, columns, controlStartX, controlStartY, w, h, gap, rowStep, "消耗+", () -> adjustConsumeCount(1), "consumeCount 增加。");
+        addGridControl(8, columns, controlStartX, controlStartY, w, h, gap, rowStep, "damage " + labelBool(template.matchDamage), () -> toggleMatcherOption("damage"), "matchDamage。");
+        addGridControl(9, columns, controlStartX, controlStartY, w, h, gap, rowStep, "名称 " + labelBool(template.matchCustomName), () -> toggleMatcherOption("name"), "matchCustomName。");
+        addGridControl(10, columns, controlStartX, controlStartY, w, h, gap, rowStep, "Lore " + labelBool(template.matchLore), () -> toggleMatcherOption("lore"), "matchLore。");
+        addGridControl(11, columns, controlStartX, controlStartY, w, h, gap, rowStep, "customData " + labelBool(template.matchCustomData), () -> toggleMatcherOption("customData"), "matchCustomData。");
+        addGridControl(12, columns, controlStartX, controlStartY, w, h, gap, rowStep, "components " + labelBool(template.matchComponents), () -> toggleMatcherOption("components"), "matchComponents。");
+    }
+
+    private void addGridControl(int order, int columns, int startX, int startY, int width, int height, int gap, int rowStep, String label, Runnable action, String hint) {
+        int col = order % Math.max(1, columns);
+        int row = order / Math.max(1, columns);
+        addControl(order, label, startX + col * (width + gap), startY + row * rowStep, width, height, action, hint);
     }
 
     private void addControl(int order, String label, int x, int y, int width, int height, Runnable action, String hint) {
@@ -282,7 +313,7 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
     }
 
     private void renderControlButtons(DrawContext context, int mouseX, int mouseY) {
-        context.drawText(textRenderer, Text.literal("单 requirement 配置"), panelX + Math.min(220, Math.max(184, panelWidth / 2)), templateSlotY - 16, 0xFF404040, false);
+        context.drawText(textRenderer, Text.literal(compactLayout ? "单项配置" : "单 requirement 配置"), controlStartX, controlStartY - 10, 0xFF404040, false);
         for (ControlButton button : controlButtons) {
             boolean hover = inside(mouseX, mouseY, button.x(), button.y(), button.width(), button.height());
             context.fill(button.x(), button.y(), button.x() + button.width(), button.y() + button.height(), hover ? 0xFFB8D6E0 : 0xFFBFC7CB);
@@ -292,7 +323,9 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
                 hoveredHint = button.hint();
             }
         }
-        drawTrimmed(context, "匹配数量和消耗数量独立；模板显示堆叠数按物品最大堆叠限制。", panelX + Math.min(220, Math.max(184, panelWidth / 2)), templateSlotY + 110, panelWidth - Math.min(230, Math.max(194, panelWidth / 2)), 0xFF666666);
+        if (!compactLayout) {
+            drawTrimmed(context, "匹配数量和消耗数量独立；模板显示堆叠数按物品最大堆叠限制。", controlStartX, templateSlotY + 110, panelWidth - Math.min(230, Math.max(194, panelWidth / 2)), 0xFF666666);
+        }
     }
 
     private void renderCursorStack(DrawContext context, int mouseX, int mouseY) {
@@ -302,11 +335,12 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
             context.drawStackOverlay(textRenderer, cursor, mouseX - 8, mouseY - 8);
         }
         int x = panelX + 92;
-        int y = panelY + panelHeight - 23;
-        String label = cursor.isEmpty()
+        String label = !noticeMessage.isBlank()
+                ? noticeMessage
+                : cursor.isEmpty()
                 ? "从下方背包拿起物品，再点提交模板槽复制 ghost。"
                 : "鼠标物品：" + Registries.ITEM.getId(cursor.getItem()) + " x" + cursor.getCount();
-        drawTrimmed(context, label, x, y + 6, Math.max(80, panelWidth - 210), cursor.isEmpty() ? 0xFF6B6B6B : 0xFF20505D);
+        drawTrimmed(context, label, x, footerButtonY + 6, Math.max(80, panelWidth - 210), noticeMessage.isBlank() ? (cursor.isEmpty() ? 0xFF6B6B6B : 0xFF20505D) : 0xFF9D4B00);
     }
 
     private void drawSlot(DrawContext context, int x, int y, int border, int fill) {
@@ -870,6 +904,171 @@ public final class WebAdminSingleItemSubmitTemplateScreen extends Screen {
 
     private static int clampOperationalCount(int rawCount) {
         return Math.max(1, Math.min(64_000, rawCount));
+    }
+
+    public JsonObject testBridgeSnapshot(boolean includeSlots, boolean includeInventory) {
+        JsonObject data = testBridgeBaseSnapshot();
+        data.addProperty("itemSubmitEnabled", template.itemSubmitEnabled);
+        data.addProperty("requirementEnabled", template.requirementEnabled);
+        data.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+        data.addProperty("count", template.hasItem() ? template.count : 0);
+        data.addProperty("consumeEnabled", template.consumeEnabled);
+        data.addProperty("consumeOrder", InventoryConsumeOrder.normalize(template.consumeOrder));
+        data.addProperty("consumeCount", template.consumeCount);
+        data.addProperty("vanillaPolicy", InteractionItemVanillaPolicy.normalize(template.vanillaPolicy));
+        JsonObject matcher = new JsonObject();
+        matcher.addProperty("matchDamage", template.matchDamage);
+        matcher.addProperty("matchCustomName", template.matchCustomName);
+        matcher.addProperty("matchLore", template.matchLore);
+        matcher.addProperty("matchCustomData", template.matchCustomData);
+        matcher.addProperty("matchComponents", template.matchComponents);
+        data.add("matcherOptions", matcher);
+        data.add("template", testBridgeTemplateSummary());
+        if (includeSlots) {
+            JsonArray slots = new JsonArray();
+            JsonObject slot = new JsonObject();
+            slot.addProperty("slot", 0);
+            slot.addProperty("slotId", "submit_template");
+            slot.addProperty("editable", true);
+            slot.addProperty("empty", !template.hasItem());
+            slot.add("item", testBridgeStackSummary(template.stack()));
+            slot.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+            slot.addProperty("count", template.hasItem() ? template.count : 0);
+            slot.addProperty("displayStackCount", template.hasItem() ? template.stack().getCount() : 0);
+            slots.add(slot);
+            data.add("slots", slots);
+        }
+        if (includeInventory) {
+            data.add("cursor", testBridgeStackSummary(cursorStack()));
+        }
+        return data;
+    }
+
+    public JsonObject testBridgePutItem(String itemId, int count) {
+        ItemStack displaySource = testBridgeStack(itemId, count);
+        template.replaceWith(displaySource);
+        template.count = clampOperationalCount(count);
+        template.syncStackCount();
+        template.templateDisplayStack = ItemStackDisplaySnapshot.encode(template.displayStack, registryLookup());
+        markTemplateDirty();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "put_item");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeClearSlot() {
+        clearTemplate();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "clear_slot");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSetCount(int count) {
+        if (!template.hasItem()) {
+            throw new IllegalArgumentException("提交模板为空，无法设置数量。");
+        }
+        template.count = clampOperationalCount(count);
+        template.syncStackCount();
+        template.templateDisplayStack = ItemStackDisplaySnapshot.encode(template.displayStack, registryLookup());
+        markTemplateDirty();
+        JsonObject data = testBridgeSnapshot(true, false);
+        data.addProperty("action", "set_count");
+        data.addProperty("changedSlot", "submit_template");
+        data.addProperty("requirementCount", template.count);
+        data.addProperty("displayStackCount", template.stack().getCount());
+        data.addProperty("realInventoryModified", false);
+        return data;
+    }
+
+    public JsonObject testBridgeSave() {
+        requestSave();
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "save");
+        data.addProperty("saveRequested", saveSent);
+        data.addProperty("usesExistingSessionSavePath", true);
+        return data;
+    }
+
+    public JsonObject testBridgeCancel(String reason) {
+        requestCancel(safe(reason).isBlank() ? "testbridge_cancel" : reason);
+        JsonObject data = testBridgeSnapshot(false, false);
+        data.addProperty("action", "cancel");
+        data.addProperty("cancelRequested", cancelSent);
+        data.addProperty("usesExistingCancelPath", true);
+        return data;
+    }
+
+    private JsonObject testBridgeBaseSnapshot() {
+        JsonObject data = new JsonObject();
+        data.addProperty("open", true);
+        data.addProperty("supported", true);
+        data.addProperty("type", "single_item_submit");
+        data.addProperty("sessionId", sessionId);
+        data.addProperty("deviceId", deviceId);
+        data.addProperty("targetPlayer", client == null || client.player == null ? "" : client.player.getName().getString());
+        data.addProperty("title", title.getString());
+        data.addProperty("displayName", displayName);
+        data.addProperty("dimension", dimension);
+        data.addProperty("x", x);
+        data.addProperty("y", y);
+        data.addProperty("z", z);
+        data.addProperty("blockId", blockId);
+        data.addProperty("dirty", dirty);
+        data.addProperty("sessionClosing", sessionClosing);
+        data.addProperty("saveSent", saveSent);
+        data.addProperty("cancelSent", cancelSent);
+        data.addProperty("cancelConfirmOpen", cancelConfirmOpen);
+        data.addProperty("notice", noticeMessage);
+        data.addProperty("realInventoryModified", false);
+        JsonArray capabilities = new JsonArray();
+        capabilities.add("current");
+        capabilities.add("slots");
+        capabilities.add("put_item");
+        capabilities.add("clear_slot");
+        capabilities.add("set_count");
+        capabilities.add("save");
+        capabilities.add("cancel");
+        data.add("capabilities", capabilities);
+        return data;
+    }
+
+    private JsonObject testBridgeTemplateSummary() {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", !template.hasItem());
+        data.addProperty("itemId", safe(template.itemId));
+        data.addProperty("count", template.hasItem() ? template.count : 0);
+        data.addProperty("displayStackCount", template.hasItem() ? template.stack().getCount() : 0);
+        data.addProperty("countMode", ContainerItemCountMode.normalize(template.countMode));
+        data.addProperty("hasDisplaySnapshot", !safe(template.templateDisplayStack).isBlank());
+        data.add("item", testBridgeStackSummary(template.stack()));
+        return data;
+    }
+
+    private ItemStack testBridgeStack(String rawItemId, int rawCount) {
+        Identifier id = Identifier.tryParse(safe(rawItemId));
+        if (id == null || !Registries.ITEM.containsId(id)) {
+            throw new IllegalArgumentException("物品 ID 无效或不存在：" + safe(rawItemId));
+        }
+        ItemStack stack = new ItemStack(Registries.ITEM.get(id), 1);
+        stack.setCount(SubmitTemplate.clampStackCount(stack, rawCount));
+        return stack;
+    }
+
+    private JsonObject testBridgeStackSummary(ItemStack stack) {
+        JsonObject data = new JsonObject();
+        data.addProperty("empty", stack == null || stack.isEmpty());
+        if (stack == null || stack.isEmpty()) {
+            return data;
+        }
+        data.addProperty("itemId", Registries.ITEM.getId(stack.getItem()).toString());
+        data.addProperty("count", stack.getCount());
+        data.addProperty("maxCount", Math.max(1, stack.getMaxCount()));
+        data.addProperty("displayName", stack.getName().getString());
+        return data;
     }
 
     private static String nextCountMode(String mode) {

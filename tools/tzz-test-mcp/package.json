@@ -1,0 +1,25 @@
+{
+  "name": "@tzz/local-test-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-only MCP testing bridge for the TZZ Mod WebAdmin workspace.",
+  "bin": {
+    "tzz-test-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.json",
+    "test": "node dist/smoke.js",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
