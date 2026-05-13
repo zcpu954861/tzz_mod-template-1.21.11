@@ -96,7 +96,13 @@ public final class WebAdminTestBridgeGuiClient {
         File gameDirectoryFile;
         try {
             path = Path.of(outputPath).toAbsolutePath().normalize();
-            gameDirectoryFile = Path.of(gameDirectory).toAbsolutePath().normalize().toFile();
+            Path gameDirectoryPath = Path.of(gameDirectory).toAbsolutePath().normalize();
+            Path allowedScreenshots = gameDirectoryPath.resolve("reports").resolve("mcp").resolve("screenshots").normalize();
+            if (!path.startsWith(allowedScreenshots)) {
+                send(payload, failed("VALIDATION_FAILED", "截图输出路径必须位于 reports/mcp/screenshots。", base));
+                return;
+            }
+            gameDirectoryFile = gameDirectoryPath.toFile();
             Path parent = path.getParent();
             if (parent == null) {
                 send(payload, failed("VALIDATION_FAILED", "截图输出目录无效。", base));
@@ -124,6 +130,7 @@ public final class WebAdminTestBridgeGuiClient {
         queued.addProperty("usesMinecraftClientFramebuffer", true);
         queued.addProperty("usesOsScreenshot", false);
         queued.addProperty("usesCoordinateClicking", false);
+        queued.addProperty("clientScreenshotOutputRestrictedToReportsMcpScreenshots", true);
         send(payload, ok(queued));
     }
 
@@ -316,9 +323,17 @@ public final class WebAdminTestBridgeGuiClient {
         return switch (operation) {
             case "current" -> screen.testBridgeSnapshot(false, false);
             case "slots" -> screen.testBridgeSnapshot(true, false);
-            case "put_item" -> screen.testBridgePutItem(getString(body, "itemId"), getInt(body, "count", 1));
-            case "clear_slot" -> screen.testBridgeClearSlot();
-            case "set_count" -> screen.testBridgeSetCount(getInt(body, "count", 1));
+            case "put_item" -> screen.testBridgePutItem(getInt(body, "slot", getInt(body, "slotIndex", 0)), getString(body, "itemId"), getInt(body, "count", 1));
+            case "clear_slot" -> screen.testBridgeClearSlot(getInt(body, "slot", getInt(body, "slotIndex", 0)));
+            case "set_count" -> screen.testBridgeSetCount(getInt(body, "slot", getInt(body, "slotIndex", 0)), getInt(body, "count", 1));
+            case "select_requirement" -> screen.testBridgeSelectRequirement(requireRequirementSlot(body, screen));
+            case "add_requirement" -> screen.testBridgeAddRequirement(getString(body, "itemId"), getInt(body, "count", 1));
+            case "delete_requirement" -> screen.testBridgeDeleteRequirement(requireRequirementSlot(body, screen), getBoolean(body, "confirmed", false));
+            case "set_count_mode" -> screen.testBridgeSetCountMode(requireRequirementSlot(body, screen), getString(body, "countMode"));
+            case "set_requirement_enabled" -> screen.testBridgeSetRequirementEnabled(requireRequirementSlot(body, screen), getBoolean(body, "enabled", true));
+            case "set_matcher_options" -> screen.testBridgeSetMatcherOptions(requireRequirementSlot(body, screen), body.has("options") && body.get("options").isJsonObject() ? body.getAsJsonObject("options") : body);
+            case "set_consume" -> screen.testBridgeSetConsume(requireRequirementSlot(body, screen), getInt(body, "consumeCount", 1), body.has("consumeEnabled") ? getBoolean(body, "consumeEnabled", false) : null, getString(body, "consumeOrder"));
+            case "set_global" -> screen.testBridgeSetGlobal(body.has("itemSubmitEnabled") ? getBoolean(body, "itemSubmitEnabled", true) : null, body.has("consumeEnabled") ? getBoolean(body, "consumeEnabled", false) : null, getString(body, "consumeOrder"), getString(body, "vanillaPolicy"));
             case "save" -> screen.testBridgeSave();
             case "cancel" -> screen.testBridgeCancel(getString(body, "reason"));
             default -> throw new GuiOperationException("VALIDATION_FAILED", "不支持的 GUI 操作：" + operation, screen.testBridgeSnapshot(false, false));
@@ -330,6 +345,16 @@ public final class WebAdminTestBridgeGuiClient {
         if (!target.isBlank() && !target.equals(actualType)) {
             throw new GuiOperationException("SCREEN_MISMATCH", "当前 GUI 类型为 " + actualType + "，与请求 target 不一致。", data);
         }
+    }
+
+    private static int requireRequirementSlot(JsonObject body, WebAdminSingleItemSubmitTemplateScreen screen) {
+        if (body != null && body.has("slot")) {
+            return getInt(body, "slot", 0);
+        }
+        if (body != null && body.has("slotIndex")) {
+            return getInt(body, "slotIndex", 0);
+        }
+        throw new GuiOperationException("VALIDATION_FAILED", "统一 itemSubmit requirement 行操作必须提供 slot 或 slotIndex。", screen.testBridgeSnapshot(false, false));
     }
 
     private static JsonObject currentBase(String type, Screen screen) {

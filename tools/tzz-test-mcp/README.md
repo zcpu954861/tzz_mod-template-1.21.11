@@ -367,7 +367,8 @@ $env:TZZ_TESTBRIDGE_URL = "http://127.0.0.1:18080/api/testbridge/"
 - TestBridge loopback-only。
 - TestBridge token required。
 - No token logged。
-- `minecraft.command` 有 allowlist / denylist；`stop`、`op`、`deop`、`ban`、`kick`、`whitelist`、`save-off`、`save-on`、`pardon`、`reload` 等危险命令会被拒绝。
+- `minecraft.command` 有 allowlist / denylist；只保留受控的 `tzz`、`time`、`weather`、`say` 根命令，`stop`、`op`、`deop`、`ban`、`kick`、`whitelist`、`save-off`、`save-on`、`pardon`、`reload` 等危险命令会被拒绝。
+- `setblock` / `give` / `clear` / `tp` 这类会写世界或玩家状态的原版裸命令不走 `minecraft.command`，必须使用有边界检查的结构化 TestBridge endpoint。
 - `minecraft.set_block` 只能在默认测试区域 `x=-128..128`、`y=-64..320`、`z=-128..128` 内操作。
 - `minecraft.clear_area` 也有最大体积限制 `4096`。
 - `minecraft.prepare_test_area` 复用同样的测试区域边界和 `4096` 最大体积限制，不会强制加载区块。
@@ -409,7 +410,7 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 当前支持的 GUI：
 
 - `container_template`：7.9 P3b 容器内容变化模板 GUI。
-- `single_item_submit`：7.10 单物品 itemSubmit 模板 GUI。
+- `single_item_submit`：7.11 统一 itemSubmit requirement list editor；1 个 requirement 时保持 7.10 单物品体验，2 个及以上时显示多项列表。
 
 新增 MCP 工具：
 
@@ -418,6 +419,14 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `minecraft.gui_put_item`：把 `itemId/count` 放入 ghost/template 槽，不修改真实玩家物品。
 - `minecraft.gui_clear_slot`：清空模板槽，不影响真实背包。
 - `minecraft.gui_set_count`：设置模板数量，沿用 GUI 现有 clamp 规则。
+- `minecraft.gui_select_requirement`：在 7.11 统一 itemSubmit editor 中选择 requirement。
+- `minecraft.gui_add_requirement`：在 7.11 统一 itemSubmit editor 中添加一个提交条件。
+- `minecraft.gui_delete_requirement`：删除 7.11 itemSubmit requirement；多项模式需要确认，唯一 requirement 不会被误删。
+- `minecraft.gui_set_count_mode`：设置当前 requirement 的 `at_least` / `exactly` / `at_most` / `ignore`。
+- `minecraft.gui_set_requirement_enabled`：启用或禁用当前 requirement。
+- `minecraft.gui_set_matcher_options`：设置 per-requirement matcher options，例如 damage、自定义名称、Lore、customData、components。
+- `minecraft.gui_set_consume`：设置 per-requirement `consumeCount`，并可设置全局 consume enabled / consume order。
+- `minecraft.gui_set_global`：设置全局 itemSubmit enabled、consume enabled/order 和原版交互策略。
 - `minecraft.gui_save`：走当前 GUI 的既有 session 保存路径。
 - `minecraft.gui_cancel`：走当前 GUI 的既有取消路径。
 - `minecraft.client_screenshot`：请求 Minecraft 客户端自己保存当前 framebuffer 截图到 `reports/mcp/screenshots`，不是 OS 截屏，不点击坐标。
@@ -434,8 +443,12 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 ```json
 {"tool":"minecraft.gui_current","arguments":{"player":"Steve"}}
 {"tool":"minecraft.gui_slots","arguments":{"player":"Steve"}}
-{"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","target":"single_item_submit","itemId":"minecraft:diamond","count":3}}
+{"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","target":"single_item_submit","slot":0,"itemId":"minecraft:diamond","count":3}}
 {"tool":"minecraft.gui_set_count","arguments":{"player":"Steve","target":"single_item_submit","count":3}}
+{"tool":"minecraft.gui_add_requirement","arguments":{"player":"Steve","itemId":"minecraft:emerald","count":2}}
+{"tool":"minecraft.gui_select_requirement","arguments":{"player":"Steve","slot":1}}
+{"tool":"minecraft.gui_set_count_mode","arguments":{"player":"Steve","slot":1,"countMode":"exactly"}}
+{"tool":"minecraft.gui_set_matcher_options","arguments":{"player":"Steve","slot":1,"options":{"matchComponents":true}}}
 {"tool":"minecraft.gui_save","arguments":{"player":"Steve"}}
 {"tool":"minecraft.client_screenshot","arguments":{"player":"Steve","name":"single-item-submit-compact-layout"}}
 ```
@@ -454,6 +467,43 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `gui_put_item` 只写 GUI draft 的 ghost/template 数据，不改真实玩家背包，不改真实世界容器。
 - `gui_save` / `gui_cancel` 复用 GUI 已有保存/取消路径，不直接写 `SignalDeviceData` JSON。
 - 本阶段不自动打开 P3b / 7.10 GUI；请先通过 WebAdmin 或现有 session 入口打开目标 GUI，再调用这些工具。
+
+### 7.11 统一 itemSubmit requirement list editor
+
+7.11 后，`single_item_submit` GUI 类型代表统一 itemSubmit requirement list editor，而不是只能编辑一个 requirement 的旧单槽界面。底层仍只保存到现有 `itemSubmitRequirements[]`：
+
+- 0 个 requirement：未配置 itemSubmit，只显示“添加提交条件”，不显示空槽矩阵。
+- 1 个 requirement：按单物品提交体验显示，不显示排序、删除、批量管理按钮。
+- 2 个及以上 requirement：显示多物品 requirement list，可选择、添加、删除、上移 / 下移，并按列表顺序保存。
+
+旧多物品 itemSubmit 运行时语义必须保留：所有 enabled requirements 都满足才成功；consume enabled 时先 stage 所有 requirement 的消耗计划，全部 stage 成功才 apply consume，任何 requirement 失败都不能产生半消耗。MCP 逻辑测试需要覆盖“部分满足不消耗”和“全部满足才消耗”。
+
+示例：从单物品扩展为两项提交条件：
+
+```json
+{"tool":"minecraft.gui_current","arguments":{"player":"Steve"}}
+{"tool":"minecraft.gui_put_item","arguments":{"player":"Steve","slot":0,"itemId":"minecraft:diamond","count":3}}
+{"tool":"minecraft.gui_set_count","arguments":{"player":"Steve","slot":0,"count":3}}
+{"tool":"minecraft.gui_add_requirement","arguments":{"player":"Steve","itemId":"minecraft:emerald","count":2}}
+{"tool":"minecraft.gui_set_count_mode","arguments":{"player":"Steve","slot":1,"countMode":"exactly"}}
+{"tool":"minecraft.gui_set_consume","arguments":{"player":"Steve","slot":0,"consumeCount":3,"consumeEnabled":true,"consumeOrder":"hotbar_first"}}
+{"tool":"minecraft.gui_set_consume","arguments":{"player":"Steve","slot":1,"consumeCount":2}}
+{"tool":"minecraft.gui_save","arguments":{"player":"Steve"}}
+```
+
+删除规则：只有 2 个及以上 requirement 时才显示删除和排序能力；删除必须确认。删除后只剩 1 个 requirement 时，GUI 自动回到单物品简化状态。唯一 requirement 不会被 `minecraft.gui_delete_requirement` 误删。
+
+7.11 自动逻辑测试清单 `7.11_unified_item_submit_logic_test` 不新增专属 scenario tool，必须复用安全原子工具组合执行：
+
+1. 准备测试世界、VBD + receiver，并启用右键交互。
+2. 打开 `single_item_submit` 统一 GUI，添加 diamond 与 emerald 两个 requirement。
+3. 用 `minecraft.gui_select_requirement` 显式选择行，再配置 `countMode`、`consumeCount`、matcher options 和全局 consume。
+4. 保存后用 `minecraft.inspect_device` 确认 `itemSubmitRequirements[]` 顺序、matcher、display template / components 未丢失。
+5. 验证 `partial_match_no_consume`：玩家只满足 A 不满足 B，`minecraft.use_block` 应整体失败，且 A 也不能被消耗。
+6. 验证 `full_match_consumes_all`：玩家同时满足 A+B，`minecraft.use_block` 应整体成功，并按 staged consume plan 一次性消耗。
+7. 检查 `minecraft.signal_history`、`minecraft.doctor_issues`、WebAdmin console，并用 `report.write` 写报告。
+
+逻辑结果可以由 Codex 自动判断；WebAdmin 和 Minecraft GUI 截图矩阵仍必须等待用户人工确认。
 
 ### Minecraft 客户端截图
 
@@ -485,6 +535,8 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 ### 响应式 / 分辨率截图矩阵长期规则
 
 以后新增或修改任何 Minecraft 游戏内 UI，都必须先跑截图矩阵，再交给用户人工验收。截图矩阵至少覆盖小分辨率、1080p、2K、4K 或当前环境可用的等价尺寸；游戏内 UI 还必须覆盖多个 GUI scale，至少覆盖 GUI scale 2 / 3 / 4。Codex 负责自动截图、整理报告和指出明显 warning，但最终 UI 是否通过必须由用户确认。用户确认前不得 checkpoint / merge。
+
+截图生成后，Codex 必须先做一次明显问题预检：检查明显遮挡、按钮是否被背包 / footer / sidebar / topbar 覆盖、横向溢出或内容裁切、关键按钮是否可见、关键卡片 / 表格是否错位，以及小分辨率与 4K scaled 是否有明显布局差异。每张截图必须给出 `pass`、`warning`、`fail` 或 `needs_user_review`，并写明 reason。无法直接视觉判断的截图必须标记 `needs_user_review`，不能假装通过；最终 UI 是否通过仍等待用户确认。
 
 以后新增或修改任何 WebAdmin WebUI，也必须先跑 WebAdmin responsive profile 截图矩阵。WebAdmin 截图矩阵必须区分：
 
@@ -538,7 +590,7 @@ Step 5 增加一层场景编排工具，用来把已有安全 MCP / TestBridge /
 
 - `basic_environment`：启动或复用 dev client，`autoEnterWorld=true` 进入测试世界，等待 WebAdmin / TestBridge / world ready，执行 `minecraft.prepare_test_world`，登录 WebAdmin，打开 dashboard，收集 console errors / screenshot / Doctor issues，并写报告。
 - `vbd_right_click`：准备 VBD + receiver，启用右键交互，调用 `minecraft.use_block`，断言 signal event / signal history，并写报告。
-- `single_item_submit_basic`：准备 VBD + receiver，通过固定 WebAdmin session API 打开 7.10 single itemSubmit GUI，用 Step 4 GUI 工具放入 diamond、设置数量、保存，然后 inspect / use_block / signal history 验证。
+- `single_item_submit_basic`：准备 VBD + receiver，通过固定 WebAdmin session API 打开 `single_item_submit` 统一 GUI；当前保留为 1 requirement 基础 smoke，7.11 多 requirement 逻辑按上方 `7.11_unified_item_submit_logic_test` 清单组合原子工具执行。
 - `container_template_basic`：准备容器 VBD + receiver，通过固定 WebAdmin session API 打开 7.9 container template GUI，用 Step 4 GUI 工具写入模板槽并保存，然后 inspect itemConditions / Doctor issues。
 
 示例：

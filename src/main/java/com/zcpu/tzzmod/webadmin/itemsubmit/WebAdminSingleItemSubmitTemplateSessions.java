@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.webadmin.itemsubmit;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
@@ -260,10 +261,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
             return failSession(session, "device_missing", "目标 virtual_block_device 不存在，单物品提交模板保存失败。", true);
         }
         if (!before.interactionEnabled()) {
-            return failSession(session, "interaction_disabled", "右键交互未启用，单物品 itemSubmit 当前不能保存。", true);
-        }
-        if (before.itemSubmitRequirements().size() > 1) {
-            return failSession(session, "multi_requirement_readonly", "当前为多物品提交配置，7.10 单物品编辑器不会覆盖。", true);
+            return failSession(session, "interaction_disabled", "右键交互未启用，itemSubmit requirement 当前不能保存。", true);
         }
         if (lockService != null) {
             WebAdminEditLockService.LockValidation lockValidation = lockService.validateLock(
@@ -281,7 +279,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         String currentFingerprint = WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService.fingerprintFor(before);
         if (!session.expectedFingerprint.equals(currentFingerprint)
                 || (!requestFingerprint.isBlank() && !session.expectedFingerprint.equals(requestFingerprint))) {
-            return failSession(session, "fingerprint_conflict", "单物品 itemSubmit 配置已被其他操作修改，保存已取消。", true);
+            return failSession(session, "fingerprint_conflict", "itemSubmit requirement 配置已被其他操作修改，保存已取消。", true);
         }
         ItemSubmitSaveDraft draft;
         try {
@@ -289,10 +287,8 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         } catch (IllegalArgumentException exception) {
             return failSession(session, "invalid_item_submit_template", exception.getMessage(), true);
         }
-        List<ItemSubmitRequirementData> nextRequirements = draft.hasTemplate()
-                ? List.of(requirementFromDraft(before, draft))
-                : List.of();
-        boolean nextItemSubmitEnabled = draft.itemSubmitEnabled() && draft.hasTemplate();
+        List<ItemSubmitRequirementData> nextRequirements = requirementsFromDraft(before, draft);
+        boolean nextItemSubmitEnabled = draft.itemSubmitEnabled() && !nextRequirements.isEmpty();
         SignalDeviceData after = SignalDeviceStore.updateVirtualItemSubmitForWebAdmin(
                 activeServer,
                 session.deviceId,
@@ -304,10 +300,10 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 draft.vanillaPolicy()
         );
         if (after == null) {
-            return failSession(session, "save_failed", "单物品提交模板保存失败，设备状态未更新。", true);
+            return failSession(session, "save_failed", "itemSubmit requirement 保存失败，设备状态未更新。", true);
         }
         removeActive(session);
-        String message = draft.hasTemplate() ? "单物品提交模板已保存。" : "单物品提交模板已清空。";
+        String message = nextRequirements.isEmpty() ? "itemSubmit requirements 已清空。" : "itemSubmit requirements 已保存（" + nextRequirements.size() + " 个条件）。";
         if (player != null) {
             notifyPlayer(player, message, Formatting.GREEN);
             sendEnd(player, "saved", session, message, Map.of("source", "client_save"));
@@ -327,13 +323,24 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
     }
 
     private record ItemSubmitSaveDraft(
-            boolean hasTemplate,
             boolean itemSubmitEnabled,
+            boolean consumeEnabled,
+            String consumeOrder,
+            String vanillaPolicy,
+            List<ItemSubmitRequirementDraft> requirements
+    ) {
+    }
+
+    private record ItemSubmitRequirementDraft(
+            String id,
+            String name,
+            boolean hasTemplate,
             boolean requirementEnabled,
             String itemId,
             int templateCount,
             String countMode,
             int requiredCount,
+            boolean matchItemId,
             boolean matchDamage,
             boolean matchCustomName,
             boolean matchLore,
@@ -345,10 +352,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
             String templateCustomData,
             String templateComponents,
             String templateDisplayStack,
-            boolean consumeEnabled,
-            String consumeOrder,
             int consumeCount,
-            String vanillaPolicy,
             String summary
     ) {
     }
@@ -357,12 +361,63 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         JsonObject template = body != null && body.has("template") && body.get("template").isJsonObject()
                 ? body.getAsJsonObject("template")
                 : new JsonObject();
+        boolean itemSubmitEnabled = getBoolean(template, "itemSubmitEnabled", true);
+        boolean consumeEnabled = getBoolean(template, "itemSubmitConsumeEnabled", false);
+        String consumeOrder = InventoryConsumeOrder.normalize(getString(template, "itemSubmitConsumeOrder"));
+        String vanillaPolicy = InteractionItemVanillaPolicy.normalize(getString(template, "interactionItemVanillaPolicy"));
+        List<ItemSubmitRequirementDraft> requirements = new ArrayList<>();
+        if (template.has("requirements") && template.get("requirements").isJsonArray()) {
+            JsonArray array = template.getAsJsonArray("requirements");
+            int index = 0;
+            for (com.google.gson.JsonElement element : array) {
+                if (element != null && element.isJsonObject()) {
+                    ItemSubmitRequirementDraft requirement = parseRequirement(element.getAsJsonObject(), index);
+                    if (!requirement.hasTemplate()) {
+                        throw new IllegalArgumentException("第 " + (index + 1) + " 个 itemSubmit requirement 还没有模板物品，请补齐或删除。");
+                    }
+                    requirements.add(requirement);
+                }
+                index++;
+            }
+        } else {
+            ItemSubmitRequirementDraft requirement = parseRequirement(template, 0);
+            if (requirement.hasTemplate()) {
+                requirements.add(requirement);
+            }
+        }
+        return new ItemSubmitSaveDraft(itemSubmitEnabled, consumeEnabled, consumeOrder, vanillaPolicy, List.copyOf(requirements));
+    }
+
+    private static ItemSubmitRequirementDraft parseRequirement(JsonObject template, int index) {
         String itemId = getString(template, "templateItemId").trim().toLowerCase();
         if (itemId.isBlank()) {
             itemId = getString(template, "itemId").trim().toLowerCase();
         }
         if (itemId.isBlank()) {
-            return new ItemSubmitSaveDraft(false, false, false, "", 0, ContainerItemCountMode.AT_LEAST.id(), 0, false, false, false, false, false, 0, "", List.of(), "", "", "", getBoolean(template, "itemSubmitConsumeEnabled", false), InventoryConsumeOrder.normalize(getString(template, "itemSubmitConsumeOrder")), 1, InteractionItemVanillaPolicy.normalize(getString(template, "interactionItemVanillaPolicy")), "");
+            return new ItemSubmitRequirementDraft(
+                    safe(getString(template, "requirementId")),
+                    requirementName(template, index),
+                    false,
+                    getBoolean(template, "requirementEnabled", true),
+                    "",
+                    0,
+                    ContainerItemCountMode.AT_LEAST.id(),
+                    0,
+                    getBoolean(template, "matchItemId", true),
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    0,
+                    "",
+                    List.of(),
+                    "",
+                    "",
+                    "",
+                    clampOperationalCount(getInt(template, "consumeCount", 1)),
+                    ""
+            );
         }
         Identifier id = Identifier.tryParse(itemId);
         if (id == null || Registries.ITEM.get(id) == null) {
@@ -373,14 +428,16 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         int required = ContainerItemCountMode.IGNORE.id().equals(mode) ? 0 : clampOperationalCount(rawCount);
         int templateCount = clampStackCount(itemId, getInt(template, "templateCount", rawCount <= 0 ? 1 : rawCount));
         int consumeCount = clampOperationalCount(getInt(template, "consumeCount", required <= 0 ? 1 : required));
-        return new ItemSubmitSaveDraft(
+        return new ItemSubmitRequirementDraft(
+                safe(getString(template, "requirementId")),
+                requirementName(template, index),
                 true,
-                getBoolean(template, "itemSubmitEnabled", true),
                 getBoolean(template, "requirementEnabled", true),
                 itemId,
                 templateCount,
                 mode,
                 required,
+                getBoolean(template, "matchItemId", true),
                 getBoolean(template, "matchDamage", false),
                 getBoolean(template, "matchCustomName", false),
                 getBoolean(template, "matchLore", false),
@@ -392,19 +449,32 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 safe(getString(template, "templateCustomData")),
                 safe(getString(template, "templateComponents")),
                 safe(getString(template, "templateDisplayStack")),
-                getBoolean(template, "itemSubmitConsumeEnabled", false),
-                InventoryConsumeOrder.normalize(getString(template, "itemSubmitConsumeOrder")),
                 consumeCount,
-                InteractionItemVanillaPolicy.normalize(getString(template, "interactionItemVanillaPolicy")),
                 safe(getString(template, "summary"))
         );
     }
 
-    private static ItemSubmitRequirementData requirementFromDraft(SignalDeviceData before, ItemSubmitSaveDraft draft) {
-        ItemSubmitRequirementData previous = before.itemSubmitRequirements().isEmpty() ? null : before.itemSubmitRequirements().get(0).normalized();
+    private static String requirementName(JsonObject template, int index) {
+        String name = getString(template, "requirementName").trim();
+        if (name.isBlank()) {
+            name = getString(template, "name").trim();
+        }
+        return name.isBlank() ? "requirement_" + String.format(java.util.Locale.ROOT, "%02d", index + 1) : name;
+    }
+
+    private static List<ItemSubmitRequirementData> requirementsFromDraft(SignalDeviceData before, ItemSubmitSaveDraft draft) {
+        List<ItemSubmitRequirementData> next = new ArrayList<>();
+        for (ItemSubmitRequirementDraft requirement : draft.requirements()) {
+            next.add(requirementFromDraft(before, requirement, draft.vanillaPolicy()));
+        }
+        return List.copyOf(next);
+    }
+
+    private static ItemSubmitRequirementData requirementFromDraft(SignalDeviceData before, ItemSubmitRequirementDraft draft, String vanillaPolicy) {
+        ItemSubmitRequirementData previous = previousRequirement(before, draft.id(), draft.name());
         long now = System.currentTimeMillis();
-        String name = previous == null || previous.name().isBlank() ? "single_item_submit" : previous.name();
-        String id = previous == null || previous.id().isBlank() ? UUID.randomUUID().toString() : previous.id();
+        String name = draft.name().isBlank() ? (previous == null || previous.name().isBlank() ? "requirement_01" : previous.name()) : draft.name();
+        String id = draft.id().isBlank() ? (previous == null || previous.id().isBlank() ? UUID.randomUUID().toString() : previous.id()) : draft.id();
         ItemStackMatcherData previousMatcher = previous == null ? ItemStackMatcherData.empty().normalized() : previous.matcher().normalized();
         ItemStackMatcherData matcher = new ItemStackMatcherData(
                 true,
@@ -412,7 +482,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 draft.templateCount(),
                 draft.countMode(),
                 draft.requiredCount(),
-                true,
+                draft.matchItemId(),
                 draft.matchDamage(),
                 draft.matchCustomName(),
                 draft.matchLore(),
@@ -440,7 +510,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 previousMatcher.interactionItemConsumeSource(),
                 previousMatcher.interactionItemInventoryConsumeOrder(),
                 previousMatcher.interactionItemSource(),
-                draft.vanillaPolicy(),
+                vanillaPolicy,
                 previousMatcher.lastInteractionItemSource(),
                 previousMatcher.lastInteractionItemMatchedSlot(),
                 previousMatcher.lastInteractionItemMatchedCount(),
@@ -462,6 +532,27 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 previous == null ? 0L : previous.lastCheckGameTime(),
                 previous == null ? "" : previous.lastResult()
         ).normalized();
+    }
+
+    private static ItemSubmitRequirementData previousRequirement(SignalDeviceData before, String id, String name) {
+        if (before == null) {
+            return null;
+        }
+        String cleanId = safe(id);
+        String cleanName = safe(name);
+        for (ItemSubmitRequirementData raw : before.itemSubmitRequirements()) {
+            ItemSubmitRequirementData requirement = raw.normalized();
+            if (!cleanId.isBlank() && cleanId.equals(requirement.id())) {
+                return requirement;
+            }
+        }
+        for (ItemSubmitRequirementData raw : before.itemSubmitRequirements()) {
+            ItemSubmitRequirementData requirement = raw.normalized();
+            if (!cleanName.isBlank() && cleanName.equals(requirement.name())) {
+                return requirement;
+            }
+        }
+        return null;
     }
 
     private static boolean hasUnsupportedAdvancedItemSubmitMatcher(SignalDeviceData device) {
@@ -630,6 +721,8 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         data.put("expiresAtMillis", session.expiresAtMillis);
         data.put("opened", session.opened);
         data.put("singleItemSubmitTemplate", true);
+        data.put("unifiedItemSubmitEditor", true);
+        data.put("requirementListEditable", true);
         return data;
     }
 
@@ -651,11 +744,12 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 .channel(after.interactChannel().isBlank() ? after.channel() : after.interactChannel())
                 .sourceType(after.type())
                 .severity("INFO")
-                .summary("VBD 单物品 itemSubmit 模板已保存。")
+                .summary("VBD 统一 itemSubmit requirements 已保存。")
                 .routeTarget(routeTarget)
                 .payload("targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT)
                 .payload("deviceType", after.type())
                 .payload("singleItemSubmit", true)
+                .payload("unifiedItemSubmitEditor", true)
                 .payload("requirementCount", after.itemSubmitRequirements().size())
                 .payload("expectedFingerprint", WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService.fingerprintFor(after))
                 .payload("actor", session.context == null ? "" : session.context.actorUsername()));
@@ -664,7 +758,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
                 .channel(after.interactChannel().isBlank() ? after.channel() : after.interactChannel())
                 .sourceType(after.type())
                 .severity("INFO")
-                .summary("VBD 单物品 itemSubmit 模板已保存：" + SignalDeviceStore.displayName(after))
+                .summary("VBD 统一 itemSubmit requirements 已保存：" + SignalDeviceStore.displayName(after))
                 .routeTarget(routeTarget)
                 .payload("targetType", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT)
                 .payload("deviceType", after.type())
@@ -744,7 +838,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
     }
 
     private static WebAdminWriteTarget target(String deviceId) {
-        return new WebAdminWriteTarget("VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT", safe(deviceId), "VBD 单物品提交模板会话");
+        return new WebAdminWriteTarget("VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT", safe(deviceId), "VBD 统一 itemSubmit requirement 会话");
     }
 
     private static JsonObject parse(String json) {

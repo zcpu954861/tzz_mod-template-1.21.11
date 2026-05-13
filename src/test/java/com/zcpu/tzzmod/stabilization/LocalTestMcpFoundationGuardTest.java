@@ -27,6 +27,7 @@ public final class LocalTestMcpFoundationGuardTest {
     private static void requireFilesExist() {
         List<String> required = List.of(
                 "docs/LOCAL_TEST_MCP_FOUNDATION_CURRENT_CONTEXT.md",
+                "docs/WEBADMIN_UNIFIED_ITEM_SUBMIT_EDITOR_7_11_CURRENT_CONTEXT.md",
                 "tools/tzz-test-mcp/package.json",
                 "tools/tzz-test-mcp/tsconfig.json",
                 "tools/tzz-test-mcp/config.example.json",
@@ -313,6 +314,14 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "minecraft.gui_put_item", "minecraft.gui_put_item tool marker");
         requireContains(testbridge, "minecraft.gui_clear_slot", "minecraft.gui_clear_slot tool marker");
         requireContains(testbridge, "minecraft.gui_set_count", "minecraft.gui_set_count tool marker");
+        requireContains(testbridge, "minecraft.gui_select_requirement", "minecraft.gui_select_requirement tool marker");
+        requireContains(testbridge, "minecraft.gui_add_requirement", "minecraft.gui_add_requirement tool marker");
+        requireContains(testbridge, "minecraft.gui_delete_requirement", "minecraft.gui_delete_requirement tool marker");
+        requireContains(testbridge, "minecraft.gui_set_count_mode", "minecraft.gui_set_count_mode tool marker");
+        requireContains(testbridge, "minecraft.gui_set_requirement_enabled", "minecraft.gui_set_requirement_enabled tool marker");
+        requireContains(testbridge, "minecraft.gui_set_matcher_options", "minecraft.gui_set_matcher_options tool marker");
+        requireContains(testbridge, "minecraft.gui_set_consume", "minecraft.gui_set_consume tool marker");
+        requireContains(testbridge, "minecraft.gui_set_global", "minecraft.gui_set_global tool marker");
         requireContains(testbridge, "minecraft.gui_save", "minecraft.gui_save tool marker");
         requireContains(testbridge, "minecraft.gui_cancel", "minecraft.gui_cancel tool marker");
         requireContains(testbridge, "minecraft.client_screenshot", "minecraft.client_screenshot tool marker");
@@ -335,6 +344,16 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "gui/put-item", "MCP gui_put_item endpoint marker");
         requireContains(testbridge, "gui/clear-slot", "MCP gui_clear_slot endpoint marker");
         requireContains(testbridge, "gui/set-count", "MCP gui_set_count endpoint marker");
+        requireContains(testbridge, "gui/select-requirement", "MCP gui_select_requirement endpoint marker");
+        requireContains(testbridge, "gui/add-requirement", "MCP gui_add_requirement endpoint marker");
+        requireContains(testbridge, "gui/delete-requirement", "MCP gui_delete_requirement endpoint marker");
+        requireContains(testbridge, "gui/set-count-mode", "MCP gui_set_count_mode endpoint marker");
+        requireContains(testbridge, "gui/set-requirement-enabled", "MCP gui_set_requirement_enabled endpoint marker");
+        requireContains(testbridge, "gui/set-matcher-options", "MCP gui_set_matcher_options endpoint marker");
+        requireContains(testbridge, "gui/set-consume", "MCP gui_set_consume endpoint marker");
+        requireContains(testbridge, "gui/set-global", "MCP gui_set_global endpoint marker");
+        requireContains(testbridge, "requireRequirementSlot", "MCP 7.11 row-level GUI tools require explicit slot marker");
+        requireContains(testbridge, "requires slot or slotIndex", "MCP 7.11 row-level GUI tools validation marker");
         requireContains(testbridge, "gui/save", "MCP gui_save endpoint marker");
         requireContains(testbridge, "gui/cancel", "MCP gui_cancel endpoint marker");
         requireContains(testbridge, "This does not modify real player inventory", "MCP gui_put_item real inventory safety marker");
@@ -386,6 +405,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridgeRoutes, "/api/testbridge/world/prepare-player", "server prepare_test_player route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/world/prepare", "server prepare_test_world route marker");
         requireContains(testbridgeRoutes, "COMMAND_ALLOWLIST", "server Minecraft command allowlist marker");
+        requireContains(testbridgeRoutes, "raw vanilla write commands stay denied", "server raw vanilla write commands denied marker");
         requireContains(testbridgeRoutes, "COMMAND_DENYLIST", "server Minecraft dangerous command deny marker");
         requireContains(testbridgeRoutes, "MAX_CLEAR_VOLUME = 4096", "server clear_area max volume marker");
         requireContains(testbridgeRoutes, "DEFAULT_PREPARE_MIN", "server default prepare area marker");
@@ -409,6 +429,14 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridgeRoutes, "/api/testbridge/gui/put-item", "server gui_put_item route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/clear-slot", "server gui_clear_slot route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/set-count", "server gui_set_count route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/select-requirement", "server gui_select_requirement route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/add-requirement", "server gui_add_requirement route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/delete-requirement", "server gui_delete_requirement route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-count-mode", "server gui_set_count_mode route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-requirement-enabled", "server gui_set_requirement_enabled route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-matcher-options", "server gui_set_matcher_options route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-consume", "server gui_set_consume route marker");
+        requireContains(testbridgeRoutes, "/api/testbridge/gui/set-global", "server gui_set_global route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/save", "server gui_save route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/gui/cancel", "server gui_cancel route marker");
         requireContains(testbridgeRoutes, "/api/testbridge/client/screenshot", "server client screenshot route marker");
@@ -434,7 +462,11 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiBridge, "WebAdminTestBridgeGuiC2SPayload", "server GUI bridge receives C2S marker");
         requireContains(guiBridge, "SESSION_DENIED", "server GUI bridge nonce/player validation marker");
         requireContains(guiBridge, "CLIENT_TIMEOUT", "server GUI bridge timeout marker");
-        requireContains(guiBridge, "put_item\", \"clear_slot\", \"set_count\", \"save\", \"cancel", "server GUI bridge allowlisted operations marker");
+        requireContains(guiBridge, "put_item\", \"clear_slot\", \"set_count\"", "server GUI bridge base template operations marker");
+        requireContains(guiBridge, "\"save\", \"cancel\"", "server GUI bridge save/cancel operations marker");
+        requireContains(guiBridge, "add_requirement", "server GUI bridge add requirement operation marker");
+        requireContains(guiBridge, "delete_requirement", "server GUI bridge delete requirement operation marker");
+        requireContains(guiBridge, "set_matcher_options", "server GUI bridge matcher options operation marker");
         requireContains(guiBridge, "client_screenshot", "server GUI bridge client screenshot operation marker");
         requireContains(guiBridge, "client_set_window_size", "server GUI bridge client window size operation marker");
         requireContains(guiBridge, "client_set_gui_scale", "server GUI bridge client GUI scale operation marker");
@@ -449,6 +481,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(guiClient, "usesOsScreenshot", "client screenshot no OS screenshot marker");
         requireContains(guiClient, "usesCoordinateClicking", "client screenshot no coordinate clicking marker");
         requireContains(guiClient, "usesClientScreenshotPayload", "client screenshot payload marker");
+        requireContains(guiClient, "clientScreenshotOutputRestrictedToReportsMcpScreenshots", "client screenshot output restricted marker");
         requireContains(guiClient, "setWindowedSize", "client window size payload uses Minecraft window API marker");
         requireContains(guiClient, "getGuiScale", "client GUI scale payload uses Minecraft options marker");
         requireContains(guiClient, "doesNotWriteOptionsFile", "client GUI scale does not write options marker");
@@ -467,6 +500,15 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(singleSubmitScreen, "testBridgePutItem", "single itemSubmit GUI testbridge put item marker");
         requireContains(singleSubmitScreen, "testBridgeClearSlot", "single itemSubmit GUI testbridge clear slot marker");
         requireContains(singleSubmitScreen, "testBridgeSetCount", "single itemSubmit GUI testbridge set count marker");
+        requireContains(singleSubmitScreen, "testBridgeAddRequirement", "unified itemSubmit GUI testbridge add requirement marker");
+        requireContains(singleSubmitScreen, "testBridgeDeleteRequirement", "unified itemSubmit GUI testbridge delete requirement marker");
+        requireContains(singleSubmitScreen, "testBridgeSetCountMode", "unified itemSubmit GUI testbridge count mode marker");
+        requireContains(singleSubmitScreen, "testBridgeSetRequirementEnabled", "unified itemSubmit GUI testbridge requirement enabled marker");
+        requireContains(singleSubmitScreen, "testBridgeSetMatcherOptions", "unified itemSubmit GUI testbridge matcher options marker");
+        requireContains(singleSubmitScreen, "testBridgeSetConsume", "unified itemSubmit GUI testbridge consume marker");
+        requireContains(singleSubmitScreen, "testBridgeSetGlobal", "unified itemSubmit GUI testbridge global marker");
+        requireContains(singleSubmitScreen, "data-item-submit-adaptive-zero-one-many", "unified itemSubmit adaptive 0/1/N UI marker");
+        requireContains(singleSubmitScreen, "SINGLE_REQUIREMENT_DELETE_DENIED", "unified itemSubmit unique requirement delete denied marker");
         requireContains(singleSubmitScreen, "testBridgeSave", "single itemSubmit GUI testbridge save marker");
         requireContains(singleSubmitScreen, "testBridgeCancel", "single itemSubmit GUI testbridge cancel marker");
         requireContains(singleSubmitScreen, "requestSave();", "single itemSubmit GUI testbridge save uses existing save path marker");
@@ -512,6 +554,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "minecraft.gui_put_item", "README documents gui_put_item tool");
         requireContains(readme, "minecraft.gui_clear_slot", "README documents gui_clear_slot tool");
         requireContains(readme, "minecraft.gui_set_count", "README documents gui_set_count tool");
+        requireContains(readme, "minecraft.gui_add_requirement", "README documents gui_add_requirement tool");
+        requireContains(readme, "minecraft.gui_delete_requirement", "README documents gui_delete_requirement tool");
+        requireContains(readme, "minecraft.gui_set_matcher_options", "README documents gui_set_matcher_options tool");
+        requireContains(readme, "7.11_unified_item_submit_logic_test", "README documents 7.11 unified itemSubmit logic test");
+        requireContains(readme, "partial_match_no_consume", "README documents partial match no consume logic test");
+        requireContains(readme, "full_match_consumes_all", "README documents full match staged consume logic test");
         requireContains(readme, "minecraft.gui_save", "README documents gui_save tool");
         requireContains(readme, "minecraft.gui_cancel", "README documents gui_cancel tool");
         requireContains(readme, "minecraft.client_screenshot", "README documents Minecraft client screenshot tool");
@@ -531,6 +579,8 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "uhd_4k_200_scaled", "README documents WebAdmin 4K 200 scaled profile");
         requireContains(readme, "uhd_3840x2160_css_extreme", "README marks 3840 CSS viewport as extreme");
         requireContains(readme, "用户确认前不得 checkpoint", "README requires user approval before checkpoint");
+        requireContains(readme, "明显问题预检", "README documents screenshot obvious issue precheck");
+        requireContains(readme, "needs_user_review", "README documents screenshot needs_user_review status");
         requireContains(readme, "reports/mcp/responsive", "README documents responsive report path");
         requireContains(readme, "不是 OS 截屏", "README documents no OS screenshot");
         requireContains(readme, "reports/mcp/screenshots", "README documents client screenshot output path");

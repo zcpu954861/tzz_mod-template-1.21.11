@@ -62,16 +62,19 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
             unsupported.put("deviceType", WebAdminReadonlySupport.deviceType(device));
             unsupported.put("displayName", WebAdminReadonlySupport.deviceDisplayName(device));
             unsupported.put("supported", false);
-            unsupported.put("unsupportedReason", "单物品 itemSubmit 模板编辑只支持 virtual_block_device。");
+            unsupported.put("unsupportedReason", "统一 itemSubmit requirement 编辑只支持 virtual_block_device。");
             return unsupported;
         }
         Map<String, Object> data = templateData(device);
         data.put("supported", true);
         data.put("typeSupported", true);
-        data.put("phase", "7.10");
+        data.put("phase", "7.11");
         data.put("rightClickConditionLayer", true);
-        data.put("singleRequirementOnly", device.itemSubmitRequirements().size() <= 1);
-        data.put("multiRequirementEditable", false);
+        data.put("singleRequirementOnly", false);
+        data.put("unifiedRequirementListOnly", true);
+        data.put("multiRequirementEditable", true);
+        data.put("unifiedItemSubmitEditor", true);
+        data.put("requirementListEditable", true);
         data.put("consumeEditor", true);
         data.put("noRawJson", true);
         data.put("noConditionEngine", true);
@@ -108,7 +111,7 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
             return WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "目标 virtual_block_device 不存在或引用不唯一。");
         }
         if (!SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
-            return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("device", "invalid_type", "单物品 itemSubmit 模板编辑只支持 virtual_block_device。", device.type())));
+            return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("device", "invalid_type", "统一 itemSubmit requirement 编辑只支持 virtual_block_device。", device.type())));
         }
         WebAdminWriteResult preflight = writePreflight(user, session, csrfToken, sameOrigin, WebAdminOperationType.START_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION, target);
         if (!preflight.success()) {
@@ -117,15 +120,12 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         if (!device.interactionEnabled()) {
             return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("interactionEnabled", "required", "itemSubmit 属于右键交互后的提交层，请先启用右键交互触发。", "false")));
         }
-        if (device.itemSubmitRequirements().size() > 1) {
-            return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("itemSubmitRequirements", "multi_requirement_readonly", "当前为多物品提交配置，7.10 单物品编辑器不支持编辑；请等待 7.11。", Integer.toString(device.itemSubmitRequirements().size()))));
-        }
         if (request == null) {
             request = new WebAdminSingleItemSubmitTemplateSessionStartRequest();
         }
         request.deviceId = device.id();
         if (isBlank(request.expectedFingerprint)) {
-            return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("expectedFingerprint", "required", "启动单物品提交模板会话需要 expectedFingerprint。", "")));
+            return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError("expectedFingerprint", "required", "启动 itemSubmit requirement 编辑会话需要 expectedFingerprint。", "")));
         }
         String currentFingerprint = fingerprintFor(device);
         if (!currentFingerprint.equals(request.expectedFingerprint)) {
@@ -133,7 +133,7 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
             conflict.put("expectedFingerprint", request.expectedFingerprint);
             conflict.put("currentFingerprint", currentFingerprint);
             conflict.put("currentTemplate", templateData(device));
-            return new WebAdminWriteResult(false, WebAdminWriteResultCode.CONFLICT_DETECTED.id(), "单物品 itemSubmit 配置已被其他操作修改，请刷新后再启动编辑会话。", target.targetType(), target.targetId(), false, List.of(), "", "", false, conflict, Map.of());
+            return new WebAdminWriteResult(false, WebAdminWriteResultCode.CONFLICT_DETECTED.id(), "itemSubmit requirement 配置已被其他操作修改，请刷新后再启动编辑会话。", target.targetType(), target.targetId(), false, List.of(), "", "", false, conflict, Map.of());
         }
         if (editLockService != null) {
             WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
@@ -221,8 +221,8 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         fp.put("interactionItemMatcherEnabled", device.interactionItemMatcherEnabled());
         fp.put("vanillaPolicy", device.interactionItemMatcher().normalized().interactionItemVanillaPolicy());
         fp.put("requirementCount", device.itemSubmitRequirements().size());
-        fp.put("singleRequirement", singleRequirementFingerprintDto(device));
-        String input = "virtual_block_device_single_item_submit|" + WebAdminJsonResponse.GSON.toJson(fp);
+        fp.put("requirements", requirementsFingerprintDto(device));
+        String input = "virtual_block_device_unified_item_submit|" + WebAdminJsonResponse.GSON.toJson(fp);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
@@ -238,10 +238,14 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         data.put("itemSubmitConsumeOrder", device == null ? "" : device.itemSubmitConsumeOrder());
         data.put("itemSubmitConsumeOrderDisplayName", InventoryConsumeOrder.displayName(device == null ? "" : device.itemSubmitConsumeOrder()));
         data.put("requirementCount", device == null ? 0 : device.itemSubmitRequirements().size());
-        data.put("multiRequirementReadOnly", device != null && device.itemSubmitRequirements().size() > 1);
+        data.put("multiRequirementReadOnly", false);
         data.put("advancedMatcherReadOnly", false);
         data.put("advancedMatcherEditable", true);
-        data.put("singleItemSubmitOnly", true);
+        data.put("singleItemSubmitOnly", false);
+        data.put("unifiedItemSubmitEditor", true);
+        data.put("requirementListEditable", true);
+        data.put("multipleRequirementsEditable", true);
+        data.put("oldMultiRequirementReadOnlyRefusalRemoved", true);
         data.put("consumeReadOnly", false);
         data.put("consumeEditor", true);
         data.put("countModeValues", List.of(
@@ -262,6 +266,10 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         ItemStackMatcherData vanillaMatcher = device == null ? ItemStackMatcherData.empty() : device.interactionItemMatcher().normalized();
         data.put("interactionItemVanillaPolicy", vanillaMatcher.interactionItemVanillaPolicy());
         data.put("interactionItemVanillaPolicyDisplayName", InteractionItemVanillaPolicy.displayName(vanillaMatcher.interactionItemVanillaPolicy()));
+        List<Map<String, Object>> requirements = requirementDtos(device);
+        data.put("requirements", requirements);
+        data.put("enabledRequirementCount", requirements.stream().filter(entry -> Boolean.TRUE.equals(entry.get("requirementEnabled"))).count());
+        data.put("modeSummary", requirements.isEmpty() ? "未配置" : (requirements.size() == 1 ? "单物品提交" : "多物品提交，" + requirements.size() + " 个条件"));
         if (device == null || device.itemSubmitRequirements().isEmpty()) {
             data.put("configured", false);
             data.put("templateItemId", "");
@@ -282,7 +290,7 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
             data.put("templateComponents", "");
             data.put("templateDisplayStack", "");
             data.put("displayTemplateComponentsPreserved", false);
-            data.put("summary", "未配置单物品提交模板");
+            data.put("summary", "未配置 itemSubmit requirements");
             return data;
         }
         ItemSubmitRequirementData requirement = device.itemSubmitRequirements().get(0).normalized();
@@ -328,15 +336,15 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
                 || matcher.matchComponents();
     }
 
-    private static Map<String, Object> singleRequirementFingerprintDto(SignalDeviceData device) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("itemSubmitEnabled", device != null && device.itemSubmitEnabled());
-        data.put("requirementCount", device == null ? 0 : device.itemSubmitRequirements().size());
+    private static List<Map<String, Object>> requirementsFingerprintDto(SignalDeviceData device) {
         if (device == null || device.itemSubmitRequirements().isEmpty()) {
-            data.put("configured", false);
-            return data;
+            return List.of();
         }
-        ItemSubmitRequirementData requirement = device.itemSubmitRequirements().get(0).normalized();
+        return device.itemSubmitRequirements().stream().map(requirement -> requirementFingerprintDto(requirement.normalized())).toList();
+    }
+
+    private static Map<String, Object> requirementFingerprintDto(ItemSubmitRequirementData requirement) {
+        Map<String, Object> data = new LinkedHashMap<>();
         ItemStackMatcherData matcher = requirement.matcher().normalized();
         data.put("id", requirement.id());
         data.put("name", requirement.name());
@@ -363,6 +371,50 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         return data;
     }
 
+    private static List<Map<String, Object>> requirementDtos(SignalDeviceData device) {
+        if (device == null || device.itemSubmitRequirements().isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> requirements = new java.util.ArrayList<>();
+        int index = 0;
+        for (ItemSubmitRequirementData rawRequirement : device.itemSubmitRequirements()) {
+            ItemSubmitRequirementData requirement = rawRequirement.normalized();
+            ItemStackMatcherData matcher = requirement.matcher().normalized();
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("index", index);
+            data.put("requirementId", requirement.id());
+            data.put("requirementName", requirement.name());
+            data.put("requirementEnabled", requirement.enabled());
+            data.put("configured", matcher.enabled() && !matcher.templateItemId().isBlank());
+            data.put("templateItemId", matcher.templateItemId());
+            data.put("templateCount", matcher.templateCount());
+            data.put("countMode", matcher.countMode());
+            data.put("requiredCount", matcher.requiredCount());
+            data.put("consumeCount", requirement.consumeCount());
+            data.put("matchItemId", matcher.matchItemId());
+            data.put("matchDamage", matcher.matchDamage());
+            data.put("matchCustomName", matcher.matchCustomName());
+            data.put("matchLore", matcher.matchLore());
+            data.put("matchCustomData", matcher.matchCustomData());
+            data.put("matchComponents", matcher.matchComponents());
+            data.put("templateDamage", matcher.templateDamage());
+            data.put("templateCustomName", matcher.templateCustomName());
+            data.put("templateLore", matcher.templateLore());
+            data.put("templateCustomData", matcher.templateCustomData());
+            data.put("templateComponents", matcher.templateComponents());
+            data.put("templateDisplayStack", matcher.templateDisplayStack());
+            data.put("displayTemplateComponentsPreserved", !matcher.templateDisplayStack().isBlank());
+            data.put("matcherSummary", matcher.templateSummary());
+            data.put("summary", ItemStackMatcherSupport.summary(matcher));
+            data.put("lastMatched", requirement.lastMatched());
+            data.put("lastMatchedCount", requirement.lastMatchedCount());
+            data.put("lastResult", requirement.lastResult());
+            requirements.add(data);
+            index++;
+        }
+        return List.copyOf(requirements);
+    }
+
     private static Map<String, Object> templateData(SignalDeviceData device) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deviceId", device.id());
@@ -377,9 +429,10 @@ public final class WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionServ
         data.put("interactChannel", device.interactChannel());
         data.put("itemSubmit", singleRequirementDto(device));
         data.put("notes", List.of(
-                "7.10 只编辑右键交互后的单物品 itemSubmit 模板。",
-                "左键复制模板、右键清空模板、滚轮 / Ctrl+滚轮调整匹配数量。",
-                "本阶段补齐单 requirement 的启用、数量规则、matcher 选项、提交后消耗和原版交互策略；多 requirement、inventory/equipment 和 ConditionEngine 留到后续阶段。",
+                "7.11 编辑右键交互后的统一 itemSubmit requirement list。",
+                "0 / 1 / N requirements 分别表示未配置、单物品提交、多物品提交；不再拆分单物品和多物品入口。",
+                "左键复制模板、右键清空模板、滚轮 / Ctrl+滚轮调整匹配数量；保存按列表顺序写入 itemSubmitRequirements[]。",
+                "本阶段保留旧 consume 字段、InteractionItemVanillaPolicy、matcher 选项和 display template snapshot；inventory/equipment、ConditionEngine 和 raw JSON 仍不进入。",
                 "GUI 回显使用独立 display template snapshot 保留附魔、名称、Lore、damage 和组件显示数据；是否参与匹配仍由 matcher option 控制。"
         ));
         return data;

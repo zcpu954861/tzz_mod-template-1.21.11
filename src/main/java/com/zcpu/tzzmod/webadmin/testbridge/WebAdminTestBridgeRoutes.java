@@ -62,7 +62,8 @@ public final class WebAdminTestBridgeRoutes {
     private static final PositionRequest DEFAULT_PREPARE_MIN = new PositionRequest(-16, -60, -16);
     private static final PositionRequest DEFAULT_PREPARE_MAX = new PositionRequest(16, -58, 16);
     private static final PositionRequest DEFAULT_PLAYER_POS = new PositionRequest(0, -57, 0);
-    private static final List<String> COMMAND_ALLOWLIST = List.of("tzz", "setblock", "give", "clear", "tp", "time", "weather", "say");
+    // Structured TestBridge endpoints handle set_block/give/clear_inventory/prepare_player so raw vanilla write commands stay denied.
+    private static final List<String> COMMAND_ALLOWLIST = List.of("tzz", "time", "weather", "say");
     private static final List<String> COMMAND_DENYLIST = List.of("stop", "op", "deop", "ban", "kick", "whitelist", "save-off", "save-on", "pardon", "reload");
 
     private final WebAdminTestBridgeSecurityService security = new WebAdminTestBridgeSecurityService();
@@ -124,6 +125,46 @@ public final class WebAdminTestBridgeRoutes {
             if (path.equals("/api/testbridge/gui/set-count")) {
                 requireMethod(exchange, method, "POST");
                 WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_count", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/select-requirement")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "select_requirement", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/add-requirement")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "add_requirement", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/delete-requirement")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "delete_requirement", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-count-mode")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_count_mode", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-requirement-enabled")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_requirement_enabled", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-matcher-options")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_matcher_options", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-consume")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_consume", readJson(exchange, GuiOperationRequest.class), exchange));
+                return;
+            }
+            if (path.equals("/api/testbridge/gui/set-global")) {
+                requireMethod(exchange, method, "POST");
+                WebAdminJsonResponse.ok(exchange, guiOperation(server, "set_global", readJson(exchange, GuiOperationRequest.class), exchange));
                 return;
             }
             if (path.equals("/api/testbridge/gui/save")) {
@@ -305,7 +346,7 @@ public final class WebAdminTestBridgeRoutes {
     }
 
     private JsonObject guiOperation(MinecraftServer server, String operation, GuiOperationRequest request, HttpExchange exchange) {
-        GuiOperationRequest safeRequest = request == null ? new GuiOperationRequest("", "", null, null, "", 0, "") : request;
+        GuiOperationRequest safeRequest = request == null ? GuiOperationRequest.empty() : request;
         if (safe(safeRequest.player).isBlank()) {
             throw new TestBridgeException(400, "VALIDATION_FAILED", "GUI 操作需要 player。");
         }
@@ -1227,7 +1268,28 @@ public final class WebAdminTestBridgeRoutes {
     private record UseBlockRequest(String player, String dimension, int x, int y, int z, String hand, String side) {
     }
 
-    private record GuiOperationRequest(String player, String target, Integer slot, Integer slotIndex, String itemId, int count, String reason) {
+    private record GuiOperationRequest(
+            String player,
+            String target,
+            Integer slot,
+            Integer slotIndex,
+            String itemId,
+            int count,
+            String reason,
+            String countMode,
+            Boolean enabled,
+            Boolean confirmed,
+            Boolean itemSubmitEnabled,
+            Boolean consumeEnabled,
+            String consumeOrder,
+            String vanillaPolicy,
+            int consumeCount,
+            JsonObject options
+    ) {
+        private static GuiOperationRequest empty() {
+            return new GuiOperationRequest("", "", null, null, "", 0, "", "", null, null, null, null, "", "", 0, null);
+        }
+
         private static GuiOperationRequest fromQuery(Map<String, String> query) {
             return new GuiOperationRequest(
                     query.getOrDefault("player", ""),
@@ -1236,7 +1298,16 @@ public final class WebAdminTestBridgeRoutes {
                     null,
                     "",
                     0,
-                    ""
+                    "",
+                    "",
+                    null,
+                    null,
+                    null,
+                    null,
+                    "",
+                    "",
+                    0,
+                    null
             );
         }
     }
