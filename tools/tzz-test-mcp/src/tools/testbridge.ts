@@ -30,6 +30,14 @@ export function testBridgeTools(): ToolDefinition[] {
     testBridgeGuiPutItemTool(),
     testBridgeGuiClearSlotTool(),
     testBridgeGuiSetCountTool(),
+    testBridgeGuiSelectRequirementTool(),
+    testBridgeGuiAddRequirementTool(),
+    testBridgeGuiDeleteRequirementTool(),
+    testBridgeGuiSetCountModeTool(),
+    testBridgeGuiSetRequirementEnabledTool(),
+    testBridgeGuiSetMatcherOptionsTool(),
+    testBridgeGuiSetConsumeTool(),
+    testBridgeGuiSetGlobalTool(),
     testBridgeGuiSaveTool(),
     testBridgeGuiCancelTool(),
     testBridgeClientScreenshotTool(),
@@ -586,6 +594,212 @@ function testBridgeGuiSetCountTool(): ToolDefinition {
   };
 }
 
+function testBridgeGuiSelectRequirementTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_select_requirement",
+    description: "Select one itemSubmit requirement row in the supported unified itemSubmit Minecraft GUI.",
+    inputSchema: guiRequirementSlotSchema(),
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_select_requirement");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/select-requirement", guiSlotBody(args), "GUI requirement selected.");
+    }
+  };
+}
+
+function testBridgeGuiAddRequirementTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_add_requirement",
+    description: "Add a new itemSubmit requirement in the unified itemSubmit Minecraft GUI. Optional itemId/count pre-fills the ghost template and never touches real inventory.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        itemId: { type: "string" },
+        count: { type: "number", minimum: 1, maximum: 64000 }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/add-requirement", guiSlotBody(args), "GUI requirement added.");
+    }
+  };
+}
+
+function testBridgeGuiDeleteRequirementTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_delete_requirement",
+    description: "Delete the selected itemSubmit requirement through the unified GUI delete-confirm path.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        confirmed: { type: "boolean" }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_delete_requirement");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/delete-requirement", guiSlotBody(args), "GUI requirement delete handled.");
+    }
+  };
+}
+
+function testBridgeGuiSetCountModeTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_count_mode",
+    description: "Set countMode for the selected itemSubmit requirement.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        countMode: { type: "string", enum: ["at_least", "exactly", "at_most", "ignore"] }
+      },
+      required: ["player", "countMode"]
+    },
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_set_count_mode");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/set-count-mode", guiSlotBody(args), "GUI requirement countMode set.");
+    }
+  };
+}
+
+function testBridgeGuiSetRequirementEnabledTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_requirement_enabled",
+    description: "Enable or disable one itemSubmit requirement in the unified GUI.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        enabled: { type: "boolean" }
+      },
+      required: ["player", "enabled"]
+    },
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_set_requirement_enabled");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/set-requirement-enabled", guiSlotBody(args), "GUI requirement enabled flag set.");
+    }
+  };
+}
+
+function testBridgeGuiSetMatcherOptionsTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_matcher_options",
+    description: "Set matcher options for one itemSubmit requirement in the unified GUI.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        matchDamage: { type: "boolean" },
+        matchCustomName: { type: "boolean" },
+        matchLore: { type: "boolean" },
+        matchCustomData: { type: "boolean" },
+        matchComponents: { type: "boolean" },
+        options: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            matchDamage: { type: "boolean" },
+            matchCustomName: { type: "boolean" },
+            matchLore: { type: "boolean" },
+            matchCustomData: { type: "boolean" },
+            matchComponents: { type: "boolean" }
+          }
+        }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_set_matcher_options");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/set-matcher-options", guiSlotBody(args), "GUI matcher options set.");
+    }
+  };
+}
+
+function testBridgeGuiSetConsumeTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_consume",
+    description: "Set global consume switch/order and per-requirement consumeCount for the unified itemSubmit GUI.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        slot: { type: "number", minimum: 0 },
+        slotIndex: { type: "number", minimum: 0 },
+        consumeEnabled: { type: "boolean" },
+        consumeOrder: { type: "string", enum: ["hotbar_first", "main_inventory_first"] },
+        consumeCount: { type: "number", minimum: 1, maximum: 64000 }
+      },
+      required: ["player", "consumeCount"]
+    },
+    async handler(args, context) {
+      const validation = requireRequirementSlot(args, "minecraft.gui_set_consume");
+      if (validation) {
+        return validation;
+      }
+      return await requestTool(context.config, "POST", "gui/set-consume", guiSlotBody(args), "GUI consume settings set.");
+    }
+  };
+}
+
+function testBridgeGuiSetGlobalTool(): ToolDefinition {
+  return {
+    name: "minecraft.gui_set_global",
+    description: "Set global itemSubmit fields in the unified GUI without changing raw SignalDeviceData.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        player: { type: "string" },
+        target: { type: "string", enum: ["single_item_submit"] },
+        itemSubmitEnabled: { type: "boolean" },
+        consumeEnabled: { type: "boolean" },
+        consumeOrder: { type: "string", enum: ["hotbar_first", "main_inventory_first"] },
+        vanillaPolicy: { type: "string", enum: ["allow", "require_item_match"] }
+      },
+      required: ["player"]
+    },
+    async handler(args, context) {
+      return await requestTool(context.config, "POST", "gui/set-global", guiSlotBody(args), "GUI global itemSubmit settings set.");
+    }
+  };
+}
+
 function testBridgeGuiSaveTool(): ToolDefinition {
   return {
     name: "minecraft.gui_save",
@@ -1096,14 +1310,54 @@ function guiSlotSchema(): JsonObject {
   };
 }
 
+function guiRequirementSlotSchema(): JsonObject {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      player: { type: "string" },
+      target: { type: "string", enum: ["single_item_submit"] },
+      slot: { type: "number", minimum: 0 },
+      slotIndex: { type: "number", minimum: 0 }
+    },
+    required: ["player"]
+  };
+}
+
 function guiSlotBody(args: JsonObject): JsonObject {
   const body: JsonObject = {
     player: stringArg(args, "player") ?? "",
     target: stringArg(args, "target") ?? "",
     itemId: stringArg(args, "itemId") ?? "",
     count: optionalIntArg(args, "count") ?? 0,
-    reason: stringArg(args, "reason") ?? ""
+    reason: stringArg(args, "reason") ?? "",
+    countMode: stringArg(args, "countMode") ?? "",
+    consumeOrder: stringArg(args, "consumeOrder") ?? "",
+    vanillaPolicy: stringArg(args, "vanillaPolicy") ?? "",
+    consumeCount: optionalIntArg(args, "consumeCount") ?? 0
   };
+  for (const key of ["enabled", "confirmed", "itemSubmitEnabled", "consumeEnabled", "matchDamage", "matchCustomName", "matchLore", "matchCustomData", "matchComponents"]) {
+    if (typeof args[key] === "boolean") {
+      body[key] = args[key] as boolean;
+    }
+  }
+  const options: JsonObject = {};
+  if (args.options && typeof args.options === "object" && !Array.isArray(args.options)) {
+    for (const key of ["matchDamage", "matchCustomName", "matchLore", "matchCustomData", "matchComponents"]) {
+      const value = (args.options as JsonObject)[key];
+      if (typeof value === "boolean") {
+        options[key] = value;
+      }
+    }
+  }
+  for (const key of ["matchDamage", "matchCustomName", "matchLore", "matchCustomData", "matchComponents"]) {
+    if (typeof args[key] === "boolean") {
+      options[key] = args[key] as boolean;
+    }
+  }
+  if (Object.keys(options).length > 0) {
+    body.options = options;
+  }
   const slot = optionalIntArg(args, "slot");
   if (slot !== undefined) {
     body.slot = slot;
@@ -1113,6 +1367,13 @@ function guiSlotBody(args: JsonObject): JsonObject {
     body.slotIndex = slotIndex;
   }
   return body;
+}
+
+function requireRequirementSlot(args: JsonObject, toolName: string) {
+  if (optionalIntArg(args, "slot") === undefined && optionalIntArg(args, "slotIndex") === undefined) {
+    return fail("VALIDATION_ERROR", `${toolName} requires slot or slotIndex for the requirement row.`);
+  }
+  return undefined;
 }
 
 function positionSchema(): JsonObject {

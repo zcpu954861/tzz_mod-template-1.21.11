@@ -2680,6 +2680,7 @@ public final class StabilizationGuardTest {
         Path root = Path.of("").toAbsolutePath();
         String context = Files.readString(root.resolve("docs/WEBADMIN_VBD_NATIVE_TRIGGER_CONFIG_7_9_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
         String itemSubmitContext = Files.readString(root.resolve("docs/WEBADMIN_SINGLE_ITEM_SUBMIT_7_10_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String unifiedItemSubmitContext = Files.readString(root.resolve("docs/WEBADMIN_UNIFIED_ITEM_SUBMIT_EDITOR_7_11_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
         String manual = Files.readString(root.resolve("docs/test/测试_7.9_WebAdmin虚拟方块设备原生触发配置P1验收.md"), StandardCharsets.UTF_8);
         String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String nativeTriggerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
@@ -3048,6 +3049,42 @@ public final class StabilizationGuardTest {
             requireContains(itemSubmitContext, marker, "7.10 single itemSubmit context marker present: " + marker);
         }
         for (String marker : List.of(
+                "7.11 WebAdmin Unified ItemSubmit Requirement List Editor",
+                "统一 itemSubmit requirement list 编辑器",
+                "7.10 的单物品编辑器语义在 7.11 中成为“1 个 requirement”的自然特例",
+                "7.10 对多 requirement 的只读拒绝需要取消",
+                "itemSubmit 仍然不是新触发源",
+                "旧多物品 itemSubmit 数据语义",
+                "VirtualBlockItemSubmitCommand",
+                "ItemSubmitEvaluator",
+                "ItemSubmitEvaluationResult",
+                "ItemSubmitRequirementData",
+                "ConsumePlan",
+                "ConsumePlanner",
+                "ItemSubmitInventoryAdapter",
+                "SignalDeviceData",
+                "VirtualBlockDeviceInteractionHandler",
+                "SignalDeviceStore.updateVirtualItemSubmit",
+                "all-or-nothing / staged consume",
+                "部分满足不消耗",
+                "全部满足才消耗",
+                "0 个 requirement",
+                "1 个 requirement",
+                "2 个及以上 requirement",
+                "单项 / 多项 UI 自适应显示规则",
+                "用户明确回复“UI 验收通过，可以 checkpoint”前不得 checkpoint",
+                "`webadmin.responsive_matrix`",
+                "`minecraft.client_screenshot_matrix`",
+                "deviceScaleFactor",
+                "明显问题预检",
+                "needs_user_review",
+                "不使用 Minecraft GUI 坐标点击",
+                "不做 raw JSON 编辑",
+                "不做 ConditionEngine"
+        )) {
+            requireContains(unifiedItemSubmitContext, marker, "7.11 unified itemSubmit context marker present: " + marker);
+        }
+        for (String marker : List.of(
                 "/single-item-submit",
                 "/single-item-submit-session/start",
                 "/single-item-submit-session/status",
@@ -3064,19 +3101,25 @@ public final class StabilizationGuardTest {
                 "fingerprintFor(device)",
                 "singleRequirementDto(device)",
                 "rightClickConditionLayer",
-                "singleRequirementOnly",
                 "multiRequirementEditable",
+                "unifiedRequirementListOnly",
+                "unifiedItemSubmitEditor",
+                "requirementListEditable",
+                "multipleRequirementsEditable",
+                "oldMultiRequirementReadOnlyRefusalRemoved",
+                "requirementsFingerprintDto",
+                "requirementDtos",
                 "consumeEditor",
                 "noRawJson",
                 "noConditionEngine",
                 "requireValidCsrf",
                 "sameOrigin",
                 "InteractionItemVanillaPolicy.displayName",
-                "itemSubmitRequirements().size() > 1",
                 "advancedMatcherEditable",
                 "countModeValues",
                 "consumeOrderValues",
                 "vanillaPolicyValues",
+                "matchItemId",
                 "matchDamage",
                 "matchCustomName",
                 "matchLore",
@@ -3084,9 +3127,11 @@ public final class StabilizationGuardTest {
                 "matchComponents",
                 "templateDisplayStack",
                 "displayTemplateComponentsPreserved",
-                "targetPlayerName"
+                "targetPlayerName",
+                "multiRequirementReadOnly\", false",
+                "singleItemSubmitOnly\", false"
         )) {
-            requireContains(singleItemSubmitService, marker, "7.10 single itemSubmit service marker present: " + marker);
+            requireContains(singleItemSubmitService, marker, "7.11 unified itemSubmit service marker present: " + marker);
         }
         requireContains(signalDeviceStore, "updateVirtualItemSubmitForWebAdmin", "7.10 saves itemSubmit through scoped WebAdmin store update");
         for (String marker : List.of(
@@ -3104,11 +3149,16 @@ public final class StabilizationGuardTest {
                 "lockService.validateLock",
                 "session.lockId",
                 "ItemSubmitSaveDraft",
+                "ItemSubmitRequirementDraft",
+                "requirementsFromDraft",
+                "previousRequirement",
+                "template.has(\"requirements\")",
                 "itemSubmitConsumeEnabled",
                 "itemSubmitConsumeOrder",
                 "consumeCount",
                 "InteractionItemVanillaPolicy.normalize",
                 "InventoryConsumeOrder.normalize",
+                "draft.matchItemId()",
                 "matchDamage",
                 "matchCustomName",
                 "matchLore",
@@ -3149,6 +3199,11 @@ public final class StabilizationGuardTest {
                 "requirementEnabled",
                 "countMode",
                 "consumeCount",
+                "consumeCountFollowsCount",
+                "syncConsumeCountIfFollowing",
+                "syncConsumeCountToCount",
+                "data-consume-count-follow-count",
+                "matchItemId",
                 "matchDamage",
                 "matchCustomName",
                 "matchLore",
@@ -3162,6 +3217,16 @@ public final class StabilizationGuardTest {
                 "data-single-item-submit-compact-layout",
                 "footerButtonsDoNotOverlapInventory",
                 "compactInstructionLines",
+                "data-unified-item-submit-compact-layout",
+                "headerEmptyAddNonOverlap",
+                "requirementConfigGridNonOverlap",
+                "footerInventoryNonOverlap",
+                "compactLongTextHidden",
+                "layout4kNonOverlap",
+                "simpleModeConfigHeadingHidden",
+                "simpleModeTemplateConfigGap",
+                "controlButtonsBottom",
+                "maxInstructionLines",
                 "footerButtonY",
                 "InteractionItemVanillaPolicy.REQUIRE_ITEM_MATCH",
                 "InventoryConsumeOrder.MAIN_INVENTORY_FIRST",
@@ -3176,6 +3241,35 @@ public final class StabilizationGuardTest {
                 "ItemStack.EMPTY"
         )) {
             requireContains(singleItemSubmitScreen, marker, "7.10 single itemSubmit GUI marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "data-unified-item-submit-editor",
+                "data-requirement-list-scroll",
+                "data-delete-requirement-confirm",
+                "data-multiple-requirements-editable",
+                "data-item-submit-adaptive-zero-one-many",
+                "data-single-requirement-simplified",
+                "data-single-requirement-no-list-card",
+                "data-multi-requirement-controls-only-when-many",
+                "multiRequirementMode()",
+                "simpleRequirementMode()",
+                "testBridgeAddRequirement",
+                "testBridgeDeleteRequirement",
+                "testBridgeSetCountMode",
+                "testBridgeSetRequirementEnabled",
+                "testBridgeSetMatcherOptions",
+                "testBridgeSetConsume",
+                "testBridgeSetGlobal",
+                "SINGLE_REQUIREMENT_DELETE_DENIED",
+                "toPayload()",
+                "requirements",
+                "requirementListSaveOrder",
+                "unifiedItemSubmitEditor",
+                "noRawJson",
+                "noConditionEngine",
+                "noNewConsumeStrategy"
+        )) {
+            requireContains(singleItemSubmitScreen, marker, "7.11 unified itemSubmit GUI marker present: " + marker);
         }
         requireFalse(singleItemSubmitScreen.contains("HandledScreen") || singleItemSubmitScreen.contains("extends ScreenHandler")
                         || singleItemSubmitScreen.contains("quickMove") || singleItemSubmitScreen.contains("insertItem")
@@ -3204,16 +3298,21 @@ public final class StabilizationGuardTest {
         requireFalse(singleItemSubmitClient.contains("sendMessage("), "7.10 terminal player feedback must not be duplicated by client chat");
         for (String marker : List.of(
                 "itemSubmitLayer",
-                "singleRequirementOnly",
+                "data-unified-requirement-list-only=\"true\"",
                 "singleItemSubmitInlineSummary",
                 "data-single-item-submit-under-right-click=\"true\"",
                 "data-single-item-submit-hidden-when-interaction-disabled=\"true\"",
                 "data-single-item-submit-disabled-warning=\"true\"",
-                "data-single-item-submit-no-multi-editor=\"true\"",
+                "data-unified-item-submit-editor=\"true\"",
+                "data-item-submit-requirement-list=\"true\"",
+                "data-item-submit-adaptive-zero-one-many=\"true\"",
+                "data-zero-requirement-add-only=\"true\"",
+                "data-single-requirement-simplified=\"true\"",
+                "data-multi-requirement-summary=\"true\"",
+                "data-old-multi-requirement-readonly-refusal-removed=\"true\"",
                 "data-single-item-submit-advanced-editable=\"true\"",
                 "data-single-item-submit-consume-editor=\"true\"",
                 "data-single-item-submit-vanilla-policy-existing-field=\"true\"",
-                "data-single-item-submit-single-slot-gui=\"true\"",
                 "data-single-item-submit-display-template-preserved=\"true\"",
                 "data-single-item-submit-lock-target=\"virtual_block_device_single_item_submit\"",
                 "singleItemSubmitResultSession",
@@ -3230,7 +3329,7 @@ public final class StabilizationGuardTest {
                 "single_item_submit_template_session_saved",
                 "virtual_block_device_single_item_submit"
         )) {
-            requireContains(js, marker, "7.10 single itemSubmit frontend marker present: " + marker);
+            requireContains(js, marker, "7.11 unified itemSubmit frontend marker present: " + marker);
         }
         requireFalse(js.contains("multiItemSubmitEditor") || js.contains("consumeItemSubmitEditor")
                         || js.contains("inventoryItemSubmitEditor") || js.contains("equipmentItemSubmitEditor")
@@ -3243,7 +3342,7 @@ public final class StabilizationGuardTest {
         String singleSubmitCancelBlock = singleItemSubmitSessions.substring(singleSubmitCancelStart, singleSubmitSaveStart);
         requireFalse(singleSubmitCancelBlock.contains("publishConfigChangedAfterSave") || singleSubmitCancelBlock.contains("CONFIG_CHANGED") || singleSubmitCancelBlock.contains("config_changed"),
                 "7.10 single itemSubmit cancel must not publish config_changed");
-        requireContains(singleItemSubmitService, "singleRequirementFingerprintDto", "7.10 single itemSubmit fingerprint uses runtime-free requirement DTO");
+        requireContains(singleItemSubmitService, "requirementsFingerprintDto", "7.11 unified itemSubmit fingerprint uses ordered runtime-free requirement DTO list");
         requireFalse(singleItemSubmitSessions.contains("multiItemSubmit") || singleItemSubmitSessions.contains("consumeItemSubmitEditor")
                         || singleItemSubmitSessions.contains("inventoryItemSubmit") || singleItemSubmitSessions.contains("equipmentItemSubmit")
                         || singleItemSubmitSessions.contains("itemSubmitConditionEngine") || singleItemSubmitSessions.contains("itemSubmitPathGraph")

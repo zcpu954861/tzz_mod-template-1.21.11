@@ -1728,7 +1728,7 @@ public final class WebAdminFrontendScripts {
                   const action=editing?waButton('继续编辑设备配置','settings',htmlHandler(`showDeviceConfigEditModal(${jsString(detail.id)})`),'primary'):deviceConfigEditButton(detail,'编辑设备配置','primary');
                   const nativeTriggers=isVirtualBlockDevice(detail)?vbdNativeTriggerConfigSummaryCard(detail):'';
                   const legacyTypeSpecific=isVirtualBlockDevice(detail)?'':`<section class="wa-config-card" data-type-specific-config-card="true"><h3>类型专属配置</h3><div class="identity-grid">${extRows}</div>${extNote}</section>`;
-                  const summaryNote=isVirtualBlockDevice(detail)?'VBD 基础配置和原生触发配置使用固定 Modal 编辑；交互物品匹配和 7.10 单物品 itemSubmit 都从右键交互条件层进入。不会创建 consume、ConditionEngine 或逻辑链图。':'基础配置与类型专属配置使用同一个固定 Modal 编辑；action_relay 可在同一 Modal 内打开 Action 列表。不会创建 itemSubmit、consume、ConditionEngine 或逻辑链图。';
+                    const summaryNote=isVirtualBlockDevice(detail)?'VBD 基础配置和原生触发配置使用固定 Modal 编辑；交互物品匹配和 7.11 统一 itemSubmit requirement 编辑器都从右键交互条件层进入。不会创建新 consume 策略、ConditionEngine 或逻辑链图。':'基础配置与类型专属配置使用同一个固定 Modal 编辑；action_relay 可在同一 Modal 内打开 Action 列表。不会创建 itemSubmit、consume、ConditionEngine 或逻辑链图。';
                   const loadNotes=[detail.basicConfigError?`基础配置加载失败：${detail.basicConfigError.message||'未知错误'}`:'',detail.extendedConfigError?`扩展配置加载失败：${detail.extendedConfigError.message||'未知错误'}`:'',detail.nativeTriggersError?`原生触发配置加载失败：${detail.nativeTriggersError.message||'未知错误'}`:'',detail.interactionItemMatcherError?`交互物品匹配加载失败：${detail.interactionItemMatcherError.message||'未知错误'}`:''].filter(Boolean);
                   return `<div class="wa-config-summary ${nativeTriggers?'wa-vbd-config-summary':''}" ${nativeTriggers?'data-vbd-config-summary="true"':''}>
                     <section class="wa-config-card"><h3>显示信息</h3><div class="identity-grid">${row('显示名称',esc(meta.displayName||meta.effectiveDisplayName||detail.displayName))}${row('备注',isBlank(meta.note)?'<span class="muted">暂无备注</span>':esc(meta.note))}${row('图标',esc(labelMetadataIcon(meta.iconKey||'auto')))}</div></section>
@@ -1758,7 +1758,7 @@ public final class WebAdminFrontendScripts {
                 function vbdSingleItemSubmitDisabledWarning(detail){
                   const interaction=(vbdNativeTriggerMap(detail).right_click)||{}, submit=interaction.itemSubmitLayer||{};
                   if(interaction.interactionEnabled||!(submit.configured||submit.enabled||Number(submit.requirementCount||0)>0))return '';
-                  return '<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true">已配置单物品提交，但右键交互触发尚未启用；itemSubmit 属于右键交互后的提交层，当前不会显示编辑入口。</div>';
+                  return '<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true" data-unified-item-submit-disabled-warning="true">已配置 itemSubmit requirements，但右键交互触发尚未启用；itemSubmit 属于右键交互后的提交层，当前不会显示完整编辑入口。</div>';
                 }
                 function vbdNativeTriggerEditAction(detail,kind='primary'){
                   const data=vbdNativeTriggerData(detail), lock=data.lockStatus||appState.deviceEditLocks[editLockCacheKey('virtual_block_device_triggers',detail?.id||'')]||null;
@@ -1791,7 +1791,7 @@ public final class WebAdminFrontendScripts {
                   if(!isVirtualBlockDevice(detail))return '';
                   const draft=appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,detail.id)?appState.vbdNativeTriggerEdit:null;
                   const body=draft?vbdNativeTriggerEditForm(detail,draft,true):`${vbdNativeTriggerOverviewCard(detail,{inConfigModal:true})}<div class="inline-actions">${vbdNativeTriggerEditAction(detail,'ghost')}</div>`;
-                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill ok">7.9 P2 / 7.10</span></header>${body}<p class="muted">保存只写入 VBD 原生触发字段；单物品 itemSubmit 模板从右键交互条件层进入。不会创建 consume、ConditionEngine、路径图，也不会清空 7.8 matcher 或容器 itemConditions。</p></section>`;
+                  return `<section class="wa-edit-section" data-edit-section="vbd-native-triggers" data-vbd-native-trigger-config-modal-section="true"><header><h3>原生触发配置</h3><span class="pill ok">7.9 P2 / 7.11</span></header>${body}<p class="muted">保存只写入 VBD 原生触发字段；统一 itemSubmit requirement 编辑器从右键交互条件层进入。不会创建新 consume 策略、ConditionEngine、路径图，也不会清空 7.8 matcher 或容器 itemConditions。</p></section>`;
                 }
                 function vbdNativeTriggerCompactCard(detail,type,options={}){
                   const trigger=vbdNativeTriggerMap(detail)[type]||{}, clickable=!options.inConfigModal;
@@ -1820,7 +1820,7 @@ public final class WebAdminFrontendScripts {
                 function vbdNativeTriggerShortSummary(type,t){
                   if(type==='redstone_powered')return esc(t.offChannel?`断电频道：${t.offChannel}`:'红石 / 受电状态触发');
                   if(type==='blockstate')return esc(`${t.supportedPropertyCount??(t.supportedProperties||[]).length} 个当前方块属性可读`);
-                  if(type==='right_click'){const matcher=t.interactionItemMatcherLayer||{}, submit=t.itemSubmitLayer||{};const parts=[];if(matcher.enabled||matcher.configured)parts.push('交互物品匹配');if(submit.enabled||submit.configured||Number(submit.requirementCount||0)>0)parts.push('单物品提交');return esc(parts.length?`含${parts.join(' / ')}条件层`:'玩家右键交互触发');}
+                  if(type==='right_click'){const matcher=t.interactionItemMatcherLayer||{}, submit=t.itemSubmitLayer||{};const parts=[];if(matcher.enabled||matcher.configured)parts.push('交互物品匹配');if(submit.enabled||submit.configured||Number(submit.requirementCount||0)>0)parts.push('itemSubmit');return esc(parts.length?`含${parts.join(' / ')}条件层`:'玩家右键交互触发');}
                   if(type==='container_change')return esc(`物品条件数：${t.itemConditionCount??(t.itemConditions||[]).length}`);
                   if(type==='container_open'||type==='container_close')return esc('容器 open / close 共用 containerEnabled');
                   return esc('');
@@ -1859,7 +1859,7 @@ public final class WebAdminFrontendScripts {
                   const matcherDetail=configured?`${matcher.templateItemId||matcher.summary||'已配置'}${matcher.countMode?` · ${labelCountMode(matcher.countMode)} ${matcher.requiredCount||1}`:''}${matcher.source||matcher.interactionItemSource?` · ${labelInteractionSource(matcher.source||matcher.interactionItemSource)}`:''}`:'尚未要求特定交互物品';
                   const warning=inactiveConfigured?`<p class="readonly-note warning" data-vbd-native-trigger-matcher-disabled-warning="true">已配置交互物品匹配，但右键交互触发尚未启用；matcher 是右键触发后的条件层，当前不会参与触发判定。</p>`:'';
                   const submitHtml=singleItemSubmitInlineSummary(detail,t,submit);
-                  return `<div class="identity-grid" data-vbd-native-trigger-interaction-matcher-summary="true">${row('交互启用',esc(labelBool(!!t.interactionEnabled)))}${row('交互频道',channelCell(t.interactChannel))}${row('冷却时间',esc(formatTicks(t.interactionCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastInteractionPlayerName||'暂无'))}${row('最近手 / 面',esc([t.lastInteractionHand,t.lastInteractionSide].filter(Boolean).join(' / ')||'暂无'))}${row('最近结果',esc(t.lastInteractionResult||'暂无'))}${row('matcher 条件层',esc(matcherState))}${row('matcher 摘要',esc(matcherDetail))}${row('原版交互策略',esc(submit.vanillaPolicyDisplayName||matcher.vanillaPolicyDisplayName||matcher.interactionItemVanillaPolicy||'沿用当前策略'))}</div>${warning}<div class="inline-actions wa-native-trigger-inline-actions" data-vbd-native-trigger-interaction-matcher-entry="true">${interactionItemMatcherInlineAction(detail)}</div>${submitHtml}<p class="muted">交互物品匹配和单物品提交都属于右键交互之后的条件 / 提交层，不是新的原生触发源。</p>`;
+                  return `<div class="identity-grid" data-vbd-native-trigger-interaction-matcher-summary="true">${row('交互启用',esc(labelBool(!!t.interactionEnabled)))}${row('交互频道',channelCell(t.interactChannel))}${row('冷却时间',esc(formatTicks(t.interactionCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastInteractionPlayerName||'暂无'))}${row('最近手 / 面',esc([t.lastInteractionHand,t.lastInteractionSide].filter(Boolean).join(' / ')||'暂无'))}${row('最近结果',esc(t.lastInteractionResult||'暂无'))}${row('matcher 条件层',esc(matcherState))}${row('matcher 摘要',esc(matcherDetail))}${row('原版交互策略',esc(submit.vanillaPolicyDisplayName||matcher.vanillaPolicyDisplayName||matcher.interactionItemVanillaPolicy||'沿用当前策略'))}</div>${warning}<div class="inline-actions wa-native-trigger-inline-actions" data-vbd-native-trigger-interaction-matcher-entry="true">${interactionItemMatcherInlineAction(detail)}</div>${submitHtml}<p class="muted">交互物品匹配和 itemSubmit requirements 都属于右键交互之后的条件 / 提交层，不是新的原生触发源。</p>`;
                 }
                 function interactionItemMatcherInlineAction(detail){
                   if(!isVirtualBlockDevice(detail))return '';
@@ -1871,22 +1871,24 @@ public final class WebAdminFrontendScripts {
                 function singleItemSubmitInlineSummary(detail,t,submit={}){
                   const configured=!!(submit.configured||submit.enabled||Number(submit.requirementCount||0)>0);
                   const interactionEnabled=!!t.interactionEnabled;
-                  if(!interactionEnabled&&configured)return `<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true">已配置单物品提交，但右键交互触发尚未启用；itemSubmit 是右键交互之后的提交层，当前不会显示编辑入口。</div>`;
+                  if(!interactionEnabled&&configured)return `<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true" data-unified-item-submit-disabled-warning="true">已配置 itemSubmit requirements，但右键交互触发尚未启用；itemSubmit 是右键交互之后的提交层，当前不会显示完整编辑入口。</div>`;
                   if(!interactionEnabled)return '<div data-single-item-submit-hidden-when-interaction-disabled="true"></div>';
-                  const multi=Number(submit.requirementCount||0)>1||submit.singleRequirementOnly===false;
-                  const advanced=false;
-                  const requirement=submit.requirement||{};
-                  const summary=multi?'当前为多物品提交配置，7.10 单物品编辑器不支持编辑；请等待 7.11 多物品编辑。':(configured?(submit.summary||requirement.summary||requirement.templateItemId||'已配置单物品提交'):'尚未配置单物品提交');
-                  const detailLine=configured&&!multi&&!advanced?`${requirement.templateItemId||submit.templateItemId||'提交物品'} · ${labelCountMode(requirement.countMode||submit.countMode||'at_least')} ${requirement.requiredCount||submit.requiredCount||submit.count||1}`:summary;
-                  const disabled=multi||advanced||!canEditSingleItemSubmit();
-                  const title=multi?'当前已有多个 itemSubmit requirements，7.10 不会覆盖。':(!canEditSingleItemSubmit()?'需要 EDITOR 或 OWNER 权限才能编辑单物品提交。':'');
+                  const count=Number(submit.requirementCount||0), enabled=Number(submit.enabledRequirementCount||0);
+                  const requirements=Array.isArray(submit.requirements)?submit.requirements:[];
+                  const mode=count<=0?'未配置':(count===1?'单物品提交':`多物品提交，${count} 个条件`);
+                  const first=requirements[0]||submit.requirement||{};
+                  const detailLine=count<=0?'尚未配置 itemSubmit requirements':(count===1?`${mode} · ${(first.templateItemId||first.summary||submit.templateItemId||'提交物品')} · ${esc(labelCountMode(first.countMode||submit.countMode||'at_least'))} ${esc(first.requiredCount||first.count||submit.requiredCount||submit.count||1)} · consumeCount ${esc(first.consumeCount||submit.consumeCount||1)}`:`${mode} · 启用 ${enabled}/${count} · ${(first.templateItemId||first.summary||submit.templateItemId||'提交物品')}`);
+                  const disabled=!canEditSingleItemSubmit();
+                  const title=!canEditSingleItemSubmit()?'需要 EDITOR 或 OWNER 权限才能编辑 itemSubmit requirements。':'';
                   const action=t.singleItemSubmitUnified?'single-item-submit-open-unified':'single-item-submit-open';
-                  const nativeDirty=t.singleItemSubmitUnified&&appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,detail.id)&&vbdNativeTriggerDirty(appState.vbdNativeTriggerEdit);
+                  const nativeDirty=appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,detail.id)&&vbdNativeTriggerDirty(appState.vbdNativeTriggerEdit);
                   const finalDisabled=disabled||nativeDirty;
-                  const finalTitle=nativeDirty?'请先保存或放弃当前原生触发配置草稿，再启动单物品提交模板编辑。':title;
-                  const button=waButton(configured?'编辑单物品提交模板':'配置单物品提交模板','chest',singleItemSubmitActionAttrs(action,detail.id,finalDisabled,finalTitle),finalDisabled?'ghost':'primary');
-                  const consumeLine=submit.itemSubmitConsumeEnabled?`提交后消耗 ${esc(submit.consumeCount||1)} · ${esc(submit.itemSubmitConsumeOrderDisplayName||submit.itemSubmitConsumeOrder||'hotbar_first')}`:'提交后不消耗';
-                  return `<div class="readonly-note" data-single-item-submit-under-right-click="true" data-single-item-submit-card="true" data-single-item-submit-single-requirement-only="true" data-single-item-submit-no-multi-editor="true" data-single-item-submit-advanced-editable="true" data-single-item-submit-consume-editor="true"><strong>单物品提交</strong><div>${esc(detailLine)}</div><small>${consumeLine}；支持 damage / 自定义名称 / Lore / customData / components matcher 选项；多 requirement 留到 7.11。</small><div class="inline-actions">${button}</div></div>`;
+                  const finalTitle=nativeDirty?'请先保存或放弃当前原生触发配置草稿，再启动 itemSubmit requirement 编辑。':title;
+                  const buttonText=count<=0?'添加提交条件':(count===1?'编辑 / 添加另一个条件':'编辑多物品条件');
+                  const button=waButton(buttonText,'chest',singleItemSubmitActionAttrs(action,detail.id,finalDisabled,finalTitle),finalDisabled?'ghost':'primary');
+                  const consumeLine=submit.itemSubmitConsumeEnabled?`提交后消耗 · ${esc(submit.itemSubmitConsumeOrderDisplayName||submit.itemSubmitConsumeOrder||'hotbar_first')}`:'提交后不消耗';
+                  const modeAttr=count<=0?'data-zero-requirement-add-only="true"':(count===1?'data-single-requirement-simplified="true"':'data-multi-requirement-summary="true" data-multi-requirement-controls-visible="true"');
+                  return `<div class="readonly-note" data-single-item-submit-under-right-click="true" data-unified-item-submit-editor="true" data-unified-item-submit-summary="true" data-item-submit-requirement-list="true" data-unified-requirement-list-only="true" data-item-submit-adaptive-zero-one-many="true" ${modeAttr} data-old-multi-requirement-readonly-refusal-removed="true" data-single-item-submit-card="true" data-single-item-submit-advanced-editable="true" data-single-item-submit-consume-editor="true"><strong>itemSubmit 条件编辑器</strong><div>${esc(detailLine)}</div><small>${esc(consumeLine)}；0 / 1 / N requirements 分别表现为未配置、单物品提交、多物品提交；单项模式不显示排序、删除、批量管理按钮。</small><div class="inline-actions">${button}</div></div>`;
                 }
                 function vbdContainerOpenSummary(t){
                   return `<div class="identity-grid">${row('容器总开关',esc(labelBool(!!t.containerEnabled)))}${row('打开频道',channelCell(t.containerOpenChannel))}${row('容器冷却',esc(formatTicks(t.containerCooldownTicks)||'0 tick'))}${row('最近玩家',esc(t.lastContainerPlayerName||'暂无'))}${row('最近打开时间',esc(nativeTriggerTime(t.lastContainerOpenWallTimeMillis)))}${row('最近事件类型',esc(t.lastContainerEventType||'暂无'))}${row('最近结果',esc(t.lastContainerResult||'暂无'))}</div><p class="muted">容器打开、关闭和内容变化共用 containerEnabled。</p>`;
@@ -1977,9 +1979,9 @@ public final class WebAdminFrontendScripts {
                     v.containerChangeEnabled?vbdNativeContainerChangeEditSection(draft,disabled):''
                   ].filter(Boolean).join('');
                   const interaction=(data.triggers||{}).right_click||{}, submit=interaction.itemSubmitLayer||{};
-                  const submitWarning=(!v.interactionEnabled&&(submit.configured||submit.enabled||Number(submit.requirementCount||0)>0))?'<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true">已配置单物品提交，但右键交互触发尚未启用；启用“玩家右键交互”后才会显示 itemSubmit 摘要和编辑入口。</div>':'';
+                  const submitWarning=(!v.interactionEnabled&&(submit.configured||submit.enabled||Number(submit.requirementCount||0)>0))?'<div class="readonly-note warning" data-single-item-submit-disabled-warning="true" data-single-item-submit-hidden-when-interaction-disabled="true" data-unified-item-submit-disabled-warning="true">已配置 itemSubmit requirements，但右键交互触发尚未启用；启用“玩家右键交互”后才会显示 itemSubmit 摘要和编辑入口。</div>':'';
                   const empty=!sections?'<div class="readonly-note" data-vbd-native-trigger-edit-empty-state="true">尚未选择原生触发方式。启用上方任一触发方式后才会显示对应配置字段。</div>':'';
-                  const body=`${lockLine}${errors}${conflict}${toggles}<div class="wa-native-trigger-edit-sections" data-vbd-native-trigger-edit-modal="true" data-vbd-native-trigger-patch-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-template-gui="true" data-vbd-native-trigger-field-preservation="true">${sections||empty}${submitWarning}</div><p class="muted">本表单只编辑红石 / 受电状态、BlockState、右键交互和容器 open / close / change 基础字段。单物品 itemSubmit 模板在右键交互启用后显示为条件 / 提交层入口；复杂 inventory/equipment、ConditionEngine、路径图或容器物品模板 GUI 不在此表单内编辑。隐藏未启用 section 不会清空 7.8 matcher、itemConditions 或未来保留字段。</p>`;
+                  const body=`${lockLine}${errors}${conflict}${toggles}<div class="wa-native-trigger-edit-sections" data-vbd-native-trigger-edit-modal="true" data-vbd-native-trigger-patch-api="true" data-vbd-native-trigger-no-raw-json="true" data-vbd-native-trigger-no-template-gui="true" data-vbd-native-trigger-field-preservation="true">${sections||empty}${submitWarning}</div><p class="muted">本表单只编辑红石 / 受电状态、BlockState、右键交互和容器 open / close / change 基础字段。itemSubmit requirement 编辑器在右键交互启用后显示为条件 / 提交层入口；复杂 inventory/equipment、ConditionEngine、路径图或容器物品模板 GUI 不在此表单内编辑。隐藏未启用 section 不会清空 7.8 matcher、itemConditions 或未来保留字段。</p>`;
                   if(inline)return `<div class="wa-native-trigger-inline-editor" data-vbd-native-trigger-inline-edit="true">${body}</div>`;
                   return `<form class="edit-form" onsubmit='event.preventDefault();saveVbdNativeTrigger(${jsString(draft.deviceId)})'>${body}</form>`;
                 }
@@ -2101,7 +2103,7 @@ public final class WebAdminFrontendScripts {
                   if(isVirtualBlockDevice(detail))sections.push(vbdNativeTriggerConfigModalSection(detail));
                   if(appState.actionRelayActionsEdit&&appState.actionRelayActionsEdit.deviceId===detail.id)sections.push(`<section class="wa-edit-section" data-edit-section="action-relay-actions" data-action-relay-config-modal-section="true"><header><h3>Action 列表</h3><span class="pill warning">action_relay only</span></header>${actionRelayActionsForm(detail,appState.actionRelayActionsEdit,true)}</section>`);
                   const body=sections.length?sections.join(''):'<div class="readonly-note">当前没有可编辑配置区，可能权限不足或该设备类型不支持编辑。</div>';
-                  return `<form class="edit-form wa-unified-config-form" data-unified-device-config="true" onsubmit='event.preventDefault();saveDeviceConfig(${jsString(detail.id)})'>${errors}${body}<p class="muted">保存会按已有安全写链路分别提交有变更的显示信息、基础配置、非 VBD 类型专属配置、VBD 原生触发配置 / 右键交互条件和 action_relay Action 列表；单物品 itemSubmit 模板使用独立游戏内 GUI 会话。不会创建或删除真实方块，也不会创建 consume、ConditionEngine 或逻辑链图。</p></form>`;
+                  return `<form class="edit-form wa-unified-config-form" data-unified-device-config="true" onsubmit='event.preventDefault();saveDeviceConfig(${jsString(detail.id)})'>${errors}${body}<p class="muted">保存会按已有安全写链路分别提交有变更的显示信息、基础配置、非 VBD 类型专属配置、VBD 原生触发配置 / 右键交互条件和 action_relay Action 列表；itemSubmit requirements 使用右键交互条件层内的独立游戏内 GUI 会话。不会创建或删除真实方块，也不会创建新 consume 策略、ConditionEngine 或逻辑链图。</p></form>`;
                 }
                 async function acquireWebAdminEditLock(targetType,targetId){
                   return await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType,targetId})});
@@ -2309,15 +2311,15 @@ public final class WebAdminFrontendScripts {
                 }
                 async function openSingleItemSubmitSessionModal(deviceId){
                   try{
-                    if(appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,deviceId)&&vbdNativeTriggerDirty(appState.vbdNativeTriggerEdit)){toast('请先保存或放弃当前原生触发配置草稿，再启动单物品提交模板编辑。');return;}
+                    if(appState.vbdNativeTriggerEdit&&sameDeviceRef(appState.vbdNativeTriggerEdit.deviceId,deviceId)&&vbdNativeTriggerDirty(appState.vbdNativeTriggerEdit)){toast('请先保存或放弃当前原生触发配置草稿，再启动 itemSubmit 条件编辑器。');return;}
                     const overview=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(deviceId)}/single-item-submit`);
                     const players=await loadOnlinePlayerOptions(true);
                     appState.singleItemSubmitSession=singleItemSubmitSessionDefault(overview.deviceId||deviceId,overview,players||[]);
                     showSingleItemSubmitSessionModal(overview.deviceId||deviceId);
-                  }catch(err){toast(err.message||'单物品提交模板会话初始化失败');}
+                  }catch(err){toast(err.message||'itemSubmit 条件编辑器会话初始化失败');}
                 }
                 async function openSingleItemSubmitSessionModalFromUnified(deviceId){
-                  if(isDeviceConfigModalDirty(deviceId)){toast('请先保存或放弃当前设备配置草稿，再启动单物品提交模板编辑。');return;}
+                  if(isDeviceConfigModalDirty(deviceId)){toast('请先保存或放弃当前设备配置草稿，再启动 itemSubmit 条件编辑器。');return;}
                   await releaseAllDeviceConfigLocks(deviceId,true);
                   appState.deviceConfigEdit=null;
                   await dismissWebAdminModal();
@@ -2328,25 +2330,33 @@ public final class WebAdminFrontendScripts {
                   if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return;
                   const overview=draft.overview||{};
                   const item=overview.itemSubmit||{};
-                  const startDisabled=draft.saving||lockHeldByOther(overview.lockStatus)||overview.interactionEnabled===false||overview.singleRequirementOnly===false||item.multiRequirementReadOnly===true;
-                  const title=overview.interactionEnabled===false?'请先启用右键交互触发。':((overview.singleRequirementOnly===false||item.multiRequirementReadOnly===true)?'当前为多物品提交配置，7.10 单物品编辑器不支持覆盖。':'');
-                  const footer=`<button class="wa-btn ghost" ${singleItemSubmitActionAttrs('single-item-submit-close',draft.deviceId,!!draft.saving)}>${icon('close')}<span>关闭</span></button>${draft.active?`<button class="wa-btn danger" ${singleItemSubmitActionAttrs('single-item-submit-cancel',draft.deviceId,!!draft.saving)}>${icon('critical-issue')}<span>${draft.saving?'取消中...':'取消会话'}</span></button>`:`<button class="wa-btn primary" ${singleItemSubmitActionAttrs('single-item-submit-start',draft.deviceId,startDisabled,title)}>${icon('selection')}<span>${draft.saving?'启动中...':'打开单物品提交 GUI'}</span></button>`}`;
-                  openWebAdminModal('单物品提交模板',singleItemSubmitSessionBody(draft),footer,{className:'wa-config-modal wa-single-item-submit-modal',onClose:async()=>closeSingleItemSubmitSessionModal(draft.deviceId)});
+                  const startDisabled=draft.saving||lockHeldByOther(overview.lockStatus)||overview.interactionEnabled===false;
+                  const title=overview.interactionEnabled===false?'请先启用右键交互触发。':'';
+                  const footer=`<button class="wa-btn ghost" ${singleItemSubmitActionAttrs('single-item-submit-close',draft.deviceId,!!draft.saving)}>${icon('close')}<span>关闭</span></button>${draft.active?`<button class="wa-btn danger" ${singleItemSubmitActionAttrs('single-item-submit-cancel',draft.deviceId,!!draft.saving)}>${icon('critical-issue')}<span>${draft.saving?'取消中...':'取消会话'}</span></button>`:`<button class="wa-btn primary" ${singleItemSubmitActionAttrs('single-item-submit-start',draft.deviceId,startDisabled,title)}>${icon('selection')}<span>${draft.saving?'启动中...':'打开 itemSubmit 条件 GUI'}</span></button>`}`;
+                  openWebAdminModal('itemSubmit 条件编辑器',singleItemSubmitSessionBody(draft),footer,{className:'wa-config-modal wa-single-item-submit-modal',onClose:async()=>closeSingleItemSubmitSessionModal(draft.deviceId)});
                 }
                 function singleItemSubmitSessionBody(draft){
                   const overview=draft.overview||{}, lock=overview.lockStatus, playerOptions=draft.players||[], item=overview.itemSubmit||{}, req=item.requirement||item||{};
                   const errors=(draft.errors||[]).length?`<ul class="validation-list">${draft.errors.map(e=>`<li>${esc(e.message||e||'会话操作失败')}</li>`).join('')}</ul>`:'';
                   const status=singleItemSubmitStatusLine(draft);
-                  const lockLine=lockHeldByOther(lock)?`<div class="readonly-note danger">${esc(lockMessage(lock,'单物品提交模板'))}</div>`:'';
-                  const playerSelect=draft.active?`<div class="readonly-note">目标玩家：${esc(draft.targetPlayerName||'-')} · Session：${esc(shortId(draft.sessionId||''))}</div>`:`<label>目标在线玩家<select id="single-item-submit-player" class="input" ${playerOptions.length?'':'disabled'} onchange="syncSingleItemSubmitSessionDraftFromForm(${jsString(draft.deviceId)})">${playerOptions.map(p=>`<option value="${esc(p.name||'')}" data-uuid="${esc(p.uuid||'')}" ${String(p.name||'')===String(draft.targetPlayerName||'')?'selected':''}>${esc(p.name||'未命名玩家')}</option>`).join('')}</select><span class="muted">${draft.playersError?'在线玩家加载失败。':'选择要打开单物品提交模板 GUI 的在线玩家。'}</span></label>`;
-                  const warning=overview.interactionEnabled===false?'<div class="readonly-note warning" data-single-item-submit-hidden-when-interaction-disabled="true">右键交互触发尚未启用；单物品提交属于右键交互后的提交层，不能单独编辑。</div>':'';
-                  const multi=(overview.singleRequirementOnly===false||item.multiRequirementReadOnly===true)?'<div class="readonly-note warning" data-single-item-submit-multiple-requirements-readonly="true">当前为多物品提交配置，7.10 单物品编辑器不支持编辑；不会覆盖为单 requirement，请等待 7.11 多物品编辑。</div>':'';
+                  const lockLine=lockHeldByOther(lock)?`<div class="readonly-note danger">${esc(lockMessage(lock,'itemSubmit 条件编辑器'))}</div>`:'';
+                  if(overview.interactionEnabled===false){
+                    const disabledWarning='<div class="readonly-note warning" data-single-item-submit-hidden-when-interaction-disabled="true" data-unified-item-submit-disabled-warning="true">右键交互触发尚未启用；itemSubmit requirements 属于右键交互后的提交层，不能单独编辑。请先启用右键交互后再打开统一编辑器。</div>';
+                    return `<form class="edit-form wa-single-item-submit-session-form" data-single-item-submit-session="7.11" data-unified-item-submit-editor="true" data-item-submit-hidden-when-interaction-disabled="true" data-single-item-submit-under-right-click="true" onsubmit="event.preventDefault()">${errors}${lockLine}${status}${disabledWarning}<p class="muted">此处不会显示玩家选择、已保存快照或完整编辑入口，避免把 itemSubmit 误导为独立触发源。</p></form>`;
+                  }
+                  const playerSelect=draft.active?`<div class="readonly-note">目标玩家：${esc(draft.targetPlayerName||'-')} · Session：${esc(shortId(draft.sessionId||''))}</div>`:`<label>目标在线玩家<select id="single-item-submit-player" class="input" ${playerOptions.length?'':'disabled'} onchange="syncSingleItemSubmitSessionDraftFromForm(${jsString(draft.deviceId)})">${playerOptions.map(p=>`<option value="${esc(p.name||'')}" data-uuid="${esc(p.uuid||'')}" ${String(p.name||'')===String(draft.targetPlayerName||'')?'selected':''}>${esc(p.name||'未命名玩家')}</option>`).join('')}</select><span class="muted">${draft.playersError?'在线玩家加载失败。':'选择要打开 itemSubmit 条件 GUI 的在线玩家。'}</span></label>`;
+                  const warning='';
+                  const multi='';
                   const advanced='';
                   const matcherOptions=['matchDamage','matchCustomName','matchLore','matchCustomData','matchComponents'].filter(k=>item[k]===true).map(k=>({matchDamage:'damage',matchCustomName:'自定义名称',matchLore:'Lore',matchCustomData:'customData',matchComponents:'components'}[k])).join(' / ')||'仅物品 ID';
                   const consumeLine=item.itemSubmitConsumeEnabled?`消耗 ${esc(item.consumeCount||1)} · ${esc(item.itemSubmitConsumeOrderDisplayName||item.itemSubmitConsumeOrder||'hotbar_first')}`:'提交后不消耗';
                   const displayTemplatePill=item.displayTemplateComponentsPreserved||item.templateDisplayStack?'<span class="pill" data-single-item-submit-display-template-preserved="true">包含组件/附魔显示数据</span>':'';
-                  const snapshot=item.configured?`<span class="pill info">${esc(req.templateItemId||item.templateItemId||'提交物品')} · ${esc(labelCountMode(req.countMode||item.countMode||'at_least'))} ${esc(req.requiredCount||item.requiredCount||1)}</span><span class="pill">${item.itemSubmitEnabled?'itemSubmit 已启用':'itemSubmit 已禁用'}</span><span class="pill">${item.requirementEnabled?'条件已启用':'条件已禁用'}</span><span class="pill">matcher：${esc(matcherOptions)}</span><span class="pill">${consumeLine}</span>${displayTemplatePill}`:'<span class="muted">当前没有已保存单物品提交模板。</span>';
-                  return `<form class="edit-form wa-single-item-submit-session-form" data-single-item-submit-session="7.10" data-single-item-submit-single-slot-gui="true" data-single-item-submit-under-right-click="true" data-single-item-submit-no-multi-editor="true" data-single-item-submit-advanced-editable="true" data-single-item-submit-consume-editor="true" data-single-item-submit-vanilla-policy-existing-field="true" data-single-item-submit-no-raw-json="true" data-single-item-submit-no-condition-engine="true" data-single-item-submit-lock-target="virtual_block_device_single_item_submit" data-single-item-submit-fingerprint="itemSubmit-single-requirement" onsubmit="event.preventDefault()">${errors}${lockLine}${status}${warning}${multi}${advanced}${playerSelect}<div class="readonly-note"><strong>已保存单物品提交模板</strong><div class="wa-template-condition-pills">${snapshot}</div></div><div class="readonly-note"><strong>原版交互策略</strong><div>${esc(item.interactionItemVanillaPolicyDisplayName||overview.vanillaPolicyDisplayName||'沿用当前交互物品匹配策略')}</div><small>游戏内单槽 GUI 编辑同一个 InteractionItemVanillaPolicy 字段，不新增屏蔽交互字段，不改变运行时 PASS / FAIL 语义。</small></div><p class="muted">7.10 会在目标玩家客户端打开单槽箱子式模板 GUI。可编辑 itemSubmit 启用、单 requirement 启用、数量规则、matcher 选项、提交后消耗、消耗顺序 / 数量和原版交互策略；不会进入多 requirement、inventory/equipment、ConditionEngine、路径图或 raw JSON。</p></form>`;
+                  const reqCount=Number(item.requirementCount||0), enabledCount=Number(item.enabledRequirementCount||0), reqs=Array.isArray(item.requirements)?item.requirements:[];
+                  const modeLine=reqCount<=0?'未配置 itemSubmit':(reqCount===1?'单物品提交':'多物品提交：'+reqCount+' 个条件，'+enabledCount+' 个启用');
+                  const modeAttr=reqCount<=0?'data-zero-requirement-add-only="true"':(reqCount===1?'data-single-requirement-simplified="true"':'data-multi-requirement-summary="true" data-multi-requirement-controls-visible="true"');
+                  const reqRows=reqs.slice(0,4).map((r,i)=>`<span class="pill info">${i+1}. ${esc(r.templateItemId||r.summary||'未配置')} · ${esc(labelCountMode(r.countMode||'at_least'))} ${esc(r.requiredCount||r.count||1)}</span>`).join('');
+                  const snapshot=reqCount>0?`${reqRows}${reqCount>4?`<span class="pill">+${reqCount-4} more</span>`:''}<span class="pill">${item.itemSubmitEnabled?'itemSubmit 已启用':'itemSubmit 已禁用'}</span><span class="pill">启用 ${enabledCount}/${reqCount}</span><span class="pill">matcher：${esc(matcherOptions)}</span><span class="pill">${consumeLine}</span>${displayTemplatePill}`:'<span class="muted">当前没有已保存 itemSubmit requirements。</span>';
+                  return `<form class="edit-form wa-single-item-submit-session-form" data-single-item-submit-session="7.11" data-unified-item-submit-editor="true" data-item-submit-requirement-list="true" data-unified-requirement-list-only="true" data-item-submit-adaptive-zero-one-many="true" ${modeAttr} data-single-item-submit-under-right-click="true" data-old-multi-requirement-readonly-refusal-removed="true" data-single-item-submit-advanced-editable="true" data-single-item-submit-consume-editor="true" data-single-item-submit-vanilla-policy-existing-field="true" data-single-item-submit-no-raw-json="true" data-single-item-submit-no-condition-engine="true" data-single-item-submit-lock-target="virtual_block_device_single_item_submit" data-single-item-submit-fingerprint="itemSubmit-requirement-list" onsubmit="event.preventDefault()">${errors}${lockLine}${status}${warning}${multi}${advanced}${playerSelect}<div class="readonly-note"><strong>${esc(modeLine)}</strong><div class="wa-template-condition-pills">${snapshot}</div></div><div class="readonly-note"><strong>原版交互策略</strong><div>${esc(item.interactionItemVanillaPolicyDisplayName||overview.vanillaPolicyDisplayName||'沿用当前交互物品匹配策略')}</div><small>游戏内统一 GUI 编辑同一个 InteractionItemVanillaPolicy 字段，不新增屏蔽交互字段，不改变运行时 PASS / FAIL 语义。</small></div><p class="muted">7.11 会在目标玩家客户端打开统一 itemSubmit requirement list GUI。0 / 1 / N requirements 自动表现为未配置、单物品提交、多物品提交；单项模式不显示排序、删除、批量管理按钮；不会进入 inventory/equipment、ConditionEngine、路径图或 raw JSON。</p></form>`;
                 }
                 function syncSingleItemSubmitSessionDraftFromForm(deviceId){
                   const draft=appState.singleItemSubmitSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return draft;
@@ -2357,20 +2367,20 @@ public final class WebAdminFrontendScripts {
                 function singleItemSubmitStatusLine(draft){
                   const status=String(draft.status||'ready');
                   const tone={ready:'info',started:'info',opened:'ok',saved:'ok',completed:'ok',cancelled:'warning',failed:'error',expired:'warning'}[status]||'info';
-                  const label={ready:'准备启动',started:'已启动，等待玩家打开 GUI',opened:'GUI 已打开',saved:'单物品提交已保存',completed:'单物品提交已保存',cancelled:'会话已取消',failed:'会话失败',expired:'会话已过期'}[status]||status;
+                  const label={ready:'准备启动',started:'已启动，等待玩家打开 GUI',opened:'GUI 已打开',saved:'itemSubmit 条件已保存',completed:'itemSubmit 条件已保存',cancelled:'会话已取消',failed:'会话失败',expired:'会话已过期'}[status]||status;
                   return `<div class="wa-selection-status ${tone}" data-single-item-submit-session-status="${esc(status)}"><strong>${esc(label)}</strong><span>${esc(draft.message||'游戏内 ESC / 关闭窗口会取消，不保存。')}</span>${draft.lockId?`<span>锁：${esc(shortId(draft.lockId))} · expectedFingerprint：${esc(shortId(draft.expectedFingerprint||''))}</span>`:''}</div>`;
                 }
                 async function startSingleItemSubmitSession(deviceId){
                   const draft=syncSingleItemSubmitSessionDraftFromForm(deviceId)||appState.singleItemSubmitSession;
                   if(!draft||draft.saving)return;
                   if(!draft.targetPlayerName){draft.errors=[{message:'请选择在线玩家。'}];appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);return;}
-                  draft.saving=true;draft.errors=[];draft.message='正在获取编辑锁并打开单物品提交 GUI...';appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);
+                  draft.saving=true;draft.errors=[];draft.message='正在获取编辑锁并打开 itemSubmit 条件 GUI...';appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);
                   try{
                     const lockResult=await acquireWebAdminEditLock('virtual_block_device_single_item_submit',draft.deviceId);
-                    if(!lockResult.success){draft.saving=false;draft.errors=writeResultErrors(lockResult,'单物品提交模板编辑锁获取失败。');appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(lockResult.message||'编辑锁获取失败');return;}
+                    if(!lockResult.success){draft.saving=false;draft.errors=writeResultErrors(lockResult,'itemSubmit 条件编辑锁获取失败。');appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(lockResult.message||'编辑锁获取失败');return;}
                     draft.lock=lockResult.data?.lock||{};draft.lockId=draft.lock.lockId||'';scheduleSingleItemSubmitSessionHeartbeat();
                     const result=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(draft.deviceId)}/single-item-submit-session/start`,{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({deviceId:draft.deviceId,targetPlayerName:draft.targetPlayerName,targetPlayerUuid:draft.targetPlayerUuid,lockId:draft.lockId,expectedFingerprint:draft.expectedFingerprint})});
-                    if(result.success){const session=singleItemSubmitResultSession(result);draft.sessionId=singleItemSubmitSessionId(session)||draft.sessionId;draft.status=session.status||'started';draft.active=true;draft.saving=false;draft.message=result.message||'已通知目标玩家打开单物品提交 GUI。';appState.singleItemSubmitSession=draft;scheduleSingleItemSubmitSessionStatusPoll();showSingleItemSubmitSessionModal(deviceId);return;}
+                    if(result.success){const session=singleItemSubmitResultSession(result);draft.sessionId=singleItemSubmitSessionId(session)||draft.sessionId;draft.status=session.status||'started';draft.active=true;draft.saving=false;draft.message=result.message||'已通知目标玩家打开 itemSubmit 条件 GUI。';appState.singleItemSubmitSession=draft;scheduleSingleItemSubmitSessionStatusPoll();showSingleItemSubmitSessionModal(deviceId);return;}
                     await releaseSingleItemSubmitSessionLock(draft,true);
                     draft.lockId='';draft.lock=null;draft.saving=false;draft.errors=writeResultErrors(result,'启动单物品提交会话失败。');draft.conflict=result.conflict||null;draft.message=result.message||'启动单物品提交会话失败。';appState.singleItemSubmitSession=draft;stopSingleItemSubmitSessionHeartbeat();showSingleItemSubmitSessionModal(deviceId);toast(draft.message);
                   }catch(err){await releaseSingleItemSubmitSessionLock(draft,true);draft.lockId='';draft.lock=null;draft.saving=false;draft.errors=[{message:err.message||'启动单物品提交会话失败。'}];appState.singleItemSubmitSession=draft;stopSingleItemSubmitSessionHeartbeat();showSingleItemSubmitSessionModal(deviceId);toast(err.message||'启动单物品提交会话失败');}
@@ -2407,24 +2417,24 @@ public final class WebAdminFrontendScripts {
                     showSingleItemSubmitSessionModal(draft.deviceId);
                   }
                 }
-                async function releaseSingleItemSubmitSessionLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'virtual_block_device_single_item_submit',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'单物品提交模板编辑锁释放失败，将等待自动过期。');}}
+                async function releaseSingleItemSubmitSessionLock(draft,silent){if(!draft||!draft.lockId)return;try{await api('/api/webadmin/edit-locks/release',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'virtual_block_device_single_item_submit',targetId:draft.deviceId,lockId:draft.lockId})});}catch(err){if(!silent)toast(err.message||'itemSubmit 条件编辑锁释放失败，将等待自动过期。');}}
                 function singleItemSubmitSessionIsActive(draft){return !!(draft&&draft.active&&draft.sessionId);}
                 function requestSingleItemSubmitSessionCancel(deviceId,options={}){
                   const draft=appState.singleItemSubmitSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return false;
-                  if(singleItemSubmitSessionIsActive(draft)&&!options.confirmed){openSingleItemSubmitCancelConfirm(deviceId,{closeAfter:!!options.closeAfter,reason:options.reason||'WebAdmin 已取消单物品提交模板会话。'});return false;}
+                  if(singleItemSubmitSessionIsActive(draft)&&!options.confirmed){openSingleItemSubmitCancelConfirm(deviceId,{closeAfter:!!options.closeAfter,reason:options.reason||'WebAdmin 已取消 itemSubmit 条件会话。'});return false;}
                   return cancelSingleItemSubmitSession(deviceId,{...options,confirmed:true});
                 }
                 function openSingleItemSubmitCancelConfirm(deviceId,options={}){
                   const draft=appState.singleItemSubmitSession;if(!singleItemSubmitSessionIsActive(draft)||!sameDeviceRef(draft.deviceId,deviceId))return false;
                   const root=document.getElementById('wa-modal-root');if(!root)return false;
                   cancelSingleItemSubmitCancelConfirm();
-                  appState.singleItemSubmitCancelConfirm={deviceId,closeAfter:!!options.closeAfter,reason:options.reason||'WebAdmin 已取消单物品提交模板会话。'};
+                  appState.singleItemSubmitCancelConfirm={deviceId,closeAfter:!!options.closeAfter,reason:options.reason||'WebAdmin 已取消 itemSubmit 条件会话。'};
                   const layer=document.createElement('div');
                   layer.id='wa-single-item-submit-cancel-confirm';
                   layer.className='wa-discard-confirm-layer';
                   layer.setAttribute('data-single-item-submit-cancel-confirm','true');
                   layer.onclick=event=>{if(event.target===layer)cancelSingleItemSubmitCancelConfirm();};
-                  layer.innerHTML=`<section class="wa-discard-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="wa-single-item-submit-cancel-title" onclick="event.stopPropagation()"><header><h3 id="wa-single-item-submit-cancel-title">确认取消单物品提交模板编辑？</h3></header><p>目标玩家的游戏内单物品提交模板 GUI 正在打开。关闭后会取消会话，不会保存任何提交模板修改。</p><footer><button class="wa-btn ghost" type="button" onclick="cancelSingleItemSubmitCancelConfirm()">继续编辑</button><button class="wa-btn danger" type="button" onclick="confirmSingleItemSubmitSessionCancel()">${icon('critical-issue')}<span>确认取消会话</span></button></footer></section>`;
+                  layer.innerHTML=`<section class="wa-discard-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="wa-single-item-submit-cancel-title" onclick="event.stopPropagation()"><header><h3 id="wa-single-item-submit-cancel-title">确认取消 itemSubmit 条件编辑？</h3></header><p>目标玩家的游戏内 itemSubmit 条件 GUI 正在打开。关闭后会取消会话，不会保存任何 requirement 修改。</p><footer><button class="wa-btn ghost" type="button" onclick="cancelSingleItemSubmitCancelConfirm()">继续编辑</button><button class="wa-btn danger" type="button" onclick="confirmSingleItemSubmitSessionCancel()">${icon('critical-issue')}<span>确认取消会话</span></button></footer></section>`;
                   root.appendChild(layer);
                   return false;
                 }
@@ -2436,37 +2446,37 @@ public final class WebAdminFrontendScripts {
                 async function confirmSingleItemSubmitSessionCancel(){
                   const confirm=appState.singleItemSubmitCancelConfirm;if(!confirm)return false;
                   cancelSingleItemSubmitCancelConfirm();
-                  return await cancelSingleItemSubmitSession(confirm.deviceId,{closeAfter:!!confirm.closeAfter,reason:confirm.reason||'WebAdmin 已取消单物品提交模板会话。',confirmed:true});
+                  return await cancelSingleItemSubmitSession(confirm.deviceId,{closeAfter:!!confirm.closeAfter,reason:confirm.reason||'WebAdmin 已取消 itemSubmit 条件会话。',confirmed:true});
                 }
                 async function cancelSingleItemSubmitSession(deviceId,options={}){
                   const draft=appState.singleItemSubmitSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId))return false;
                   if(draft.saving)return false;
-                  const closeAfter=!!options.closeAfter, reason=options.reason||'WebAdmin 已取消单物品提交模板会话。';
-                  draft.saving=true;draft.errors=[];draft.message='正在取消单物品提交模板会话...';appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);
+                  const closeAfter=!!options.closeAfter, reason=options.reason||'WebAdmin 已取消 itemSubmit 条件会话。';
+                  draft.saving=true;draft.errors=[];draft.message='正在取消 itemSubmit 条件会话...';appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);
                   try{
                     if(draft.sessionId){
                       const result=await api(`/api/webadmin/virtual-block-devices/${encodeURIComponent(draft.deviceId)}/single-item-submit-session/cancel`,{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({deviceId:draft.deviceId,sessionId:draft.sessionId,lockId:draft.lockId,reason})});
-                      if(!result.success){draft.saving=false;draft.errors=writeResultErrors(result,'取消单物品提交模板会话失败。');draft.message=result.message||draft.message;appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(draft.message||'取消单物品提交模板会话失败');return false;}
+                      if(!result.success){draft.saving=false;draft.errors=writeResultErrors(result,'取消 itemSubmit 条件会话失败。');draft.message=result.message||draft.message;appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(draft.message||'取消 itemSubmit 条件会话失败');return false;}
                       const session=singleItemSubmitResultSession(result);
-                      draft.errors=[];draft.message=result.message||session.message||'单物品提交模板会话已取消。';draft.status=session.status||'cancelled';draft.active=false;
+                      draft.errors=[];draft.message=result.message||session.message||'itemSubmit 条件会话已取消。';draft.status=session.status||'cancelled';draft.active=false;
                     }else{
-                      await releaseSingleItemSubmitSessionLock(draft,false);draft.status='cancelled';draft.active=false;draft.message='单物品提交模板会话已取消。';
+                      await releaseSingleItemSubmitSessionLock(draft,false);draft.status='cancelled';draft.active=false;draft.message='itemSubmit 条件会话已取消。';
                     }
-                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'取消单物品提交模板会话失败。'}];appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(err.message||'取消单物品提交模板会话失败');return false;}
+                  }catch(err){draft.saving=false;draft.errors=[{message:err.message||'取消 itemSubmit 条件会话失败。'}];appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);toast(err.message||'取消 itemSubmit 条件会话失败');return false;}
                   draft.saving=false;draft.lockId='';draft.lock=null;stopSingleItemSubmitSessionHeartbeat();stopSingleItemSubmitSessionStatusPoll();
                   if(closeAfter){appState.singleItemSubmitSession=null;await dismissWebAdminModal();return true;}
                   appState.singleItemSubmitSession=draft;showSingleItemSubmitSessionModal(deviceId);return true;
                 }
                 async function closeSingleItemSubmitSessionModal(deviceId){
                   const draft=appState.singleItemSubmitSession;if(!draft||!sameDeviceRef(draft.deviceId,deviceId)){await dismissWebAdminModal();return true;}
-                  if(draft.saving){toast('单物品提交模板会话操作正在进行，请稍候。');showSingleItemSubmitSessionModal(deviceId);return false;}
-                  if(draft.active&&draft.sessionId)return requestSingleItemSubmitSessionCancel(deviceId,{closeAfter:true,reason:'WebAdmin 关闭窗口时取消单物品提交模板会话。'});
+                  if(draft.saving){toast('itemSubmit 条件会话操作正在进行，请稍候。');showSingleItemSubmitSessionModal(deviceId);return false;}
+                  if(draft.active&&draft.sessionId)return requestSingleItemSubmitSessionCancel(deviceId,{closeAfter:true,reason:'WebAdmin 关闭窗口时取消 itemSubmit 条件会话。'});
                   await releaseSingleItemSubmitSessionLock(draft,true);appState.singleItemSubmitSession=null;stopSingleItemSubmitSessionHeartbeat();stopSingleItemSubmitSessionStatusPoll();await dismissWebAdminModal();return true;
                 }
                 function maybeCancelSingleItemSubmitSessionForRoute(hash){
                   const draft=appState.singleItemSubmitSession;if(!draft)return;
                   const h=String(hash||'');if(h.startsWith('#/devices/')){const info=detailRoute(h.substring('#/devices/'.length),'#/devices');if(sameDeviceRef(info.id,draft.deviceId))return;}
-                  if(draft.active&&draft.sessionId){requestSingleItemSubmitSessionCancel(draft.deviceId,{closeAfter:true,reason:'WebAdmin 离开页面时取消单物品提交模板会话。'});return;}
+                  if(draft.active&&draft.sessionId){requestSingleItemSubmitSessionCancel(draft.deviceId,{closeAfter:true,reason:'WebAdmin 离开页面时取消 itemSubmit 条件会话。'});return;}
                   releaseSingleItemSubmitSessionLock(draft,true);appState.singleItemSubmitSession=null;stopSingleItemSubmitSessionHeartbeat();stopSingleItemSubmitSessionStatusPoll();
                 }
                 async function startDeviceConfigEdit(deviceId){
@@ -3188,15 +3198,12 @@ public final class WebAdminFrontendScripts {
                     ['原版交互策略',item.vanillaPolicyDisplayName||labelVanillaPolicy(item.vanillaPolicy)],
                     ['消耗策略',item.consumeEnabled?`${item.consumeCount||1} 个，${item.consumeSourceDisplayName||labelConsumeSource(item.consumeSource)}`:''],
                     ['背包消耗顺序',item.consumeEnabled?(item.inventoryConsumeOrderDisplayName||labelConsumeOrder(item.inventoryConsumeOrder)):''],
-                    ['物品模板',item.templateSummary]
+                    ['物品模板',item.templateSummary],
+                    ['itemSubmit 条件层',(()=>{const n=Number(cfg.itemSubmitRequirementCount||0);if(!cfg.interactionEnabled&&n>0)return `右键交互未启用，仅保留警告：${n===1?'单物品提交':`多物品提交 ${n} 个条件`}`;if(n<=0)return '未配置 itemSubmit';return n===1?'单物品提交':`多物品提交：${n} 个条件`;})()]
                   ]);
                   html+=configGroup('容器配置',[
                     ['容器事件',cfg.containerEnabled?'已启用':''],
                     ['物品条件数量',cfg.itemConditionCount]
-                  ]);
-                  html+=configGroup('物品提交',[
-                    ['多物品提交',cfg.itemSubmitEnabled?'已启用':''],
-                    ['提交条件数量',cfg.itemSubmitRequirementCount]
                   ]);
                   return `<div class="wa-config-stack">${html || empty('当前设备没有可展示的关键配置。')}</div>`;
                 }

@@ -738,10 +738,13 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         Map<String, Object> itemSubmitLayer = new LinkedHashMap<>(WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService.singleRequirementDto(device));
         itemSubmitLayer.put("enabled", device.itemSubmitEnabled());
         itemSubmitLayer.put("configured", device.itemSubmitEnabled() || !device.itemSubmitRequirements().isEmpty());
-        itemSubmitLayer.put("singleRequirementOnly", device.itemSubmitRequirements().size() <= 1);
+        itemSubmitLayer.put("singleRequirementOnly", false);
+        itemSubmitLayer.put("unifiedRequirementListOnly", true);
+        itemSubmitLayer.put("multiRequirementEditable", true);
+        itemSubmitLayer.put("unifiedItemSubmitEditor", true);
         itemSubmitLayer.put("vanillaPolicyDisplayName", itemSubmitLayer.get("interactionItemVanillaPolicyDisplayName"));
         data.put("itemSubmitLayer", itemSubmitLayer);
-        data.put("conditionLayerNote", "interaction item matcher 是右键交互之后的条件/判定层；single itemSubmit 是右键交互之后的提交层，不是新的原生触发源。");
+        data.put("conditionLayerNote", "interaction item matcher 是右键交互之后的条件/判定层；itemSubmit requirements 是右键交互之后的提交层，不是新的原生触发源。");
         return data;
     }
 
