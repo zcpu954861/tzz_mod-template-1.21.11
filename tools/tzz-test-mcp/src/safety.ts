@@ -72,6 +72,16 @@ export function ensureReportPath(config: TzzTestMcpConfig, name: unknown, extens
   return assertInside(base, path.join(base, file));
 }
 
+export function ensureScenarioReportPath(config: TzzTestMcpConfig, name: unknown): string {
+  const base = ensureDirectory(resolveRepoOutputDir(config.repoRoot, path.join(config.reportsDir, "scenarios")));
+  const file = `${timestamp()}-${safeName(name)}.md`;
+  return assertInside(base, path.join(base, file));
+}
+
+export function scenarioReportsDir(config: TzzTestMcpConfig): string {
+  return ensureDirectory(resolveRepoOutputDir(config.repoRoot, path.join(config.reportsDir, "scenarios")));
+}
+
 export function sessionLogPath(config: TzzTestMcpConfig): string {
   const dir = ensureDirectory(resolveRepoOutputDir(config.repoRoot, config.reportsDir));
   return assertInside(dir, path.join(dir, "session.log"));

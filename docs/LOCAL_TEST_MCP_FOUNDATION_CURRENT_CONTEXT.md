@@ -301,6 +301,44 @@ Step 4 still does not:
 - Bypass existing WebAdmin session save / cancel validation.
 - Automate full P3b / 7.10 GUI opening flows; use existing WebAdmin or session tools to open the supported GUI first.
 
+## Step 5 Scope: Scenario Test Orchestration Foundation
+
+Step 5 adds a local scenario runner that composes existing safe MCP / TestBridge / WebAdmin tools into repeatable smoke tests. The scenario runner is an orchestration layer only: it does not add arbitrary shell execution, does not add git mutation, does not access external hosts, does not click Minecraft GUI coordinates, and does not bypass TestBridge token / loopback checks.
+
+Step 5 MCP tools:
+
+- `scenario.list`
+- `scenario.run`
+- `scenario.report`
+- `scenario.cleanup`
+- `webadmin.close`
+
+Built-in scenarios:
+
+- `basic_environment`: starts or reuses `runClient`, auto-enters the configured test world, waits for WebAdmin/TestBridge/world readiness, prepares the test world, logs in to WebAdmin, opens dashboard, captures browser diagnostics, reads Doctor issues, writes a report, and then applies cleanup according to `keepClientOpen`.
+- `vbd_right_click`: prepares a bounded VBD + receiver scene, configures right-click interaction through fixed `/tzz` commands, calls `minecraft.use_block`, checks signal events/history, captures diagnostics, and writes a report.
+- `single_item_submit_basic`: prepares a VBD + receiver scene, opens the 7.10 single itemSubmit GUI through the existing fixed WebAdmin session API with CSRF, lock, and expected fingerprint, edits the supported GUI through Step 4 semantic tools, saves through the existing GUI save path, inspects the saved requirement, performs `use_block`, checks signal history, and writes a report.
+- `container_template_basic`: prepares a bounded container VBD + receiver scene, opens the 7.9 container template GUI through the existing fixed WebAdmin session API with CSRF, lock, and expected fingerprint, edits the supported GUI through Step 4 semantic tools, saves through the existing GUI save path, inspects saved itemConditions, reads Doctor issues, and writes a report.
+
+Scenario execution model:
+
+- `scenario.run` has a fixed scenario allowlist and only calls `SCENARIO_ALLOWED_TOOLS` / `ALLOWED_SCENARIO_TOOLS` from the existing safe MCP tool registry.
+- The scenario step runner stops on failure and records the failed step id, tool name, code, message, and sanitized structured data.
+- Scenario reports are written under `reports/mcp/scenarios`.
+- Reports include start/end time, pass/fail, step table, failure details, screenshot paths, selected structured data, and cleanup result.
+- `scenario.cleanup` closes only resources managed by the MCP session: it can call `minecraft.stop` and `webadmin.close`; it does not delete logs, reports, screenshots, worlds, or other files.
+- `webadmin.close` closes the current Playwright page/context/browser if one is open and is idempotent when no browser is open.
+
+Step 5 still does not:
+
+- Create arbitrary scenario programs supplied by the user.
+- Execute arbitrary shell commands.
+- Expose git mutation.
+- Access external WebAdmin or public internet hosts.
+- Click Minecraft GUI coordinates.
+- Support arbitrary Minecraft screens.
+- Delete reports, screenshots, logs, worlds, or repository files during cleanup.
+
 ## Later Planning
 
 Recommended later work should build on the dev-only TestBridge instead of OS coordinate clicking:

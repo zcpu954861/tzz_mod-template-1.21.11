@@ -15,6 +15,7 @@ export function webAdminTools(): ToolDefinition[] {
     webAdminLoginTool(),
     webAdminChangePasswordTool(),
     webAdminOwnerSetPasswordTool(),
+    webAdminCloseTool(),
     webAdminGotoTool(),
     webAdminScreenshotTool(),
     webAdminConsoleErrorsTool(),
@@ -83,6 +84,36 @@ function webAdminOwnerSetPasswordTool(): ToolDefinition {
         { newPassword, confirmPassword },
         "WebAdmin user password set."
       );
+    }
+  };
+}
+
+function webAdminCloseTool(): ToolDefinition {
+  return {
+    name: "webadmin.close",
+    description: "Close the current Playwright WebAdmin browser/page. This is idempotent and does not delete reports, screenshots, or logs.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        resetDiagnostics: { type: "boolean" }
+      }
+    },
+    async handler(args, context) {
+      const hadBrowser = Boolean(context.webAdmin.browser || context.webAdmin.context || context.webAdmin.page);
+      await closeBrowser(context);
+      if (args.resetDiagnostics === true) {
+        context.webAdmin.consoleErrors = [];
+        context.webAdmin.pageErrors = [];
+        context.webAdmin.failedRequests = [];
+        context.webAdmin.badResponses = [];
+        context.webAdmin.screenshots = [];
+      }
+      return ok(hadBrowser ? "WebAdmin browser closed." : "No WebAdmin browser is open.", {
+        closed: hadBrowser,
+        browserOpen: false,
+        resetDiagnostics: args.resetDiagnostics === true
+      });
     }
   };
 }
@@ -669,6 +700,7 @@ async function closeBrowser(context: ToolContext): Promise<void> {
   context.webAdmin.browser = undefined;
   context.webAdmin.context = undefined;
   context.webAdmin.page = undefined;
+  context.webAdmin.baseUrl = undefined;
 }
 
 async function postWebAdminWrite(context: ToolContext, path: string, body: Record<string, unknown>, successMessage: string) {

@@ -28,13 +28,10 @@ const DEFAULT_TEST_WORLD_NAME = "TZZ_MCP_TEST_WORLD";
 const WINDOWS_MANAGED_PROCESS_TREE_STOP = "taskkill.exe";
 const WINDOWS_MANAGED_RUNCLIENT_PROCESS_QUERY = "powershell.exe";
 const WINDOWS_RUNCLIENT_PROCESS_QUERY_SCRIPT = `
-& {
-param(
-  [string]$repo,
-  [string]$world,
-  [Int64]$startedMs
-)
 $ErrorActionPreference = 'Stop'
+$repo = [string]$env:TZZ_MCP_RUNCLIENT_REPO
+$world = [string]$env:TZZ_MCP_RUNCLIENT_WORLD
+$startedMs = [Int64]$env:TZZ_MCP_RUNCLIENT_STARTED_MS
 $started = [DateTimeOffset]::FromUnixTimeMilliseconds($startedMs).UtcDateTime.AddSeconds(-60)
 $comparison = [System.StringComparison]::OrdinalIgnoreCase
 $items = @()
@@ -58,7 +55,6 @@ Get-CimInstance Win32_Process | ForEach-Object {
   }
 }
 @($items) | ConvertTo-Json -Compress
-}
 `;
 
 export function minecraftTools(): ToolDefinition[] {
@@ -537,14 +533,16 @@ function findWindowsManagedRunClientProcesses(config: TzzTestMcpConfig): Promise
       "-ExecutionPolicy",
       "Bypass",
       "-Command",
-      WINDOWS_RUNCLIENT_PROCESS_QUERY_SCRIPT,
-      config.repoRoot,
-      runtime.worldName ?? "",
-      String(startedAtMs)
+      WINDOWS_RUNCLIENT_PROCESS_QUERY_SCRIPT
     ], {
       shell: false,
       windowsHide: true,
-      env: process.env
+      env: {
+        ...process.env,
+        TZZ_MCP_RUNCLIENT_REPO: config.repoRoot,
+        TZZ_MCP_RUNCLIENT_WORLD: runtime.worldName ?? "",
+        TZZ_MCP_RUNCLIENT_STARTED_MS: String(startedAtMs)
+      }
     });
     let stdout = "";
     let stderr = "";

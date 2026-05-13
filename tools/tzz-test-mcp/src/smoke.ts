@@ -17,6 +17,7 @@ async function main(): Promise<void> {
     "webadmin.goto",
     "webadmin.screenshot",
     "webadmin.console_errors",
+    "webadmin.close",
     "webadmin.click",
     "webadmin.fill",
     "webadmin.text",
@@ -49,7 +50,11 @@ async function main(): Promise<void> {
     "minecraft.gui_clear_slot",
     "minecraft.gui_set_count",
     "minecraft.gui_save",
-    "minecraft.gui_cancel"
+    "minecraft.gui_cancel",
+    "scenario.list",
+    "scenario.run",
+    "scenario.report",
+    "scenario.cleanup"
   ];
   for (const name of required) {
     assert(tools.includes(name), `missing tool ${name}`);

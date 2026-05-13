@@ -39,6 +39,7 @@ public final class LocalTestMcpFoundationGuardTest {
                 "tools/tzz-test-mcp/src/tools/gradle.ts",
                 "tools/tzz-test-mcp/src/tools/logs.ts",
                 "tools/tzz-test-mcp/src/tools/minecraft.ts",
+                "tools/tzz-test-mcp/src/tools/scenario.ts",
                 "tools/tzz-test-mcp/src/tools/testbridge.ts",
                 "tools/tzz-test-mcp/src/tools/webadmin.ts",
                 "tools/tzz-test-mcp/src/tools/report.ts",
@@ -103,6 +104,16 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "Unsupported screens return `UNSUPPORTED_GUI`; no screen returns `GUI_NOT_OPEN`", "context documents unsupported GUI errors");
         requireContains(context, "Step 4 still does not:", "context documents Step 4 forbidden scope");
         requireContains(context, "Support arbitrary Minecraft screens", "context forbids arbitrary GUI support");
+        requireContains(context, "Step 5 Scope: Scenario Test Orchestration Foundation", "context documents Step 5 foundation");
+        requireContains(context, "`scenario.list`", "context documents scenario.list tool");
+        requireContains(context, "`scenario.run`", "context documents scenario.run tool");
+        requireContains(context, "`scenario.report`", "context documents scenario.report tool");
+        requireContains(context, "`scenario.cleanup`", "context documents scenario.cleanup tool");
+        requireContains(context, "`webadmin.close`", "context documents webadmin.close tool");
+        requireContains(context, "reports/mcp/scenarios", "context documents scenario report path");
+        requireContains(context, "The scenario step runner stops on failure", "context documents scenario stop on failure");
+        requireContains(context, "only calls `SCENARIO_ALLOWED_TOOLS` / `ALLOWED_SCENARIO_TOOLS`", "context documents scenario safe tool allowlist");
+        requireContains(context, "Delete reports, screenshots, logs, worlds, or repository files during cleanup", "context documents scenario cleanup no deletion");
         requireContains(context, "WebAdmin UI exposes a current-user password change entry", "context documents WebAdmin password UI");
         requireContains(context, "not written to WebAdmin state, browser storage, logs, reports, or URLs", "context documents password UI secret boundary");
         requireContains(context, "`webadmin.login` must verify real authentication state before returning success", "context documents login auth verification");
@@ -134,6 +145,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(tools, "reportWriteTool()", "report tool registered");
         requireContains(tools, "minecraftTools()", "minecraft runtime tools registered");
         requireContains(tools, "webAdminTools()", "webadmin tools registered");
+        requireContains(tools, "scenarioTools()", "scenario tools registered");
 
         String server = read("tools/tzz-test-mcp/src/server.ts");
         requireContains(server, "tools/list", "MCP tools/list handler exists");
@@ -151,6 +163,8 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(safety, "URL host must be localhost or loopback", "non-loopback host denied marker");
         requireContains(safety, "resolveRepoOutputDir", "report output directory is repo relative");
         requireContains(safety, "ensureReportPath", "report path helper exists");
+        requireContains(safety, "ensureScenarioReportPath", "scenario report path helper exists");
+        requireContains(safety, "scenarioReportsDir", "scenario report directory helper exists");
         requireContains(safety, "resolveAllowedLog", "log path allowlist helper exists");
         requireContains(safety, "redactSecrets", "secret redaction helper exists");
         requireContains(safety, "authorization", "authorization redaction marker");
@@ -204,6 +218,9 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(webadmin, "BUTTON_DISABLED", "WebAdmin login disabled button marker");
         requireContains(webadmin, "webadmin.change_password", "WebAdmin current-user password tool marker");
         requireContains(webadmin, "webadmin.owner_set_password", "WebAdmin owner password reset tool marker");
+        requireContains(webadmin, "webadmin.close", "WebAdmin close tool marker");
+        requireContains(webadmin, "closeBrowser(context)", "WebAdmin close uses browser cleanup marker");
+        requireContains(webadmin, "baseUrl = undefined", "WebAdmin close clears base URL marker");
         requireContains(webadmin, "/api/webadmin/users/me/password", "WebAdmin password change API marker");
         requireContains(webadmin, "/password-reset", "WebAdmin owner password reset API marker");
 
@@ -287,6 +304,30 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(testbridge, "world/prepare-player", "MCP prepare_test_player endpoint marker");
         requireContains(testbridge, "world/prepare", "MCP prepare_test_world endpoint marker");
         requireContains(testbridge, "Idempotently prepare", "MCP prepare_test_world idempotent marker");
+
+        String scenario = read("tools/tzz-test-mcp/src/tools/scenario.ts");
+        requireContains(scenario, "scenario.list", "scenario.list tool marker");
+        requireContains(scenario, "scenario.run", "scenario.run tool marker");
+        requireContains(scenario, "scenario.report", "scenario.report tool marker");
+        requireContains(scenario, "scenario.cleanup", "scenario.cleanup tool marker");
+        requireContains(scenario, "basic_environment", "basic environment scenario marker");
+        requireContains(scenario, "vbd_right_click", "vbd right click scenario marker");
+        requireContains(scenario, "single_item_submit_basic", "single itemSubmit scenario marker");
+        requireContains(scenario, "container_template_basic", "container template scenario marker");
+        requireContains(scenario, "ALLOWED_SCENARIO_TOOLS", "scenario uses explicit safe tool allowlist marker");
+        requireContains(scenario, "scenarioFailure", "scenario step runner stops on failure marker");
+        requireContains(scenario, "ensureScenarioReportPath", "scenario report path marker");
+        requireContains(scenario, "reports/mcp/scenarios", "scenario report directory marker");
+        requireContains(scenario, "webadmin.close", "scenario cleanup closes webadmin marker");
+        requireContains(scenario, "minecraft.stop", "scenario cleanup stops managed client marker");
+        requireContains(scenario, "fixed_template_session_start", "scenario uses fixed template session start marker");
+        requireContains(scenario, "virtual_block_device_single_item_submit", "scenario single itemSubmit lock target marker");
+        requireContains(scenario, "virtual_block_device_container_template", "scenario container template lock target marker");
+        requireContains(scenario, "X-TZZ-WebAdmin-CSRF", "scenario fixed session start uses CSRF marker");
+        requireContains(scenario, "noMinecraftGuiCoordinateClicking", "scenario no coordinate clicking marker");
+        requireContains(scenario, "noArbitraryShell", "scenario no arbitrary shell marker");
+        requireContains(scenario, "noGitMutation", "scenario no git mutation marker");
+        requireContains(scenario, "noExternalHost", "scenario no external host marker");
 
         String testbridgeSecurity = read("src/main/java/com/zcpu/tzzmod/webadmin/testbridge/WebAdminTestBridgeSecurityService.java");
         requireContains(testbridgeSecurity, "TZZ_TESTBRIDGE_ENABLED", "server TestBridge default disabled env marker");
@@ -413,6 +454,19 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "不直接写 `SignalDeviceData` JSON", "README documents no raw SignalDeviceData write");
         requireContains(readme, "UNSUPPORTED_GUI", "README documents unsupported GUI error");
         requireContains(readme, "GUI_NOT_OPEN", "README documents no GUI error");
+        requireContains(readme, "Scenario Test Orchestration Foundation", "README documents Step 5 scenario foundation");
+        requireContains(readme, "scenario.list", "README documents scenario.list");
+        requireContains(readme, "scenario.run", "README documents scenario.run");
+        requireContains(readme, "scenario.report", "README documents scenario.report");
+        requireContains(readme, "scenario.cleanup", "README documents scenario.cleanup");
+        requireContains(readme, "webadmin.close", "README documents webadmin.close");
+        requireContains(readme, "reports/mcp/scenarios", "README documents scenario report path");
+        requireContains(readme, "basic_environment", "README documents basic environment scenario");
+        requireContains(readme, "vbd_right_click", "README documents VBD right click scenario");
+        requireContains(readme, "single_item_submit_basic", "README documents single itemSubmit scenario");
+        requireContains(readme, "container_template_basic", "README documents container template scenario");
+        requireContains(readme, "场景失败时会停止当前场景步骤", "README documents scenario stop on failure");
+        requireContains(readme, "只调用 `minecraft.stop` 和 `webadmin.close`", "README documents cleanup tools");
 
         String userService = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminUserService.java");
         requireContains(userService, "changeOwnPassword", "WebAdmin self password change service marker");

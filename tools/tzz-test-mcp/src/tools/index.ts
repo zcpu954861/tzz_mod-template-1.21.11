@@ -5,6 +5,7 @@ import { logsTailTool } from "./logs.js";
 import { minecraftTools } from "./minecraft.js";
 import { repoStatusTool } from "./repo.js";
 import { reportWriteTool } from "./report.js";
+import { scenarioTools } from "./scenario.js";
 import { webAdminTools } from "./webadmin.js";
 
 export function createTools(): ToolDefinition[] {
@@ -15,6 +16,7 @@ export function createTools(): ToolDefinition[] {
     repoStatusTool(),
     reportWriteTool(),
     ...minecraftTools(),
-    ...webAdminTools()
+    ...webAdminTools(),
+    ...scenarioTools()
   ];
 }

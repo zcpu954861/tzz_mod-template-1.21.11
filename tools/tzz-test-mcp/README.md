@@ -172,6 +172,7 @@ $env:TZZ_TEST_MCP_CONFIG = "E:\path\to\your\config.json"
 - `webadmin.goto`：跳转到 WebAdmin hash route。
 - `webadmin.screenshot`：保存截图到 `reports/mcp/screenshots`。
 - `webadmin.console_errors`：返回 Console error、page error、失败请求和错误响应。
+- `webadmin.close`：关闭当前 Playwright page / browser / context；未打开时幂等返回。
 - `webadmin.click`：点击当前本地 WebAdmin 页面内可见且启用的 selector。
 - `webadmin.fill`：填写当前本地 WebAdmin 页面内可见且启用的 selector。
 - `webadmin.text`：读取当前本地 WebAdmin 页面内 selector 的文本。
@@ -416,6 +417,10 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `minecraft.gui_set_count`：设置模板数量，沿用 GUI 现有 clamp 规则。
 - `minecraft.gui_save`：走当前 GUI 的既有 session 保存路径。
 - `minecraft.gui_cancel`：走当前 GUI 的既有取消路径。
+- `scenario.list`：列出内置场景 smoke。
+- `scenario.run`：运行一个固定白名单内的本地测试场景。
+- `scenario.report`：读取最近的场景报告摘要。
+- `scenario.cleanup`：关闭当前 MCP session 管理的测试客户端和 WebAdmin 页面，不删除本地输出。
 
 示例：
 
@@ -441,6 +446,42 @@ Step 4 增加受控的 Minecraft GUI 语义操作工具，用来操作已经打�
 - `gui_put_item` 只写 GUI draft 的 ghost/template 数据，不改真实玩家背包，不改真实世界容器。
 - `gui_save` / `gui_cancel` 复用 GUI 已有保存/取消路径，不直接写 `SignalDeviceData` JSON。
 - 本阶段不自动打开 P3b / 7.10 GUI；请先通过 WebAdmin 或现有 session 入口打开目标 GUI，再调用这些工具。
+
+## Scenario Test Orchestration Foundation
+
+Step 5 增加一层场景编排工具，用来把已有安全 MCP / TestBridge / WebAdmin 工具组合成可重复的本地 smoke。场景工具不会执行任意 shell，不提供 git mutation，不访问外网，不点击 Minecraft GUI 坐标，也不直接写 `SignalDeviceData` JSON。
+
+新增 MCP 工具：
+
+- `scenario.list`
+- `scenario.run`
+- `scenario.report`
+- `scenario.cleanup`
+- `webadmin.close`
+
+当前内置场景：
+
+- `basic_environment`：启动或复用 dev client，`autoEnterWorld=true` 进入测试世界，等待 WebAdmin / TestBridge / world ready，执行 `minecraft.prepare_test_world`，登录 WebAdmin，打开 dashboard，收集 console errors / screenshot / Doctor issues，并写报告。
+- `vbd_right_click`：准备 VBD + receiver，启用右键交互，调用 `minecraft.use_block`，断言 signal event / signal history，并写报告。
+- `single_item_submit_basic`：准备 VBD + receiver，通过固定 WebAdmin session API 打开 7.10 single itemSubmit GUI，用 Step 4 GUI 工具放入 diamond、设置数量、保存，然后 inspect / use_block / signal history 验证。
+- `container_template_basic`：准备容器 VBD + receiver，通过固定 WebAdmin session API 打开 7.9 container template GUI，用 Step 4 GUI 工具写入模板槽并保存，然后 inspect itemConditions / Doctor issues。
+
+示例：
+
+```json
+{"tool":"scenario.list","arguments":{}}
+{"tool":"scenario.run","arguments":{"scenarioName":"basic_environment","worldName":"TZZ_MCP_TEST_WORLD","keepClientOpen":false,"saveReport":true,"screenshot":true}}
+{"tool":"scenario.cleanup","arguments":{"mode":"all"}}
+```
+
+报告输出：
+
+- 场景报告写入 `reports/mcp/scenarios/*.md`。
+- 场景截图仍写入 `reports/mcp/screenshots/*.png`。
+- 场景失败时会停止当前场景步骤、记录失败步骤、写失败报告，并根据 `keepClientOpen` 决定是否关闭 managed Minecraft client。
+- `scenario.cleanup` 只调用 `minecraft.stop` 和 `webadmin.close`，不删除 `logs/`、`reports/mcp`、截图、世界或仓库文件。
+
+场景 runner 只允许调用内置安全工具白名单。`single_item_submit_basic` 和 `container_template_basic` 打开 GUI 时使用固定 WebAdmin API、CSRF、edit lock 和 expected fingerprint，不绕过已有保存校验；真正保存仍由 `minecraft.gui_save` 走现有 GUI/session save path。
 
 ## 安全边界
 
