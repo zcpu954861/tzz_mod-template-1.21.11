@@ -130,6 +130,7 @@ public final class StabilizationGuardTest {
         testWebAdminVbdNativeTriggerOverview();
         testWebAdminRegionControllerEditing();
         testWebAdminSignalListenerEditing();
+        testWebAdminEditingStabilization714();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -5070,6 +5071,115 @@ public final class StabilizationGuardTest {
     ) {
         boolean actual = permissions.decide(role, operation).allowed();
         requireEquals(expected, actual, "permission " + role.id() + " " + operation.id());
+    }
+
+    private static void testWebAdminEditingStabilization714() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String context = Files.readString(root.resolve("docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md"), StandardCharsets.UTF_8);
+        String localMcpContext = Files.readString(root.resolve("docs/LOCAL_TEST_MCP_FOUNDATION_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendScripts.appJs();
+
+        for (String marker : List.of(
+                "7.14 WebAdmin Editing Stabilization",
+                "not a new feature expansion stage",
+                "Manual testing is primary after 7.13",
+                "Local Test MCP remains available as an auxiliary tool",
+                "Generate screenshots",
+                "Run screenshot matrices",
+                "Run MCP scenarios",
+                "7.15 Channel Logic Chain Viewer",
+                "8.x ConditionEngine",
+                "Raw JSON or arbitrary NBT path editors",
+                "No arbitrary shell",
+                "No git mutation tools in MCP"
+        )) {
+            requireContains(context, marker, "7.14 stabilization context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "v1.43.0-web-admin-signal-listener-editing",
+                "7.14 WebAdmin Editing Stabilization",
+                "7.x 已把 WebAdmin 从只读观察层推进到受控编辑层",
+                "docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md",
+                "docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md",
+                "Local Test MCP Foundation",
+                "手动测试仍为主",
+                "MCP 不提供任意 shell",
+                "不提供 git mutation",
+                "edit lock 不是 toast-only",
+                "dark combobox",
+                "4K 200% scaled",
+                "7.15：Channel Logic Chain Viewer",
+                "8.x：ConditionEngine",
+                "不要误认为已完成",
+                "不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`",
+                "不提供 raw JSON / NBT path 编辑",
+                "WebAdmin 历史阶段记录"
+        )) {
+            requireContains(readme, marker, "README 7.14 current capability marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdmin Editing Capability Matrix 7.14",
+                "Device metadata",
+                "Physical device basic config",
+                "VBD native trigger",
+                "Interaction matcher",
+                "itemSubmit unified editor",
+                "Container template",
+                "Signal channel metadata",
+                "ActionRelay",
+                "SignalReceiver",
+                "RegionController",
+                "SignalListener",
+                "Users",
+                "Settings",
+                "Doctor",
+                "History",
+                "Local Test MCP",
+                "Manual testing is primary",
+                "7.15: Channel Logic Chain Viewer MVP",
+                "8.x: ConditionEngine"
+        )) {
+            requireContains(matrix, marker, "7.14 editing capability matrix marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "channel-combo",
+                "renderRegionControllerRegionCombo",
+                "openActionRelayActionsReadonlyModal",
+                "openRegionControllerActionListModal",
+                "openSignalListenerActionListModal",
+                "signalListenerBasicConfigEditAction",
+                "data-signal-listener-basic-lock-disabled=\"true\"",
+                "data-region-controller-action-summary-card=\"true\"",
+                "data-signal-listener-action-summary-card=\"true\"",
+                "data-region-action-dynamic-fields=\"true\"",
+                "data-signal-listener-action-dynamic-fields=\"true\"",
+                "dangerousModalFooter"
+        )) {
+            requireContains(js, marker, "7.14 WebAdmin UI style consistency marker present: " + marker);
+        }
+
+        requireContains(localMcpContext, "No arbitrary shell tool", "MCP context still forbids arbitrary shell");
+        requireContains(localMcpContext, "No git mutation tools", "MCP context still forbids git mutation");
+        requireContains(localMcpContext, "No Minecraft client GUI coordinate clicking", "MCP context still forbids Minecraft GUI coordinate clicking");
+        requireContains(localMcpContext, "reports/mcp", "MCP context documents local report output");
+
+        requireFalse(readme.contains("MCP 已完全代替手工验收") || readme.contains("MCP completely replaces manual testing"),
+                "README must not claim MCP replaces manual testing");
+        requireFalse(context.contains("本阶段实现 ConditionEngine") || context.contains("Channel Logic Chain Editor is complete"),
+                "7.14 context must not claim future large systems are complete");
+        requireFalse(matrix.contains("raw JSON editor complete") || matrix.contains("ConditionEngine complete"),
+                "7.14 matrix must not mark raw JSON or ConditionEngine complete");
+        requireFalse(js.contains("channelLogicChainEditor") || js.contains("saveChannelLogicChain") || js.contains("data-channel-logic-chain-editor"),
+                "7.14 must not introduce channel logic chain editor write paths");
+        requireFalse(js.contains("conditionEngineEditor") || js.contains("saveConditionEngine"),
+                "7.14 must not introduce ConditionEngine editor write paths");
+        requireFalse(js.contains("raw-json-textarea") || js.contains("rawJsonEditor"),
+                "7.14 must not introduce raw JSON editor paths");
     }
 
     private static void requireTrue(boolean value, String message) {

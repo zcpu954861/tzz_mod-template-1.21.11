@@ -19,6 +19,7 @@ public final class LocalTestMcpFoundationGuardTest {
         testPackageAndConfig();
         testToolRegistryMarkers();
         testSafetyMarkers();
+        testReadmeStabilizationMarkers();
         testWebAdminPasswordUiMarkers();
         testForbiddenToolSourceMarkers();
         System.out.println("Local test MCP foundation guard checks passed.");
@@ -135,6 +136,23 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(context, "observes `/api/auth/login`", "context documents login request observation");
         requireContains(context, "returns `SUBMIT_NOT_TRIGGERED`", "context documents no-submit login failure");
         requireContains(context, "If the page is redirected or stuck on `/login`, it returns `AUTH_REQUIRED`", "context documents goto auth gate");
+    }
+
+    private static void testReadmeStabilizationMarkers() throws IOException {
+        String readme = read("README.md");
+        requireContains(readme, "当前 WebAdmin / 7.x 编辑层状态", "README documents current WebAdmin capabilities");
+        requireContains(readme, "WebAdmin Editing Capability Matrix 7.14", "README links 7.14 capability matrix");
+        requireContains(readme, "Local Test MCP Foundation", "README documents Local Test MCP auxiliary tools");
+        requireContains(readme, "手动测试仍为主", "README states manual testing remains primary");
+        requireContains(readme, "MCP remains auxiliary and does not replace user acceptance", "README states MCP is auxiliary");
+        requireContains(readme, "7.14 stabilization does not generate screenshots", "README states 7.14 does not generate screenshots");
+        requireContains(readme, "does not run MCP scenarios", "README states 7.14 does not run MCP scenarios");
+        requireContains(readme, "MCP 不提供任意 shell", "README keeps no arbitrary shell boundary");
+        requireContains(readme, "不提供 git mutation", "README keeps no git mutation boundary");
+        requireContains(readme, "不提供 raw JSON / NBT path 编辑", "README keeps no raw JSON boundary");
+        requireContains(readme, "8.x：ConditionEngine", "README keeps ConditionEngine as future work");
+        requireContains(readme, "7.15：Channel Logic Chain Viewer", "README keeps channel logic chain viewer as future work");
+        requireFalse(readme.contains("MCP 已完全代替手工验收"), "README must not claim MCP replaces manual testing");
     }
 
     private static void testPackageAndConfig() throws IOException {

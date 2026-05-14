@@ -1,13 +1,79 @@
 # Tzz_mod
 
-Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和服务器玩法的 Fabric mod。模组提供手机、AR、地图区域、任务、封锁卡、动作执行和区域事件控制等服务端与客户端能力。
+Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 最新发布版本：`v1.33.0-web-admin-signal-listener-basic-editing`
-- 当前开发版本：`v1.33.0-web-admin-signal-listener-basic-editing`（7.4 WebAdmin Signal channel metadata + listener basic config editing；以 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.43.0-web-admin-signal-listener-editing`
+- 当前开发基线：`7.14 WebAdmin Editing Stabilization`；本阶段发布后建议版本为 `v1.44.0-web-admin-editing-stabilization`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
 - 许可证：`CC0-1.0`
+
+## 当前 WebAdmin / 7.x 编辑层状态
+
+7.x 已把 WebAdmin 从只读观察层推进到受控编辑层。当前已开放或补齐的主要能力包括：
+
+- 登录、session、当前用户改密和 OWNER 密码重置辅助 API。
+- Dashboard、设备管理、Signal channel、Doctor、History、用户与设置只读页面。
+- 设备显示元数据编辑：显示名、备注、图标 key。
+- 设备基础配置编辑：enabled、primary channel。
+- 支持设备扩展配置：VBD 交互频道、成功/失败频道、冷却，SignalReceiver pulse ticks，ActionRelay cooldown 等。
+- Signal channel metadata 编辑：显示名、备注、图标 key。
+- VBD native trigger 编辑：红石、BlockState、右键、容器 open/close/change 等现有触发配置。
+- interaction matcher 编辑：模板物品、来源、matcher options、数量模式和原版交互策略。
+- itemSubmit unified requirement editor：0/1/N requirement 统一编辑，保留 all-or-nothing / staged consume 语义。
+- container template 编辑：通过受控 session / GUI 路径编辑容器条件模板。
+- ActionRelay action list 编辑：稳定 summary card + modal/drawer，一条一条新增、查看、删除、清空。
+- RegionController editing：创建、删除、enabled/name/regionId/targetFilter/stayInterval 编辑，enter/exit/stay actions 管理。
+- SignalListener / 虚拟监听器 editing：创建、删除、enabled/channel/cooldown 编辑，actions 管理，最近事件、edit lock 和运行时 action 支持。
+- WebAdmin 写入基础：权限、CSRF / same-origin、edit lock、expectedFingerprint、`WebAdminWriteResult`、audit、realtime 和 dirty guard。
+
+当前能力入口文档：
+
+- [7.14 WebAdmin Editing Stabilization Current Context](docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md)
+- [WebAdmin Editing Capability Matrix 7.14](docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md)
+
+当前仍未完成、不要误认为已完成的方向：
+
+- 7.15：Channel Logic Chain Viewer / 频道视角模块化逻辑链查看器 MVP。
+- 8.x：ConditionEngine / 条件判断系统。
+- 后续：GameController / MissionSystem / PhaseController。
+- 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
+
+## WebAdmin UI 规范
+
+后续类似编辑功能应复用 7.x 已验收交互模式：
+
+- channel 字段使用 dark combobox，可选择已有 channel，也可手动输入新 channel；输入新 channel 不自动创建消费者。
+- regionId 使用可搜索 dark selector，不能退回突兀的原生白色 select。
+- action list 在详情页显示稳定 summary card，完整列表放在 modal/drawer 中管理，避免 action 数量撑大页面。
+- action add form 按类型动态显示字段：signal 只显示频道，command 显示命令/权限/安全提示，message 显示消息，sound 显示音效字段。
+- edit lock 不是 toast-only：被别人锁定时按钮应 disabled 或替换为锁状态，当前用户持锁时显示正在编辑 / 到期信息。
+- 删除和清空确认要清楚说明对象，通常不要求输入 ID/name。
+- 主文案使用中文；技术 ID 可作为副文本保留。
+- UI 改动需要小分辨率和 4K 200% scaled 人工确认。7.14 本身不生成截图。
+
+## Local Test MCP Foundation
+
+仓库包含 `tools/tzz-test-mcp` 本地辅助工具箱，用于 WebAdmin / Minecraft dev runtime / TestBridge / report 的受控本地检查。它当前主要作为 Codex 和开发者的辅助工具，不再强制替代用户完整手动验收。
+
+原则：
+
+- 手动测试仍为主，特别是 UI 视觉验收和真实玩法手感。
+- MCP 可以辅助启动 dev client、等待 WebAdmin/TestBridge、准备测试区域、执行安全 TestBridge 原子工具、截图和写报告。
+- MCP 工具箱包括固定 Gradle preset、本地 WebAdmin browser helpers、loopback/token TestBridge、Minecraft dev runtime start/wait/stop、test world prepare、Minecraft GUI semantic ops、Minecraft client screenshot、WebAdmin responsive matrix、固定 scenario runner 和 cleanup。
+- `reports/mcp`、`reports/mcp/screenshots`、responsive reports、scenario reports 都是本地测试输出，不提交。
+- MCP 不提供任意 shell、不提供 git mutation、不访问外部 host、不做 OS 鼠标键盘控制、不做 Minecraft GUI 坐标点击。
+- TestBridge 仅 loopback/local、需要 token、默认关闭。
+- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance.
+
+## 安全边界
+
+- WebAdmin 写入必须走 session、角色权限、CSRF / same-origin、validation、edit lock、expectedFingerprint、`WebAdminWriteResult`、audit 和 realtime。
+- Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
+- 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
+- 不提供 raw JSON / NBT path 编辑。
+- 不提供 ConditionEngine、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能。
 
 ## 主要功能
 
@@ -19,7 +85,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、只读 API、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region 管理、Action 系统只读页面，以及 7.0 起低风险设备显示元数据编辑闭环。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region / Action 观测，以及 7.x 受控编辑能力。ActionRelay、RegionController、SignalListener 等已具备对应 WebUI 编辑入口；Action 系统聚合页仍以只读观测为主。
 
 ## 命令入口
 
@@ -37,7 +103,9 @@ Tzz_mod（mod id: `tzz_mod`）是用于适配“全员逃走中”数据包和�
 
 旧根命令已迁移到 `/tzz` 子命令下；当前代码不再注册旧的 `/map`、`/task`、`/note`、`/sendmsg` 根命令。
 
-## WebAdmin Foundation
+## WebAdmin 历史阶段记录（6.0-7.2，仅背景）
+
+下面内容保留 6.x 到早期 7.x 阶段的历史记录。当这些历史段落写“只读”“暂不开放”或“不包含”时，表示当时阶段边界，不代表当前 7.14 能力。当前能力以本 README 顶部的 7.x 编辑层状态、`docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md` 和 `docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md` 为准。
 
 ### 7.2 WebAdmin Device Basic Config Editing
 
@@ -1026,6 +1094,19 @@ world/tzz_mod/region_controllers.json
 
 ```bash
 ./gradlew.bat clean build
+```
+
+当前 7.x / Local Test MCP 验证通常还需要：
+
+```powershell
+cd tools\tzz-test-mcp
+npm run build
+npm test
+
+cd ..\..
+.\gradlew.bat stabilizationGuardTest --rerun-tasks
+.\gradlew.bat localTestMcpGuardTest --rerun-tasks
+git diff --check
 ```
 
 构建产物位于 `build/libs/`。
