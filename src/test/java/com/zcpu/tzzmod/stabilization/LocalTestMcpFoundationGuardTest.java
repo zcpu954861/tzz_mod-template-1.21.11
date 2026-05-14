@@ -182,10 +182,16 @@ public final class LocalTestMcpFoundationGuardTest {
         String lowerTools = tools.toLowerCase();
         requireFalse(lowerTools.contains("logic_chain") || lowerTools.contains("logic-chain") || tools.contains("logicChain") || tools.contains("logic-chains"),
                 "7.15 logic chain viewer must not add a new MCP tool");
+        requireFalse(lowerTools.contains("condition_engine") || lowerTools.contains("condition-engine") || tools.contains("conditionEngine")
+                        || lowerTools.contains("game_controller") || lowerTools.contains("mission_system") || lowerTools.contains("phase_controller"),
+                "8.0 ConditionEngine core must not add MCP tools for conditions or high-level game systems");
         String scenarios = read("tools/tzz-test-mcp/src/tools/scenario.ts");
         String lowerScenarios = scenarios.toLowerCase();
         requireFalse(lowerScenarios.contains("logic_chain") || lowerScenarios.contains("logic-chain") || scenarios.contains("logicChain") || scenarios.contains("logic-chains"),
                 "7.15 logic chain viewer must not add an MCP scenario");
+        requireFalse(lowerScenarios.contains("condition_engine") || lowerScenarios.contains("condition-engine") || scenarios.contains("conditionEngine")
+                        || lowerScenarios.contains("game_controller") || lowerScenarios.contains("mission_system") || lowerScenarios.contains("phase_controller"),
+                "8.0 ConditionEngine core must not add MCP scenarios");
 
         String server = read("tools/tzz-test-mcp/src/server.ts");
         requireContains(server, "tools/list", "MCP tools/list handler exists");
@@ -689,6 +695,9 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("pyautogui"), "MCP source does not expose pyautogui automation");
         requireFalse(source.contains("keyboard"), "MCP source does not expose OS keyboard automation");
         requireFalse(source.contains("ConditionEngine"), "MCP source does not enter ConditionEngine");
+        requireFalse(source.contains("GameController"), "MCP source does not enter GameController");
+        requireFalse(source.contains("MissionSystem"), "MCP source does not enter MissionSystem");
+        requireFalse(source.contains("PhaseController"), "MCP source does not enter PhaseController");
     }
 
     private static String readToolSources() throws IOException {
