@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.44.0-web-admin-editing-stabilization`
-- 当前开发基线：`7.15 WebAdmin Cross-Channel Logic Chain Viewer MVP`；本阶段发布后建议版本为 `v1.45.0-web-admin-logic-chain-viewer`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.45.0-web-admin-logic-chain-viewer`
+- 当前开发基线：`8.0 ConditionEngine Core`；本阶段只做 ConditionEngine Core，发布后建议版本为 `v1.46.0-condition-engine-core`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -34,12 +34,28 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [7.14 WebAdmin Editing Stabilization Current Context](docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md)
 - [WebAdmin Editing Capability Matrix 7.14](docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md)
 - [7.15 WebAdmin Logic Chain Viewer Current Context](docs/WEBADMIN_LOGIC_CHAIN_VIEWER_7_15_CURRENT_CONTEXT.md)
+- [8.0 ConditionEngine Core Current Context](docs/CONDITION_ENGINE_CORE_8_0_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.0](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_0.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.0 Core；当前只提供无副作用判断核心，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
+
+## 8.0 ConditionEngine Core
+
+8.0 是 TZZ Mod 从“事件工具链 / WebAdmin 编辑层”进入“可配置游戏逻辑判断层”的核心起点。当前只做 ConditionEngine Core：条件树、AND / OR / NOT、最小内置条件、EvaluationContext、ConditionResult debug tree、registry、validation 和安全限制。
+
+核心边界：
+
+- Condition 只负责判断，不产生副作用。
+- 状态写入、发信号、发消息、给物品、传送、执行命令等仍由 Action / Signal / 未来 GameController 负责。
+- 旧“全员逃走中”数据包只作为条件复杂度参考，不把旧 function、scoreboard、trigger 或任务流程搬进模组。
+- 8.0 不做具体逃走中任务，不做任务一 / 任务二 / 复活任务 / 猎人出生点选择 / 逃走能量 / OP 计时器。
+- 8.0 不做 GameController / MissionSystem / PhaseController。
+- 8.0 不接入 VBD、SignalListener、RegionController、ActionRelay、itemSubmit runtime，不改 SignalBridge runtime。
+- 8.0 不提供 WebAdmin 条件可视化编辑器，不提供 raw JSON / NBT path 编辑器，不新增 MCP tool，不跑 MCP scenario，不生成截图。
 
 ## WebAdmin UI 规范
 
@@ -66,7 +82,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - `reports/mcp`、`reports/mcp/screenshots`、responsive reports、scenario reports 都是本地测试输出，不提交。
 - MCP 不提供任意 shell、不提供 git mutation、不访问外部 host、不做 OS 鼠标键盘控制、不做 Minecraft GUI 坐标点击。
 - TestBridge 仅 loopback/local、需要 token、默认关闭。
-- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance.
+- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core requirements or new 8.0 scope.
 
 ## 安全边界
 
@@ -74,7 +90,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- 不提供 ConditionEngine、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能；7.15 逻辑链只读查看器不是编辑器。
+- 不提供 ConditionEngine runtime integration / WebAdmin editor、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能；7.15 逻辑链只读查看器不是编辑器。
 
 ## 主要功能
 

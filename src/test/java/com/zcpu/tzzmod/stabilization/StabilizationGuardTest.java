@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.stabilization;
 import com.google.gson.Gson;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
@@ -132,6 +133,8 @@ public final class StabilizationGuardTest {
         testWebAdminSignalListenerEditing();
         testWebAdminEditingStabilization714();
         testWebAdminLogicChainViewer715();
+        ConditionEngineCoreTest.run();
+        testConditionEngineCore80();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -5100,7 +5103,7 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "v1.44.0-web-admin-editing-stabilization",
+                "v1.45.0-web-admin-logic-chain-viewer",
                 "7.14 WebAdmin Editing Stabilization",
                 "7.x 已把 WebAdmin 从只读观察层推进到受控编辑层",
                 "docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md",
@@ -5236,8 +5239,8 @@ public final class StabilizationGuardTest {
                 "7.15 context must not claim ConditionEngine/editor/MCP scenario completion");
 
         for (String marker : List.of(
-                "v1.44.0-web-admin-editing-stabilization",
-                "7.15 WebAdmin Cross-Channel Logic Chain Viewer MVP",
+                "v1.45.0-web-admin-logic-chain-viewer",
+                "8.0 ConditionEngine Core",
                 "Logic Chain Viewer MVP",
                 "只读跨频道逻辑链查看器",
                 "WebAdmin-only 视图 metadata",
@@ -5386,6 +5389,226 @@ public final class StabilizationGuardTest {
                 "7.15 logic chain metadata must not mutate runtime devices/listeners/regions/actions");
         requireFalse(service.contains("SignalBridge.dispatch") || service.contains("SignalBridge.emit"),
                 "7.15 service must not rewrite or dispatch SignalBridge runtime");
+    }
+
+    private static void testConditionEngineCore80() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_ENGINE_CORE_8_0_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_0.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String evaluator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluator.java"), StandardCharsets.UTF_8);
+        String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
+        String node = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNode.java"), StandardCharsets.UTF_8);
+        String definition = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionGroupDefinition.java"), StandardCharsets.UTF_8);
+        String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
+        String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
+        String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionEngineCoreTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionDefinition.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionGroupDefinition.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionNode.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionGroupMode.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationTrace.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluator.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionTypeHandler.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionPredicate.java",
+                "src/main/java/com/zcpu/tzzmod/condition/ConditionValidationResult.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.0 ConditionEngine core file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.0 ConditionEngine Core",
+                "旧数据包只作为条件复杂度参考",
+                "Condition has no side effects",
+                "EvaluationContext",
+                "ConditionResult",
+                "ConditionRegistry",
+                "Validation",
+                "max depth",
+                "max node",
+                "always_true",
+                "always_false",
+                "AND / OR / NOT",
+                "failure reason",
+                "debug tree",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做 PhaseController",
+                "不接入 VBD",
+                "不接入 SignalListener",
+                "不接入 RegionController",
+                "不接入 ActionRelay",
+                "不改 SignalBridge runtime",
+                "不做 raw JSON editor",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图"
+        )) {
+            requireContains(context, marker, "8.0 context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "ConditionEngine Core",
+                "无副作用",
+                "ConditionDefinition",
+                "ConditionGroupDefinition",
+                "ConditionNode",
+                "ConditionGroupMode",
+                "AND / OR / NOT",
+                "ConditionEvaluationContext",
+                "ConditionEvaluationResult",
+                "ConditionRegistry",
+                "Validation",
+                "maxDepth",
+                "maxNodes",
+                "always_true",
+                "always_false",
+                "context_field_exists",
+                "context_equals",
+                "不做具体逃走中任务",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不接入现有运行时"
+        )) {
+            requireContains(matrix, marker, "8.0 capability matrix marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "v1.45.0-web-admin-logic-chain-viewer",
+                "8.0 ConditionEngine Core",
+                "只做 ConditionEngine Core",
+                "不做具体逃走中任务",
+                "不做 GameController / MissionSystem / PhaseController"
+        )) {
+            requireContains(readme, marker, "README 8.0 marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "ConditionNodeType.GROUP",
+                "ConditionGroupMode.AND",
+                "ConditionGroupMode.OR",
+                "ConditionGroupMode.NOT",
+                "condition_max_depth_exceeded",
+                "condition_max_nodes_exceeded",
+                "condition_group_not_child_count_invalid",
+                "condition_duplicate_node_id"
+        )) {
+            requireContains(evaluator, marker, "8.0 evaluator marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "ConditionNodeType.ALWAYS_TRUE",
+                "ConditionNodeType.ALWAYS_FALSE",
+                "ConditionNodeType.CONTEXT_FIELD_EXISTS",
+                "ConditionNodeType.CONTEXT_EQUALS",
+                "condition_type_unknown",
+                "condition_evaluation_exception",
+                "ConditionTypeMetadata",
+                "ConditionFieldSchema"
+        )) {
+            requireContains(registry, marker, "8.0 registry marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "enabled",
+                "groupMode",
+                "children",
+                "ConditionNodeConfig",
+                "normalized"
+        )) {
+            requireContains(node, marker, "8.0 node marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "stableFingerprint",
+                "SHA-256",
+                "CURRENT_VERSION"
+        )) {
+            requireContains(definition, marker, "8.0 stable fingerprint marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "playerId",
+                "worldId",
+                "sourceType",
+                "channel",
+                "deviceId",
+                "listenerId",
+                "regionId",
+                "actionId",
+                "blockPos",
+                "itemStackSummary",
+                "gameTime",
+                "variables",
+                "eventMetadata"
+        )) {
+            requireContains(contextModel, marker, "8.0 EvaluationContext marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "matched",
+                "failureReason",
+                "reasonCode",
+                "childResults",
+                "skipped",
+                "error",
+                "evaluatedNodeCount",
+                "durationNanos",
+                "contextSummary"
+        )) {
+            requireContains(result, marker, "8.0 ConditionResult debug tree marker present: " + marker);
+        }
+        for (String marker : List.of(
+                "testBooleanGroups",
+                "testNestedGroup",
+                "testDisabledNode",
+                "testContextConditions",
+                "testUnknownAndInvalidTypes",
+                "testValidationIssues",
+                "testDepthAndNodeLimits",
+                "testResultDebugTree"
+        )) {
+            requireContains(tests, marker, "8.0 condition core test marker present: " + marker);
+        }
+
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"), null);
+        requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
+                "8.0 ConditionEngine core must not execute actions or emit signals");
+        requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
+                        || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
+                "8.0 ConditionEngine core must not integrate VBD/listener/region/action runtime stores");
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
+                        || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
+                "8.0 must not wire ConditionEngine into existing runtime packages");
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
+                        || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
+                "8.0 must not add a WebAdmin ConditionEngine editor or raw JSON condition API");
+        requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.0 docs must not claim concrete old datapack tasks or high-level game systems are implemented");
+    }
+
+    private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {
+        StringBuilder content = new StringBuilder();
+        Path excluded = excludedDirectory == null ? null : excludedDirectory.toAbsolutePath().normalize();
+        try (java.util.stream.Stream<Path> paths = Files.walk(directory)) {
+            paths.filter(Files::isRegularFile)
+                    .filter((path) -> path.toString().endsWith(".java"))
+                    .filter((path) -> excluded == null || !path.toAbsolutePath().normalize().startsWith(excluded))
+                    .sorted()
+                    .forEach((path) -> {
+                        try {
+                            content.append(Files.readString(path, StandardCharsets.UTF_8)).append('\n');
+                        } catch (IOException exception) {
+                            throw new java.io.UncheckedIOException(exception);
+                        }
+                    });
+        } catch (java.io.UncheckedIOException exception) {
+            throw exception.getCause();
+        }
+        return content.toString();
     }
 
     private static void requireTrue(boolean value, String message) {
