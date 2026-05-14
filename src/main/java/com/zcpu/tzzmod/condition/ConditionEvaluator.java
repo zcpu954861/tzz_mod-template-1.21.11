@@ -110,26 +110,26 @@ public final class ConditionEvaluator {
         } else if (node.groupMode() == ConditionGroupMode.AND) {
             matched = !error && active.stream().allMatch(ConditionEvaluationResult::matched);
             code = matched ? "condition_group_and_passed" : "condition_group_and_failed";
-            message = matched ? "AND 条件组全部通过" : "AND 条件组存在未通过子条件";
+            message = matched ? "全部满足条件组已通过" : "全部满足条件组存在未通过子条件";
         } else if (node.groupMode() == ConditionGroupMode.OR) {
             matched = !error && active.stream().anyMatch(ConditionEvaluationResult::matched);
             code = matched ? "condition_group_or_passed" : "condition_group_or_failed";
-            message = matched ? "OR 条件组至少一个子条件通过" : "OR 条件组没有子条件通过";
+            message = matched ? "任意满足条件组至少一个子条件通过" : "任意满足条件组没有子条件通过";
         } else {
             if (active.size() != 1) {
                 matched = false;
                 error = true;
                 code = "condition_group_not_child_count_invalid";
-                message = "NOT 条件组必须且只能有一个启用子条件";
+                message = "条件取反组必须且只能有一个启用子条件";
             } else if (active.getFirst().error()) {
                 matched = false;
                 error = true;
                 code = "condition_group_not_child_error";
-                message = "NOT 子条件判断失败：" + active.getFirst().message();
+                message = "条件取反子条件判断失败：" + active.getFirst().message();
             } else {
                 matched = !active.getFirst().matched();
                 code = matched ? "condition_group_not_passed" : "condition_group_not_failed";
-                message = matched ? "NOT 子条件未通过，因此条件组通过" : "NOT 子条件通过，因此条件组失败";
+                message = matched ? "条件取反：子条件未通过，因此条件组通过" : "条件取反：子条件通过，因此条件组失败";
             }
         }
         if (!matched || error) {
@@ -191,7 +191,7 @@ public final class ConditionEvaluator {
                 issues.add(new ConditionValidationIssue(node.id(), path, "condition_group_empty", "条件组至少需要一个启用子条件"));
             }
             if (node.groupMode() == ConditionGroupMode.NOT && enabledChildren != 1) {
-                issues.add(new ConditionValidationIssue(node.id(), path, "condition_group_not_child_count_invalid", "NOT 条件组必须且只能有一个启用子条件"));
+                issues.add(new ConditionValidationIssue(node.id(), path, "condition_group_not_child_count_invalid", "条件取反组必须且只能有一个启用子条件"));
             }
             for (int index = 0; index < node.children().size(); index++) {
                 if (state.truncated) {
@@ -215,8 +215,7 @@ public final class ConditionEvaluator {
     private static String appendFirstChildFailure(String message, List<ConditionEvaluationResult> active) {
         for (ConditionEvaluationResult child : active) {
             if (child.error() || !child.matched()) {
-                String nodeId = child.nodeId() == null || child.nodeId().isBlank() ? child.label() : child.nodeId();
-                return message + "；首个失败节点：" + nodeId + "（" + child.reasonCode() + "）" + child.message();
+                return message + "；首个失败节点：" + child.label() + "（" + child.reasonCode() + "）" + child.message();
             }
         }
         return message;

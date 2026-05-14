@@ -71,7 +71,7 @@ public final class ConditionEngineCoreTest {
         ConditionNode mismatch = ConditionNode.leaf("source_mismatch", ConditionNodeType.CONTEXT_EQUALS, ConditionNodeConfig.of("field", "sourceType", "expected", "region"));
         ConditionEvaluationResult mismatchResult = evaluator.evaluate(ConditionGroupDefinition.of("mismatch", mismatch), context);
         requireFalse(mismatchResult.matched(), "context mismatch fails");
-        requireContains(mismatchResult.failureReason(), "期望 `region`", "context mismatch failure reason");
+        requireContains(mismatchResult.failureReason(), "期望 region", "context mismatch failure reason");
     }
 
     private static void testUnknownAndInvalidTypes() {
@@ -140,8 +140,8 @@ public final class ConditionEngineCoreTest {
         requireEquals("debug", result.conditionId(), "result carries condition id");
         requireEquals(2, result.childResults().size(), "debug tree carries child results");
         requireTrue(result.evaluatedNodeCount() >= 3, "debug tree reports evaluated node count");
-        requireContains(result.failureReason(), "AND", "debug tree has readable failure reason");
-        requireContains(result.failureReason(), "b", "debug tree failure reason points at failed child");
+        requireContains(result.failureReason(), "全部满足", "debug tree has readable failure reason");
+        requireContains(result.failureReason(), "永远失败", "debug tree failure reason points at failed child");
     }
 
     private static ConditionEvaluationResult evaluate(ConditionEvaluator evaluator, ConditionGroupMode mode, ConditionNode left, ConditionNode right) {
