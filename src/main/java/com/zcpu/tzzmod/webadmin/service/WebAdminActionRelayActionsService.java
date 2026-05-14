@@ -444,7 +444,18 @@ public final class WebAdminActionRelayActionsService {
         if (tokens.isEmpty()) {
             return false;
         }
-        return isServerManagementRoot(commandRoot(tokens.getFirst()));
+        if (isServerManagementRoot(commandRoot(tokens.getFirst()))) {
+            return true;
+        }
+        if ("execute".equals(commandRoot(tokens.getFirst()))) {
+            for (int index = 0; index < tokens.size() - 1; index++) {
+                if ("run".equals(commandRoot(tokens.get(index)))
+                        && isServerManagementRoot(commandRoot(tokens.get(index + 1)))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isServerManagementRoot(String root) {
@@ -453,6 +464,9 @@ public final class WebAdminActionRelayActionsService {
                 || "kick".equals(root)
                 || "op".equals(root)
                 || "deop".equals(root)
+                || "reload".equals(root)
+                || "save-off".equals(root)
+                || "save-on".equals(root)
                 || "stop".equals(root)
                 || "whitelist".equals(root)
                 || "pardon".equals(root)

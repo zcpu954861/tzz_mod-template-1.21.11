@@ -28,6 +28,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
+    public static final String TARGET_REGION_CONTROLLER_CONFIG = "region_controller_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
     private final Map<String, WebAdminEditLock> locks = new ConcurrentHashMap<>();
@@ -543,6 +544,9 @@ public final class WebAdminEditLockService {
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return "Signal Listener 基础配置";
         }
+        if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
+            return "RegionController 配置";
+        }
         return "WebAdmin";
     }
 
@@ -598,6 +602,9 @@ public final class WebAdminEditLockService {
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG;
         }
+        if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_REGION;
+        }
         return null;
     }
 
@@ -610,6 +617,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(lock.targetType())) {
             return "#/signals";
+        }
+        if (TARGET_REGION_CONTROLLER_CONFIG.equals(lock.targetType())) {
+            return "#/region-controllers/" + encode(lock.targetId());
         }
         return "";
     }

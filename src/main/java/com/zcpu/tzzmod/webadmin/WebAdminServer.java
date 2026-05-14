@@ -21,6 +21,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest;
 import com.zcpu.tzzmod.webadmin.route.WebAdminReadonlyRoutes;
@@ -39,6 +40,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubm
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
@@ -86,6 +88,7 @@ public final class WebAdminServer {
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
@@ -298,6 +301,10 @@ public final class WebAdminServer {
             }
             if (path.startsWith("/api/webadmin/signal-listener-basic-config/")) {
                 handleSignalListenerBasicConfig(exchange, auth, path, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/region-controllers") || path.startsWith("/api/webadmin/region-controllers/")) {
+                runOnServerThread(() -> handleRegionControllers(exchange, auth, path, method));
                 return;
             }
             final boolean[] readonlyHandled = new boolean[1];
@@ -1280,6 +1287,201 @@ public final class WebAdminServer {
         WebAdminJsonResponse.ok(exchange, result);
     }
 
+    private void handleRegionControllers(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/region-controllers";
+        if (path.equals(root)) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, regionControllerService.listControllers(minecraftServer, auth.user, auth.session));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminRegionControllerRequests.CreateRequest request = readJson(exchange, WebAdminRegionControllerRequests.CreateRequest.class);
+                if (request == null) {
+                    request = new WebAdminRegionControllerRequests.CreateRequest();
+                }
+                WebAdminWriteResult result = regionControllerService.create(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        String prefix = root + "/";
+        String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "RegionController ID 不能为空。");
+            return;
+        }
+        String[] parts = tail.split("/");
+        String controllerId = decodePathSegment(parts[0]);
+        if (controllerId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "RegionController ID 不能为空。");
+            return;
+        }
+
+        if (parts.length == 1) {
+            if (method.equalsIgnoreCase("GET")) {
+                Map<String, Object> data = regionControllerService.controllerFor(minecraftServer, auth.user, auth.session, controllerId);
+                if (data == null) {
+                    WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "区域控制器不存在。");
+                    return;
+                }
+                WebAdminJsonResponse.ok(exchange, data);
+                return;
+            }
+            if (method.equalsIgnoreCase("PATCH")) {
+                WebAdminRegionControllerRequests.UpdateRequest request = readJson(exchange, WebAdminRegionControllerRequests.UpdateRequest.class);
+                if (request == null) {
+                    request = new WebAdminRegionControllerRequests.UpdateRequest();
+                }
+                request.controllerId = controllerId;
+                WebAdminWriteResult result = regionControllerService.update(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        controllerId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH。");
+            return;
+        }
+
+        if (parts.length == 2 && "delete".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminRegionControllerRequests.DeleteRequest request = readJson(exchange, WebAdminRegionControllerRequests.DeleteRequest.class);
+            if (request == null) {
+                request = new WebAdminRegionControllerRequests.DeleteRequest();
+            }
+            request.controllerId = controllerId;
+            WebAdminWriteResult result = regionControllerService.delete(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    controllerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 3 && "actions".equals(parts[1])) {
+            com.zcpu.tzzmod.region.RegionTriggerType triggerType = parseRegionTriggerType(parts[2]);
+            if (triggerType == null) {
+                WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "triggerType 只支持 enter / exit / stay。");
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminRegionControllerRequests.ActionAddRequest request = readJson(exchange, WebAdminRegionControllerRequests.ActionAddRequest.class);
+                if (request == null) {
+                    request = new WebAdminRegionControllerRequests.ActionAddRequest();
+                }
+                request.controllerId = controllerId;
+                request.triggerType = triggerType.name();
+                WebAdminWriteResult result = regionControllerService.addAction(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        controllerId,
+                        triggerType,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+
+        if (parts.length == 4 && "actions".equals(parts[1]) && "clear".equals(parts[3])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            com.zcpu.tzzmod.region.RegionTriggerType triggerType = parseRegionTriggerType(parts[2]);
+            if (triggerType == null) {
+                WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "triggerType 只支持 enter / exit / stay。");
+                return;
+            }
+            WebAdminRegionControllerRequests.ActionClearRequest request = readJson(exchange, WebAdminRegionControllerRequests.ActionClearRequest.class);
+            if (request == null) {
+                request = new WebAdminRegionControllerRequests.ActionClearRequest();
+            }
+            request.controllerId = controllerId;
+            request.triggerType = triggerType.name();
+            WebAdminWriteResult result = regionControllerService.clearActions(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    controllerId,
+                    triggerType,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 5 && "actions".equals(parts[1]) && "delete".equals(parts[4])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            com.zcpu.tzzmod.region.RegionTriggerType triggerType = parseRegionTriggerType(parts[2]);
+            if (triggerType == null) {
+                WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "triggerType 只支持 enter / exit / stay。");
+                return;
+            }
+            WebAdminRegionControllerRequests.ActionDeleteRequest request = readJson(exchange, WebAdminRegionControllerRequests.ActionDeleteRequest.class);
+            if (request == null) {
+                request = new WebAdminRegionControllerRequests.ActionDeleteRequest();
+            }
+            request.controllerId = controllerId;
+            request.triggerType = triggerType.name();
+            request.actionIndex = decodePathSegment(parts[3]);
+            WebAdminWriteResult result = regionControllerService.deleteAction(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    controllerId,
+                    triggerType,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "RegionController 接口不存在。");
+    }
+
     private AuthContext requireAuth(HttpExchange exchange) throws IOException {
         String token = cookie(exchange, WebAdminSessionService.COOKIE_NAME);
         WebAdminSession session = sessionService.get(token).orElse(null);
@@ -1430,6 +1632,20 @@ public final class WebAdminServer {
 
     private static String decodePathSegment(String value) {
         return URLDecoder.decode((value == null ? "" : value).replace("+", "%2B"), StandardCharsets.UTF_8);
+    }
+
+    private static com.zcpu.tzzmod.region.RegionTriggerType parseRegionTriggerType(String value) {
+        String safe = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if ("ENTER".equals(safe)) {
+            return com.zcpu.tzzmod.region.RegionTriggerType.ENTER;
+        }
+        if ("EXIT".equals(safe)) {
+            return com.zcpu.tzzmod.region.RegionTriggerType.EXIT;
+        }
+        if ("STAY".equals(safe)) {
+            return com.zcpu.tzzmod.region.RegionTriggerType.STAY;
+        }
+        return null;
     }
 
     private static Map<String, String> queryParams(HttpExchange exchange) {
