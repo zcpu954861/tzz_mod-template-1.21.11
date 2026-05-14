@@ -14,6 +14,8 @@ public final class ConditionBasicPlayerContextTest {
         testGameTimeCompare();
         testEventMetadataConditions();
         testMissingContextSafeFailures();
+        testPlayerChineseFailureReasons();
+        testContextIdConditionFailures();
         testInvalidConfigValidation();
         testChineseMetadataAndFailureReasons();
         testGroupsWithNewConditions();
@@ -32,6 +34,10 @@ public final class ConditionBasicPlayerContextTest {
         ConditionEvaluationResult offlineResult = evaluate(leaf(ConditionNodeType.PLAYER_ONLINE), offline);
         requireFalse(offlineResult.matched(), "player_online false");
         requireContains(offlineResult.failureReason(), "玩家不在线", "player_online Chinese failure");
+
+        ConditionEvaluationResult missingPlayer = evaluate(leaf(ConditionNodeType.PLAYER_EXISTS), null);
+        requireFalse(missingPlayer.matched(), "player_exists missing context");
+        requireContains(missingPlayer.failureReason(), "上下文不存在，无法读取触发玩家", "player_exists Chinese missing context");
     }
 
     private static void testPlayerOpTagsTeamGamemodeAndAliveState() {
@@ -54,6 +60,7 @@ public final class ConditionBasicPlayerContextTest {
                 .playerAlive(false)
                 .build();
         requireTrue(evaluate(leaf(ConditionNodeType.PLAYER_DEAD), dead).matched(), "player_dead true");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_ALIVE), dead).matched(), "player_alive false");
     }
 
     private static void testContextIdConditions() {
@@ -65,10 +72,15 @@ public final class ConditionBasicPlayerContextTest {
         requireTrue(evaluate(leaf(ConditionNodeType.SOURCE_TYPE_EQUALS, config("sourceType", "signal_device")), context).matched(), "source_type_equals true");
         requireFalse(evaluate(leaf(ConditionNodeType.SOURCE_TYPE_EQUALS, config("sourceType", "command")), context).matched(), "source_type_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.SOURCE_ID_EQUALS, config("sourceId", "device-1")), context).matched(), "source_id_equals true");
+        requireFalse(evaluate(leaf(ConditionNodeType.SOURCE_ID_EQUALS, config("sourceId", "device-2")), context).matched(), "source_id_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.WORLD_EQUALS, config("world", "minecraft:overworld")), context).matched(), "world_equals true");
+        requireFalse(evaluate(leaf(ConditionNodeType.WORLD_EQUALS, config("world", "minecraft:the_nether")), context).matched(), "world_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.DEVICE_ID_EQUALS, config("deviceId", "device-1")), context).matched(), "device_id_equals true");
+        requireFalse(evaluate(leaf(ConditionNodeType.DEVICE_ID_EQUALS, config("deviceId", "device-2")), context).matched(), "device_id_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.LISTENER_ID_EQUALS, config("listenerId", "listener-1")), context).matched(), "listener_id_equals true");
+        requireFalse(evaluate(leaf(ConditionNodeType.LISTENER_ID_EQUALS, config("listenerId", "listener-2")), context).matched(), "listener_id_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.REGION_ID_EQUALS, config("regionId", "region-1")), context).matched(), "region_id_equals true");
+        requireFalse(evaluate(leaf(ConditionNodeType.REGION_ID_EQUALS, config("regionId", "region-2")), context).matched(), "region_id_equals false");
         requireTrue(evaluate(leaf(ConditionNodeType.ACTION_ID_EQUALS, config("actionId", "action-1")), context).matched(), "action_id_equals true");
         requireFalse(evaluate(leaf(ConditionNodeType.ACTION_ID_EQUALS, config("actionId", "action-2")), context).matched(), "action_id_equals false");
     }
@@ -98,11 +110,17 @@ public final class ConditionBasicPlayerContextTest {
 
     private static void testMissingContextSafeFailures() {
         requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_HAS_TAG, config("tag", "runner")), null).matched(), "missing context player tag fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_ONLINE), null).matched(), "missing context player_online fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_IS_OP), null).matched(), "missing context player_is_op fails");
         requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_LACKS_TAG, config("tag", "runner")), null).matched(), "missing context lacks tag still fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_TEAM_EQUALS, config("team", "tzz_team_runner")), null).matched(), "missing context player_team fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_GAMEMODE_EQUALS, config("gamemode", "survival")), null).matched(), "missing context player_gamemode fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_ALIVE), null).matched(), "missing context player_alive fails");
         requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_DEAD), null).matched(), "missing context player_dead fails");
         requireFalse(evaluate(leaf(ConditionNodeType.PLAYER_DEAD), ConditionEvaluationContext.builder().build()).matched(), "missing player player_dead fails");
         requireFalse(evaluate(leaf(ConditionNodeType.CHANNEL_EQUALS, config("channel", "mission.start")), null).matched(), "missing context channel fails");
         requireFalse(evaluate(leaf(ConditionNodeType.SOURCE_TYPE_EQUALS, config("sourceType", "signal_device")), ConditionEvaluationContext.builder().build()).matched(), "missing sourceType fails");
+        requireFalse(evaluate(leaf(ConditionNodeType.SOURCE_ID_EQUALS, config("sourceId", "device-1")), ConditionEvaluationContext.builder().build()).matched(), "missing sourceId fails");
         requireFalse(evaluate(leaf(ConditionNodeType.DEVICE_ID_EQUALS, config("deviceId", "device-1")), ConditionEvaluationContext.builder().build()).matched(), "missing deviceId fails");
         requireFalse(evaluate(leaf(ConditionNodeType.LISTENER_ID_EQUALS, config("listenerId", "listener-1")), ConditionEvaluationContext.builder().build()).matched(), "missing listenerId fails");
         requireFalse(evaluate(leaf(ConditionNodeType.REGION_ID_EQUALS, config("regionId", "region-1")), ConditionEvaluationContext.builder().build()).matched(), "missing regionId fails");
@@ -116,15 +134,51 @@ public final class ConditionBasicPlayerContextTest {
         requireFalse(evaluate(leaf(ConditionNodeType.EVENT_METADATA_EQUALS, config("key", "phase", "value", "start")), null).matched(), "missing context metadata equals fails");
     }
 
+    private static void testPlayerChineseFailureReasons() {
+        ConditionEvaluationContext context = richContext();
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_IS_OP, config("expected", "false")), context).failureReason(), "玩家管理员状态不匹配", "player_is_op Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_HAS_TAG, config("tag", "catcher")), context).failureReason(), "玩家缺少标签", "player_has_tag Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_LACKS_TAG, config("tag", "runner")), context).failureReason(), "玩家不应拥有标签", "player_lacks_tag Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_TEAM_EQUALS, config("team", "tzz_team_catcher")), context).failureReason(), "玩家队伍不匹配", "player_team Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_GAMEMODE_EQUALS, config("gamemode", "spectator")), context).failureReason(), "玩家游戏模式不匹配", "player_gamemode Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_ALIVE), ConditionEvaluationContext.builder().player("uuid", "Dead").playerAlive(false).build()).failureReason(), "玩家存活状态不匹配", "player_alive Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.PLAYER_DEAD), context).failureReason(), "玩家存活状态不匹配", "player_dead Chinese failure");
+    }
+
+    private static void testContextIdConditionFailures() {
+        ConditionEvaluationContext context = richContext();
+        requireContains(evaluate(leaf(ConditionNodeType.SOURCE_TYPE_EQUALS, config("sourceType", "command")), context).failureReason(), "来源类型不匹配", "source_type Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.SOURCE_ID_EQUALS, config("sourceId", "device-2")), context).failureReason(), "来源 ID不匹配", "source_id Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.WORLD_EQUALS, config("world", "minecraft:the_nether")), context).failureReason(), "世界不匹配", "world Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.DEVICE_ID_EQUALS, config("deviceId", "device-2")), context).failureReason(), "设备 ID不匹配", "device_id Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.LISTENER_ID_EQUALS, config("listenerId", "listener-2")), context).failureReason(), "监听器 ID不匹配", "listener_id Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.REGION_ID_EQUALS, config("regionId", "region-2")), context).failureReason(), "区域 ID不匹配", "region_id Chinese failure");
+        requireContains(evaluate(leaf(ConditionNodeType.ACTION_ID_EQUALS, config("actionId", "action-2")), context).failureReason(), "动作 ID不匹配", "action_id Chinese failure");
+    }
+
     private static void testInvalidConfigValidation() {
         ConditionEvaluator evaluator = new ConditionEvaluator();
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_HAS_TAG))), "condition_config_missing_tag", "missing tag validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_LACKS_TAG))), "condition_config_missing_tag", "missing lacks tag validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_IS_OP, config("expected", "yes")))), "condition_config_invalid_expected", "invalid expected validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_TEAM_EQUALS))), "condition_config_missing_team", "missing team validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_GAMEMODE_EQUALS))), "condition_config_missing_gamemode", "missing gamemode validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.PLAYER_GAMEMODE_EQUALS, config("gamemode", "flying")))), "condition_config_invalid_gamemode", "invalid gamemode validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.SOURCE_TYPE_EQUALS))), "condition_config_missing_sourceType", "missing source type validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.SOURCE_ID_EQUALS))), "condition_config_missing_sourceId", "missing source id validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.WORLD_EQUALS))), "condition_config_missing_world", "missing world validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.DEVICE_ID_EQUALS))), "condition_config_missing_deviceId", "missing device id validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.LISTENER_ID_EQUALS))), "condition_config_missing_listenerId", "missing listener id validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.REGION_ID_EQUALS))), "condition_config_missing_regionId", "missing region id validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.ACTION_ID_EQUALS))), "condition_config_missing_actionId", "missing action id validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.CHANNEL_EQUALS))), "condition_config_missing_channel", "missing channel validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.CHANNEL_EQUALS, config("channel", "Mission Start!")))), "condition_config_invalid_channel", "invalid channel validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.GAME_TIME_COMPARE, config("value", "120")))), "condition_config_missing_operator", "missing operator validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.GAME_TIME_COMPARE, config("operator", "gte")))), "condition_config_missing_value", "missing game time value validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.GAME_TIME_COMPARE, config("operator", "between", "value", "120")))), "condition_config_invalid_operator", "invalid operator validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.GAME_TIME_COMPARE, config("operator", "gte", "value", "abc")))), "condition_config_invalid_game_time", "invalid game time validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.EVENT_METADATA_EXISTS))), "condition_config_missing_key", "missing metadata key validation");
+        requireIssue(evaluator.validate(def(leaf(ConditionNodeType.EVENT_METADATA_EQUALS))), "condition_config_missing_key", "missing metadata equals key validation");
         requireIssue(evaluator.validate(def(leaf(ConditionNodeType.EVENT_METADATA_EQUALS, config("key", "phase")))), "condition_config_missing_value", "missing metadata value validation");
 
         ConditionEvaluationContext nonOp = ConditionEvaluationContext.builder()
