@@ -283,19 +283,18 @@ public final class WebAdminSignalListenerLifecycleService {
     }
 
     private WebAdminWriteResult requireDangerConfirmation(WebAdminSignalListenerDeleteRequest request, WebAdminWriteTarget target, SignalListenerData listener) {
-        String confirmation = safe(request == null ? "" : request.confirmationText).trim();
         boolean confirmed = request != null && Boolean.TRUE.equals(request.confirmed);
-        if (confirmed && (confirmation.equals(listener.id()) || (!displayName(listener).isBlank() && confirmation.equals(displayName(listener))))) {
+        if (confirmed) {
             return WebAdminWriteResult.ok(target, false, "危险操作确认通过。");
         }
         return new WebAdminWriteResult(
                 false,
                 WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION.id(),
-                "删除 Signal Listener 前，需要勾选确认并输入 Listener ID 或名称。",
+                "删除 Signal Listener 前，需要勾选二次确认。",
                 target.targetType(),
                 target.targetId(),
                 false,
-                List.of(new WebAdminValidationError("confirmationText", "required", "请输入 Listener ID 或名称以确认删除。", confirmation)),
+                List.of(new WebAdminValidationError("confirmed", "required", "请确认删除该虚拟监听器。", String.valueOf(confirmed))),
                 "",
                 "",
                 true,

@@ -94,12 +94,15 @@ public final class ActionEngine {
     }
 
     private static ActionExecutionResult executeMessage(ActionContext context, ActionConfig config) {
-        if (context.player() == null) {
-            return ActionExecutionResult.failure(Text.literal("没有可接收消息的玩家"));
+        if (context.player() != null) {
+            context.player().sendMessage(Text.literal(config.value()), false);
+            return ActionExecutionResult.success(Text.literal("消息已发送"));
         }
 
-        context.player().sendMessage(Text.literal(config.value()), false);
-        return ActionExecutionResult.success(Text.literal("消息已发送"));
+        for (ServerPlayerEntity onlinePlayer : context.world().getServer().getPlayerManager().getPlayerList()) {
+            onlinePlayer.sendMessage(Text.literal(config.value()), false);
+        }
+        return ActionExecutionResult.success(Text.literal("消息已广播"));
     }
 
     private static ActionExecutionResult executeSound(ActionContext context, ActionConfig config) {

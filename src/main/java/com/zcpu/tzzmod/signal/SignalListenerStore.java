@@ -196,6 +196,30 @@ public final class SignalListenerStore {
         return updated != null;
     }
 
+    public static synchronized SignalListenerData replaceActionsForWebAdmin(
+            MinecraftServer server,
+            String listenerRef,
+            List<ActionConfig> actions
+    ) {
+        List<ActionConfig> safeActions = actions == null ? List.of() : List.copyOf(actions);
+        SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
+                listener.id(),
+                listener.name(),
+                listener.channel(),
+                listener.enabled(),
+                listener.cooldownTicks(),
+                safeActions
+        ).normalized());
+        if (updated != null) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_ACTION_CHANGED,
+                    updated,
+                    "Signal Listener 动作已变化：" + displayName(updated)
+            );
+        }
+        return updated;
+    }
+
     public static synchronized void flushDirty(MinecraftServer server) {
         State state = CACHE.get(server);
         if (state != null) {

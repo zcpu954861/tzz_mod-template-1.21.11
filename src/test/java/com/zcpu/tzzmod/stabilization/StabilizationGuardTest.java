@@ -129,6 +129,7 @@ public final class StabilizationGuardTest {
         testWebAdminInteractionItemMatcherEditing();
         testWebAdminVbdNativeTriggerOverview();
         testWebAdminRegionControllerEditing();
+        testWebAdminSignalListenerEditing();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -833,7 +834,7 @@ public final class StabilizationGuardTest {
                 "设备基础配置",
                 "设备扩展配置",
                 "频道显示信息",
-                "Signal Listener 基础配置"
+                "虚拟监听器基础配置"
         )) {
             requireContains(js, editEntry, "WebAdmin edit entry remains present: " + editEntry);
         }
@@ -968,7 +969,7 @@ public final class StabilizationGuardTest {
                 "data-listener-delete-modal=\"true\"",
                 "data-listener-create-channel-combo=\"true\"",
                 "data-danger-confirm-modal=\"true\"",
-                "不会创建 matcher、itemSubmit、ConditionEngine",
+                "不会创建 matcher、itemSubmit 或 ConditionEngine",
                 "不 setblock、不破坏世界方块"
         )) {
             requireContains(js, lifecycleMarker, "WebAdmin 7.6 lifecycle UI marker present: " + lifecycleMarker);
@@ -1341,7 +1342,6 @@ public final class StabilizationGuardTest {
                     await openSignalListenerDeleteModal('test-listener','test.channel');
                     const listenerDeleteHtml = String(document.getElementById('wa-modal-root').innerHTML || '');
                     document.getElementById('listener-delete-confirmed').checked = true;
-                    document.getElementById('listener-delete-confirmation').value = 'test-listener';
                     await deleteSignalListenerFromModal();
                     const listenerDeleteHash = String(location.hash || '');
                     const listenerDeleteUrls = requestedUrls.slice();
@@ -1727,7 +1727,7 @@ public final class StabilizationGuardTest {
                     if (!lifecycle.listenerCreateHash.includes('#/listeners/new-listener') || !lifecycle.listenerCreateHash.includes('returnTo=%23%2Flisteners') || !lifecycle.listenerCreateUrls.includes('/api/webadmin/signal-listeners')) {
                       failures.push('lifecycle modal: listener create did not call API or navigate to detail returnTo');
                     }
-                    if (!lifecycle.listenerDeleteHtml.includes('data-listener-delete-modal="true"') || !lifecycle.listenerDeleteHtml.includes('data-danger-confirm-modal="true"') || !lifecycle.listenerDeleteHtml.includes('Action 数量')) {
+                    if (!lifecycle.listenerDeleteHtml.includes('data-listener-delete-modal="true"') || !lifecycle.listenerDeleteHtml.includes('data-danger-confirm-modal="true"') || !lifecycle.listenerDeleteHtml.includes('动作数量')) {
                       failures.push('lifecycle modal: listener delete missing dangerous confirm summary');
                     }
                     if (!lifecycle.listenerDeleteHash.includes('#/listeners') || !lifecycle.listenerDeleteUrls.includes('/api/webadmin/signal-listeners/test-listener/delete')) {
@@ -4484,6 +4484,215 @@ public final class StabilizationGuardTest {
         }
         requireFalse(js.contains("conditionEngineEditor") || js.contains("regionPathGraph") || js.contains("raw-json-textarea"),
                 "7.12 RegionController frontend does not expose ConditionEngine/path graph/raw JSON editors");
+    }
+
+    private static void testWebAdminSignalListenerEditing() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_SIGNAL_LISTENER_EDITING_7_13_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendAssets.appJs();
+        String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerActionsService.java"), StandardCharsets.UTF_8);
+        String requests = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminSignalListenerActionRequests.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalListenerStore.java"), StandardCharsets.UTF_8);
+        String signalBridge = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalBridgeServer.java"), StandardCharsets.UTF_8);
+        String actionEngine = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionEngine.java"), StandardCharsets.UTF_8);
+        String lifecycle = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerLifecycleService.java"), StandardCharsets.UTF_8);
+        String actionRelayActions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String editLock = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String writeFoundation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminWriteFoundationService.java"), StandardCharsets.UTF_8);
+
+        for (String marker : List.of(
+                "7.13 WebAdmin SignalListener",
+                "虚拟监听器完整编辑",
+                "This phase only completes WebAdmin editing for existing SignalListener capabilities",
+                "Action list display",
+                "Action add, single delete, and clear",
+                "Dark channel combobox",
+                "Edit lock UI must be visible",
+                "Manual UI validation remains required before checkpoint",
+                "854x480",
+                "4K 200% scaled",
+                "ConditionEngine",
+                "Path visualization",
+                "Raw JSON",
+                "SignalBridge runtime rewrite",
+                "RegionController editing",
+                "Listener recent events",
+                "latest 3",
+                "basic config edit button"
+        )) {
+            requireContains(context, marker, "7.13 context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "signalListenerActionsService",
+                "/api/webadmin/signal-listeners/",
+                "\"actions\".equals(parts[1])",
+                "signalListenerActionsService.actionsFor",
+                "signalListenerActionsService.addAction",
+                "signalListenerActionsService.clearActions",
+                "signalListenerActionsService.deleteAction",
+                "\"clear\".equals(parts[2])",
+                "\"delete\".equals(parts[3])"
+        )) {
+            requireContains(webServer, marker, "7.13 SignalListener action route marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "ActionAddRequest",
+                "ActionClearRequest",
+                "ActionDeleteRequest",
+                "expectedFingerprint",
+                "lockId",
+                "confirmed"
+        )) {
+            requireContains(requests, marker, "7.13 SignalListener action request DTO marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "actionsFor",
+                "addAction(",
+                "clearActions(",
+                "deleteAction(",
+                "WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS",
+                "WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS",
+                "validateLock",
+                "requireValidCsrf",
+                "sameOrigin",
+                "synchronized (SignalListenerStore.class)",
+                "WebAdminSignalListenerBasicConfigService.fingerprintFor",
+                "WebAdminActionRelayActionsService.validateActionEntries",
+                "DANGEROUS_OPERATION_REQUIRES_CONFIRMATION",
+                "SIGNAL_LISTENER_ACTION_CHANGED",
+                "WRITE_AUDIT_APPENDED",
+                "noRawJson",
+                "noConditionEngine",
+                "noPathVisualization"
+        )) {
+            requireContains(service, marker, "7.13 SignalListener actions service marker present: " + marker);
+        }
+        requireFalse(service.contains("conditionEngineEditor") || service.contains("pathGraph") || service.contains("rawJsonEditor"),
+                "7.13 SignalListener action service does not introduce ConditionEngine/path graph/raw JSON editors");
+
+        for (String marker : List.of(
+                "replaceActionsForWebAdmin",
+                "listener.name()",
+                "listener.channel()",
+                "listener.enabled()",
+                "listener.cooldownTicks()",
+                "safeActions",
+                "SIGNAL_LISTENER_ACTION_CHANGED"
+        )) {
+            requireContains(store, marker, "7.13 SignalListener store scoped action update marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "ActionEngine.execute(context, action)",
+                "监听器动作执行失败：第 ",
+                "action.type().id()",
+                "部分监听器执行失败",
+                "recordHistory("
+        )) {
+            requireContains(signalBridge, marker, "7.13 SignalListener runtime diagnostic marker present: " + marker);
+        }
+        requireFalse(signalBridge.contains("conditionEngine") || signalBridge.contains("PathGraph") || signalBridge.contains("rawJson"),
+                "SignalListener runtime fix does not introduce ConditionEngine/path graph/raw JSON");
+
+        for (String marker : List.of(
+                "case MESSAGE -> executeMessage",
+                "context.world().getServer().getPlayerManager().getPlayerList()",
+                "消息已广播",
+                "case SIGNAL -> executeSignal",
+                "case SOUND -> executeSound",
+                "case COMMAND -> executeCommand"
+        )) {
+            requireContains(actionEngine, marker, "7.13 SignalListener supported action runtime marker present: " + marker);
+        }
+
+        requireContains(lifecycle, "请确认删除该虚拟监听器", "SignalListener delete confirm no longer requires typed id/name");
+        requireFalse(lifecycle.contains("请输入 Listener ID 或名称以确认删除"),
+                "SignalListener delete confirmation does not require typed listener id/name");
+
+        for (String marker : List.of(
+                "TARGET_SIGNAL_LISTENER_ACTIONS",
+                "Signal Listener 动作列表",
+                "WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS",
+                "#/listeners/"
+        )) {
+            requireContains(editLock, marker, "7.13 SignalListener action edit lock marker present: " + marker);
+        }
+        requireContains(writeFoundation, "signalListenerActionListWriteEnabled", "write capabilities expose SignalListener action list editing");
+        requireContains(writeFoundation, "Signal Listener 基础配置与动作列表", "write capability message mentions SignalListener action list");
+
+        for (String marker : List.of(
+                "renderSignalListenerDetail",
+                "currentSignalListenerDetail",
+                "routeListenerChannel",
+                "signal_history_appended",
+                "data-signal-listener-recent-events-max3=\"true\"",
+                "data-signal-listener-recent-events-deduped=\"true\"",
+                "listenerRecentEvents(items,channel)",
+                "recent.length>=3",
+                "signalListenerBasicConfigEditAction",
+                "data-signal-listener-basic-lock-disabled=\"true\"",
+                "data-signal-listener-basic-lock-badge=\"true\"",
+                "data-signal-listener-basic-lock-current=\"true\"",
+                "signalListenerActionSummaryCard",
+                "data-signal-listener-action-summary-card=\"true\"",
+                "data-signal-listener-action-preview-hidden=\"true\"",
+                "openSignalListenerActionListModal",
+                "openReadonlySignalListenerActionListFromLock",
+                "data-signal-listener-action-list-modal=\"true\"",
+                "data-signal-listener-actions-managed-in-modal=\"true\"",
+                "data-signal-listener-action-list-acquires-lock=\"true\"",
+                "openSignalListenerActionAddModal",
+                "saveSignalListenerActionAdd",
+                "data-signal-listener-action-dynamic-fields=\"true\"",
+                "data-signal-listener-action-signal-only=\"true\"",
+                "data-signal-listener-action-command-fields=\"true\"",
+                "data-signal-listener-action-message-field=\"true\"",
+                "data-signal-listener-action-sound-field=\"true\"",
+                "data-signal-listener-action-preserve-scroll=\"true\"",
+                "renderSignalListenerActionChannelCombo",
+                "signal-listener-action-channel-combo",
+                "confirmDeleteSignalListenerAction",
+                "data-signal-listener-action-delete-confirm=\"true\"",
+                "openSignalListenerActionClearModal",
+                "saveSignalListenerActionClear",
+                "data-signal-listener-action-clear-confirm=\"true\"",
+                "data-signal-listener-action-lock-disabled=\"true\"",
+                "data-signal-listener-action-lock-badge=\"true\"",
+                "data-signal-listener-action-current-lock=\"true\"",
+                "signal_listener_actions",
+                "expectedFingerprint",
+                "编辑锁",
+                "虚拟监听器",
+                "监听频道",
+                "动作列表",
+                "添加动作",
+                "清空动作",
+                "暂无动作",
+                "信号频道",
+                "消息内容",
+                "音效 ID",
+                "需要 OP 权限",
+                "通知 OP",
+                "不需要输入 ID 或名称",
+                "不会提供 raw JSON",
+                "不改变 SignalBridge 运行时语义"
+        )) {
+            requireContains(js, marker, "7.13 SignalListener frontend marker present: " + marker);
+        }
+        requireFalse(js.contains("listener-delete-confirmation"), "SignalListener delete modal no longer asks for typed id/name");
+        requireFalse(js.contains("conditionEngineEditor") || js.contains("signalPathGraph") || js.contains("raw-json-textarea"),
+                "7.13 SignalListener frontend does not expose ConditionEngine/path graph/raw JSON editors");
+        for (String marker : List.of(
+                "server_management_command_forbidden",
+                "isBlockedServerManagementCommand",
+                "isServerManagementRoot"
+        )) {
+            requireContains(actionRelayActions, marker, "7.13 SignalListener command action validation marker present: " + marker);
+        }
     }
 
     private static WebAdminUser webAdminUser(String username, WebAdminRole role) {
