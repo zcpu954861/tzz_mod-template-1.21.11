@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.signal;
 
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
@@ -97,7 +98,7 @@ public final class SignalBridgeServer {
                         ItemStack.EMPTY
                 );
                 executedCount++;
-                lastResult = ActionEngine.executeAll(context, listener.actions());
+                lastResult = executeListenerActions(context, listener);
                 LAST_TRIGGER_TICKS.put(listener.id(), event.gameTime());
 
                 if (!lastResult.success()) {
@@ -111,7 +112,7 @@ public final class SignalBridgeServer {
                             skippedEmptyCount,
                             failedCount,
                             depth,
-                            "部分监听器执行失败"
+                            lastResult.message() == null ? "部分监听器执行失败" : lastResult.message().getString()
                     );
                     return lastResult;
                 }
@@ -131,6 +132,26 @@ public final class SignalBridgeServer {
                 depth,
                 resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, receiverCount, relayResult)
         );
+        return lastResult;
+    }
+
+    private static ActionExecutionResult executeListenerActions(ActionContext context, SignalListenerData listener) {
+        ActionExecutionResult lastResult = ActionExecutionResult.success(Text.literal("未执行动作"));
+        List<ActionConfig> actions = listener == null ? List.of() : listener.actions();
+        for (int index = 0; index < actions.size(); index++) {
+            ActionConfig action = actions.get(index);
+            if (action == null || !action.isUsable()) {
+                continue;
+            }
+            lastResult = ActionEngine.execute(context, action);
+            if (!lastResult.success()) {
+                String reason = lastResult.message() == null ? "unknown" : lastResult.message().getString();
+                String type = action.type() == null ? "unknown" : action.type().id();
+                return ActionExecutionResult.failure(Text.literal(
+                        "监听器动作执行失败：第 " + (index + 1) + " 条 " + type + " action，原因：" + reason
+                ));
+            }
+        }
         return lastResult;
     }
 

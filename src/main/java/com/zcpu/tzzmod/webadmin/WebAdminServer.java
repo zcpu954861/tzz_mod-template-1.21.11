@@ -19,6 +19,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSingleItemSubmitTemplateSessionStart
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSelectionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
@@ -38,6 +39,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
@@ -88,6 +90,7 @@ public final class WebAdminServer {
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
@@ -1217,19 +1220,106 @@ public final class WebAdminServer {
         }
 
         String prefix = "/api/webadmin/signal-listeners/";
-        String suffix = "/delete";
-        if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
-            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 生命周期接口不存在。");
+        if (!path.startsWith(prefix)) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 接口不存在。");
+            return;
+        }
+        String tail = path.substring(prefix.length());
+        String[] parts = tail.split("/");
+        String listenerId = parts.length == 0 ? "" : decodePathSegment(parts[0]);
+        if (listenerId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Signal Listener ID 不能为空。");
+            return;
+        }
+
+        if (parts.length == 2 && "actions".equals(parts[1])) {
+            if (method.equalsIgnoreCase("GET")) {
+                Map<String, Object> data = signalListenerActionsService.actionsFor(minecraftServer, auth.user, auth.session, listenerId);
+                if (data == null) {
+                    WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 不存在或引用不唯一。");
+                    return;
+                }
+                WebAdminJsonResponse.ok(exchange, data);
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminSignalListenerActionRequests.ActionAddRequest request = readJson(exchange, WebAdminSignalListenerActionRequests.ActionAddRequest.class);
+                if (request == null) {
+                    request = new WebAdminSignalListenerActionRequests.ActionAddRequest();
+                }
+                request.listenerId = listenerId;
+                WebAdminWriteResult result = signalListenerActionsService.addAction(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        listenerId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        if (parts.length == 3 && "actions".equals(parts[1]) && "clear".equals(parts[2])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSignalListenerActionRequests.ActionClearRequest request = readJson(exchange, WebAdminSignalListenerActionRequests.ActionClearRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalListenerActionRequests.ActionClearRequest();
+            }
+            request.listenerId = listenerId;
+            WebAdminWriteResult result = signalListenerActionsService.clearActions(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    listenerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 4 && "actions".equals(parts[1]) && "delete".equals(parts[3])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSignalListenerActionRequests.ActionDeleteRequest request = readJson(exchange, WebAdminSignalListenerActionRequests.ActionDeleteRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalListenerActionRequests.ActionDeleteRequest();
+            }
+            request.listenerId = listenerId;
+            request.actionIndex = decodePathSegment(parts[2]);
+            WebAdminWriteResult result = signalListenerActionsService.deleteAction(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    listenerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length != 2 || !"delete".equals(parts[1])) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Listener 接口不存在。");
             return;
         }
         if (!method.equalsIgnoreCase("POST")) {
             WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
-            return;
-        }
-        String encodedListenerId = path.substring(prefix.length(), path.length() - suffix.length());
-        String listenerId = decodePathSegment(encodedListenerId);
-        if (listenerId.isBlank()) {
-            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Signal Listener ID 不能为空。");
             return;
         }
         WebAdminSignalListenerDeleteRequest request = readJson(exchange, WebAdminSignalListenerDeleteRequest.class);
