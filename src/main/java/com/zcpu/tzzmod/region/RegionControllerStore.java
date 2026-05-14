@@ -131,6 +131,23 @@ public final class RegionControllerStore {
         ).normalized());
     }
 
+    public static synchronized boolean updateController(MinecraftServer server, String controllerId, RegionControllerData updatedController) {
+        if (updatedController == null) {
+            return false;
+        }
+        return replace(server, controllerId, controller -> new RegionControllerData(
+                controller.id(),
+                updatedController.name(),
+                updatedController.regionId(),
+                updatedController.enabled(),
+                updatedController.targetFilter(),
+                updatedController.stayIntervalTicks(),
+                controller.enterActions(),
+                controller.exitActions(),
+                controller.stayActions()
+        ).normalized());
+    }
+
     public static synchronized boolean addAction(MinecraftServer server, String controllerId, RegionTriggerType triggerType, ActionConfig action) {
         if (triggerType == null || action == null) {
             return false;
@@ -172,6 +189,24 @@ public final class RegionControllerStore {
                 triggerType == RegionTriggerType.ENTER ? List.of() : controller.enterActions(),
                 triggerType == RegionTriggerType.EXIT ? List.of() : controller.exitActions(),
                 triggerType == RegionTriggerType.STAY ? List.of() : controller.stayActions()
+        ).normalized());
+    }
+
+    public static synchronized boolean replaceActions(MinecraftServer server, String controllerId, RegionTriggerType triggerType, List<ActionConfig> actions) {
+        if (triggerType == null) {
+            return false;
+        }
+        List<ActionConfig> safeActions = actions == null ? List.of() : List.copyOf(actions);
+        return replace(server, controllerId, controller -> new RegionControllerData(
+                controller.id(),
+                controller.name(),
+                controller.regionId(),
+                controller.enabled(),
+                controller.targetFilter(),
+                controller.stayIntervalTicks(),
+                triggerType == RegionTriggerType.ENTER ? safeActions : controller.enterActions(),
+                triggerType == RegionTriggerType.EXIT ? safeActions : controller.exitActions(),
+                triggerType == RegionTriggerType.STAY ? safeActions : controller.stayActions()
         ).normalized());
     }
 

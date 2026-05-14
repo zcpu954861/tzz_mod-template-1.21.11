@@ -128,6 +128,7 @@ public final class StabilizationGuardTest {
         testWebAdminPhysicalDeviceActionRelayFoundation();
         testWebAdminInteractionItemMatcherEditing();
         testWebAdminVbdNativeTriggerOverview();
+        testWebAdminRegionControllerEditing();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -2127,11 +2128,7 @@ public final class StabilizationGuardTest {
                 "data get entity PlayerName",
                 "say ban kick op stop whitelist",
                 "tellraw PlayerName {\"text\":\"op stop whitelist\"}",
-                "execute as PlayerName run op Someone",
-                "save-off",
-                "save-on",
-                "save-all",
-                "reload"
+                "save-all"
         )) {
             requireTrue(WebAdminActionRelayActionsService.validateActionEntries(List.of(actionEntry("command", allowedCommand))).isEmpty(),
                     "7.7 action relay allows map-control command action: " + allowedCommand);
@@ -2147,7 +2144,13 @@ public final class StabilizationGuardTest {
                 "whitelist add PlayerName",
                 "pardon PlayerName",
                 "pardon-ip 127.0.0.1",
-                "/minecraft:op PlayerName"
+                "/minecraft:op PlayerName",
+                "execute as PlayerName run op Someone",
+                "execute positioned 0 64 0 run stop",
+                "minecraft:execute as PlayerName run minecraft:deop Someone",
+                "save-off",
+                "save-on",
+                "reload"
         )) {
             requireFalse(WebAdminActionRelayActionsService.validateActionEntries(List.of(actionEntry("command", blockedCommand))).isEmpty(),
                     "7.7 action relay rejects server management command action: " + blockedCommand);
@@ -4273,6 +4276,14 @@ public final class StabilizationGuardTest {
         requireContains(js, "saveSignalListenerBasicConfig", "frontend contains scoped signal listener save handler");
         requireContains(js, "listener.basicConfig=result.data", "signal detail loads listener lock status for readonly lock hint");
         requireContains(js, "canEdit&&!lockedByOther?`<button class=\"secondary\" type=\"button\" ${htmlHandler(`startSignalListenerBasicConfigEdit", "signal listener basic config hides edit action while another user holds lock");
+        requireContains(js, "/api/webadmin/region-controllers", "frontend exposes scoped RegionController WebUI editing API");
+        requireContains(js, "region_controller_config", "frontend uses distinct RegionController edit lock target");
+        requireContains(js, "saveRegionControllerEdit", "frontend contains scoped RegionController config save handler");
+        requireContains(js, "saveRegionControllerCreate", "frontend contains RegionController create handler");
+        requireContains(js, "saveRegionControllerDelete", "frontend contains RegionController delete handler");
+        requireContains(js, "saveRegionControllerActionAdd", "frontend contains RegionController action add handler");
+        requireContains(js, "saveRegionControllerActionClear", "frontend contains RegionController action clear handler");
+        requireContains(js, "会阻断 stop/op/ban/kick/whitelist", "RegionController action add UI documents dangerous command blocking");
         requireContains(js, "channel_metadata_changed", "frontend listens for channel metadata realtime events");
         requireContains(js, "signal_listener_config_changed", "frontend listens for signal listener realtime events");
         requireContains(js, "编辑显示信息", "frontend exposes scoped metadata edit action");
@@ -4281,9 +4292,198 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("fetch('/api/regions', {method:'PATCH'"), "frontend does not expose region write PATCH");
         requireFalse(js.contains("fetch('/api/webadmin/users', {method:'PATCH'"), "frontend does not expose user write PATCH");
         requireFalse(js.contains("saveItemSubmit"), "frontend does not expose itemSubmit save flow");
-        requireFalse(js.contains("saveRegion") || js.contains("saveSettings"), "frontend does not expose region/settings save flow");
+        requireFalse(js.contains("saveRegion(") || js.contains("saveSettings"), "frontend does not expose generic region/settings save flow");
         requireFalse(js.contains("saveAction(") || js.contains("saveActionTemplate"), "frontend still avoids generic action editor save flow");
         requireContains(js, "data-danger-confirm-modal=\"true\"", "supported lifecycle deletes use dangerous confirm modal");
+    }
+
+    private static void testWebAdminRegionControllerEditing() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_REGION_CONTROLLER_EDITING_7_12_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendAssets.appJs();
+        String webServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String requests = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminRegionControllerRequests.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerStore.java"), StandardCharsets.UTF_8);
+        String actionRelayActions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String editLock = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String writeFoundation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminWriteFoundationService.java"), StandardCharsets.UTF_8);
+
+        for (String marker : List.of(
+                "7.12 WebAdmin RegionController Full Editing",
+                "RegionController WebUI editing only",
+                "Existing RegionController Feature Inventory",
+                "targetFilter",
+                "`enterActions`",
+                "`exitActions`",
+                "`stayActions`",
+                "Manual testing is primary",
+                "4K 200% scaled visual profile",
+                "No checkpoint before user approval",
+                "ConditionEngine",
+                "Virtual listener",
+                "Path visualization",
+                "raw JSON",
+                "RegionController runtime semantics are not changed"
+        )) {
+            requireContains(context, marker, "7.12 context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/region-controllers",
+                "handleRegionControllers",
+                "regionControllerService.listControllers",
+                "regionControllerService.create",
+                "regionControllerService.update",
+                "regionControllerService.addAction",
+                "regionControllerService.clearActions",
+                "regionControllerService.deleteAction",
+                "regionControllerService.delete",
+                "\"clear\".equals(parts[3])",
+                "\"delete\".equals(parts[4])",
+                "parseRegionTriggerType",
+                "triggerType 只支持 enter / exit / stay"
+        )) {
+            requireContains(webServer, marker, "7.12 RegionController route marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminRegionControllerRequests",
+                "CreateRequest",
+                "UpdateRequest",
+                "ActionAddRequest",
+                "ActionClearRequest",
+                "ActionDeleteRequest",
+                "DeleteRequest",
+                "expectedFingerprint",
+                "lockId"
+        )) {
+            requireContains(requests, marker, "7.12 RegionController request DTO marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "listControllers",
+                "controllerFor",
+                "create(",
+                "update(",
+                "addAction(",
+                "clearActions(",
+                "deleteAction(",
+                "delete(",
+                "fingerprintFor",
+                "CREATE_LOCK_TARGET_ID",
+                "CREATE_EXPECTED_FINGERPRINT",
+                "expectedFingerprint",
+                "validateLock",
+                "requireValidCsrf",
+                "sameOrigin",
+                "RegionTargetFilter.Type.TAG",
+                "MIN_STAY_INTERVAL_TICKS",
+                "WebAdminActionRelayActionsService.validateActionEntries",
+                "REGION_CONTROLLER_CHANGED",
+                "WRITE_AUDIT_APPENDED",
+                "noRawJson",
+                "noConditionEngine"
+        )) {
+            requireContains(service, marker, "7.12 RegionController service marker present: " + marker);
+        }
+        requireFalse(service.contains("rawJson") || service.contains("raw-json") || service.contains("pathGraph"),
+                "7.12 RegionController service does not introduce raw JSON/path graph editing");
+        for (String marker : List.of(
+                "server_management_command_forbidden",
+                "isBlockedServerManagementCommand",
+                "isServerManagementRoot"
+        )) {
+            requireContains(actionRelayActions, marker, "7.12 RegionController action validation marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "updateController",
+                "replaceActions",
+                "RegionTargetFilter.all()",
+                "RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS",
+                "controller.enterActions()",
+                "controller.exitActions()",
+                "controller.stayActions()",
+                "triggerType == RegionTriggerType.ENTER ? safeActions : controller.enterActions()"
+        )) {
+            requireContains(store, marker, "7.12 RegionController store scoped update marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "TARGET_REGION_CONTROLLER_CONFIG",
+                "RegionController 配置",
+                "WebAdminOperationType.EDIT_REGION",
+                "#/region-controllers/"
+        )) {
+            requireContains(editLock, marker, "7.12 RegionController edit lock marker present: " + marker);
+        }
+        requireContains(writeFoundation, "regionControllerWriteEnabled", "write capabilities expose RegionController editing");
+        requireContains(writeFoundation, "RegionController 配置", "write capability message mentions RegionController config");
+
+        for (String marker : List.of(
+                "renderRegionControllersPage",
+                "renderRegionControllerDetail",
+                "regionControllerWriteEnabled",
+                "regionControllerDetail:",
+                "loadRegionCatalog",
+                "/api/regions?limit=500",
+                "renderRegionControllerRegionCombo",
+                "data-region-catalog-selector=\"true\"",
+                "data-region-catalog-read-only=\"true\"",
+                "当前绑定区域未在区域列表中找到",
+                "openRegionControllerCreateModal",
+                "region_controller_create_v1",
+                "saveRegionControllerCreate",
+                "startRegionControllerEdit",
+                "saveRegionControllerEdit",
+                "openRegionControllerDeleteModal",
+                "saveRegionControllerDelete",
+                "openRegionControllerActionAddModal",
+                "saveRegionControllerActionAdd",
+                "data-region-action-dynamic-fields=\"true\"",
+                "data-region-action-signal-only=\"true\"",
+                "data-region-action-command-fields=\"true\"",
+                "data-region-action-message-field=\"true\"",
+                "data-region-action-sound-field=\"true\"",
+                "data-region-action-preserve-scroll=\"true\"",
+                "openRegionControllerActionClearModal",
+                "saveRegionControllerActionClear",
+                "openRegionControllerActionListModal",
+                "data-region-controller-action-list-modal=\"true\"",
+                "data-region-controller-actions-managed-in-modal=\"true\"",
+                "data-region-controller-action-list-acquires-lock=\"true\"",
+                "data-region-controller-action-preview-hidden=\"true\"",
+                "confirmDeleteRegionControllerAction",
+                "data-region-controller-action-delete-confirm=\"true\"",
+                "data-region-controller-lock-disabled=\"true\"",
+                "data-region-controller-lock-badge=\"true\"",
+                "region_controller_config",
+                "region_controller_action",
+                "expectedFingerprint",
+                "region-controller-name",
+                "region-controller-region-id",
+                "region-controller-enabled",
+                "targetFilterType",
+                "targetFilterValue",
+                "stayIntervalTicks",
+                "进入动作",
+                "离开动作",
+                "停留动作",
+                "添加动作",
+                "暂无进入动作",
+                "暂无离开动作",
+                "暂无停留动作",
+                "dangerousModalFooter(d.saving,",
+                "data-danger-confirm-modal=\"true\"",
+                "region-controller-action-type",
+                "region-controller-action-value",
+                "region-controller-action-cooldown"
+        )) {
+            requireContains(js, marker, "7.12 RegionController frontend marker present: " + marker);
+        }
+        requireFalse(js.contains("conditionEngineEditor") || js.contains("regionPathGraph") || js.contains("raw-json-textarea"),
+                "7.12 RegionController frontend does not expose ConditionEngine/path graph/raw JSON editors");
     }
 
     private static WebAdminUser webAdminUser(String username, WebAdminRole role) {

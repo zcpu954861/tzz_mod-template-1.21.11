@@ -28,10 +28,11 @@ public final class WebAdminWriteFoundationService {
         data.put("singleItemSubmitTemplateWriteEnabled", true);
         data.put("channelMetadataWriteEnabled", true);
         data.put("signalListenerBasicConfigWriteEnabled", true);
+        data.put("regionControllerWriteEnabled", true);
         data.put("objectSelectionEnabled", true);
         data.put("virtualBlockDeviceLifecycleEnabled", true);
         data.put("signalListenerLifecycleWriteEnabled", true);
-        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、VBD 统一 itemSubmit requirement 编辑器、频道显示信息、Signal Listener 基础配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
+        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、VBD 统一 itemSubmit requirement 编辑器、频道显示信息、Signal Listener 基础配置、RegionController 配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
         data.put("permissions", permissionService.capabilitySummary(user == null ? null : user.roleEnum()));
         Map<String, Object> csrf = new LinkedHashMap<>();
         csrf.put("requiredForFutureWrites", true);
@@ -60,7 +61,8 @@ public final class WebAdminWriteFoundationService {
                     && operation != WebAdminOperationType.START_OBJECT_SELECTION
                     && operation != WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE
                     && operation != WebAdminOperationType.CREATE_SIGNAL_LISTENER
-                    && operation != WebAdminOperationType.DELETE_SIGNAL_LISTENER);
+                    && operation != WebAdminOperationType.DELETE_SIGNAL_LISTENER
+                    && operation != WebAdminOperationType.EDIT_REGION);
             operations.add(entry);
         }
         data.put("operations", operations);
