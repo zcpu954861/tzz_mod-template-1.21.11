@@ -131,6 +131,7 @@ public final class ConditionBasicPlayerContextTest {
         ConditionEvaluationResult gameTime = evaluate(leaf(ConditionNodeType.GAME_TIME_COMPARE, config("operator", "eq", "value", "0")), null);
         requireFalse(gameTime.matched(), "missing context game_time fails");
         requireContains(gameTime.failureReason(), "上下文不存在，无法读取游戏时间", "missing game time Chinese failure");
+        requireFalse(evaluate(leaf(ConditionNodeType.EVENT_METADATA_EXISTS, config("key", "phase")), null).matched(), "missing context metadata exists fails");
         requireFalse(evaluate(leaf(ConditionNodeType.EVENT_METADATA_EQUALS, config("key", "phase", "value", "start")), null).matched(), "missing context metadata equals fails");
     }
 
