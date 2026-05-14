@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainMetadataRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionStartRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSingleItemSubmitTemplateSessionCancelRequest;
@@ -36,6 +37,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
@@ -88,6 +90,7 @@ public final class WebAdminServer {
     private final WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminInteractionItemMatcherService interactionItemMatcherService = new WebAdminInteractionItemMatcherService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
@@ -276,6 +279,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
                 handleChannelMetadata(exchange, auth, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
+                runOnServerThread(() -> handleLogicChains(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/selection/")) {
@@ -863,6 +870,114 @@ public final class WebAdminServer {
         WebAdminJsonResponse.ok(exchange, result);
     }
 
+    private void handleLogicChains(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/logic-chains";
+        if (path.equals(root)) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, logicChainService.listChains(minecraftServer, auth.user, auth.session, intQuery(exchange, "limit", 500)));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminLogicChainMetadataRequest request = readJson(exchange, WebAdminLogicChainMetadataRequest.class);
+                if (request == null) {
+                    request = new WebAdminLogicChainMetadataRequest();
+                }
+                WebAdminWriteResult result = logicChainService.upsertMetadata(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        String prefix = root + "/";
+        String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        if (tail.equals("resolve")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            boolean includeDisabled = !"false".equalsIgnoreCase(query.getOrDefault("includeDisabled", "true"));
+            WebAdminJsonResponse.ok(exchange, logicChainService.graphForRoot(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    query.getOrDefault("rootType", "channel"),
+                    query.getOrDefault("rootRef", ""),
+                    includeDisabled,
+                    intQuery(exchange, "maxDepth", 3),
+                    null
+            ));
+            return;
+        }
+
+        String[] parts = tail.split("/");
+        String chainId = parts.length == 0 ? "" : decodePathSegment(parts[0]);
+        if (chainId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "逻辑链 ID 不能为空。");
+            return;
+        }
+        if (parts.length == 1) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, logicChainService.graphForChain(minecraftServer, auth.user, auth.session, chainId));
+                return;
+            }
+            if (method.equalsIgnoreCase("PATCH")) {
+                WebAdminLogicChainMetadataRequest request = readJson(exchange, WebAdminLogicChainMetadataRequest.class);
+                if (request == null) {
+                    request = new WebAdminLogicChainMetadataRequest();
+                }
+                request.chainId = chainId;
+                WebAdminWriteResult result = logicChainService.upsertMetadata(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH。");
+            return;
+        }
+        if (parts.length == 2 && "delete".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminLogicChainMetadataRequest request = readJson(exchange, WebAdminLogicChainMetadataRequest.class);
+            if (request == null) {
+                request = new WebAdminLogicChainMetadataRequest();
+            }
+            request.chainId = chainId;
+            WebAdminWriteResult result = logicChainService.deleteMetadata(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    chainId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "逻辑链接口不存在。");
+    }
+
     private void handleSelection(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
         if (path.equals("/api/webadmin/selection/status")) {
             if (!method.equalsIgnoreCase("GET")) {
@@ -1276,6 +1391,31 @@ public final class WebAdminServer {
             }
             request.listenerId = listenerId;
             WebAdminWriteResult result = signalListenerActionsService.clearActions(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    listenerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 3 && "actions".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("PATCH")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 PATCH。");
+                return;
+            }
+            WebAdminSignalListenerActionRequests.ActionUpdateRequest request = readJson(exchange, WebAdminSignalListenerActionRequests.ActionUpdateRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalListenerActionRequests.ActionUpdateRequest();
+            }
+            request.listenerId = listenerId;
+            request.actionIndex = decodePathSegment(parts[2]);
+            WebAdminWriteResult result = signalListenerActionsService.updateAction(
                     minecraftServer,
                     auth.user,
                     auth.session,
@@ -1754,6 +1894,18 @@ public final class WebAdminServer {
             params.put(key, value);
         }
         return params;
+    }
+
+    private static int intQuery(HttpExchange exchange, String name, int fallback) {
+        String value = queryParams(exchange).get(name);
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private static String sourceIp(HttpExchange exchange) {

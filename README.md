@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.43.0-web-admin-signal-listener-editing`
-- 当前开发基线：`7.14 WebAdmin Editing Stabilization`；本阶段发布后建议版本为 `v1.44.0-web-admin-editing-stabilization`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.44.0-web-admin-editing-stabilization`
+- 当前开发基线：`7.15 WebAdmin Cross-Channel Logic Chain Viewer MVP`；本阶段发布后建议版本为 `v1.45.0-web-admin-logic-chain-viewer`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -26,16 +26,17 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - ActionRelay action list 编辑：稳定 summary card + modal/drawer，一条一条新增、查看、删除、清空。
 - RegionController editing：创建、删除、enabled/name/regionId/targetFilter/stayInterval 编辑，enter/exit/stay actions 管理。
 - SignalListener / 虚拟监听器 editing：创建、删除、enabled/channel/cooldown 编辑，actions 管理，最近事件、edit lock 和运行时 action 支持。
+- Logic Chain Viewer MVP：只读跨频道逻辑链查看器，把现有 SignalBridge 生产者、频道、消费者、动作和下游频道以可拖动画布的思维导图式树形视图展示；列表按主链 / 子链 / 多级子链组织，只允许保存 WebAdmin-only 视图 metadata，不修改 runtime。
 - WebAdmin 写入基础：权限、CSRF / same-origin、edit lock、expectedFingerprint、`WebAdminWriteResult`、audit、realtime 和 dirty guard。
 
 当前能力入口文档：
 
 - [7.14 WebAdmin Editing Stabilization Current Context](docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md)
 - [WebAdmin Editing Capability Matrix 7.14](docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md)
+- [7.15 WebAdmin Logic Chain Viewer Current Context](docs/WEBADMIN_LOGIC_CHAIN_VIEWER_7_15_CURRENT_CONTEXT.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 7.15：Channel Logic Chain Viewer / 频道视角模块化逻辑链查看器 MVP。
 - 8.x：ConditionEngine / 条件判断系统。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
@@ -73,7 +74,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- 不提供 ConditionEngine、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能。
+- 不提供 ConditionEngine、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能；7.15 逻辑链只读查看器不是编辑器。
 
 ## 主要功能
 
@@ -85,7 +86,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - ActionEngine：统一执行命令、消息、音效等动作。
 - RegionController：为已有规划区域绑定进入、离开、停留事件动作。
 - Signal 设备：支持发射器、接收器和动作继电器，把红石、signal 与 ActionEngine 串联起来。
-- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、Dashboard、设备管理、Signal 频道、Doctor 诊断、History 历史、用户管理、系统设置、Region / Action 观测，以及 7.x 受控编辑能力。ActionRelay、RegionController、SignalListener 等已具备对应 WebUI 编辑入口；Action 系统聚合页仍以只读观测为主。
+- WebAdmin：提供默认关闭的轻量 Web 管理入口，支持登录、session、Dashboard、设备管理、Signal 频道、跨频道逻辑链只读查看器、Doctor 诊断、History 历史、用户管理、系统设置、Region / Action 观测，以及 7.x 受控编辑能力。ActionRelay、RegionController、SignalListener 等已具备对应 WebUI 编辑入口；Action 系统聚合页仍以只读观测为主。
 
 ## 命令入口
 

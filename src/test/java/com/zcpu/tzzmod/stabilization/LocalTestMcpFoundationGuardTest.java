@@ -151,7 +151,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "不提供 git mutation", "README keeps no git mutation boundary");
         requireContains(readme, "不提供 raw JSON / NBT path 编辑", "README keeps no raw JSON boundary");
         requireContains(readme, "8.x：ConditionEngine", "README keeps ConditionEngine as future work");
-        requireContains(readme, "7.15：Channel Logic Chain Viewer", "README keeps channel logic chain viewer as future work");
+        requireContains(readme, "Logic Chain Viewer MVP", "README documents 7.15 logic chain viewer as read-only MVP");
         requireFalse(readme.contains("MCP 已完全代替手工验收"), "README must not claim MCP replaces manual testing");
     }
 
@@ -179,6 +179,13 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(tools, "minecraftTools()", "minecraft runtime tools registered");
         requireContains(tools, "webAdminTools()", "webadmin tools registered");
         requireContains(tools, "scenarioTools()", "scenario tools registered");
+        String lowerTools = tools.toLowerCase();
+        requireFalse(lowerTools.contains("logic_chain") || lowerTools.contains("logic-chain") || tools.contains("logicChain") || tools.contains("logic-chains"),
+                "7.15 logic chain viewer must not add a new MCP tool");
+        String scenarios = read("tools/tzz-test-mcp/src/tools/scenario.ts");
+        String lowerScenarios = scenarios.toLowerCase();
+        requireFalse(lowerScenarios.contains("logic_chain") || lowerScenarios.contains("logic-chain") || scenarios.contains("logicChain") || scenarios.contains("logic-chains"),
+                "7.15 logic chain viewer must not add an MCP scenario");
 
         String server = read("tools/tzz-test-mcp/src/server.ts");
         requireContains(server, "tools/list", "MCP tools/list handler exists");

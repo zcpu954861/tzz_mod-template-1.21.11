@@ -25,4 +25,12 @@ public final class WebAdminSignalListenerActionRequests {
         public String expectedFingerprint = "";
         public String lockId = "";
     }
+
+    public static final class ActionUpdateRequest {
+        public String listenerId = "";
+        public Object actionIndex = 0;
+        public WebAdminActionRelayActionsUpdateRequest.ActionEntry action = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        public String expectedFingerprint = "";
+        public String lockId = "";
+    }
 }
