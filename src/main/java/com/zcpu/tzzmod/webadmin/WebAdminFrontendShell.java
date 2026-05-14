@@ -76,6 +76,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">事件与信号</div>
                           <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signalbridge-main"></span>SignalBridge</button>
+                          <button class="nav-item" data-route="#/logic-chains"><span class="nav-icon" data-icon="action-binding"></span>逻辑链</button>
                           <button class="nav-item" data-route="#/listeners"><span class="nav-icon" data-icon="consumer-listener"></span>信号监听器</button>
                           <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
                           <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>

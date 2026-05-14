@@ -19,6 +19,7 @@ This matrix summarizes the current 7.x WebAdmin editing layer at the 7.14 stabil
 | SignalReceiver | Device detail and config modal. | Receiver channel through basic config and pulse ticks where loaded/supported. | Redstone output state and history. | No standalone receiver CRUD. |
 | RegionController | Region controller list/detail/editing. | Create, delete, enabled, name, regionId, target filter, stay interval, enter/exit/stay action add/delete/clear. | Runtime status, Doctor/history, region catalog summaries. | Runtime semantics unchanged; no path graph. |
 | SignalListener | Virtual listener list/detail/editing. | Create, delete, enabled, channel, cooldown, action add/single delete/clear, dynamic action fields. | Recent events, runtime summaries, Doctor/history/channel links. | SignalBridge runtime is not rewritten. |
+| Logic Chain Viewer | Cross-channel logic chain list and read-only mind-map/tree viewer. | WebAdmin-only view metadata: display name, note, icon key, tags/group, root type/ref, include disabled, max depth, layout preference. | SignalBridge-derived channel tree, producers, same-channel parallel consumers, ordered actions, downstream channel child subtrees, main/sub-chain hierarchy, warnings, cycle/max-depth references. | 7.15 MVP only; draggable viewport and SVG curved connectors; no runtime editing, no ConditionEngine, no table-like fixed lane layout, no long cross-channel line mixing. |
 | Users | Users page and password tools. | Current-user password change and OWNER password reset/set API. | User list/session summaries according to role. | Full WebUI user CRUD remains limited. |
 | Settings | Settings/config page. | No broad settings editing. | WebAdmin server status, storage/security summaries. | Do not expose host/port/access mode editing as completed. |
 | Doctor | Diagnostic page. | None. | Issues, severity, affected targets, suggested action. | No auto-fix button. |
@@ -41,7 +42,6 @@ This matrix summarizes the current 7.x WebAdmin editing layer at the 7.14 stabil
 
 ## Explicit Future Work
 
-- 7.15: Channel Logic Chain Viewer MVP. This is a viewer/planning surface, not a condition system.
 - 8.x: ConditionEngine / conditional decision layer.
 - Later: GameController / MissionSystem / PhaseController.
 - Later: any graph/path visualization or Scratch-like editor, if still desired.

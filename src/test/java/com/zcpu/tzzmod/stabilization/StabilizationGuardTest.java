@@ -131,6 +131,7 @@ public final class StabilizationGuardTest {
         testWebAdminRegionControllerEditing();
         testWebAdminSignalListenerEditing();
         testWebAdminEditingStabilization714();
+        testWebAdminLogicChainViewer715();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1532,7 +1533,7 @@ public final class StabilizationGuardTest {
                       if (html.includes('wa-table') && !html.includes('data-table-row-stretch="false"')) {
                         failures.push(`${route}: detail table missing no-row-stretch marker`);
                       }
-                      if (html.includes('data-detail-adaptive-grid="true"') || html.includes('wa-detail-adaptive-grid') || html.includes('data-responsive-card-grid="true') || html.includes('raw-config') || html.includes('logic-chain') || html.includes('detail-grid') || html.includes('config-section') || html.includes('panel-card') || html.includes('legacy') || html.includes('wa-card-grid wa-metrics-5') || html.includes('wa-table-card')) {
+                      if (html.includes('data-detail-adaptive-grid="true"') || html.includes('wa-detail-adaptive-grid') || html.includes('data-responsive-card-grid="true') || html.includes('raw-config') || html.includes('detail-grid') || html.includes('config-section') || html.includes('panel-card') || html.includes('legacy') || html.includes('wa-card-grid wa-metrics-5') || html.includes('wa-table-card')) {
                         failures.push(`${route}: legacy detail markup leaked`);
                       }
                       const routeUrls = context.__smokeRequestedUrls();
@@ -5099,7 +5100,7 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "v1.43.0-web-admin-signal-listener-editing",
+                "v1.44.0-web-admin-editing-stabilization",
                 "7.14 WebAdmin Editing Stabilization",
                 "7.x 已把 WebAdmin 从只读观察层推进到受控编辑层",
                 "docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md",
@@ -5111,7 +5112,7 @@ public final class StabilizationGuardTest {
                 "edit lock 不是 toast-only",
                 "dark combobox",
                 "4K 200% scaled",
-                "7.15：Channel Logic Chain Viewer",
+                "7.15 WebAdmin Logic Chain Viewer Current Context",
                 "8.x：ConditionEngine",
                 "不要误认为已完成",
                 "不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`",
@@ -5140,7 +5141,7 @@ public final class StabilizationGuardTest {
                 "History",
                 "Local Test MCP",
                 "Manual testing is primary",
-                "7.15: Channel Logic Chain Viewer MVP",
+                "Logic Chain Viewer",
                 "8.x: ConditionEngine"
         )) {
             requireContains(matrix, marker, "7.14 editing capability matrix marker present: " + marker);
@@ -5180,6 +5181,211 @@ public final class StabilizationGuardTest {
                 "7.14 must not introduce ConditionEngine editor write paths");
         requireFalse(js.contains("raw-json-textarea") || js.contains("rawJsonEditor"),
                 "7.14 must not introduce raw JSON editor paths");
+    }
+
+    private static void testWebAdminLogicChainViewer715() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_LOGIC_CHAIN_VIEWER_7_15_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/WEBADMIN_EDITING_CAPABILITY_MATRIX_7_14.md"), StandardCharsets.UTF_8);
+        String js = WebAdminFrontendScripts.appJs();
+        String shell = WebAdminFrontendShell.appHtml();
+        String styles = WebAdminFrontendStyles.appCss();
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String listenerActionsService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerActionsService.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminLogicChainMetadataStore.java"), StandardCharsets.UTF_8);
+        String dtos = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminDtos.java"), StandardCharsets.UTF_8);
+        String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String editLock = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+
+        for (String marker : List.of(
+                "7.15 WebAdmin Cross-Channel Logic Chain Viewer MVP",
+                "read-only visualization stage",
+                "Producer -> Channel -> Consumer -> Action / Relay / Receiver -> Downstream Channel -> Next Channel Segment",
+                "WebAdmin-only metadata",
+                "does not modify SignalBridge runtime",
+                "tree / mind-map model",
+                "not a fixed-lane table layout",
+                "Curved connectors",
+                "mouse drag pan",
+                "parent y",
+                "main chain / sub-chain hierarchy",
+                "Child-chain rows can be expanded and collapsed both ways",
+                "Self-cycle channels",
+                "A -> B -> A",
+                "SignalListener action management supports single action edit",
+                "Do not mix consumers from different channels",
+                "Do not draw long cross-channel lines",
+                "Cycle detection",
+                "Maximum depth",
+                "ConditionEngine",
+                "AND / OR / NOT",
+                "New MCP tool",
+                "MCP scenario"
+        )) {
+            requireContains(context, marker, "7.15 context marker present: " + marker);
+        }
+        requireContains(context, "7.15 does not implement:", "7.15 context keeps explicit non-goal section");
+        requireContains(context, "New MCP tool.", "7.15 context keeps new MCP tool in non-goals");
+        requireContains(context, "MCP scenario.", "7.15 context keeps MCP scenario in non-goals");
+        requireFalse(context.contains("ConditionEngine is complete") || context.contains("ConditionEngine 已完成")
+                        || context.contains("channel logic chain editor is complete") || context.contains("频道逻辑链编辑器已完成")
+                        || context.contains("MCP scenario is required") || context.contains("Run MCP scenarios"),
+                "7.15 context must not claim ConditionEngine/editor/MCP scenario completion");
+
+        for (String marker : List.of(
+                "v1.44.0-web-admin-editing-stabilization",
+                "7.15 WebAdmin Cross-Channel Logic Chain Viewer MVP",
+                "Logic Chain Viewer MVP",
+                "只读跨频道逻辑链查看器",
+                "WebAdmin-only 视图 metadata",
+                "7.15 逻辑链只读查看器不是编辑器",
+                "docs/WEBADMIN_LOGIC_CHAIN_VIEWER_7_15_CURRENT_CONTEXT.md"
+        )) {
+            requireContains(readme, marker, "README 7.15 marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "Logic Chain Viewer",
+                "Cross-channel logic chain list and read-only mind-map/tree viewer",
+                "WebAdmin-only view metadata",
+                "mind-map/tree viewer",
+                "downstream channel child subtrees",
+                "main/sub-chain hierarchy",
+                "draggable viewport",
+                "SVG curved connectors",
+                "no table-like fixed lane layout",
+                "no runtime editing",
+                "no ConditionEngine",
+                "no long cross-channel line mixing"
+        )) {
+            requireContains(matrix, marker, "capability matrix 7.15 marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "#/logic-chains",
+                "renderLogicChainsPage",
+                "renderLogicChainViewer",
+                "renderLogicChainResolve",
+                "logicChainResolveHash",
+                "查看逻辑链",
+                "data-channel-logic-chain-viewer=\"true\"",
+                "data-logic-chain-mind-map-tree=\"true\"",
+                "data-curved-connectors=\"true\"",
+                "data-no-table-like-fixed-lane-layout=\"true\"",
+                "data-root-channel-consumer-action-downstream-tree=\"true\"",
+                "data-channel-separates-consumers=\"true\"",
+                "data-same-channel-consumers-parallel=\"true\"",
+                "data-action-order-local-only=\"true\"",
+                "data-downstream-channel-child-subtree=\"true\"",
+                "data-no-cross-channel-consumer-mixing=\"true\"",
+                "data-no-cross-channel-long-line-mixing=\"true\"",
+                "data-logic-chain-readonly-graph=\"true\"",
+                "data-no-runtime-node-creation=\"true\"",
+                "logicChainBuildTree",
+                "logicChainLayoutTree",
+                "logicChainMindMap",
+                "logicChainHierarchyRows",
+                "data-curved-continuous-connectors=\"true\"",
+                "data-canvas-mouse-drag-pan=\"true\"",
+                "data-node-selection-preserves-viewport=\"true\"",
+                "data-local-badges-anchored=\"true\"",
+                "data-parent-y-centered-by-child-subtree=\"true\"",
+                "data-logic-chain-sub-chain-hierarchy=\"true\"",
+                "data-no-flat-all-chains-list=\"true\"",
+                "data-third-level-sub-chain",
+                "data-multiple-upstream-reference",
+                "data-cycle-hierarchy-guard",
+                "data-logic-chain-child-toggle-collapses=\"true\"",
+                "data-nested-child-chain-collapse=\"true\"",
+                "data-expanded-state-keyed-by-chain-id=\"true\"",
+                "data-self-cycle-not-child-chain",
+                "data-signal-listener-single-action-edit=\"true\"",
+                "data-signal-listener-action-edit-uses-dynamic-fields=\"true\"",
+                "data-signal-listener-action-edit-preserves-order=\"true\"",
+                "data-signal-listener-action-delete-preserves-scroll=\"true\"",
+                "data-action-modal-validation-preserves-scroll=\"true\"",
+                "data-action-update-keeps-listener-base-fields=\"true\"",
+                "toggleLogicChainSubtree",
+                "startLogicChainPan",
+                "思维导图模式",
+                "展开下游",
+                "下游频道表示由上游动作触发的新频道",
+                "7.15 仅提供只读跨频道逻辑链查看器",
+                "8.x ConditionEngine"
+        )) {
+            requireContains(js, marker, "7.15 frontend marker present: " + marker);
+        }
+
+        requireContains(shell, "data-route=\"#/logic-chains\"", "7.15 shell navigation exposes logic chain list page");
+        requireContains(styles, ".logic-chain-layout", "7.15 styles include logic chain layout");
+        requireContains(styles, ".logic-chain-mind-map", "7.15 styles include mind-map tree layout");
+        requireContains(styles, ".logic-chain-tree-node", "7.15 styles include tree nodes");
+        requireContains(styles, ".logic-chain-edge-layer", "7.15 styles include SVG edge overlay");
+        requireContains(styles, ".logic-chain-edge", "7.15 styles include continuous curved connectors");
+        requireContains(styles, ".logic-chain-collapse", "7.15 styles include downstream expand/collapse control");
+        requireContains(styles, ".logic-chain-node-badge", "7.15 styles anchor local badges to nodes");
+        requireContains(styles, ".logic-chain-row-toggle", "7.15 styles include expandable sub-chain rows");
+        requireContains(styles, ".logic-chain-minimap", "7.15 styles include minimap");
+        requireFalse(styles.contains(".logic-chain-segment-grid") || js.contains("logicChainColumn(") || js.contains("logicChainSegment("),
+                "7.15 frontend no longer uses table-like fixed lane segment layout");
+        requireContains(server, "/api/webadmin/logic-chains", "7.15 server exposes logic chain API route");
+        requireContains(server, "tail.equals(\"resolve\")", "7.15 server exposes temporary logic chain resolve route");
+        requireContains(service, "buildSegment", "7.15 service builds channel segments");
+        requireContains(service, "already_expanded", "7.15 service marks repeated channel references");
+        requireContains(service, "cycle", "7.15 service handles cycles");
+        requireContains(service, "DEFAULT_MAX_DEPTH", "7.15 service declares default max depth");
+        requireContains(service, "HARD_MAX_DEPTH", "7.15 service clamps hard max depth");
+        requireContains(service, "超出最大展开深度", "7.15 service reports max-depth truncation");
+        requireContains(service, "includeNode", "7.15 service applies includeDisabled setting");
+        requireContains(service, "未加载，无法展开其动作列表", "7.15 service warns when action relay actions are unavailable");
+        requireContains(service, "deviceMatchesRootType", "7.15 service validates non-channel root type matches");
+        requireContains(service, "resolveActionRootChannel", "7.15 service can resolve action detail entries without runtime editing");
+        requireContains(service, "emits_downstream", "7.15 service models downstream channel cards");
+        requireContains(service, "ChannelHierarchy", "7.15 service derives top-level/sub-chain hierarchy");
+        requireContains(service, "multipleParents", "7.15 service marks multiple upstream references");
+        requireContains(service, "selfCycles", "7.15 service marks self-cycle without generating child chain");
+        requireContains(service, "cycleChannels", "7.15 service guards A->B->A and deeper cycle references");
+        requireContains(dtos, "hierarchyLevel", "7.15 summary DTO exposes hierarchy level");
+        requireContains(dtos, "parentChainId", "7.15 summary DTO exposes parent chain id");
+        requireContains(dtos, "upstreamSourceLabel", "7.15 summary DTO exposes upstream source label");
+        requireContains(dtos, "selfCycle", "7.15 summary DTO exposes self-cycle flag");
+        requireContains(server, "method.equalsIgnoreCase(\"PATCH\")", "7.15 SignalListener single action edit API uses PATCH");
+        requireContains(server, "signalListenerActionsService.updateAction", "7.15 server routes SignalListener single action update");
+        requireContains(listenerActionsService, "updateAction", "7.15 SignalListener action service supports single action edit");
+        requireContains(listenerActionsService, "actions.set(index", "7.15 SignalListener action edit preserves action order by replacing target index");
+        requireContains(listenerActionsService, "changedFields\", List.of(\"actions\")", "7.15 SignalListener action edit only changes actions");
+        requireContains(service, "GraphStats", "7.15 service summarizes graph stats");
+        requireContains(dtos, "LogicChainGraphDto", "7.15 DTO exposes logic chain graph");
+        requireContains(store, "WebAdmin-only", "7.15 metadata store documents WebAdmin-only metadata");
+        requireContains(operationType, "EDIT_LOGIC_CHAIN_METADATA", "7.15 metadata write operation registered");
+        requireContains(editLock, "TARGET_LOGIC_CHAIN_METADATA", "7.15 metadata edit lock target registered");
+        requireContains(realtime, "LOGIC_CHAIN_METADATA_CHANGED", "7.15 realtime event registered");
+        requireContains(service, "requireValidCsrf", "7.15 metadata write requires CSRF");
+        requireContains(service, "sameOrigin", "7.15 metadata write checks same-origin");
+        requireContains(service, "expectedFingerprint", "7.15 metadata write carries expected fingerprint");
+        requireContains(service, "WebAdminWriteResult", "7.15 metadata write returns WebAdminWriteResult");
+        requireContains(service, "WebAdminAuditLogger", "7.15 metadata write records audit");
+        requireContains(js, "modalDraftDirty('logic_chain_metadata'", "7.15 metadata modal has dirty guard");
+        requireContains(service, "autoRootChainId", "7.15 temporary metadata ids are scoped by root type/ref");
+
+        requireFalse(js.contains("data-channel-logic-chain-editor") || js.contains("saveRuntimeLogicChain") || js.contains("createRuntimeLogicNode"),
+                "7.15 must not expose runtime logic chain editor paths");
+        requireFalse(js.contains("conditionBranchNode") || js.contains("andOrNotNode") || js.contains("logicConditionEditor"),
+                "7.15 must not expose AND/OR/NOT or condition branch nodes");
+        requireFalse(js.contains("conditionEngineEditor") || js.contains("saveConditionEngine") || service.contains("ConditionEngine"),
+                "7.15 must not introduce ConditionEngine implementation");
+        requireFalse(js.contains("raw-json-textarea") || js.contains("rawJsonEditor") || service.contains("raw JSON editor"),
+                "7.15 must not introduce raw JSON editor paths");
+        requireFalse(service.contains("SignalDeviceStore.update") || service.contains("SignalDeviceStore.create") || service.contains("SignalDeviceStore.delete")
+                        || service.contains("SignalListenerStore.update") || service.contains("SignalListenerStore.create") || service.contains("SignalListenerStore.delete")
+                        || service.contains("RegionControllerStore.createController") || service.contains("RegionControllerStore.deleteController")
+                        || service.contains("ActionRelayBlockEntity.setActions"),
+                "7.15 logic chain metadata must not mutate runtime devices/listeners/regions/actions");
+        requireFalse(service.contains("SignalBridge.dispatch") || service.contains("SignalBridge.emit"),
+                "7.15 service must not rewrite or dispatch SignalBridge runtime");
     }
 
     private static void requireTrue(boolean value, String message) {

@@ -27,6 +27,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT = "virtual_block_device_single_item_submit";
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
+    public static final String TARGET_LOGIC_CHAIN_METADATA = "logic_chain_metadata";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
     public static final String TARGET_REGION_CONTROLLER_CONFIG = "region_controller_config";
@@ -542,6 +543,9 @@ public final class WebAdminEditLockService {
         if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
             return "频道显示信息";
         }
+        if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
+            return "逻辑链显示信息";
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return "Signal Listener 基础配置";
         }
@@ -603,6 +607,9 @@ public final class WebAdminEditLockService {
         if (TARGET_CHANNEL_METADATA.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CHANNEL_METADATA;
         }
+        if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA;
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG;
         }
@@ -621,6 +628,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_CHANNEL_METADATA.equals(lock.targetType())) {
             return "#/signals/" + encode(lock.targetId());
+        }
+        if (TARGET_LOGIC_CHAIN_METADATA.equals(lock.targetType())) {
+            return "#/logic-chains/" + encode(lock.targetId());
         }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(lock.targetType())) {
             return "#/signals";

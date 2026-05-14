@@ -355,4 +355,109 @@ public final class WebAdminDtos {
             Map<String, Object> visibility
     ) {
     }
+
+    public record LogicChainMetadataDto(
+            String id,
+            String displayName,
+            String note,
+            String iconKey,
+            String effectiveDisplayName,
+            String effectiveIconKey,
+            List<String> tags,
+            String group,
+            String rootType,
+            String rootRef,
+            String rootChannel,
+            boolean includeDisabled,
+            int maxDepth,
+            String layoutPreference,
+            String updatedAt,
+            String updatedBy,
+            long version,
+            String expectedFingerprint,
+            WebAdminEditLockStatusDto lockStatus
+    ) {
+    }
+
+    public record LogicChainSummaryDto(
+            String id,
+            String displayName,
+            String rootType,
+            String rootRef,
+            String rootChannel,
+            int channelCount,
+            int producerCount,
+            int consumerCount,
+            int actionCount,
+            int downstreamChannelCount,
+            int disabledNodeCount,
+            String doctorStatus,
+            String lastTriggeredAt,
+            boolean saved,
+            int hierarchyLevel,
+            String parentChainId,
+            String parentRootRef,
+            String upstreamSourceLabel,
+            String upstreamNodeId,
+            boolean isSubChain,
+            boolean isReference,
+            boolean hasMultipleParents,
+            boolean hasCycle,
+            boolean selfCycle,
+            int childrenCount,
+            boolean visibleInTopLevel,
+            LogicChainMetadataDto metadata
+    ) {
+    }
+
+    public record LogicChainGraphDto(
+            LogicChainMetadataDto metadata,
+            LogicChainNodeDto root,
+            List<LogicChainSegmentDto> segments,
+            List<LogicChainNodeDto> nodes,
+            List<LogicChainEdgeDto> edges,
+            List<String> warnings,
+            Map<String, Object> stats
+    ) {
+    }
+
+    public record LogicChainSegmentDto(
+            String id,
+            String channel,
+            int depth,
+            boolean expanded,
+            String visitedState,
+            List<String> producers,
+            List<String> consumers,
+            List<String> actions,
+            List<String> downstreamChannels,
+            List<String> warnings
+    ) {
+    }
+
+    public record LogicChainNodeDto(
+            String id,
+            String type,
+            String refType,
+            String refId,
+            String label,
+            String subtitle,
+            String channel,
+            boolean enabled,
+            String status,
+            String doctorStatus,
+            String lastEvent,
+            String detailRoute,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record LogicChainEdgeDto(
+            String from,
+            String to,
+            String type,
+            String label,
+            String style
+    ) {
+    }
 }
