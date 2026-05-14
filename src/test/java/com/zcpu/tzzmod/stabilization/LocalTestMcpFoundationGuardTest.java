@@ -147,6 +147,8 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "MCP remains auxiliary and does not replace user acceptance", "README states MCP is auxiliary");
         requireContains(readme, "7.14 stabilization does not generate screenshots", "README states 7.14 does not generate screenshots");
         requireContains(readme, "does not run MCP scenarios", "README states 7.14 does not run MCP scenarios");
+        requireContains(readme, "8.1 不启动 Minecraft", "README states 8.1 does not start Minecraft");
+        requireContains(readme, "8.1 不提供 WebAdmin 条件可视化编辑器", "README states 8.1 has no condition editor");
         requireContains(readme, "MCP 不提供任意 shell", "README keeps no arbitrary shell boundary");
         requireContains(readme, "不提供 git mutation", "README keeps no git mutation boundary");
         requireContains(readme, "不提供 raw JSON / NBT path 编辑", "README keeps no raw JSON boundary");
@@ -183,15 +185,19 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(lowerTools.contains("logic_chain") || lowerTools.contains("logic-chain") || tools.contains("logicChain") || tools.contains("logic-chains"),
                 "7.15 logic chain viewer must not add a new MCP tool");
         requireFalse(lowerTools.contains("condition_engine") || lowerTools.contains("condition-engine") || tools.contains("conditionEngine")
-                        || lowerTools.contains("game_controller") || lowerTools.contains("mission_system") || lowerTools.contains("phase_controller"),
-                "8.0 ConditionEngine core must not add MCP tools for conditions or high-level game systems");
+                        || lowerTools.contains("condition.") || lowerTools.contains("player_condition") || lowerTools.contains("webadmin.condition")
+                        || lowerTools.contains("minecraft.condition") || lowerTools.contains("game_controller")
+                        || lowerTools.contains("mission_system") || lowerTools.contains("phase_controller"),
+                "8.1 ConditionEngine player/context conditions must not add MCP tools for conditions or high-level game systems");
         String scenarios = read("tools/tzz-test-mcp/src/tools/scenario.ts");
         String lowerScenarios = scenarios.toLowerCase();
         requireFalse(lowerScenarios.contains("logic_chain") || lowerScenarios.contains("logic-chain") || scenarios.contains("logicChain") || scenarios.contains("logic-chains"),
                 "7.15 logic chain viewer must not add an MCP scenario");
         requireFalse(lowerScenarios.contains("condition_engine") || lowerScenarios.contains("condition-engine") || scenarios.contains("conditionEngine")
-                        || lowerScenarios.contains("game_controller") || lowerScenarios.contains("mission_system") || lowerScenarios.contains("phase_controller"),
-                "8.0 ConditionEngine core must not add MCP scenarios");
+                        || lowerScenarios.contains("player_condition") || lowerScenarios.contains("webadmin.condition")
+                        || lowerScenarios.contains("minecraft.condition") || lowerScenarios.contains("game_controller")
+                        || lowerScenarios.contains("mission_system") || lowerScenarios.contains("phase_controller"),
+                "8.1 ConditionEngine player/context conditions must not add MCP scenarios");
 
         String server = read("tools/tzz-test-mcp/src/server.ts");
         requireContains(server, "tools/list", "MCP tools/list handler exists");

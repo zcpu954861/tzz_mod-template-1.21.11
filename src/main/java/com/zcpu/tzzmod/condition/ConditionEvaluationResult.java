@@ -51,12 +51,23 @@ public record ConditionEvaluationResult(
             String reasonCode,
             String message
     ) {
+        return leaf(node, context, matched, reasonCode, message, label(node));
+    }
+
+    public static ConditionEvaluationResult leaf(
+            ConditionNode node,
+            ConditionEvaluationContext context,
+            boolean matched,
+            String reasonCode,
+            String message,
+            String label
+    ) {
         return new ConditionEvaluationResult(
                 matched,
                 "",
                 node == null ? "" : node.id(),
                 node == null ? "" : node.type(),
-                label(node),
+                label,
                 reasonCode,
                 matched ? "" : message,
                 message,
@@ -157,7 +168,41 @@ public record ConditionEvaluationResult(
         if (!node.name().isBlank()) {
             return node.name();
         }
-        return node.id().isBlank() ? node.type() : node.id();
+        if (node.isGroup()) {
+            return switch (node.groupMode()) {
+                case AND -> "全部满足条件组";
+                case OR -> "任意满足条件组";
+                case NOT -> "条件取反组";
+            };
+        }
+        return switch (node.type()) {
+            case ConditionNodeType.ALWAYS_TRUE -> "永远通过";
+            case ConditionNodeType.ALWAYS_FALSE -> "永远失败";
+            case ConditionNodeType.CONTEXT_EXISTS -> "上下文存在";
+            case ConditionNodeType.CONTEXT_FIELD_EXISTS -> "上下文字段存在";
+            case ConditionNodeType.CONTEXT_EQUALS -> "上下文字段匹配";
+            case ConditionNodeType.PLAYER_EXISTS -> "触发玩家存在";
+            case ConditionNodeType.PLAYER_ONLINE -> "玩家在线";
+            case ConditionNodeType.PLAYER_IS_OP -> "玩家是管理员";
+            case ConditionNodeType.PLAYER_HAS_TAG -> "玩家拥有标签";
+            case ConditionNodeType.PLAYER_LACKS_TAG -> "玩家没有标签";
+            case ConditionNodeType.PLAYER_TEAM_EQUALS -> "玩家队伍匹配";
+            case ConditionNodeType.PLAYER_GAMEMODE_EQUALS -> "玩家游戏模式匹配";
+            case ConditionNodeType.PLAYER_ALIVE -> "玩家存活";
+            case ConditionNodeType.PLAYER_DEAD -> "玩家死亡";
+            case ConditionNodeType.SOURCE_TYPE_EQUALS -> "来源类型匹配";
+            case ConditionNodeType.SOURCE_ID_EQUALS -> "来源 ID 匹配";
+            case ConditionNodeType.CHANNEL_EQUALS -> "信号频道匹配";
+            case ConditionNodeType.WORLD_EQUALS -> "世界匹配";
+            case ConditionNodeType.DEVICE_ID_EQUALS -> "设备 ID 匹配";
+            case ConditionNodeType.LISTENER_ID_EQUALS -> "监听器 ID 匹配";
+            case ConditionNodeType.REGION_ID_EQUALS -> "区域 ID 匹配";
+            case ConditionNodeType.ACTION_ID_EQUALS -> "动作 ID 匹配";
+            case ConditionNodeType.GAME_TIME_COMPARE -> "游戏时间比较";
+            case ConditionNodeType.EVENT_METADATA_EXISTS -> "事件元数据存在";
+            case ConditionNodeType.EVENT_METADATA_EQUALS -> "事件元数据匹配";
+            default -> node.id().isBlank() ? node.type() : node.id();
+        };
     }
 
     private static String safe(String value) {

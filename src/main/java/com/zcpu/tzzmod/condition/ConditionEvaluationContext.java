@@ -1,11 +1,19 @@
 package com.zcpu.tzzmod.condition;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public record ConditionEvaluationContext(
         String playerId,
         String playerName,
+        Boolean playerOnline,
+        Boolean playerOp,
+        List<String> playerTags,
+        String playerTeam,
+        String playerGameMode,
+        Boolean playerAlive,
         String worldId,
         String sourceType,
         String sourceId,
@@ -26,6 +34,9 @@ public record ConditionEvaluationContext(
     public ConditionEvaluationContext {
         playerId = safe(playerId);
         playerName = safe(playerName);
+        playerTags = copyList(playerTags);
+        playerTeam = safe(playerTeam);
+        playerGameMode = safe(playerGameMode).toLowerCase(java.util.Locale.ROOT);
         worldId = safe(worldId);
         sourceType = safe(sourceType);
         sourceId = safe(sourceId);
@@ -58,6 +69,13 @@ public record ConditionEvaluationContext(
         return switch (key) {
             case "playerId" -> playerId;
             case "playerName" -> playerName;
+            case "playerOnline" -> playerOnline == null ? "" : playerOnline.toString();
+            case "playerOp", "playerIsOp" -> playerOp == null ? "" : playerOp.toString();
+            case "playerTags" -> String.join(",", playerTags);
+            case "playerTeam", "team" -> playerTeam;
+            case "playerGameMode", "playerGamemode", "gamemode" -> playerGameMode;
+            case "playerAlive" -> playerAlive == null ? "" : playerAlive.toString();
+            case "playerDead" -> playerAlive == null ? "" : Boolean.toString(!playerAlive);
             case "worldId", "world" -> worldId;
             case "sourceType" -> sourceType;
             case "sourceId" -> sourceId;
@@ -79,6 +97,8 @@ public record ConditionEvaluationContext(
     public Map<String, String> summary() {
         Map<String, String> summary = new LinkedHashMap<>();
         put(summary, "player", playerName.isBlank() ? playerId : playerName);
+        put(summary, "playerTeam", playerTeam);
+        put(summary, "playerGameMode", playerGameMode);
         put(summary, "world", worldId);
         put(summary, "channel", channel);
         put(summary, "sourceType", sourceType);
@@ -91,6 +111,22 @@ public record ConditionEvaluationContext(
         put(summary, "triggerType", triggerType);
         put(summary, "gameTime", Long.toString(gameTime));
         return Map.copyOf(summary);
+    }
+
+    public boolean hasPlayerIdentity() {
+        return !playerId.isBlank() || !playerName.isBlank();
+    }
+
+    public String playerLabel() {
+        if (!playerName.isBlank()) {
+            return playerName;
+        }
+        return playerId.isBlank() ? "未知玩家" : playerId;
+    }
+
+    public boolean hasPlayerTag(String tag) {
+        String expected = safe(tag);
+        return !expected.isBlank() && playerTags.contains(expected);
     }
 
     public String compactSummary() {
@@ -127,6 +163,17 @@ public record ConditionEvaluationContext(
         return Map.copyOf(copy);
     }
 
+    private static List<String> copyList(Collection<String> raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        return raw.stream()
+                .map(ConditionEvaluationContext::safe)
+                .filter((value) -> !value.isBlank())
+                .distinct()
+                .toList();
+    }
+
     private static String safe(String value) {
         return value == null ? "" : value.trim();
     }
@@ -134,8 +181,14 @@ public record ConditionEvaluationContext(
     public static final class Builder {
         private final Map<String, String> eventMetadata = new LinkedHashMap<>();
         private final Map<String, String> variables = new LinkedHashMap<>();
+        private final java.util.ArrayList<String> playerTags = new java.util.ArrayList<>();
         private String playerId = "";
         private String playerName = "";
+        private Boolean playerOnline = null;
+        private Boolean playerOp = null;
+        private String playerTeam = "";
+        private String playerGameMode = "";
+        private Boolean playerAlive = null;
         private String worldId = "";
         private String sourceType = "";
         private String sourceId = "";
@@ -154,6 +207,45 @@ public record ConditionEvaluationContext(
         public Builder player(String id, String name) {
             this.playerId = id;
             this.playerName = name;
+            return this;
+        }
+
+        public Builder playerOnline(boolean playerOnline) {
+            this.playerOnline = playerOnline;
+            return this;
+        }
+
+        public Builder playerOp(boolean playerOp) {
+            this.playerOp = playerOp;
+            return this;
+        }
+
+        public Builder playerTags(Collection<String> tags) {
+            this.playerTags.clear();
+            this.playerTags.addAll(copyList(tags));
+            return this;
+        }
+
+        public Builder playerTag(String tag) {
+            String safeTag = safe(tag);
+            if (!safeTag.isBlank() && !this.playerTags.contains(safeTag)) {
+                this.playerTags.add(safeTag);
+            }
+            return this;
+        }
+
+        public Builder playerTeam(String playerTeam) {
+            this.playerTeam = playerTeam;
+            return this;
+        }
+
+        public Builder playerGameMode(String playerGameMode) {
+            this.playerGameMode = playerGameMode;
+            return this;
+        }
+
+        public Builder playerAlive(boolean playerAlive) {
+            this.playerAlive = playerAlive;
             return this;
         }
 
@@ -237,6 +329,12 @@ public record ConditionEvaluationContext(
             return new ConditionEvaluationContext(
                     playerId,
                     playerName,
+                    playerOnline,
+                    playerOp,
+                    playerTags,
+                    playerTeam,
+                    playerGameMode,
+                    playerAlive,
                     worldId,
                     sourceType,
                     sourceId,

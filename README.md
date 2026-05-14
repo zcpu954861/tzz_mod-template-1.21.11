@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.45.0-web-admin-logic-chain-viewer`
-- 当前开发基线：`8.0 ConditionEngine Core`；本阶段只做 ConditionEngine Core，发布后建议版本为 `v1.46.0-condition-engine-core`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.46.0-condition-engine-core`
+- 当前开发基线：`8.1 基础玩家 / 上下文条件包`（Basic Player / Context Conditions）；本阶段只做基础玩家 / 上下文条件包，发布后建议版本为 `v1.47.0-condition-basic-player-context`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -36,10 +36,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [7.15 WebAdmin Logic Chain Viewer Current Context](docs/WEBADMIN_LOGIC_CHAIN_VIEWER_7_15_CURRENT_CONTEXT.md)
 - [8.0 ConditionEngine Core Current Context](docs/CONDITION_ENGINE_CORE_8_0_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.0](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_0.md)
+- [8.1 基础玩家 / 上下文条件包 Current Context](docs/CONDITION_BASIC_PLAYER_CONTEXT_8_1_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.1](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_1.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.0 Core；当前只提供无副作用判断核心，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.1；当前提供无副作用判断核心和第一批基础玩家 / 上下文条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -56,6 +58,20 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.0 不做 GameController / MissionSystem / PhaseController。
 - 8.0 不接入 VBD、SignalListener、RegionController、ActionRelay、itemSubmit runtime，不改 SignalBridge runtime。
 - 8.0 不提供 WebAdmin 条件可视化编辑器，不提供 raw JSON / NBT path 编辑器，不新增 MCP tool，不跑 MCP scenario，不生成截图。
+
+## 8.1 基础玩家 / 上下文条件包
+
+8.1 在 8.0 Core 上加入第一批可复用基础条件。新增条件覆盖触发玩家存在、在线快照、管理员状态、玩家 tag、玩家队伍、玩家游戏模式、存活/死亡快照，以及 source/channel/world/device/listener/region/action/gameTime/event metadata 等上下文判断。
+
+8.1 约束：
+
+- 条件显示名支持中文，条件描述、字段名和失败原因也使用中文主文案。
+- 条件 type id 仍使用稳定英文 lower_snake_case；WebAdmin / Doctor / Debug / capability 输出优先显示中文显示名、中文描述、中文字段名和中文失败原因。
+- 8.1 仍未接入 runtime：VBD、SignalListener、RegionController、ActionRelay、itemSubmit 等运行路径不会自动调用 ConditionEngine。
+- 8.1 不做任务/关卡，不做 GameController / MissionSystem / PhaseController。
+- 8.1 不做 State Variable System，不做物品 / 背包 / 装备 / 容器条件，不做区域人数聚合，不做任务阶段条件。
+- 8.1 不提供 WebAdmin 条件可视化编辑器，不提供 raw JSON / NBT path 编辑器，不新增 MCP tool，不跑 MCP scenario，不生成截图，不启动 Minecraft。
+- 8.1 不启动 Minecraft，仍以纯单元测试、guard 和手动审查为主。
 
 ## WebAdmin UI 规范
 

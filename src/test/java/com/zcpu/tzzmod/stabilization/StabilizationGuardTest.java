@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.stabilization;
 import com.google.gson.Gson;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
@@ -134,7 +135,9 @@ public final class StabilizationGuardTest {
         testWebAdminEditingStabilization714();
         testWebAdminLogicChainViewer715();
         ConditionEngineCoreTest.run();
+        ConditionBasicPlayerContextTest.run();
         testConditionEngineCore80();
+        testConditionBasicPlayerContext81();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -5103,7 +5106,7 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "v1.45.0-web-admin-logic-chain-viewer",
+                "v1.46.0-condition-engine-core",
                 "7.14 WebAdmin Editing Stabilization",
                 "7.x 已把 WebAdmin 从只读观察层推进到受控编辑层",
                 "docs/WEBADMIN_EDITING_STABILIZATION_7_14_CURRENT_CONTEXT.md",
@@ -5239,7 +5242,7 @@ public final class StabilizationGuardTest {
                 "7.15 context must not claim ConditionEngine/editor/MCP scenario completion");
 
         for (String marker : List.of(
-                "v1.45.0-web-admin-logic-chain-viewer",
+                "v1.46.0-condition-engine-core",
                 "8.0 ConditionEngine Core",
                 "Logic Chain Viewer MVP",
                 "只读跨频道逻辑链查看器",
@@ -5479,7 +5482,7 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "v1.45.0-web-admin-logic-chain-viewer",
+                "v1.46.0-condition-engine-core",
                 "8.0 ConditionEngine Core",
                 "只做 ConditionEngine Core",
                 "不做具体逃走中任务",
@@ -5588,6 +5591,218 @@ public final class StabilizationGuardTest {
         requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
                 "8.0 docs must not claim concrete old datapack tasks or high-level game systems are implemented");
+    }
+
+    private static void testConditionBasicPlayerContext81() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_BASIC_PLAYER_CONTEXT_8_1_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_1.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
+        String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
+        String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
+        String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
+        String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionBasicPlayerContextTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_BASIC_PLAYER_CONTEXT_8_1_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_1.md",
+                "src/test/java/com/zcpu/tzzmod/condition/ConditionBasicPlayerContextTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.1 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "基础玩家 / 上下文条件",
+                "中文显示名",
+                "中文失败原因",
+                "player_exists",
+                "player_has_tag",
+                "player_lacks_tag",
+                "player_team_equals",
+                "player_gamemode_equals",
+                "player_is_op",
+                "channel_equals",
+                "source_type_equals",
+                "source_id_equals",
+                "device_id_equals",
+                "listener_id_equals",
+                "region_id_equals",
+                "action_id_equals",
+                "game_time_compare",
+                "event_metadata_exists",
+                "event_metadata_equals",
+                "不接入 VBD",
+                "不接入 SignalListener",
+                "不接入 RegionController",
+                "不做 WebAdmin 条件可视化编辑器",
+                "不做 State Variable System",
+                "不做物品 / 背包 / 容器条件",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(context, marker, "8.1 context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "player_exists",
+                "player_online",
+                "player_is_op",
+                "player_has_tag",
+                "player_lacks_tag",
+                "player_team_equals",
+                "player_gamemode_equals",
+                "player_alive",
+                "player_dead",
+                "source_type_equals",
+                "source_id_equals",
+                "channel_equals",
+                "world_equals",
+                "device_id_equals",
+                "listener_id_equals",
+                "region_id_equals",
+                "action_id_equals",
+                "game_time_compare",
+                "event_metadata_exists",
+                "event_metadata_equals",
+                "中文失败原因",
+                "无 runtime integration",
+                "无 WebAdmin editor",
+                "无 MCP scenario requirement",
+                "无截图要求",
+                "无 Minecraft 启动要求"
+        )) {
+            requireContains(matrix, marker, "8.1 capability matrix marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "基础玩家 / 上下文条件",
+                "条件显示名支持中文",
+                "仍未接入 runtime",
+                "不做任务/关卡",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(readme, marker, "README 8.1 marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "PLAYER_EXISTS",
+                "PLAYER_ONLINE",
+                "PLAYER_IS_OP",
+                "PLAYER_HAS_TAG",
+                "PLAYER_LACKS_TAG",
+                "PLAYER_TEAM_EQUALS",
+                "PLAYER_GAMEMODE_EQUALS",
+                "PLAYER_ALIVE",
+                "PLAYER_DEAD",
+                "SOURCE_TYPE_EQUALS",
+                "SOURCE_ID_EQUALS",
+                "CHANNEL_EQUALS",
+                "WORLD_EQUALS",
+                "DEVICE_ID_EQUALS",
+                "LISTENER_ID_EQUALS",
+                "REGION_ID_EQUALS",
+                "ACTION_ID_EQUALS",
+                "GAME_TIME_COMPARE",
+                "EVENT_METADATA_EXISTS",
+                "EVENT_METADATA_EQUALS"
+        )) {
+            requireContains(nodeTypes, marker, "8.1 node type marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "玩家条件",
+                "上下文条件",
+                "时间条件",
+                "元数据条件",
+                "玩家拥有标签",
+                "玩家没有标签",
+                "玩家队伍匹配",
+                "玩家游戏模式匹配",
+                "玩家是管理员",
+                "信号频道匹配",
+                "来源类型匹配",
+                "来源 ID 匹配",
+                "设备 ID 匹配",
+                "监听器 ID 匹配",
+                "区域 ID 匹配",
+                "动作 ID 匹配",
+                "游戏时间比较",
+                "事件元数据存在",
+                "事件元数据匹配",
+                "玩家缺少标签",
+                "信号频道不匹配",
+                "游戏时间不满足",
+                "事件元数据不匹配",
+                "SignalChannel.normalize",
+                "condition_config_invalid_channel",
+                "condition_config_invalid_gamemode",
+                "condition_config_invalid_operator"
+        )) {
+            requireContains(registry, marker, "8.1 registry marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "playerOnline",
+                "playerOp",
+                "playerTags",
+                "playerTeam",
+                "playerGameMode",
+                "playerAlive",
+                "hasPlayerIdentity",
+                "hasPlayerTag",
+                "eventMetadata",
+                "variables"
+        )) {
+            requireContains(contextModel, marker, "8.1 context model marker present: " + marker);
+        }
+
+        requireContains(result, "leaf(", "8.1 result helper keeps leaf result path");
+        requireContains(result, "String label", "8.1 result helper allows Chinese labels");
+
+        for (String marker : List.of(
+                "testPlayerExistsAndOnline",
+                "testPlayerOpTagsTeamGamemodeAndAliveState",
+                "testContextIdConditions",
+                "testGameTimeCompare",
+                "testEventMetadataConditions",
+                "testMissingContextSafeFailures",
+                "testInvalidConfigValidation",
+                "testChineseMetadataAndFailureReasons",
+                "testGroupsWithNewConditions",
+                "player_exists true",
+                "channel_equals normalizes true",
+                "game_time eq",
+                "metadata equals true"
+        )) {
+            requireContains(tests, marker, "8.1 condition test marker present: " + marker);
+        }
+
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"), null);
+        requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
+                "8.1 ConditionEngine conditions must not execute actions or emit signals");
+        requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
+                        || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
+                "8.1 ConditionEngine conditions must not integrate VBD/listener/region/action runtime stores");
+        String lowerRegistry = registry.toLowerCase(java.util.Locale.ROOT);
+        requireFalse(lowerRegistry.contains("item_") || lowerRegistry.contains("inventory_") || lowerRegistry.contains("container_")
+                        || lowerRegistry.contains("state_variable"),
+                "8.1 must not add item/inventory/container conditions or state variable system");
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
+                        || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
+                "8.1 must not wire ConditionEngine into existing runtime packages");
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
+                        || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
+                "8.1 must not add a WebAdmin condition editor or raw JSON condition API");
+        requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.1 docs must not claim concrete tasks or high-level game systems are implemented");
     }
 
     private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {
