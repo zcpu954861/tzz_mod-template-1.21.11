@@ -28,6 +28,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_LOGIC_CHAIN_METADATA = "logic_chain_metadata";
+    public static final String TARGET_CONDITION_GROUP = "condition_group";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
     public static final String TARGET_REGION_CONTROLLER_CONFIG = "region_controller_config";
@@ -546,6 +547,9 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
             return "逻辑链显示信息";
         }
+        if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
+            return "条件组";
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return "Signal Listener 基础配置";
         }
@@ -610,6 +614,9 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA;
         }
+        if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_CONDITION_GROUP;
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG;
         }
@@ -631,6 +638,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_LOGIC_CHAIN_METADATA.equals(lock.targetType())) {
             return "#/logic-chains/" + encode(lock.targetId());
+        }
+        if (TARGET_CONDITION_GROUP.equals(lock.targetType())) {
+            return "#/condition-groups/" + encode(lock.targetId());
         }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(lock.targetType())) {
             return "#/signals";

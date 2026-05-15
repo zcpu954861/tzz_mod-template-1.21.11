@@ -27,13 +27,14 @@ public final class WebAdminWriteFoundationService {
         data.put("interactionItemMatcherWriteEnabled", true);
         data.put("singleItemSubmitTemplateWriteEnabled", true);
         data.put("channelMetadataWriteEnabled", true);
+        data.put("conditionGroupWriteEnabled", true);
         data.put("signalListenerBasicConfigWriteEnabled", true);
         data.put("signalListenerActionListWriteEnabled", true);
         data.put("regionControllerWriteEnabled", true);
         data.put("objectSelectionEnabled", true);
         data.put("virtualBlockDeviceLifecycleEnabled", true);
         data.put("signalListenerLifecycleWriteEnabled", true);
-        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、VBD 统一 itemSubmit requirement 编辑器、频道显示信息、Signal Listener 基础配置与动作列表、RegionController 配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
+        data.put("message", "当前版本开放 WebAdmin 设备显示信息、设备基础/扩展配置、Action Relay 动作列表、VBD 原生触发配置、VBD 交互物品匹配、VBD 统一 itemSubmit requirement 编辑器、频道显示信息、条件组编辑、Signal Listener 基础配置与动作列表、RegionController 配置、对象选择创建、虚拟方块设备删除/解绑和 Signal Listener 创建/删除。");
         data.put("permissions", permissionService.capabilitySummary(user == null ? null : user.roleEnum()));
         Map<String, Object> csrf = new LinkedHashMap<>();
         csrf.put("requiredForFutureWrites", true);
@@ -58,6 +59,7 @@ public final class WebAdminWriteFoundationService {
                     && operation != WebAdminOperationType.CANCEL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION
                     && operation != WebAdminOperationType.FAIL_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT_SESSION
                     && operation != WebAdminOperationType.EDIT_CHANNEL_METADATA
+                    && operation != WebAdminOperationType.EDIT_CONDITION_GROUP
                     && operation != WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG
                     && operation != WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS
                     && operation != WebAdminOperationType.START_OBJECT_SELECTION

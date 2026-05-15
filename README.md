@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.49.0-condition-item-inventory-container`
-- 当前开发基线：`8.4 Region / Signal / Logic Chain Conditions / 区域、信号、逻辑链条件包`；本阶段只做 condition-safe snapshot 和只读条件，发布后建议版本为 `v1.50.0-condition-region-signal-logic-chain`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.50.0-condition-region-signal-logic-chain`
+- 当前开发基线：`8.5 WebAdmin Condition Editor / WebAdmin 条件组编辑器 MVP`；本阶段只把 8.0-8.4 条件能力接入 WebAdmin 配置、校验和模拟评估，不挂载任何 runtime，发布后建议版本为 `v1.51.0-web-admin-condition-editor`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -44,10 +44,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.3](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_3.md)
 - [8.4 Region / Signal / Logic Chain Conditions Current Context](docs/CONDITION_REGION_SIGNAL_LOGIC_CHAIN_8_4_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.4](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_4.md)
+- [8.5 WebAdmin Condition Editor Current Context](docs/WEBADMIN_CONDITION_EDITOR_8_5_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.5](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.4；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件，以及 Region / Signal / Logic Chain snapshot 条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.5；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件，以及 WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP；仍不做具体逃走中任务，不接入现有运行时。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -154,6 +156,27 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.4 不做具体任务/关卡，不做 GameController / MissionSystem / PhaseController。
 - 8.4 不新增 MCP tool。8.4 不跑 MCP scenario。8.4 不生成截图。8.4 不启动 Minecraft。
 
+## 8.5 WebAdmin Condition Editor
+
+8.5 在 8.0-8.4 ConditionEngine 能力之上加入 WebAdmin 条件组编辑器 MVP。它用于创建、保存、校验和模拟评估 Condition Group，但不让条件组实际影响任何设备、监听器、区域、Action 或 itemSubmit。
+
+8.5 已提供：
+
+- Condition Type Catalog：`GET /api/webadmin/condition-types`，只读展示已注册 condition type、中文显示名、中文描述、中文字段名、字段类型和 operator / enum 选项。
+- World-scoped Condition Group store：`<world-save-root>/tzz/webadmin/condition_groups.json`。
+- Condition Group API：list / detail / create / update / delete / validate / preview。
+- WebAdmin UI：`#/condition-groups` 列表与目录，`#/condition-groups/{id}` 详情、结构化节点编辑、校验结果和模拟评估。
+- 写入安全：permission、CSRF / same-origin、edit lock、expectedFingerprint、`WebAdminWriteResult`、audit、realtime event。
+- Preview MVP：支持基础 context、player snapshot 和手动输入的 GLOBAL / PLAYER state variable snapshot；不会读取 live world、live state store 或 runtime service。
+
+8.5 约束：
+
+- 8.5 仍不接入 runtime：不把 condition group 挂到 VBD、SignalListener、RegionController、ActionRelay、Action、itemSubmit。
+- 8.5 不读取 live world、live player list、live inventory/container、live RegionController、live SignalBridge、live Logic Chain Viewer service。
+- 8.5 不做 GameController / MissionSystem / PhaseController，不做具体任务/关卡。
+- 8.5 不提供 raw JSON editor 作为主要入口，不做任意 NBT path 或通用脚本表达式。
+- 8.5 不新增 MCP tool。8.5 不跑 MCP scenario。8.5 不生成截图。8.5 不启动 Minecraft。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -187,7 +210,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- 不提供 ConditionEngine runtime integration / WebAdmin editor、频道逻辑链编辑器、路径可视化、GameController / MissionSystem 作为已完成功能；7.15 逻辑链只读查看器不是编辑器。
+- 不提供 ConditionEngine runtime integration；8.5 WebAdmin Condition Editor 只负责条件组配置、校验和模拟评估，不把条件组挂载到运行时。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
 
 ## 主要功能
 

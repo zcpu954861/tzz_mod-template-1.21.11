@@ -12,6 +12,8 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminConditionGroupPreviewRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminConditionGroupRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainMetadataRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionStartRequest;
@@ -37,6 +39,8 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService;
@@ -90,6 +94,8 @@ public final class WebAdminServer {
     private final WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminInteractionItemMatcherService interactionItemMatcherService = new WebAdminInteractionItemMatcherService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminConditionCatalogService conditionCatalogService = new WebAdminConditionCatalogService();
+    private final WebAdminConditionGroupService conditionGroupService = new WebAdminConditionGroupService(permissionService, writeSecurityService, editLockService);
     private final WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
@@ -279,6 +285,14 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/channel-metadata")) {
                 handleChannelMetadata(exchange, auth, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/condition-types")) {
+                handleConditionTypes(exchange, auth, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/condition-groups") || path.startsWith("/api/webadmin/condition-groups/")) {
+                runOnServerThread(() -> handleConditionGroups(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
@@ -976,6 +990,121 @@ public final class WebAdminServer {
             return;
         }
         WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "逻辑链接口不存在。");
+    }
+
+    private void handleConditionTypes(HttpExchange exchange, AuthContext auth, String method) throws IOException {
+        if (!method.equalsIgnoreCase("GET")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+            return;
+        }
+        WebAdminJsonResponse.ok(exchange, conditionCatalogService.catalog());
+    }
+
+    private void handleConditionGroups(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/condition-groups";
+        // 8.5 Condition Group API marker: /delete /validate /preview.
+        if (path.equals(root)) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, conditionGroupService.list(minecraftServer, auth.user, auth.session));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminConditionGroupRequest request = readJson(exchange, WebAdminConditionGroupRequest.class);
+                if (request == null) {
+                    request = new WebAdminConditionGroupRequest();
+                }
+                WebAdminWriteResult result = conditionGroupService.create(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        String prefix = root + "/";
+        String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        String[] parts = tail.split("/");
+        String groupId = parts.length == 0 ? "" : decodePathSegment(parts[0]);
+        if (groupId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "条件组 ID 不能为空。");
+            return;
+        }
+        if (parts.length == 1) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, conditionGroupService.detail(minecraftServer, auth.user, auth.session, groupId));
+                return;
+            }
+            if (method.equalsIgnoreCase("PATCH")) {
+                WebAdminConditionGroupRequest request = readJson(exchange, WebAdminConditionGroupRequest.class);
+                if (request == null) {
+                    request = new WebAdminConditionGroupRequest();
+                }
+                WebAdminWriteResult result = conditionGroupService.update(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        groupId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH。");
+            return;
+        }
+        String action = parts.length > 1 ? parts[1] : "";
+        if ("delete".equals(action)) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminConditionGroupRequest request = readJson(exchange, WebAdminConditionGroupRequest.class);
+            if (request == null) {
+                request = new WebAdminConditionGroupRequest();
+            }
+            WebAdminWriteResult result = conditionGroupService.delete(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    groupId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if ("validate".equals(action)) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminConditionGroupPreviewRequest request = readJson(exchange, WebAdminConditionGroupPreviewRequest.class);
+            WebAdminJsonResponse.ok(exchange, conditionGroupService.validate(minecraftServer, auth.user, groupId, request == null ? null : request.groupDefinition));
+            return;
+        }
+        if ("preview".equals(action)) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminConditionGroupPreviewRequest request = readJson(exchange, WebAdminConditionGroupPreviewRequest.class);
+            WebAdminJsonResponse.ok(exchange, conditionGroupService.preview(minecraftServer, auth.user, groupId, request));
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "条件组接口不存在。");
     }
 
     private void handleSelection(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
@@ -1739,6 +1868,8 @@ public final class WebAdminServer {
     private static void sendText(HttpExchange exchange, int status, String contentType, String text) throws IOException {
         byte[] body = text.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.getResponseHeaders().set("Cache-Control", "no-store, max-age=0");
+        exchange.getResponseHeaders().set("Pragma", "no-cache");
         exchange.sendResponseHeaders(status, body.length);
         exchange.getResponseBody().write(body);
         exchange.close();

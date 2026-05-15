@@ -65,6 +65,8 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -142,11 +144,14 @@ public final class StabilizationGuardTest {
         ConditionStateVariableTest.run();
         ConditionItemInventoryContainerTest.run();
         ConditionRegionSignalLogicChainTest.run();
+        WebAdminConditionCatalogTest.run();
+        WebAdminConditionGroupServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
         testConditionItemInventoryContainer83();
         testConditionRegionSignalLogicChain84();
+        testWebAdminConditionEditor85();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1123,7 +1128,7 @@ public final class StabilizationGuardTest {
     }
 
     private static String webAdminRenderSmokeHarness(String encodedAppJs) {
-        return """
+        String harness = """
                 const vm = require('vm');
                 const code = Buffer.from('__APP_JS_BASE64__', 'base64').toString('utf8');
                 const elements = new Map();
@@ -1169,10 +1174,27 @@ public final class StabilizationGuardTest {
                 elements.set('toast', el('toast'));
                 const errors = [];
                 const requestedUrls = [];
-                function apiData(path) {
+                const requestedRequests = [];
+                function apiData(path, options={}) {
                   const url = String(path);
+                  const method = String(options.method || 'GET').toUpperCase();
                   if (url.startsWith('/api/webadmin/edit-locks/acquire')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, holderUsername:'Owner', expiresAt:'2026-05-09T10:10:00Z' } } };
                   if (url.startsWith('/api/webadmin/edit-locks/release') || url.startsWith('/api/webadmin/edit-locks/heartbeat')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, expiresAt:'2026-05-09T10:10:00Z' } } };
+                  if (url === '/api/webadmin/condition-types') return { readOnly:true, count:7, types:[
+                    { type:'always_true', displayName:'永远通过', description:'总是通过。', category:'调试条件', suite:'core', fields:[] },
+                    { type:'context_equals', displayName:'上下文字段匹配', description:'检查上下文字段。', category:'上下文条件', suite:'core', fields:[{ key:'field', displayName:'上下文字段', kind:'string', required:true }, { key:'expected', displayName:'期望值', kind:'string', required:true }] },
+                    { type:'state_variable_bool_equals', displayName:'布尔状态匹配', description:'检查布尔状态。', category:'状态变量条件', suite:'state-variable', fields:[{ key:'scope', displayName:'作用域', kind:'enum:GLOBAL,PLAYER', required:true, options:['GLOBAL','PLAYER'] }, { key:'key', displayName:'变量键', kind:'string', required:true }, { key:'targetMode', displayName:'目标模式', kind:'enum:global,context_player,explicit_target', required:true, options:['global','context_player','explicit_target'] }, { key:'expected', displayName:'期望值', kind:'boolean', required:true }] },
+                    { type:'inventory_contains_item', displayName:'背包包含物品', description:'检查背包快照。', category:'物品条件', suite:'item-inventory-container', fields:[{ key:'inventoryKey', displayName:'背包快照键', kind:'string', required:true }, { key:'itemId', displayName:'物品 ID', kind:'item-id', required:true }, { key:'countOperator', displayName:'数量比较方式', kind:'enum:eq,ne,gt,gte,lt,lte', required:true }, { key:'count', displayName:'目标数量', kind:'integer', required:true }] },
+                    { type:'container_slot_item_matches', displayName:'容器槽位物品匹配', description:'检查容器槽位。', category:'物品条件', suite:'item-inventory-container', fields:[{ key:'containerKey', displayName:'容器快照键', kind:'string', required:true }, { key:'slot', displayName:'槽位', kind:'integer', required:true }, { key:'itemId', displayName:'物品 ID', kind:'item-id', required:true }] },
+                    { type:'region_enabled', displayName:'区域已启用', description:'检查区域启用。', category:'区域条件', suite:'region-signal-logic-chain', fields:[{ key:'regionKey', displayName:'区域快照键', kind:'string', required:true }] },
+                    { type:'signal_event_count_compare', displayName:'信号事件数量比较', description:'检查信号历史事件数。', category:'信号条件', suite:'region-signal-logic-chain', fields:[{ key:'signalHistoryKey', displayName:'信号历史快照键', kind:'string', required:true }, { key:'operator', displayName:'比较方式', kind:'enum:eq,ne,gt,gte,lt,lte', required:true }, { key:'count', displayName:'目标数量', kind:'integer', required:true }] },
+                    { type:'logic_chain_has_cycle', displayName:'逻辑链存在循环', description:'检查逻辑链循环标记。', category:'逻辑链条件', suite:'region-signal-logic-chain', fields:[{ key:'logicChainKey', displayName:'逻辑链快照键', kind:'string', required:true }, { key:'expected', displayName:'期望循环状态', kind:'boolean', required:false }] }
+                  ] };
+                  if (url === '/api/webadmin/condition-groups' && method === 'POST') return { success:true, message:'条件组已保存。', data:{ group:{ id:'smoke.request' }, routeTarget:'#/condition-groups/smoke.request' } };
+                  if (url === '/api/webadmin/condition-groups') return { count:1, groups:[{ id:'smoke.roundtrip', displayName:'Smoke 条件组', note:'', iconKey:'doctor-overview', enabled:true, nodeCount:2, fingerprint:'condition-fp', updatedAt:'2026-05-09T10:00:00Z' }] };
+                  if (url === '/api/webadmin/condition-groups/smoke.roundtrip') return { id:'smoke.roundtrip', displayName:'Smoke 条件组', note:'', iconKey:'doctor-overview', enabled:true, fingerprint:'condition-fp', expectedFingerprint:'condition-fp', lockStatus:{ locked:false }, groupDefinition:{ id:'smoke.roundtrip', version:1, displayName:'Smoke 条件组', note:'', tags:[], root:{ id:'root', type:'group', name:'', note:'', enabled:true, groupMode:'AND', config:{ values:{} }, children:[{ id:'context', type:'context_equals', name:'', note:'', enabled:true, groupMode:'AND', config:{ values:{ field:'channel', expected:'mission.start' } }, children:[] }] } }, validation:{ valid:true, issues:[] } };
+                  if (url === '/api/webadmin/condition-groups/smoke.roundtrip/validate') return { valid:true, issues:[], message:'条件组校验通过。' };
+                  if (url === '/api/webadmin/condition-groups/smoke.roundtrip/preview') return { success:true, matched:true, previewOnly:true, failureReason:'', evaluatedCount:1, debugTree:{ matched:true, label:'上下文字段匹配', childResults:[] } };
                   if (url.startsWith('/api/webadmin/device-metadata/')) return { success:true, changed:false, message:'ok' };
                   if (url.startsWith('/api/webadmin/device-basic-config/')) return { supported:true, enabled:true, channel:'test.channel', expectedFingerprint:'basic-fp', lockStatus:{ locked:false } };
                   if (url.startsWith('/api/webadmin/device-extended-config/')) return { supported:true, supportedFields:['pulseTicks','cooldownTicks'], fieldLabels:{ pulseTicks:'脉冲时长', cooldownTicks:'冷却时间' }, values:{ pulseTicks:20, cooldownTicks:0 }, expectedFingerprint:'extended-fp', lockStatus:{ locked:false } };
@@ -1219,6 +1241,7 @@ public final class StabilizationGuardTest {
                   setTimeout, clearTimeout, setInterval, clearInterval,
                   requestAnimationFrame(fn){ fn(); },
                   requestedUrls,
+                  requestedRequests,
                   URLSearchParams,
                   encodeURIComponent,
                   decodeURIComponent,
@@ -1230,12 +1253,13 @@ public final class StabilizationGuardTest {
                     documentElement: { classList: { add(){}, remove(){}, toggle(){} } },
                     activeElement: null,
                     getElementById(id){ return id === 'wa-modal-root' ? (elements.get(id) || null) : el(id); },
+                    querySelector(){ return null; },
                     querySelectorAll(){ return []; },
                     addEventListener(){},
                     createElement(tag){ const node = el(`${tag}-${elements.size}`); node.tagName = String(tag || '').toUpperCase(); node.id = ''; return node; },
                   },
                   window: { addEventListener(){}, removeEventListener(){} },
-                  fetch: async (path) => { requestedUrls.push(String(path)); return { ok:true, status:200, json: async () => ({ ok:true, data: apiData(path) }) }; },
+                  fetch: async (path, options={}) => { requestedUrls.push(String(path)); requestedRequests.push({ url:String(path), method:String(options.method || 'GET').toUpperCase(), body:String(options.body || ''), headers:options.headers || {} }); return { ok:true, status:200, json: async () => ({ ok:true, data: apiData(path, options) }) }; },
                   EventSource: function(){ this.close = function(){}; },
                 };
                 context.window.location = context.location;
@@ -1420,9 +1444,81 @@ public final class StabilizationGuardTest {
                     const after = String(document.getElementById('view').innerHTML || '');
                     return { before, after, urls: requestedUrls.slice(), pending:Object.keys(appState.realtime.pendingRefresh).length, dirty:Object.keys(appState.realtime.dirtyRoutes).join(',') };
                   };
+                  globalThis.__smokeConditionGroupSavePayload = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    await loadConditionCatalog(true);
+                    const cases = [
+                      { type:'context_equals', values:{ field:'channel', expected:'mission.start' } },
+                      { type:'state_variable_bool_equals', values:{ scope:'GLOBAL', key:'game.active', targetMode:'global', expected:'true' } },
+                      { type:'inventory_contains_item', values:{ inventoryKey:'player', itemId:'minecraft:diamond', countOperator:'gte', count:'1' } },
+                      { type:'container_slot_item_matches', values:{ containerKey:'chest', slot:'0', itemId:'minecraft:stone' } },
+                      { type:'region_enabled', values:{ regionKey:'spawn' } },
+                      { type:'signal_event_count_compare', values:{ signalHistoryKey:'history', operator:'gte', count:'2' } },
+                      { type:'logic_chain_has_cycle', values:{ logicChainKey:'chain', expected:'false' } }
+                    ];
+                    const results = [];
+                    for (const testCase of cases) {
+                      appState.conditionGroupEdit = makeConditionDraftFromDetail({ id:'smoke.' + testCase.type, displayName:'Smoke Create' }, 'create');
+                      const target = conditionNodeByPath('0');
+                      appState.conditionNodeEditor = { open:true, path:'0', draft:cloneConditionNode(target), errors:[], typeQuery:'', typeSuite:'all', initialSnapshot:'' };
+                      changeConditionNodeType('', testCase.type);
+                      appState.conditionNodeEditor.draft.config = { values:{ ...testCase.values } };
+                      const selectorHtml = conditionTypePicker(appState.conditionNodeEditor, appState.conditionNodeEditor.draft.type);
+                      Object.keys(target).forEach(k => delete target[k]);
+                      Object.assign(target, cloneConditionNode(appState.conditionNodeEditor.draft));
+                      appState.conditionNodeEditor = null;
+                      syncConditionGroupDraft();
+                      const payload = conditionGroupSavePayload(appState.conditionGroupEdit);
+                      const child = payload.groupDefinition.root.children[0];
+                      results.push({
+                        expectedType:testCase.type,
+                        selectedCount:(selectorHtml.match(/data-condition-type-single-selected/g) || []).length,
+                        selectorMarker:selectorHtml.includes('data-condition-type-selector="list-search-custom-ui"'),
+                        type:child.type,
+                        values:child.config.values,
+                        fellBack:child.type === 'always_true'
+                      });
+                    }
+                    return { results };
+                  };
+                  globalThis.__smokeConditionGroupSaveRequest = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    appState.capabilities = { csrf:{ token:'csrf-smoke' } };
+                    await loadConditionCatalog(true);
+                    requestedRequests.length = 0;
+                    appState.conditionGroupEdit = makeConditionDraftFromDetail({ id:'smoke.request', displayName:'Smoke Request' }, 'create');
+                    appState.conditionNodeEditor = { path:'0' };
+                    document.getElementById('condition-group-id').value = 'smoke.request';
+                    document.getElementById('condition-group-name').value = 'Smoke Request';
+                    document.getElementById('condition-group-icon').value = 'doctor-overview';
+                    document.getElementById('condition-group-note').value = '';
+                    document.getElementById('condition-group-tags').value = '';
+                    document.getElementById('condition-group-enabled').checked = true;
+                    const target = conditionNodeByPath('0');
+                    appState.conditionNodeEditor = { open:true, path:'0', draft:cloneConditionNode(target), errors:[], typeQuery:'', typeSuite:'all', initialSnapshot:'' };
+                    changeConditionNodeType('', 'context_equals');
+                    appState.conditionNodeEditor.draft.config = { values:{ field:'channel', expected:'mission.start' } };
+                    Object.keys(target).forEach(k => delete target[k]);
+                    Object.assign(target, cloneConditionNode(appState.conditionNodeEditor.draft));
+                    appState.conditionNodeEditor = null;
+                    await saveConditionGroup();
+                    const post = requestedRequests.find(r => r.url === '/api/webadmin/condition-groups' && r.method === 'POST') || {};
+                    const body = post.body ? JSON.parse(post.body) : {};
+                    const child = body.groupDefinition?.root?.children?.[0] || {};
+                    return {
+                      urls: requestedRequests.map(r => r.method + ' ' + r.url),
+                      hasCsrf: !!(post.headers && post.headers['X-TZZ-WebAdmin-CSRF']),
+                      type: child.type,
+                      field: child.config?.values?.field,
+                      expected: child.config?.values?.expected,
+                      fellBack: child.type === 'always_true'
+                    };
+                  };
                   globalThis.__smokeClearRequestedUrls = function(){ requestedUrls.length = 0; };
                   globalThis.__smokeRequestedUrls = function(){ return requestedUrls.slice(); };
                 `, context, { filename:"webadmin-app-extra-smoke.js" });
+                """;
+        harness += """
                 const routes = [
                   '#/dashboard',
                   '#/signals',
@@ -1445,6 +1541,10 @@ public final class StabilizationGuardTest {
                   '#/region-controllers',
                   '#/action-templates',
                   '#/templates',
+                  '#/condition-groups',
+                  '#/condition-groups/smoke.roundtrip',
+                  '#/conditions',
+                  '#/conditions/smoke.roundtrip',
                   '#/doctor',
                   '#/diagnostics',
                   '#/signal-doctor',
@@ -1564,6 +1664,28 @@ public final class StabilizationGuardTest {
                         failures.push(`${route}: missing horizontally scrollable tabs`);
                       }
                     }
+                  }
+                  try {
+                    const conditionPayload = await context.__smokeConditionGroupSavePayload();
+                    for (const item of conditionPayload.results || []) {
+                      if (item.type !== item.expectedType) failures.push(`condition editor save payload type mismatch for ${item.expectedType}: ${item.type}`);
+                      if (item.selectedCount !== 1 || !item.selectorMarker) failures.push(`condition editor selector single-selected marker mismatch for ${item.expectedType}: ${JSON.stringify(item)}`);
+                      if (item.fellBack) failures.push(`condition editor save payload fell back to always_true for ${item.expectedType}`);
+                    }
+                    if ((conditionPayload.results || []).length !== 7) failures.push(`condition editor representative payload case count mismatch: ${(conditionPayload.results || []).length}`);
+                  } catch (err) {
+                    failures.push(`condition editor save payload smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const saveRequest = await context.__smokeConditionGroupSaveRequest();
+                    if (!saveRequest.urls.includes('POST /api/webadmin/edit-locks/acquire')) failures.push(`condition editor save request did not acquire lock: ${JSON.stringify(saveRequest.urls)}`);
+                    if (!saveRequest.urls.includes('POST /api/webadmin/condition-groups')) failures.push(`condition editor save request did not POST condition group: ${JSON.stringify(saveRequest.urls)}`);
+                    if (!saveRequest.hasCsrf) failures.push('condition editor save request missing CSRF header');
+                    if (saveRequest.type !== 'context_equals') failures.push(`condition editor save request type mismatch: ${saveRequest.type}`);
+                    if (saveRequest.field !== 'channel' || saveRequest.expected !== 'mission.start') failures.push(`condition editor save request config mismatch: ${JSON.stringify(saveRequest)}`);
+                    if (saveRequest.fellBack) failures.push('condition editor save request fell back to always_true');
+                  } catch (err) {
+                    failures.push(`condition editor save request smoke: ${err.name}: ${err.message}`);
                   }
                   try {
                     await context.__smokeRoute('#/signals/test.channel');
@@ -1813,7 +1935,8 @@ public final class StabilizationGuardTest {
                   }
                   console.log(`render smoke ok: ${routes.length} routes`);
                 })();
-                """.replace("__APP_JS_BASE64__", encodedAppJs);
+                """;
+        return harness.replace("__APP_JS_BASE64__", encodedAppJs);
     }
 
     private static void testWebAdminRealtimeFoundation() throws Exception {
@@ -5583,17 +5706,19 @@ public final class StabilizationGuardTest {
             requireContains(tests, marker, "8.0 condition core test marker present: " + marker);
         }
 
-        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"), null);
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
         requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
                 "8.0 ConditionEngine core must not execute actions or emit signals");
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
                         || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
                 "8.0 ConditionEngine core must not integrate VBD/listener/region/action runtime stores");
-        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
                         || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
                 "8.0 must not wire ConditionEngine into existing runtime packages");
-        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
                         || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
                 "8.0 must not add a WebAdmin ConditionEngine editor or raw JSON condition API");
@@ -5791,18 +5916,20 @@ public final class StabilizationGuardTest {
             requireContains(tests, marker, "8.1 condition test marker present: " + marker);
         }
 
-        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"), null);
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
         requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
                 "8.1 ConditionEngine conditions must not execute actions or emit signals");
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
                         || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
                 "8.1 ConditionEngine conditions must not integrate VBD/listener/region/action runtime stores");
         requireContains(context, "不做物品 / 背包 / 容器条件", "8.1 context keeps item/inventory/container deferred marker");
-        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
                         || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
                 "8.1 must not wire ConditionEngine into existing runtime packages");
-        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
                         || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
                 "8.1 must not add a WebAdmin condition editor or raw JSON condition API");
@@ -5819,7 +5946,7 @@ public final class StabilizationGuardTest {
         String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
         String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
         String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
-        String statePackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state"), null);
+        String statePackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state"));
         String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionStateVariableTest.java"), StandardCharsets.UTF_8);
 
         for (String file : List.of(
@@ -5998,11 +6125,13 @@ public final class StabilizationGuardTest {
 
         requireFalse(registry.contains("StateVariableService") || registry.contains("StateVariableStore"),
                 "8.2 condition evaluation must read only StateVariableSnapshot, not write through store/service");
-        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(runtimeMain.contains("StateVariableService") || runtimeMain.contains("StateVariableStore")
                         || runtimeMain.contains("ConditionNodeType.STATE_VARIABLE"),
                 "8.2 must not wire state variables into existing runtime packages");
-        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("stateVariableEditor")
                         || webadminMain.contains("/api/webadmin/state-variables") || webadminMain.contains("condition-groups/raw"),
                 "8.2 must not add WebAdmin condition editor, state variable UI/API, or raw JSON editor");
@@ -6020,7 +6149,7 @@ public final class StabilizationGuardTest {
         String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
         String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
         String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
-        String itemPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/item"), null);
+        String itemPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/item"));
         String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
         String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionItemInventoryContainerTest.java"), StandardCharsets.UTF_8);
 
@@ -6149,12 +6278,14 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(forbiddenSource.contains(forbidden), "8.3 condition item package must not use forbidden runtime/source: " + forbidden);
         }
-        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(runtimeMain.contains("ConditionItemStackSnapshot") || runtimeMain.contains("ConditionInventorySnapshot")
                         || runtimeMain.contains("ConditionContainerSnapshot") || runtimeMain.contains("ConditionNodeType.ITEM_STACK")
                         || runtimeMain.contains("ConditionNodeType.INVENTORY_") || runtimeMain.contains("ConditionNodeType.CONTAINER_"),
                 "8.3 must not wire item/inventory/container conditions into existing runtime packages");
-        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
                         || webadminMain.contains("itemConditionEditor") || webadminMain.contains("condition-groups/raw"),
                 "8.3 must not add WebAdmin condition editor/API/UI or raw JSON editor");
@@ -6171,7 +6302,7 @@ public final class StabilizationGuardTest {
         String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
         String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
         String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
-        String regionLogicPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/regionlogic"), null);
+        String regionLogicPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/regionlogic"));
         String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
         String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionRegionSignalLogicChainTest.java"), StandardCharsets.UTF_8);
 
@@ -6305,13 +6436,15 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(forbiddenSource.contains(forbidden), "8.4 regionlogic package must not use forbidden runtime/source: " + forbidden);
         }
-        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(runtimeMain.contains("ConditionRegionSnapshot") || runtimeMain.contains("ConditionSignalChannelSnapshot")
                         || runtimeMain.contains("ConditionSignalHistorySnapshot") || runtimeMain.contains("ConditionLogicChainSnapshot")
                         || runtimeMain.contains("ConditionNodeType.REGION_EXISTS") || runtimeMain.contains("ConditionNodeType.SIGNAL_CHANNEL")
                         || runtimeMain.contains("ConditionNodeType.LOGIC_CHAIN"),
                 "8.4 must not wire region/signal/logic chain conditions into existing runtime packages");
-        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
                         || webadminMain.contains("regionConditionEditor") || webadminMain.contains("signalConditionEditor")
                         || webadminMain.contains("logicChainConditionEditor") || webadminMain.contains("condition-groups/raw"),
@@ -6321,13 +6454,296 @@ public final class StabilizationGuardTest {
                 "8.4 docs must not claim concrete tasks or high-level game systems are implemented");
     }
 
-    private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {
+    private static void testWebAdminConditionEditor85() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_CONDITION_EDITOR_8_5_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminConditionGroupStore.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java"), StandardCharsets.UTF_8);
+        String catalogService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionCatalogService.java"), StandardCharsets.UTF_8);
+        String operationTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String rolePolicy = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminRolePolicy.java"), StandardCharsets.UTF_8);
+        String editLocks = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String realtimeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+        String catalogTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionCatalogTest.java"), StandardCharsets.UTF_8);
+        String groupTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupServiceTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/WEBADMIN_CONDITION_EDITOR_8_5_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md",
+                "docs/WEBADMIN_CONDITION_EDITOR_8_5_TEST_PLAN.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminConditionGroupStore.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionCatalogService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminConditionGroupRequest.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminConditionGroupPreviewRequest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionCatalogTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.5 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.5 WebAdmin Condition Editor",
+                "Condition Type Catalog",
+                "Condition Group world-scoped store",
+                "condition_groups.json",
+                "structured",
+                "Preview / Simulation evaluate",
+                "CSRF / same-origin",
+                "edit lock",
+                "expectedFingerprint",
+                "audit",
+                "realtime",
+                "不接入 runtime",
+                "不把 condition group 挂到",
+                "不查询 live world",
+                "不提供 raw JSON editor 作为主入口",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.5 docs/README marker: " + marker);
+        }
+
+        requireContains(catalogService, "ConditionRegistry.defaultRegistry()", "8.5 catalog reads ConditionRegistry");
+        requireContains(catalogService, "displayName", "8.5 catalog exposes Chinese display name");
+        requireContains(catalogService, "fields", "8.5 catalog exposes field schema");
+        requireContains(catalogService, "readOnly", "8.5 catalog is read-only");
+
+        requireContains(store, "WebAdminStoragePaths.resolve(server)", "8.5 store uses world-scoped WebAdminStoragePaths");
+        requireContains(store, "condition_groups.json", "8.5 store file marker");
+        requireContains(store, "fingerprintFor", "8.5 store fingerprint marker");
+        requireContains(store, "ConditionGroupDefinition", "8.5 store persists condition group definition");
+
+        for (String marker : List.of(
+                "/api/webadmin/condition-types",
+                "/api/webadmin/condition-groups",
+                "/delete",
+                "/validate",
+                "/preview",
+                "X-TZZ-WebAdmin-CSRF",
+                "isWriteSameOrigin",
+                "WebAdminWriteResult"
+        )) {
+            requireContains(server, marker, "8.5 WebAdmin API marker: " + marker);
+        }
+        requireContains(server, "该接口只支持 POST。", "8.5 condition group delete is POST-only");
+        requireContains(server, "Cache-Control", "8.5 P0 asset no-store cache header marker");
+        requireContains(server, "no-store, max-age=0", "8.5 P0 app shell/assets avoid stale JS marker");
+        requireContains(shell, "8.5-condition-editor-p0-3", "8.5 P0 bumped asset version marker");
+        requireContains(shell, "data-asset-version", "8.5 P0 loaded asset version visible in DOM marker");
+        requireContains(shell, "tzz-webadmin-asset-version", "8.5 P0 asset version meta marker");
+
+        for (String marker : List.of(
+                "WebAdminEditLockService.TARGET_CONDITION_GROUP",
+                "EDIT_CONDITION_GROUP",
+                "CONDITION_GROUP_CHANGED",
+                "previewOnly",
+                "deferredSnapshots",
+                "ConditionEvaluationContext.builder",
+                "stateVariables"
+        )) {
+            requireContains(service, marker, "8.5 condition group service marker: " + marker);
+        }
+        requireContains(operationTypes, "EDIT_CONDITION_GROUP", "8.5 operation type marker");
+        requireContains(rolePolicy, "EDIT_CONDITION_GROUP", "8.5 role policy marker");
+        requireContains(editLocks, "TARGET_CONDITION_GROUP", "8.5 edit lock target marker");
+        requireContains(realtimeTypes, "CONDITION_GROUP_CHANGED", "8.5 realtime event marker");
+
+        for (String marker : List.of(
+                "#/condition-groups",
+                "条件组",
+                "renderConditionGroupsPage",
+                "renderConditionGroupDetail",
+                "data-condition-group-structured-editor",
+                "condition-preview-panel",
+                "previewConditionGroup",
+                "saveConditionGroup",
+                "openConditionGroupDeleteModal",
+                "data-condition-group-create-draft-lock-note",
+                "data-condition-node-compact-list",
+                "data-condition-main-compact-card-model",
+                "data-condition-node-modal-model",
+                "data-condition-no-secondary-editor",
+                "data-condition-node-edit-modal",
+                "data-condition-group-edit-modal",
+                "data-condition-node-modal-uses-wa-animation",
+                "data-condition-node-modal-animated-closing",
+                "data-condition-node-modal-capture-delegation",
+                "data-condition-node-card-click-opens-editor",
+                "data-condition-node-quick-action",
+                "conditionNodeQuickAttrs",
+                "openConditionNodeEditor",
+                "saveConditionNodeEditor",
+                "deleteConditionNodeFromModal",
+                "addConditionNodeModalChild",
+                "data-condition-node-type-select",
+                "data-condition-type-selector=\"list-search-custom-ui\"",
+                "data-condition-category",
+                "data-condition-type",
+                "data-condition-type-option",
+                "data-condition-type-suite",
+                "data-condition-type-single-selected",
+                "handleConditionNodeModalDelegatedClick",
+                "changeConditionTypeSuiteFromElement",
+                "changeConditionNodeTypeFromElement",
+                "changeConditionNodeType('',type)",
+                "node.type=next",
+                "showConditionNodeEditorModal(captureConditionNodeModalUiState())",
+                "data-condition-field-kind",
+                "data-condition-field-required",
+                "key.endsWith('Operator')?'operator':'enum'",
+                "marker:'scope'",
+                "marker:'targetMode'",
+                "marker:'gamemode'",
+                "marker:'sourceType'",
+                "data-condition-field-editor=\"boolean\"",
+                "data-condition-field-help",
+                "conditionFieldPlaceholder",
+                "data-condition-node-safe-actions",
+                "data-no-native-condition-type-select",
+                "data-no-condition-type-grid-buttons",
+                "data-condition-type-event-delegation",
+                "conditionDraftRoot(){const def=ensureConditionGroupDefinitionDraft",
+                "conditionNodeByPath(path,rootOverride=null)",
+                "toast('未找到要切换类型的条件节点。')",
+                "syncConditionNodeModalDraftFromForm",
+                "captureConditionNodeModalUiState",
+                "restoreConditionNodeModalUiState",
+                "nodeListScrollTop",
+                "typeListScrollTop",
+                "condition-node-discard-confirm",
+                "appState.modalDirtyChecker=dirtyChecker",
+                "definitionMissing",
+                "data-condition-modal-scroll-restore",
+                "data-condition-dirty-confirm-one-shot",
+                "function captureViewState()",
+                "windowScrollTop:window.scrollY",
+                "appState.conditionNodeEditor?.open",
+                "conditionGroupSavePayload",
+                "TZZ_WEBADMIN_ASSET_VERSION",
+                "scheduleConditionEditorRerender",
+                "targetId:d.lockTargetId||d.id",
+                "targetId,lockId:d.lockId",
+                "location.hash===target",
+                "condition_group",
+                "条件类型目录",
+                "测试评估"
+        )) {
+            requireContains(scripts + "\n" + shell, marker, "8.5 frontend marker: " + marker);
+        }
+        requireContains(styles, "condition-editor-layout", "8.5 condition editor layout CSS marker");
+        requireContains(styles, "condition-node-compact-card", "8.5 compact condition node card CSS marker");
+        requireContains(styles, "condition-node-modal-layer", "8.5 independent condition node modal CSS marker");
+        requireContains(styles, "condition-node-edit-modal", "8.5 independent condition node edit modal CSS marker");
+        requireContains(styles, "condition-type-selector-layout", "8.5 list/search condition type picker CSS marker");
+        requireContains(styles, "condition-type-option", "8.5 readable condition type option CSS marker");
+        requireContains(styles, "condition-specific-fields", "8.5 condition field editor CSS marker");
+        requireContains(styles, "min-width:0;box-sizing:border-box", "8.5 preview input width guard marker");
+        requireContains(styles, "condition-preview-card", "8.5 preview CSS marker");
+        requireFalse(scripts.contains("condition-raw-json-editor") || scripts.contains("conditionGroupRawJson"),
+                "8.5 frontend must not add raw JSON condition editor as primary UI");
+        requireFalse(scripts.contains("data-condition-node-secondary-editor") || scripts.contains("condition-node-secondary-card"),
+                "8.5 P0 condition node editing must not stay in the old right-side secondary editor markup");
+        requireFalse(scripts.contains("condition-type-choice"),
+                "8.5 P0 condition type picker must not render the unreadable legacy grid choice markup");
+        requireFalse(scripts.contains("document.querySelectorAll('[data-condition-node-type-select][data-condition-node-path]')"),
+                "8.5 P0 condition save must not depend on stale hidden select scans");
+        requireFalse(scripts.contains("onclick=\"changeConditionNodeType('{") || scripts.contains("onclick=\"changeConditionNodeType([") || scripts.contains("datalist"),
+                "8.5 P0 condition type picker must not inline JSON or use native datalist/page popup controls");
+        requireFalse(scripts.contains("onchange=\"changeConditionNodeType("),
+                "8.5 P0 condition type picker must not use broken native select onchange handler");
+        requireFalse(scripts.contains("setValueAndClosePopup") || scripts.contains("PagePopupController"),
+                "8.5 P0 frontend must not contain stale browser popup error handlers");
+
+        for (String marker : List.of(
+                "catalog includes 8.0 core condition types",
+                "condition catalog is read-only",
+                "condition type has Chinese display name",
+                "operator field exposes compare options",
+                "context_equals",
+                "state_variable_bool_equals",
+                "inventory_contains_item"
+        )) {
+            requireContains(catalogTest, marker, "8.5 catalog test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "create condition group",
+                "list contains one group",
+                "update changes fingerprint",
+                "stale expectedFingerprint rejected",
+                "delete condition group",
+                "preview true result",
+                "preview false result",
+                "preview failure reason Chinese",
+                "VIEWER cannot write condition groups",
+                "CSRF required for condition group writes",
+                "same-origin required for condition group writes"
+        )) {
+            requireContains(groupTest, marker, "8.5 group service test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "invalid preview does not evaluate",
+                "preview does not create store file",
+                "missing groupDefinition store blocks writes",
+                "degraded store blocks writes",
+                "condition group write requires edit lock",
+                "condition group lock conflict rejected",
+                "condition group write succeeds with held lock",
+                "context_equals type roundtrips",
+                "state_variable_bool_equals type roundtrips",
+                "inventory condition type roundtrips",
+                "JSON create keeps selected condition types",
+                "JSON update from always_true to context_equals succeeds",
+                "container_slot_item_matches",
+                "region_enabled",
+                "signal_event_count_compare",
+                "logic_chain_has_cycle",
+                "JSON missing groupDefinition rejected",
+                "invalid JSON does not persist default always_true fallback",
+                "unknown-type",
+                "blank-type"
+        )) {
+            requireContains(groupTest, marker, "8.5 expanded group service test marker: " + marker);
+        }
+
+        String runtimePackages = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/signal"))
+                + readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/action"))
+                + readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/region"));
+        requireFalse(runtimePackages.contains("WebAdminConditionGroupStore") || runtimePackages.contains("condition_groups.json")
+                        || runtimePackages.contains("EDIT_CONDITION_GROUP") || runtimePackages.contains("TARGET_CONDITION_GROUP"),
+                "8.5 must not wire condition group store/editor into runtime packages");
+        requireFalse(service.contains("SignalBridgeServer.emit") || service.contains("ActionEngine.execute")
+                        || service.contains("RegionControllerStore") || service.contains("SignalListenerStore")
+                        || service.contains("SignalDeviceStore") || service.contains("WebAdminLogicChainService"),
+                "8.5 preview/service must not query live runtime services or execute side effects");
+        requireFalse(readme.contains("具体任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.5 docs must not claim concrete tasks or high-level game systems are implemented");
+    }
+
+    private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {
         StringBuilder content = new StringBuilder();
-        Path excluded = excludedDirectory == null ? null : excludedDirectory.toAbsolutePath().normalize();
+        List<Path> excluded = new ArrayList<>();
+        if (excludedDirectories != null) {
+            for (Path excludedDirectory : excludedDirectories) {
+                if (excludedDirectory != null) {
+                    excluded.add(excludedDirectory.toAbsolutePath().normalize());
+                }
+            }
+        }
         try (java.util.stream.Stream<Path> paths = Files.walk(directory)) {
             paths.filter(Files::isRegularFile)
                     .filter((path) -> path.toString().endsWith(".java"))
-                    .filter((path) -> excluded == null || !path.toAbsolutePath().normalize().startsWith(excluded))
+                    .filter((path) -> excluded.stream()
+                            .noneMatch((excludedDirectory) -> path.toAbsolutePath().normalize().startsWith(excludedDirectory)))
                     .sorted()
                     .forEach((path) -> {
                         try {
