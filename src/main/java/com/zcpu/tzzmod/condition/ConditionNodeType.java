@@ -27,6 +27,11 @@ public final class ConditionNodeType {
     public static final String GAME_TIME_COMPARE = "game_time_compare";
     public static final String EVENT_METADATA_EXISTS = "event_metadata_exists";
     public static final String EVENT_METADATA_EQUALS = "event_metadata_equals";
+    public static final String STATE_VARIABLE_EXISTS = "state_variable_exists";
+    public static final String STATE_VARIABLE_BOOL_EQUALS = "state_variable_bool_equals";
+    public static final String STATE_VARIABLE_INT_COMPARE = "state_variable_int_compare";
+    public static final String STATE_VARIABLE_STRING_EQUALS = "state_variable_string_equals";
+    public static final String STATE_VARIABLE_STRING_CONTAINS = "state_variable_string_contains";
 
     private ConditionNodeType() {
     }

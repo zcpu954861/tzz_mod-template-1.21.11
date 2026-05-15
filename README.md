@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.46.0-condition-engine-core`
-- 当前开发基线：`8.1 基础玩家 / 上下文条件包`（Basic Player / Context Conditions）；本阶段只做基础玩家 / 上下文条件包，发布后建议版本为 `v1.47.0-condition-basic-player-context`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.47.0-condition-basic-player-context`
+- 当前开发基线：`8.2 State Variable System / 状态变量系统`；本阶段只做状态变量底座，发布后建议版本为 `v1.48.0-condition-state-variables`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -38,16 +38,20 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.0](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_0.md)
 - [8.1 基础玩家 / 上下文条件包 Current Context](docs/CONDITION_BASIC_PLAYER_CONTEXT_8_1_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.1](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_1.md)
+- [8.2 State Variable System Current Context](docs/CONDITION_STATE_VARIABLES_8_2_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.2](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_2.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.1；当前提供无副作用判断核心和第一批基础玩家 / 上下文条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.2；当前提供无副作用判断核心、基础玩家 / 上下文条件和类型化状态变量底座，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
 ## 8.0 ConditionEngine Core
 
 8.0 是 TZZ Mod 从“事件工具链 / WebAdmin 编辑层”进入“可配置游戏逻辑判断层”的核心起点。当前只做 ConditionEngine Core：条件树、AND / OR / NOT、最小内置条件、EvaluationContext、ConditionResult debug tree、registry、validation 和安全限制。
+
+8.0 已作为 `v1.46.0-condition-engine-core` 稳定基线发布。
 
 核心边界：
 
@@ -72,6 +76,29 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.1 不做 State Variable System，不做物品 / 背包 / 装备 / 容器条件，不做区域人数聚合，不做任务阶段条件。
 - 8.1 不提供 WebAdmin 条件可视化编辑器，不提供 raw JSON / NBT path 编辑器，不新增 MCP tool，不跑 MCP scenario，不生成截图，不启动 Minecraft。
 - 8.1 不启动 Minecraft，仍以纯单元测试、guard 和手动审查为主。
+
+## 8.2 State Variable System
+
+8.2 在 8.0 Core 和 8.1 基础条件之上加入类型化状态变量系统，用于替代旧数据包中大量 scoreboard fake player、player tag、全局分数和临时状态位的底层能力参考。
+
+8.2 已提供：
+
+- `GLOBAL / PLAYER` 状态变量 scope。
+- `BOOLEAN / INTEGER / STRING` 状态变量类型。
+- world-scoped store：`<world-save-root>/tzz/webadmin/state_variables.json`。
+- `StateVariableService` 基础 set / remove / snapshot 写入服务，带 validation、fingerprint 和中文诊断。
+- `ConditionEvaluationContext` 中的只读 `StateVariableSnapshot`。
+- 状态变量条件：`state_variable_exists`、`state_variable_bool_equals`、`state_variable_int_compare`、`state_variable_string_equals`、`state_variable_string_contains`。
+- 中文显示名、中文描述、中文字段名、中文 validation error 和中文失败原因。
+
+8.2 约束：
+
+- Condition 只读取状态变量，不写状态变量，evaluation 无副作用。
+- 8.2 仍不接入 runtime：VBD、SignalListener、RegionController、ActionRelay、itemSubmit 等运行路径不会自动调用状态变量条件。
+- 8.2 不提供 WebAdmin condition editor，不提供状态变量 WebAdmin 页面/API，不提供 raw JSON / NBT path 编辑器。
+- 8.2 不做具体任务/关卡，不做 GameController / MissionSystem / PhaseController。
+- 8.2 不做 item / inventory / container conditions，不做区域人数聚合，不做任务阶段条件，不做多人聚合条件。
+- 8.2 不新增 MCP tool，不跑 MCP scenario，不生成截图，不启动 Minecraft。
 
 ## WebAdmin UI 规范
 
@@ -98,7 +125,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - `reports/mcp`、`reports/mcp/screenshots`、responsive reports、scenario reports 都是本地测试输出，不提交。
 - MCP 不提供任意 shell、不提供 git mutation、不访问外部 host、不做 OS 鼠标键盘控制、不做 Minecraft GUI 坐标点击。
 - TestBridge 仅 loopback/local、需要 token、默认关闭。
-- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core requirements or new 8.0 scope.
+- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core, 8.1 Basic Player / Context Conditions, or 8.2 State Variable System requirements or new scope.
 
 ## 安全边界
 
