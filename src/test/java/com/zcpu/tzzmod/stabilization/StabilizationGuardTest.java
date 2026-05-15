@@ -6950,11 +6950,23 @@ public final class StabilizationGuardTest {
                 "evaluateGate(",
                 "ConditionRuntimeGateStore.conditionGroupId",
                 "ConditionRuntimeContextBuilder.base",
-                "if (!gate.allowed()) {\n                return;\n            }",
+                "if (!gate.allowed())",
                 "SignalBridgeServer.emit"
         )) {
             requireContains(dispatcher, marker, "8.6 VBD redstone/blockstate gate marker: " + marker);
         }
+        requireGateReturnBeforeSideEffects(
+                dispatcher,
+                "ConditionRuntimeTargetType.VBD_REDSTONE",
+                "SignalDeviceStore.recordVirtualBlockTrigger",
+                "8.6 redstone gate false returns before emit/record side effects"
+        );
+        requireGateReturnBeforeSideEffects(
+                dispatcher,
+                "ConditionRuntimeTargetType.VBD_BLOCKSTATE",
+                "SignalDeviceStore.recordVirtualConditionTrigger",
+                "8.6 blockstate gate false returns before emit/record side effects"
+        );
         for (String marker : List.of(
                 "ConditionRuntimeTargetType.VBD_INTERACTION",
                 "ConditionRuntimeTargetType.ITEM_SUBMIT",
@@ -7114,6 +7126,24 @@ public final class StabilizationGuardTest {
         if (value == null || !value.contains(expectedPart)) {
             throw new AssertionError(message + ": expected <" + value + "> to contain <" + expectedPart + ">");
         }
+    }
+
+    private static void requireGateReturnBeforeSideEffects(
+            String source,
+            String targetMarker,
+            String recordMarker,
+            String message
+    ) {
+        int targetIndex = source.indexOf(targetMarker);
+        int gateIndex = targetIndex < 0 ? -1 : source.indexOf("if (!gate.allowed())", targetIndex);
+        int returnIndex = gateIndex < 0 ? -1 : source.indexOf("return;", gateIndex);
+        int emitIndex = gateIndex < 0 ? -1 : source.indexOf("SignalBridgeServer.emit", gateIndex);
+        int recordIndex = gateIndex < 0 ? -1 : source.indexOf(recordMarker, gateIndex);
+        requireTrue(targetIndex >= 0, message + ": target marker missing");
+        requireTrue(gateIndex > targetIndex, message + ": gate allowed check missing after target marker");
+        requireTrue(returnIndex > gateIndex, message + ": gate false return missing");
+        requireTrue(emitIndex > returnIndex, message + ": emit must stay after gate false return");
+        requireTrue(recordIndex > emitIndex, message + ": trigger record must stay after guarded emit");
     }
 
     private static boolean hasDiagnosticCode(DeviceDiagnostic diagnostic, String code) {
