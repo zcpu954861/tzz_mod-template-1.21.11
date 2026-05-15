@@ -2,6 +2,12 @@ package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
@@ -12,6 +18,8 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 public final class VirtualBlockDeviceDispatcher {
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
+
     private VirtualBlockDeviceDispatcher() {
     }
 
@@ -71,6 +79,10 @@ public final class VirtualBlockDeviceDispatcher {
 
         ActionExecutionResult result;
         if (SignalChannel.isValid(channel)) {
+            ConditionGateResult gate = evaluateGate(world, pos, device, ConditionRuntimeTargetType.VBD_REDSTONE, channel, rising ? "redstone_rising" : "redstone_falling");
+            if (!gate.allowed()) {
+                return;
+            }
             result = SignalBridgeServer.emit(new SignalEvent(
                     channel,
                     null,
@@ -122,6 +134,10 @@ public final class VirtualBlockDeviceDispatcher {
 
         ActionExecutionResult result;
         if (SignalChannel.isValid(channel)) {
+            ConditionGateResult gate = evaluateGate(world, pos, device, ConditionRuntimeTargetType.VBD_BLOCKSTATE, channel, entering ? "blockstate_enter" : "blockstate_exit");
+            if (!gate.allowed()) {
+                return;
+            }
             result = SignalBridgeServer.emit(new SignalEvent(
                     channel,
                     null,
@@ -136,5 +152,25 @@ public final class VirtualBlockDeviceDispatcher {
             result = ActionExecutionResult.failure(SignalChannel.validationError(channel));
         }
         SignalDeviceStore.recordVirtualConditionTrigger(world, device, currentMatched, result);
+    }
+
+    private static ConditionGateResult evaluateGate(
+            ServerWorld world,
+            BlockPos pos,
+            SignalDeviceData device,
+            ConditionRuntimeTargetType targetType,
+            String channel,
+            String detail
+    ) {
+        String conditionGroupId = ConditionRuntimeGateStore.conditionGroupId(world.getServer(), device.id(), targetType);
+        return CONDITION_GATE_SERVICE.evaluate(
+                world.getServer(),
+                new ConditionGateRequest(
+                        conditionGroupId,
+                        targetType,
+                        device.id(),
+                        () -> ConditionRuntimeContextBuilder.base(world, pos, device, targetType, channel, detail)
+                )
+        );
     }
 }

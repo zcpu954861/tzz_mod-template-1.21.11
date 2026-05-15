@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.condition.ConditionGroupMode;
 import com.zcpu.tzzmod.condition.ConditionNode;
 import com.zcpu.tzzmod.condition.ConditionNodeConfig;
 import com.zcpu.tzzmod.condition.ConditionNodeType;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
@@ -35,6 +36,7 @@ public final class WebAdminConditionGroupServiceTest {
         testWriteFoundationBoundaries();
         testValidationMatrixAndStoreSafety();
         testEditLockEnforcement();
+        testAvailableListFiltersCompatibleAndValidGroups();
         testConditionTypeRoundTripAndStrictValidation();
         testJsonCreateUpdateRoundTripsAll85RepresentativeTypes();
         testJsonUnknownBlankMissingConfigFailsWithoutAlwaysTrueFallback();
@@ -268,6 +270,56 @@ public final class WebAdminConditionGroupServiceTest {
         requireEquals(0, locks.activeLockCount(), "condition group write releases edit lock");
     }
 
+    private static void testAvailableListFiltersCompatibleAndValidGroups() throws Exception {
+        Path storePath = Files.createTempDirectory("tzz-condition-available").resolve(WebAdminConditionGroupStore.FILE_NAME);
+        WebAdminConditionGroupStore.ConditionGroupFile file = new WebAdminConditionGroupStore.ConditionGroupFile();
+        file.groups.put("always", entry("always", "始终通过", definition("always", ConditionNode.leaf("always", ConditionNodeType.ALWAYS_TRUE)), true));
+        file.groups.put("player", entry("player", "玩家条件", definition("player", ConditionNode.leaf("player", ConditionNodeType.PLAYER_EXISTS)), true));
+        file.groups.put("container", entry("container", "容器条件", definition("container", ConditionNode.leaf("container", ConditionNodeType.CONTAINER_ITEM_COUNT_COMPARE,
+                config("containerKey", "container", "itemId", "minecraft:stone", "operator", "gte", "count", "1"))), true));
+        file.groups.put("invalid", entry("invalid", "无效条件", definition("invalid", ConditionNode.leaf("invalid", "unknown_type")), true));
+        file.groups.put("disabled", entry("disabled", "停用条件", definition("disabled", ConditionNode.leaf("disabled", ConditionNodeType.ALWAYS_TRUE)), false));
+        requireTrue(WebAdminConditionGroupStore.save(storePath, file), "seed available list condition groups");
+
+        WebAdminConditionGroupService service = new WebAdminConditionGroupService(new WebAdminPermissionService(), new WebAdminWriteSecurityService(), null, storePath, null);
+        WebAdminUser editor = user(WebAdminRole.EDITOR);
+        WebAdminSession session = session(editor);
+
+        Map<String, Object> redstone = service.available(null, editor, session, ConditionRuntimeTargetType.VBD_REDSTONE.id(), "vbd-1");
+        requireEquals(1, redstone.get("count"), "redstone available list returns only always_true");
+        requireTrue(groupIds(redstone).contains("always"), "redstone available includes always group");
+        requireFalse(groupIds(redstone).contains("player"), "redstone available excludes player group");
+        requireFalse(groupIds(redstone).contains("container"), "redstone available excludes container group");
+        requireFalse(groupIds(redstone).contains("invalid"), "redstone available excludes invalid group");
+        requireFalse(groupIds(redstone).contains("disabled"), "redstone available excludes disabled group");
+        requireTrue(((Number) redstone.get("incompatibleCount")).intValue() >= 3, "redstone available reports incompatible diagnostics");
+        requireContains(string(redstone.get("optionalGateMessage")), "保持旧逻辑", "available list optional gate message Chinese");
+
+        Map<String, Object> containerChange = service.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_CHANGE.id(), "vbd-1");
+        requireTrue(groupIds(containerChange).contains("container"), "container change available includes container snapshot group");
+        requireFalse(groupIds(containerChange).contains("player"), "container change available excludes player group");
+
+        Map<String, Object> containerOpenUnresolved = service.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_OPEN.id(), "missing-vbd");
+        requireFalse(groupIds(containerOpenUnresolved).contains("container"), "unresolved container open target excludes container snapshot group");
+        requireContains(string(containerOpenUnresolved.get("message")), "无法提供容器内容快照", "unresolved container open diagnostic is Chinese");
+
+        WebAdminConditionGroupService inventoryTargetService = new WebAdminConditionGroupService(
+                new WebAdminPermissionService(),
+                new WebAdminWriteSecurityService(),
+                null,
+                storePath,
+                null,
+                (server, targetId) -> "inventory-vbd".equals(targetId)
+        );
+        Map<String, Object> containerOpenInventory = inventoryTargetService.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_OPEN.id(), "inventory-vbd");
+        Map<String, Object> containerCloseInventory = inventoryTargetService.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_CLOSE.id(), "inventory-vbd");
+        Map<String, Object> containerCloseNonInventory = inventoryTargetService.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_CLOSE.id(), "non-inventory-vbd");
+        requireTrue(groupIds(containerOpenInventory).contains("container"), "Inventory container open available includes container_slot_item_matches-compatible group");
+        requireTrue(groupIds(containerCloseInventory).contains("container"), "Inventory container close available includes container_slot_item_matches-compatible group");
+        requireFalse(groupIds(containerCloseNonInventory).contains("container"), "non-Inventory container close available excludes container snapshot group");
+        requireContains(string(containerCloseNonInventory.get("message")), "无法提供容器内容快照", "non-Inventory container close diagnostic is Chinese");
+    }
+
     private static void testConditionTypeRoundTripAndStrictValidation() throws Exception {
         Path storePath = Files.createTempDirectory("tzz-condition-roundtrip").resolve(WebAdminConditionGroupStore.FILE_NAME);
         WebAdminWriteSecurityService security = new WebAdminWriteSecurityService();
@@ -431,6 +483,33 @@ public final class WebAdminConditionGroupServiceTest {
 
     private static WebAdminConditionGroupRequest requestFromJson(String json) {
         return WebAdminJsonResponse.GSON.fromJson(json, WebAdminConditionGroupRequest.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> groupIds(Map<String, Object> available) {
+        Object groupsRaw = available.get("groups");
+        if (!(groupsRaw instanceof List<?> groups)) {
+            return List.of();
+        }
+        return groups.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .map(group -> string(((Map<String, Object>) group).get("id")))
+                .toList();
+    }
+
+    private static WebAdminConditionGroupStore.ConditionGroupEntry entry(
+            String id,
+            String displayName,
+            ConditionGroupDefinition definition,
+            boolean enabled
+    ) {
+        WebAdminConditionGroupStore.ConditionGroupEntry entry = new WebAdminConditionGroupStore.ConditionGroupEntry();
+        entry.id = id;
+        entry.displayName = displayName;
+        entry.enabled = enabled;
+        entry.groupDefinition = definition;
+        return entry;
     }
 
     private static List<ConditionNode> detailChildren(WebAdminConditionGroupService service, WebAdminUser editor, WebAdminSession session, String id) {

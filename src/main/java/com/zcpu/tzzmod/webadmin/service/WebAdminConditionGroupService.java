@@ -6,11 +6,19 @@ import com.zcpu.tzzmod.condition.ConditionEvaluator;
 import com.zcpu.tzzmod.condition.ConditionGroupDefinition;
 import com.zcpu.tzzmod.condition.ConditionValidationIssue;
 import com.zcpu.tzzmod.condition.ConditionValidationResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityProfile;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.condition.state.StateVariableRecord;
 import com.zcpu.tzzmod.condition.state.StateVariableScope;
 import com.zcpu.tzzmod.condition.state.StateVariableSnapshot;
 import com.zcpu.tzzmod.condition.state.StateVariableType;
 import com.zcpu.tzzmod.condition.state.StateVariableValidation;
+import com.zcpu.tzzmod.signal.device.ContainerDeviceSupport;
+import com.zcpu.tzzmod.signal.device.SignalDeviceData;
+import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceSupport;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
@@ -42,7 +50,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 
 public final class WebAdminConditionGroupService {
     public static final String TARGET_TYPE = "CONDITION_GROUP";
@@ -51,6 +62,8 @@ public final class WebAdminConditionGroupService {
     private final WebAdminEditLockService editLockService;
     private final Path testStorePath;
     private final ConditionEvaluator evaluator;
+    private final TargetCapabilityResolver targetCapabilityResolver;
+    private final ConditionGroupCompatibilityService compatibilityService = new ConditionGroupCompatibilityService();
 
     public WebAdminConditionGroupService(
             WebAdminPermissionService permissionService,
@@ -71,11 +84,23 @@ public final class WebAdminConditionGroupService {
             Path testStorePath,
             ConditionEvaluator evaluator
     ) {
+        this(permissionService, securityService, editLockService, testStorePath, evaluator, WebAdminConditionGroupService::targetProvidesContainerSnapshot);
+    }
+
+    WebAdminConditionGroupService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path testStorePath,
+            ConditionEvaluator evaluator,
+            TargetCapabilityResolver targetCapabilityResolver
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
         this.testStorePath = testStorePath;
         this.evaluator = evaluator == null ? new ConditionEvaluator() : evaluator;
+        this.targetCapabilityResolver = targetCapabilityResolver == null ? WebAdminConditionGroupService::targetProvidesContainerSnapshot : targetCapabilityResolver;
     }
 
     public Map<String, Object> list(MinecraftServer server, WebAdminUser user, WebAdminSession session) {
@@ -97,6 +122,180 @@ public final class WebAdminConditionGroupService {
                 "storeDegraded", loaded.degraded(),
                 "storeMessage", loaded.message()
         );
+    }
+
+    public Map<String, Object> available(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String targetType,
+            String targetId
+    ) {
+        WebAdminPermissionDecision decision = permissionService.decide(user, WebAdminOperationType.READ);
+        if (!decision.allowed()) {
+            return Map.of("groups", List.of(), "permissionDenied", true, "message", decision.message());
+        }
+        ConditionRuntimeTargetType runtimeTargetType = ConditionRuntimeTargetType.parse(targetType).orElse(null);
+        if (runtimeTargetType == null) {
+            return Map.of(
+                    "groups", List.of(),
+                    "count", 0,
+                    "targetType", safe(targetType),
+                    "targetId", safe(targetId),
+                    "message", "未知的条件组运行时目标类型：" + safe(targetType)
+            );
+        }
+        ConditionGroupCompatibilityProfile profile = availableProfile(server, runtimeTargetType, targetId);
+        String diagnostic = availableDiagnostic(server, runtimeTargetType, targetId, profile);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = loadResult(server);
+        if (loaded.degraded()) {
+            return Map.of(
+                    "groups", List.of(),
+                    "count", 0,
+                    "targetType", runtimeTargetType.id(),
+                    "targetId", safe(targetId),
+                    "storeDegraded", true,
+                    "message", loaded.message()
+            );
+        }
+        List<Map<String, Object>> groups = new ArrayList<>();
+        List<Map<String, Object>> incompatible = new ArrayList<>();
+        for (WebAdminConditionGroupStore.ConditionGroupEntry entry : loaded.file().groups.values()) {
+            WebAdminConditionGroupStore.ConditionGroupEntry normalized = WebAdminConditionGroupStore.ConditionGroupEntry.normalized(entry == null ? "" : entry.id, entry);
+            if (!normalized.enabled) {
+                continue;
+            }
+            ConditionValidationResult validation = evaluator.validate(normalized.groupDefinition);
+            if (!validation.valid()) {
+                incompatible.add(Map.of(
+                        "id", normalized.id,
+                        "displayName", normalized.displayName,
+                        "compatibility", ConditionGroupCompatibilityResult.incompatible(
+                                runtimeTargetType,
+                                normalized.id,
+                                List.of("条件组校验失败：" + validationMessage(validation))
+                        ).summary()
+                ));
+                continue;
+            }
+            ConditionGroupCompatibilityResult compatibility = compatibilityService.analyze(normalized.groupDefinition, profile);
+            if (compatibility.compatible()) {
+                Map<String, Object> data = detailMap(normalized, user, session, false);
+                data.put("compatibility", compatibility.summary());
+                groups.add(data);
+            } else {
+                incompatible.add(Map.of(
+                        "id", normalized.id,
+                        "displayName", normalized.displayName,
+                        "compatibility", compatibility.summary()
+                ));
+            }
+        }
+        groups = groups.stream()
+                .sorted(Comparator.comparing(entry -> String.valueOf(entry.getOrDefault("displayName", ""))))
+                .toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("groups", groups);
+        result.put("count", groups.size());
+        result.put("targetType", runtimeTargetType.id());
+        result.put("targetId", safe(targetId));
+        result.put("targetCapabilities", profile.summary());
+        result.put("incompatibleCount", incompatible.size());
+        result.put("incompatibleReasons", incompatible);
+        result.put("emptyMessage", "暂无适用于此触发方式的条件组");
+        result.put("optionalGateMessage", "未配置条件组 = 不拦截，保持旧逻辑");
+        if (!diagnostic.isBlank()) {
+            result.put("message", diagnostic);
+            result.put("diagnostics", List.of(Map.of(
+                    "code", "container_snapshot_unavailable",
+                    "message", diagnostic
+            )));
+        }
+        return Map.copyOf(result);
+    }
+
+    private ConditionGroupCompatibilityProfile availableProfile(
+            MinecraftServer server,
+            ConditionRuntimeTargetType targetType,
+            String targetId
+    ) {
+        boolean containerSnapshot = requiresDynamicContainerSnapshot(targetType)
+                && targetCapabilityResolver.hasContainerSnapshot(server, targetId);
+        return compatibilityService.profile(targetType, containerSnapshot);
+    }
+
+    private String availableDiagnostic(
+            MinecraftServer server,
+            ConditionRuntimeTargetType targetType,
+            String targetId,
+            ConditionGroupCompatibilityProfile profile
+    ) {
+        if (!requiresDynamicContainerSnapshot(targetType) || profile.containerKeys().contains("container")) {
+            return "";
+        }
+        if (safe(targetId).isBlank() || findVirtualBlockDevice(server, targetId) == null) {
+            return "当前触发目标无法解析，无法提供容器内容快照，因此不能使用容器槽位条件。";
+        }
+        return "当前触发目标无法提供容器内容快照，因此不能使用容器槽位条件。";
+    }
+
+    private static boolean requiresDynamicContainerSnapshot(ConditionRuntimeTargetType targetType) {
+        return targetType == ConditionRuntimeTargetType.CONTAINER_OPEN
+                || targetType == ConditionRuntimeTargetType.CONTAINER_CLOSE;
+    }
+
+    private static boolean targetProvidesContainerSnapshot(MinecraftServer server, String targetId) {
+        SignalDeviceData device = findVirtualBlockDevice(server, targetId);
+        if (device == null) {
+            return false;
+        }
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(server, device);
+        if (world == null) {
+            return false;
+        }
+        BlockPos pos = new BlockPos(device.x(), device.y(), device.z());
+        if (!world.isChunkLoaded(pos)) {
+            return false;
+        }
+        BlockState state = world.getBlockState(pos);
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        String actualBlockId = VirtualBlockDeviceSupport.blockId(state);
+        if (!safe(device.blockId()).isBlank() && !safe(device.blockId()).equals(actualBlockId)) {
+            return false;
+        }
+        return ContainerDeviceSupport.hasInventory(world, pos);
+    }
+
+    private static SignalDeviceData findVirtualBlockDevice(MinecraftServer server, String targetId) {
+        String id = safe(targetId);
+        if (server == null || id.isBlank()) {
+            return null;
+        }
+        for (SignalDeviceData device : SignalDeviceStore.getVirtualBlockDevicesSnapshot(server)) {
+            if (device != null && id.equals(device.id())) {
+                return device;
+            }
+        }
+        return null;
+    }
+
+    interface TargetCapabilityResolver {
+        boolean hasContainerSnapshot(MinecraftServer server, String targetId);
+    }
+
+    private static String validationMessage(ConditionValidationResult validation) {
+        if (validation == null || validation.issues().isEmpty()) {
+            return "存在未知校验错误。";
+        }
+        ConditionValidationIssue issue = validation.issues().get(0);
+        String message = safe(issue.message());
+        if (!message.isBlank()) {
+            return message;
+        }
+        String code = safe(issue.code());
+        return code.isBlank() ? "存在未知校验错误。" : code;
     }
 
     public Map<String, Object> detail(MinecraftServer server, WebAdminUser user, WebAdminSession session, String id) {

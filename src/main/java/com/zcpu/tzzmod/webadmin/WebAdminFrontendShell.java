@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "8.5-condition-editor-p0-3";
+    private static final String ASSET_VERSION = "8.6-runtime-gates";
 
     private WebAdminFrontendShell() {
     }

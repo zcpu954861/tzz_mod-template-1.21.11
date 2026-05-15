@@ -1,5 +1,12 @@
 package com.zcpu.tzzmod.webadmin.service;
 
+import com.zcpu.tzzmod.condition.ConditionEvaluator;
+import com.zcpu.tzzmod.condition.ConditionValidationResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityProfile;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.BlockStateCondition;
 import com.zcpu.tzzmod.signal.device.BlockStateConditionMode;
@@ -15,6 +22,7 @@ import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceSupport;
 import com.zcpu.tzzmod.signal.device.VirtualBlockPowerState;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest;
@@ -36,6 +44,7 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -83,15 +92,28 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final Path conditionGroupStorePath;
+    private final ConditionGroupCompatibilityService compatibilityService = new ConditionGroupCompatibilityService();
+    private final ConditionEvaluator conditionEvaluator = new ConditionEvaluator();
 
     public WebAdminVirtualBlockDeviceNativeTriggerService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService,
             WebAdminEditLockService editLockService
     ) {
+        this(permissionService, securityService, editLockService, null);
+    }
+
+    WebAdminVirtualBlockDeviceNativeTriggerService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path conditionGroupStorePath
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
+        this.conditionGroupStorePath = conditionGroupStorePath;
     }
 
     public Map<String, Object> overview(MinecraftServer server, String deviceRef) {
@@ -125,6 +147,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         }
 
         NativeTriggerRuntime runtime = runtime(server, device);
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates = ConditionRuntimeGateStore.virtualBlockDevice(server, device.id());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("deviceId", device.id());
         data.put("deviceType", WebAdminReadonlySupport.deviceType(device));
@@ -139,10 +162,12 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         data.put("allowedRedstoneModes", ALLOWED_REDSTONE_MODES);
         data.put("allowedConditionModes", ALLOWED_CONDITION_MODES);
         data.put("boundBlock", boundBlock(device, runtime));
-        Map<String, Object> triggers = triggers(device, runtime);
+        Map<String, Object> triggers = triggers(device, runtime, gates);
         data.put("triggers", triggers);
         data.put("activeTriggerTypes", activeTriggerTypes(triggers));
-        data.put("expectedFingerprint", fingerprintFor(device));
+        data.put("conditionGateStoreFile", ConditionRuntimeGateStore.FILE_NAME);
+        data.put("conditionGateOptionalMessage", "未配置条件组 = 不拦截，保持旧逻辑");
+        data.put("expectedFingerprint", fingerprintFor(device, gates));
         data.put("lockStatus", editLockService == null ? null : editLockService.status(
                 WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS,
                 device.id(),
@@ -211,21 +236,22 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
             audit(context, result, currentSummary(device), Map.of("attempt", "invalid_type"));
             return result;
         }
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig currentGates = ConditionRuntimeGateStore.virtualBlockDevice(server, device.id());
         WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS);
         if (!permission.allowed()) {
             WebAdminWriteResult result = permission.asWriteResult(target);
-            audit(context, result, currentSummary(device), Map.of("attempt", "permission_denied"));
+            audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "permission_denied"));
             return result;
         }
         WebAdminWriteResult csrf = securityService.requireValidCsrf(session, csrfToken);
         if (!csrf.success()) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(resultCode(csrf.code()), target, csrf.message());
-            audit(context, result, currentSummary(device), Map.of("attempt", "csrf_failed"));
+            audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "csrf_failed"));
             return result;
         }
         if (!sameOrigin) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.CSRF_INVALID, target, "写请求来源校验失败，请刷新页面后重试。");
-            audit(context, result, currentSummary(device), Map.of("attempt", "origin_failed"));
+            audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "origin_failed"));
             return result;
         }
         if (editLockService != null) {
@@ -238,7 +264,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
             );
             if (!lockValidation.success()) {
                 WebAdminWriteResult result = lockValidation.result();
-                audit(context, result, currentSummary(device), Map.of("attempt", "edit_lock_failed"));
+                audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "edit_lock_failed"));
                 return result;
             }
         }
@@ -249,12 +275,12 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
                     "保存需要 expectedFingerprint，用于防止覆盖其他操作的修改。",
                     ""
             )));
-            audit(context, result, currentSummary(device), Map.of("attempt", "expected_fingerprint_missing"));
+            audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "expected_fingerprint_missing"));
             return result;
         }
-        if (!fingerprintMatches(device, request.expectedFingerprint)) {
-            WebAdminWriteResult result = conflictDetected(target, device, request.expectedFingerprint);
-            audit(context, result, currentSummary(device), Map.of("attempt", "fingerprint_conflict"));
+        if (!fingerprintMatches(device, currentGates, request.expectedFingerprint)) {
+            WebAdminWriteResult result = conflictDetected(target, device, currentGates, request.expectedFingerprint);
+            audit(context, result, currentSummary(device, currentGates), Map.of("attempt", "fingerprint_conflict"));
             return result;
         }
 
@@ -262,41 +288,57 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         Validation validation = validateRequest(server, device, runtime, request);
         if (!validation.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
-            audit(context, result, currentSummary(device), requestSummary(request));
+            audit(context, result, currentSummary(device, currentGates), requestSummary(request));
             return result;
         }
         SignalDeviceStore.WebAdminNativeTriggerPatch patch = validation.patch();
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig nextGates = validation.gates();
         SignalDeviceData preview = applyPreview(device, patch);
-        List<String> changedFields = changedFields(device, preview);
+        List<String> nativeChangedFields = changedFields(device, preview);
+        List<String> changedFields = changedFields(device, preview, currentGates, nextGates);
         if (changedFields.isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的 VBD 原生触发配置变化。");
-            audit(context, result, currentSummary(device), currentSummary(device));
+            audit(context, result, currentSummary(device, currentGates), currentSummary(device, currentGates));
             releaseLockAfterWrite(request, user, session, remoteAddress);
             return result;
         }
 
-        ServerWorld world = SignalDeviceStore.getDeviceWorld(server, device);
-        if (world == null) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
-                    "world",
-                    "world_unavailable",
-                    "设备所在维度不可用，无法保存 VBD 原生触发配置。",
-                    device.dimension()
-            )));
-            audit(context, result, currentSummary(device), requestSummary(request));
+        ServerWorld nativeWriteWorld = null;
+        BlockPos nativeWritePos = null;
+        if (!nativeChangedFields.isEmpty()) {
+            nativeWriteWorld = SignalDeviceStore.getDeviceWorld(server, device);
+            if (nativeWriteWorld == null) {
+                WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                        "world",
+                        "world_unavailable",
+                        "设备所在维度不可用，无法保存 VBD 原生触发配置。",
+                        device.dimension()
+                )));
+                audit(context, result, currentSummary(device, currentGates), requestSummary(request));
+                return result;
+            }
+            nativeWritePos = new BlockPos(device.x(), device.y(), device.z());
+        }
+        if (!currentGates.equals(nextGates) && !ConditionRuntimeGateStore.updateVirtualBlockDevice(server, device.id(), nextGates)) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "条件组运行时 gate 配置保存失败，请查看服务端日志。");
+            audit(context, result, currentSummary(device, currentGates), requestSummary(request));
             return result;
         }
-        SignalDeviceData updated = SignalDeviceStore.updateVirtualNativeTriggersForWebAdmin(
-                world,
-                new BlockPos(device.x(), device.y(), device.z()),
-                patch
-        );
-        if (updated == null) {
-            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "保存时目标 virtual_block_device 已不存在。");
-            audit(context, result, currentSummary(device), requestSummary(request));
-            return result;
+
+        SignalDeviceData updated = device;
+        if (!nativeChangedFields.isEmpty()) {
+            updated = SignalDeviceStore.updateVirtualNativeTriggersForWebAdmin(
+                    nativeWriteWorld,
+                    nativeWritePos,
+                    patch
+            );
+            if (updated == null) {
+                WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "保存时目标 virtual_block_device 已不存在。");
+                audit(context, result, currentSummary(device, currentGates), requestSummary(request));
+                return result;
+            }
+            SignalDeviceStore.forceFlushDirty(server);
         }
-        SignalDeviceStore.forceFlushDirty(server);
 
         Map<String, Object> resultData = new LinkedHashMap<>();
         resultData.put("nativeTriggers", overview(server, user, session, updated.id()));
@@ -316,22 +358,37 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
                 Map.of(),
                 resultData
         );
-        WebAdminAuditEvent auditEvent = audit(context, result, currentSummary(device), currentSummary(updated));
+        WebAdminAuditEvent auditEvent = audit(context, result, currentSummary(device, currentGates), currentSummary(updated, nextGates));
         publishRealtime(device, updated, auditEvent, changedFields, user);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
     }
 
     public static boolean fingerprintMatches(SignalDeviceData device, String expectedFingerprint) {
-        return !isBlank(expectedFingerprint) && fingerprintFor(device).equals(expectedFingerprint);
+        return fingerprintMatches(device, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty(), expectedFingerprint);
+    }
+
+    public static boolean fingerprintMatches(
+            SignalDeviceData device,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates,
+            String expectedFingerprint
+    ) {
+        return !isBlank(expectedFingerprint) && fingerprintFor(device, gates).equals(expectedFingerprint);
     }
 
     public static String fingerprintFor(SignalDeviceData rawDevice) {
+        return fingerprintFor(rawDevice, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty());
+    }
+
+    public static String fingerprintFor(
+            SignalDeviceData rawDevice,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates
+    ) {
         SignalDeviceData device = rawDevice == null ? null : rawDevice.normalized();
         if (device == null) {
             return "";
         }
-        String input = "virtual_block_device_triggers|" + device.id() + "|" + device.type() + "|" + editableSummary(device);
+        String input = "virtual_block_device_triggers|" + device.id() + "|" + device.type() + "|" + editableSummary(device, gates);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
@@ -349,7 +406,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         List<WebAdminValidationError> errors = new ArrayList<>();
         if (request == null) {
             errors.add(new WebAdminValidationError("nativeTriggers", "required", "原生触发配置不能为空。", ""));
-            return new Validation(List.copyOf(errors), null);
+            return new Validation(List.copyOf(errors), null, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty());
         }
         boolean redstoneEnabled = Boolean.TRUE.equals(request.redstoneEnabled);
         String redstoneMode = redstoneEnabled
@@ -406,6 +463,22 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         String changeChannel = validateChannel(errors, "containerChangeChannel", request.containerChangeChannel, containerChangeEnabled);
         int containerCooldownTicks = validateTicks(errors, "containerCooldownTicks", request.containerCooldownTicks, 0, MAX_TICKS, device.containerCooldownTicks());
         int checkIntervalTicks = validateTicks(errors, "containerChangeCheckIntervalTicks", request.containerChangeCheckIntervalTicks, 1, MAX_TICKS, device.containerChangeCheckIntervalTicks());
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates = new ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig(
+                request.redstoneConditionGroupId,
+                request.blockStateConditionGroupId,
+                request.interactionConditionGroupId,
+                request.itemSubmitConditionGroupId,
+                request.containerOpenConditionGroupId,
+                request.containerCloseConditionGroupId,
+                request.containerChangeConditionGroupId
+        );
+        validateGateBinding(server, errors, "redstoneConditionGroupId", gates.redstoneConditionGroupId(), ConditionRuntimeTargetType.VBD_REDSTONE);
+        validateGateBinding(server, errors, "blockStateConditionGroupId", gates.blockStateConditionGroupId(), ConditionRuntimeTargetType.VBD_BLOCKSTATE);
+        validateGateBinding(server, errors, "interactionConditionGroupId", gates.interactionConditionGroupId(), ConditionRuntimeTargetType.VBD_INTERACTION);
+        validateGateBinding(server, errors, "itemSubmitConditionGroupId", gates.itemSubmitConditionGroupId(), ConditionRuntimeTargetType.ITEM_SUBMIT);
+        validateGateBinding(server, errors, "containerOpenConditionGroupId", gates.containerOpenConditionGroupId(), ConditionRuntimeTargetType.CONTAINER_OPEN, gateProfile(server, device, runtime, ConditionRuntimeTargetType.CONTAINER_OPEN));
+        validateGateBinding(server, errors, "containerCloseConditionGroupId", gates.containerCloseConditionGroupId(), ConditionRuntimeTargetType.CONTAINER_CLOSE, gateProfile(server, device, runtime, ConditionRuntimeTargetType.CONTAINER_CLOSE));
+        validateGateBinding(server, errors, "containerChangeConditionGroupId", gates.containerChangeConditionGroupId(), ConditionRuntimeTargetType.CONTAINER_CHANGE);
         String fingerprint = device.lastContainerFingerprint();
         boolean anyContainerEnabled = containerOpenEnabled || containerCloseEnabled || containerChangeEnabled;
         if (anyContainerEnabled) {
@@ -429,7 +502,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         }
 
         if (!errors.isEmpty()) {
-            return new Validation(List.copyOf(errors), null);
+            return new Validation(List.copyOf(errors), null, gates);
         }
         SignalDeviceStore.WebAdminNativeTriggerPatch patch = new SignalDeviceStore.WebAdminNativeTriggerPatch(
                 redstoneEnabled,
@@ -456,7 +529,100 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
                 checkIntervalTicks,
                 fingerprint
         );
-        return new Validation(List.of(), patch);
+        return new Validation(List.of(), patch, gates);
+    }
+
+    void validateGateBinding(
+            MinecraftServer server,
+            List<WebAdminValidationError> errors,
+            String field,
+            String groupId,
+            ConditionRuntimeTargetType targetType
+    ) {
+        validateGateBinding(server, errors, field, groupId, targetType, compatibilityService.profile(targetType));
+    }
+
+    void validateGateBinding(
+            MinecraftServer server,
+            List<WebAdminValidationError> errors,
+            String field,
+            String groupId,
+            ConditionRuntimeTargetType targetType,
+            ConditionGroupCompatibilityProfile profile
+    ) {
+        String normalizedGroupId = WebAdminConditionGroupStore.normalizeId(groupId);
+        if (normalizedGroupId.isBlank()) {
+            return;
+        }
+        WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = loadConditionGroups(server);
+        if (loaded.degraded()) {
+            errors.add(new WebAdminValidationError(field, "condition_group_store_degraded", loaded.message(), normalizedGroupId));
+            return;
+        }
+        WebAdminConditionGroupStore.ConditionGroupEntry entry = loaded.file().groups.get(normalizedGroupId);
+        if (entry == null) {
+            errors.add(new WebAdminValidationError(field, "condition_group_missing", "条件组不存在或已删除：" + normalizedGroupId, normalizedGroupId));
+            return;
+        }
+        WebAdminConditionGroupStore.ConditionGroupEntry normalized = WebAdminConditionGroupStore.ConditionGroupEntry.normalized(entry.id, entry);
+        if (!normalized.enabled) {
+            errors.add(new WebAdminValidationError(field, "condition_group_disabled", "条件组已停用，不能绑定到运行时触发：" + normalizedGroupId, normalizedGroupId));
+            return;
+        }
+        if (normalized.groupDefinition == null) {
+            errors.add(new WebAdminValidationError(field, "condition_group_definition_missing", "条件组定义缺失，不能绑定到运行时触发：" + normalizedGroupId, normalizedGroupId));
+            return;
+        }
+        ConditionValidationResult validation = conditionEvaluator.validate(normalized.groupDefinition);
+        if (!validation.valid()) {
+            String firstIssue = validation.issues().stream()
+                    .map(issue -> issue.message())
+                    .filter(message -> message != null && !message.isBlank())
+                    .findFirst()
+                    .orElse("存在无效条件节点");
+            errors.add(new WebAdminValidationError(field, "condition_group_validation_failed", "条件组校验失败，不能绑定到运行时触发：" + firstIssue, normalizedGroupId));
+            return;
+        }
+        ConditionGroupCompatibilityResult compatibility = compatibilityService.analyze(normalized.groupDefinition, profile);
+        if (!compatibility.compatible()) {
+            errors.add(new WebAdminValidationError(field, "condition_group_incompatible", "条件组与当前触发方式不兼容：" + compatibility.message(), normalizedGroupId));
+        }
+    }
+
+    private ConditionGroupCompatibilityProfile gateProfile(
+            MinecraftServer server,
+            SignalDeviceData device,
+            NativeTriggerRuntime runtime,
+            ConditionRuntimeTargetType targetType
+    ) {
+        boolean containerSnapshot = (targetType == ConditionRuntimeTargetType.CONTAINER_OPEN
+                || targetType == ConditionRuntimeTargetType.CONTAINER_CLOSE)
+                && runtimeProvidesContainerSnapshot(server, device, runtime);
+        return compatibilityService.profile(targetType, containerSnapshot);
+    }
+
+    private static boolean runtimeProvidesContainerSnapshot(
+            MinecraftServer server,
+            SignalDeviceData device,
+            NativeTriggerRuntime runtime
+    ) {
+        if (server == null || device == null || runtime == null || !runtime.worldAvailable() || !runtime.chunkLoaded()) {
+            return false;
+        }
+        if (runtime.state() == null || runtime.state().isAir() || !"ready".equals(runtime.status())) {
+            return false;
+        }
+        ServerWorld world = SignalDeviceStore.getDeviceWorld(server, device);
+        if (world == null) {
+            return false;
+        }
+        return ContainerDeviceSupport.hasInventory(world, new BlockPos(device.x(), device.y(), device.z()));
+    }
+
+    private WebAdminConditionGroupStore.ConditionGroupLoadResult loadConditionGroups(MinecraftServer server) {
+        return conditionGroupStorePath == null
+                ? WebAdminConditionGroupStore.loadWithStatus(server)
+                : WebAdminConditionGroupStore.loadWithStatus(conditionGroupStorePath);
     }
 
     private static Map<String, String> conditionPropertiesFrom(
@@ -635,15 +801,49 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         ).normalized();
     }
 
-    private static Map<String, Object> triggers(SignalDeviceData device, NativeTriggerRuntime runtime) {
+    private static Map<String, Object> triggers(
+            SignalDeviceData device,
+            NativeTriggerRuntime runtime,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates
+    ) {
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig safeGates = gates == null ? ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty() : gates;
         Map<String, Object> triggers = new LinkedHashMap<>();
-        triggers.put("redstone_powered", redstone(device, runtime));
-        triggers.put("blockstate", blockState(device, runtime));
-        triggers.put("right_click", rightClick(device));
-        triggers.put("container_open", containerOpen(device));
-        triggers.put("container_close", containerClose(device));
-        triggers.put("container_change", containerChange(device));
+        triggers.put("redstone_powered", withGate(redstone(device, runtime), ConditionRuntimeTargetType.VBD_REDSTONE, safeGates.redstoneConditionGroupId()));
+        triggers.put("blockstate", withGate(blockState(device, runtime), ConditionRuntimeTargetType.VBD_BLOCKSTATE, safeGates.blockStateConditionGroupId()));
+        triggers.put("right_click", withGate(rightClick(device), ConditionRuntimeTargetType.VBD_INTERACTION, safeGates.interactionConditionGroupId(), safeGates.itemSubmitConditionGroupId()));
+        triggers.put("container_open", withGate(containerOpen(device), ConditionRuntimeTargetType.CONTAINER_OPEN, safeGates.containerOpenConditionGroupId()));
+        triggers.put("container_close", withGate(containerClose(device), ConditionRuntimeTargetType.CONTAINER_CLOSE, safeGates.containerCloseConditionGroupId()));
+        triggers.put("container_change", withGate(containerChange(device), ConditionRuntimeTargetType.CONTAINER_CHANGE, safeGates.containerChangeConditionGroupId()));
         return triggers;
+    }
+
+    private static Map<String, Object> withGate(
+            Map<String, Object> data,
+            ConditionRuntimeTargetType targetType,
+            String conditionGroupId
+    ) {
+        return withGate(data, targetType, conditionGroupId, "");
+    }
+
+    private static Map<String, Object> withGate(
+            Map<String, Object> data,
+            ConditionRuntimeTargetType targetType,
+            String conditionGroupId,
+            String itemSubmitConditionGroupId
+    ) {
+        Map<String, Object> target = data == null ? new LinkedHashMap<>() : data;
+        String groupId = WebAdminConditionGroupStore.normalizeId(conditionGroupId);
+        String itemSubmitGroupId = WebAdminConditionGroupStore.normalizeId(itemSubmitConditionGroupId);
+        target.put("conditionGroupId", groupId);
+        target.put("conditionGateConfigured", !groupId.isBlank());
+        target.put("conditionGateTargetType", targetType == null ? "" : targetType.id());
+        target.put("conditionGateOptionalMessage", "未配置条件组 = 不拦截，保持旧逻辑");
+        target.put("conditionGroupAvailableTargetType", targetType == null ? "" : targetType.id());
+        if (!itemSubmitGroupId.isBlank() || "right_click".equals(String.valueOf(target.get("type")))) {
+            target.put("itemSubmitConditionGroupId", itemSubmitGroupId);
+            target.put("itemSubmitConditionGateTargetType", ConditionRuntimeTargetType.ITEM_SUBMIT.id());
+        }
+        return target;
     }
 
     private static Map<String, Object> redstone(SignalDeviceData device, NativeTriggerRuntime runtime) {
@@ -965,31 +1165,53 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     }
 
     private static Map<String, Object> editableSummary(SignalDeviceData device) {
+        return editableSummary(device, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty());
+    }
+
+    private static Map<String, Object> editableSummary(
+            SignalDeviceData device,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates
+    ) {
         Map<String, Object> summary = new LinkedHashMap<>();
         if (device == null) {
             return summary;
         }
+        ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig safeGates = gates == null ? ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty() : gates;
         summary.put("channel", device.channel());
         summary.put("offChannel", device.offChannel());
         summary.put("mode", device.mode());
+        summary.put("redstoneConditionGroupId", safeGates.redstoneConditionGroupId());
         summary.put("conditionEnabled", device.conditionEnabled());
         summary.put("conditionBlockId", device.conditionBlockId());
         summary.put("conditionProperties", new TreeMap<>(device.conditionProperties()));
         summary.put("conditionRaw", device.conditionRaw());
         summary.put("conditionMode", device.conditionMode());
+        summary.put("blockStateConditionGroupId", safeGates.blockStateConditionGroupId());
         summary.put("interactionEnabled", device.interactionEnabled());
         summary.put("interactChannel", device.interactChannel());
         summary.put("interactionCooldownTicks", device.interactionCooldownTicks());
+        summary.put("interactionConditionGroupId", safeGates.interactionConditionGroupId());
+        summary.put("itemSubmitConditionGroupId", safeGates.itemSubmitConditionGroupId());
         summary.put("containerEnabled", device.containerEnabled());
         summary.put("containerOpenChannel", device.containerOpenChannel());
+        summary.put("containerOpenConditionGroupId", safeGates.containerOpenConditionGroupId());
         summary.put("containerCloseChannel", device.containerCloseChannel());
+        summary.put("containerCloseConditionGroupId", safeGates.containerCloseConditionGroupId());
         summary.put("containerChangeChannel", device.containerChangeChannel());
+        summary.put("containerChangeConditionGroupId", safeGates.containerChangeConditionGroupId());
         summary.put("containerCooldownTicks", device.containerCooldownTicks());
         summary.put("containerChangeCheckIntervalTicks", device.containerChangeCheckIntervalTicks());
         return summary;
     }
 
     private static Map<String, Object> currentSummary(SignalDeviceData device) {
+        return currentSummary(device, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty());
+    }
+
+    private static Map<String, Object> currentSummary(
+            SignalDeviceData device,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates
+    ) {
         Map<String, Object> summary = new LinkedHashMap<>();
         if (device == null) {
             return summary;
@@ -997,11 +1219,11 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         summary.put("deviceId", device.id());
         summary.put("deviceType", WebAdminReadonlySupport.deviceType(device));
         summary.put("displayName", WebAdminReadonlySupport.deviceDisplayName(device));
-        summary.put("nativeTriggers", editableSummary(device));
+        summary.put("nativeTriggers", editableSummary(device, gates));
         summary.put("containerItemConditionsReadonlyCount", device.itemConditions().size());
         summary.put("interactionItemMatcherPreserved", device.interactionItemMatcher().normalized().enabled());
         summary.put("itemSubmitPreserved", device.itemSubmitEnabled());
-        summary.put("expectedFingerprint", fingerprintFor(device));
+        summary.put("expectedFingerprint", fingerprintFor(device, gates));
         return summary;
     }
 
@@ -1016,6 +1238,13 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         summary.put("containerOpenEnabled", Boolean.TRUE.equals(request.containerOpenEnabled));
         summary.put("containerCloseEnabled", Boolean.TRUE.equals(request.containerCloseEnabled));
         summary.put("containerChangeEnabled", Boolean.TRUE.equals(request.containerChangeEnabled));
+        summary.put("redstoneConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.redstoneConditionGroupId));
+        summary.put("blockStateConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.blockStateConditionGroupId));
+        summary.put("interactionConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.interactionConditionGroupId));
+        summary.put("itemSubmitConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.itemSubmitConditionGroupId));
+        summary.put("containerOpenConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.containerOpenConditionGroupId));
+        summary.put("containerCloseConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.containerCloseConditionGroupId));
+        summary.put("containerChangeConditionGroupId", WebAdminConditionGroupStore.normalizeId(request.containerChangeConditionGroupId));
         summary.put("expectedFingerprint", request.expectedFingerprint);
         return summary;
     }
@@ -1034,11 +1263,42 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         return List.copyOf(changed);
     }
 
+    private static List<String> changedFields(
+            SignalDeviceData before,
+            SignalDeviceData after,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig beforeGates,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig afterGates
+    ) {
+        Map<String, Object> beforeValues = editableSummary(before, beforeGates);
+        Map<String, Object> afterValues = editableSummary(after, afterGates);
+        List<String> changed = new ArrayList<>();
+        for (String key : beforeValues.keySet()) {
+            Object beforeValue = beforeValues.get(key);
+            Object afterValue = afterValues.get(key);
+            if (beforeValue == null ? afterValue != null : !beforeValue.equals(afterValue)) {
+                changed.add(key);
+            }
+        }
+        return List.copyOf(changed);
+    }
+
     private static List<String> changedTriggerTypes(List<String> changedFields) {
         Set<String> types = new LinkedHashSet<>();
         for (String field : changedFields == null ? List.<String>of() : changedFields) {
             if (List.of("enabled", "channel", "offChannel", "mode").contains(field)) {
                 types.add("redstone_powered");
+            } else if (field.equals("redstoneConditionGroupId")) {
+                types.add("redstone_powered");
+            } else if (field.equals("blockStateConditionGroupId")) {
+                types.add("blockstate");
+            } else if (field.equals("interactionConditionGroupId") || field.equals("itemSubmitConditionGroupId")) {
+                types.add("right_click");
+            } else if (field.equals("containerOpenConditionGroupId")) {
+                types.add("container_open");
+            } else if (field.equals("containerCloseConditionGroupId")) {
+                types.add("container_close");
+            } else if (field.equals("containerChangeConditionGroupId")) {
+                types.add("container_change");
             } else if (field.startsWith("condition")) {
                 types.add("blockstate");
             } else if (field.startsWith("interaction") || field.equals("interactChannel")) {
@@ -1170,10 +1430,19 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     }
 
     private static WebAdminWriteResult conflictDetected(WebAdminWriteTarget target, SignalDeviceData current, String expectedFingerprint) {
+        return conflictDetected(target, current, ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty(), expectedFingerprint);
+    }
+
+    private static WebAdminWriteResult conflictDetected(
+            WebAdminWriteTarget target,
+            SignalDeviceData current,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates,
+            String expectedFingerprint
+    ) {
         Map<String, Object> conflict = new LinkedHashMap<>();
         conflict.put("expectedFingerprint", expectedFingerprint);
-        conflict.put("currentFingerprint", fingerprintFor(current));
-        conflict.put("currentNativeTriggers", currentSummary(current));
+        conflict.put("currentFingerprint", fingerprintFor(current, gates));
+        conflict.put("currentNativeTriggers", currentSummary(current, gates));
         return new WebAdminWriteResult(
                 false,
                 WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
@@ -1218,7 +1487,8 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
 
     private record Validation(
             List<WebAdminValidationError> errors,
-            SignalDeviceStore.WebAdminNativeTriggerPatch patch
+            SignalDeviceStore.WebAdminNativeTriggerPatch patch,
+            ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig gates
     ) {
     }
 

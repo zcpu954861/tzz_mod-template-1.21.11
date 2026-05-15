@@ -8,6 +8,8 @@ import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
 import com.zcpu.tzzmod.condition.ConditionRegionSignalLogicChainTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateServiceTest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityServiceTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
@@ -65,6 +67,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateConfigTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -144,6 +147,9 @@ public final class StabilizationGuardTest {
         ConditionStateVariableTest.run();
         ConditionItemInventoryContainerTest.run();
         ConditionRegionSignalLogicChainTest.run();
+        ConditionGroupCompatibilityServiceTest.run();
+        ConditionGateServiceTest.run();
+        WebAdminConditionGateConfigTest.run();
         WebAdminConditionCatalogTest.run();
         WebAdminConditionGroupServiceTest.run();
         testConditionEngineCore80();
@@ -152,6 +158,7 @@ public final class StabilizationGuardTest {
         testConditionItemInventoryContainer83();
         testConditionRegionSignalLogicChain84();
         testWebAdminConditionEditor85();
+        testConditionRuntimeGates86();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -2979,7 +2986,6 @@ public final class StabilizationGuardTest {
                 "EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
                 "WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
                 "expectedFingerprint",
-                "fingerprintFor(device)",
                 "redstone_powered",
                 "blockstate",
                 "right_click",
@@ -3004,6 +3010,8 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(nativeTriggerService, marker, "7.9 P2 native trigger service marker present: " + marker);
         }
+        requireTrue(nativeTriggerService.contains("fingerprintFor(device)") || nativeTriggerService.contains("fingerprintFor(device, gates)"),
+                "7.9/8.6 native trigger fingerprint marker present");
 
         for (String marker : List.of(
                 "START_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE_SESSION",
@@ -3660,8 +3668,9 @@ public final class StabilizationGuardTest {
                         || js.contains("onclick=\"cancelContainerTemplateSession(")
                         || js.contains("onsubmit=\"event.preventDefault();startContainerTemplateSession("),
                 "7.9 P3a container template modal must use data-action event delegation instead of unsafe inline JS handlers");
+        String nativeTriggerRequestLegacySurface = nativeTriggerRequest.replace("itemSubmitConditionGroupId", "");
         for (String forbidden : List.of("itemSubmit", "consume", "inventory", "equipment", "armor", "itemConditions", "rawJson", "conditionEngine", "conditionChannel")) {
-            requireFalse(nativeTriggerRequest.contains(forbidden),
+            requireFalse(nativeTriggerRequestLegacySurface.contains(forbidden),
                     "7.9 P2 native trigger PATCH DTO must not expose forbidden field: " + forbidden);
         }
         requireFalse(js.contains("conditionChannel"),
@@ -5712,12 +5721,15 @@ public final class StabilizationGuardTest {
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
                         || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
                 "8.0 ConditionEngine core must not integrate VBD/listener/region/action runtime stores");
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
-        requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
-                        || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
-                "8.0 must not wire ConditionEngine into existing runtime packages");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
+                            || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
+                    "8.0 must not wire ConditionEngine into existing runtime packages");
+        }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
                         || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
@@ -5923,12 +5935,15 @@ public final class StabilizationGuardTest {
                         || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
                 "8.1 ConditionEngine conditions must not integrate VBD/listener/region/action runtime stores");
         requireContains(context, "不做物品 / 背包 / 容器条件", "8.1 context keeps item/inventory/container deferred marker");
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
-        requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
-                        || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
-                "8.1 must not wire ConditionEngine into existing runtime packages");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
+                            || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
+                    "8.1 must not wire ConditionEngine into existing runtime packages");
+        }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("saveConditionEngine")
                         || webadminMain.contains("/api/webadmin/conditions") || webadminMain.contains("condition-groups/raw"),
@@ -6125,12 +6140,15 @@ public final class StabilizationGuardTest {
 
         requireFalse(registry.contains("StateVariableService") || registry.contains("StateVariableStore"),
                 "8.2 condition evaluation must read only StateVariableSnapshot, not write through store/service");
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
-        requireFalse(runtimeMain.contains("StateVariableService") || runtimeMain.contains("StateVariableStore")
-                        || runtimeMain.contains("ConditionNodeType.STATE_VARIABLE"),
-                "8.2 must not wire state variables into existing runtime packages");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimeMain.contains("StateVariableService") || runtimeMain.contains("StateVariableStore")
+                            || runtimeMain.contains("ConditionNodeType.STATE_VARIABLE"),
+                    "8.2 must not wire state variables into existing runtime packages");
+        }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("stateVariableEditor")
                         || webadminMain.contains("/api/webadmin/state-variables") || webadminMain.contains("condition-groups/raw"),
@@ -6278,13 +6296,16 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(forbiddenSource.contains(forbidden), "8.3 condition item package must not use forbidden runtime/source: " + forbidden);
         }
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
-        requireFalse(runtimeMain.contains("ConditionItemStackSnapshot") || runtimeMain.contains("ConditionInventorySnapshot")
-                        || runtimeMain.contains("ConditionContainerSnapshot") || runtimeMain.contains("ConditionNodeType.ITEM_STACK")
-                        || runtimeMain.contains("ConditionNodeType.INVENTORY_") || runtimeMain.contains("ConditionNodeType.CONTAINER_"),
-                "8.3 must not wire item/inventory/container conditions into existing runtime packages");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimeMain.contains("ConditionItemStackSnapshot") || runtimeMain.contains("ConditionInventorySnapshot")
+                            || runtimeMain.contains("ConditionContainerSnapshot") || runtimeMain.contains("ConditionNodeType.ITEM_STACK")
+                            || runtimeMain.contains("ConditionNodeType.INVENTORY_") || runtimeMain.contains("ConditionNodeType.CONTAINER_"),
+                    "8.3 must not wire item/inventory/container conditions into existing runtime packages");
+        }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
                         || webadminMain.contains("itemConditionEditor") || webadminMain.contains("condition-groups/raw"),
@@ -6436,14 +6457,17 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(forbiddenSource.contains(forbidden), "8.4 regionlogic package must not use forbidden runtime/source: " + forbidden);
         }
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
                 root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
-        requireFalse(runtimeMain.contains("ConditionRegionSnapshot") || runtimeMain.contains("ConditionSignalChannelSnapshot")
-                        || runtimeMain.contains("ConditionSignalHistorySnapshot") || runtimeMain.contains("ConditionLogicChainSnapshot")
-                        || runtimeMain.contains("ConditionNodeType.REGION_EXISTS") || runtimeMain.contains("ConditionNodeType.SIGNAL_CHANNEL")
-                        || runtimeMain.contains("ConditionNodeType.LOGIC_CHAIN"),
-                "8.4 must not wire region/signal/logic chain conditions into existing runtime packages");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimeMain.contains("ConditionRegionSnapshot") || runtimeMain.contains("ConditionSignalChannelSnapshot")
+                            || runtimeMain.contains("ConditionSignalHistorySnapshot") || runtimeMain.contains("ConditionLogicChainSnapshot")
+                            || runtimeMain.contains("ConditionNodeType.REGION_EXISTS") || runtimeMain.contains("ConditionNodeType.SIGNAL_CHANNEL")
+                            || runtimeMain.contains("ConditionNodeType.LOGIC_CHAIN"),
+                    "8.4 must not wire region/signal/logic chain conditions into existing runtime packages");
+        }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
                         || webadminMain.contains("regionConditionEditor") || webadminMain.contains("signalConditionEditor")
@@ -6537,7 +6561,7 @@ public final class StabilizationGuardTest {
         requireContains(server, "该接口只支持 POST。", "8.5 condition group delete is POST-only");
         requireContains(server, "Cache-Control", "8.5 P0 asset no-store cache header marker");
         requireContains(server, "no-store, max-age=0", "8.5 P0 app shell/assets avoid stale JS marker");
-        requireContains(shell, "8.5-condition-editor-p0-3", "8.5 P0 bumped asset version marker");
+        requireContains(shell, "8.6-runtime-gates", "8.6 runtime gates bumped asset version marker");
         requireContains(shell, "data-asset-version", "8.5 P0 loaded asset version visible in DOM marker");
         requireContains(shell, "tzz-webadmin-asset-version", "8.5 P0 asset version meta marker");
 
@@ -6714,19 +6738,310 @@ public final class StabilizationGuardTest {
             requireContains(groupTest, marker, "8.5 expanded group service test marker: " + marker);
         }
 
+        boolean runtimeGates86Started = Files.isRegularFile(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"));
         String runtimePackages = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/signal"))
                 + readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/action"))
                 + readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/region"));
-        requireFalse(runtimePackages.contains("WebAdminConditionGroupStore") || runtimePackages.contains("condition_groups.json")
-                        || runtimePackages.contains("EDIT_CONDITION_GROUP") || runtimePackages.contains("TARGET_CONDITION_GROUP"),
-                "8.5 must not wire condition group store/editor into runtime packages");
-        requireFalse(service.contains("SignalBridgeServer.emit") || service.contains("ActionEngine.execute")
-                        || service.contains("RegionControllerStore") || service.contains("SignalListenerStore")
-                        || service.contains("SignalDeviceStore") || service.contains("WebAdminLogicChainService"),
-                "8.5 preview/service must not query live runtime services or execute side effects");
+        if (!runtimeGates86Started) {
+            requireFalse(runtimePackages.contains("WebAdminConditionGroupStore") || runtimePackages.contains("condition_groups.json")
+                            || runtimePackages.contains("EDIT_CONDITION_GROUP") || runtimePackages.contains("TARGET_CONDITION_GROUP"),
+                    "8.5 must not wire condition group store/editor into runtime packages");
+        }
+        if (!runtimeGates86Started) {
+            requireFalse(service.contains("SignalBridgeServer.emit") || service.contains("ActionEngine.execute")
+                            || service.contains("RegionControllerStore") || service.contains("SignalListenerStore")
+                            || service.contains("SignalDeviceStore") || service.contains("WebAdminLogicChainService"),
+                    "8.5 preview/service must not query live runtime services or execute side effects");
+        } else {
+            requireFalse(service.contains("SignalBridgeServer.emit") || service.contains("ActionEngine.execute")
+                            || service.contains("RegionControllerStore") || service.contains("SignalListenerStore")
+                            || service.contains("WebAdminLogicChainService"),
+                    "8.6 available-list service may inspect VBD target capability but must not execute side effects or query out-of-scope runtimes");
+        }
         requireFalse(readme.contains("具体任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
                 "8.5 docs must not claim concrete tasks or high-level game systems are implemented");
+    }
+
+    private static void testConditionRuntimeGates86() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String gateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateService.java"), StandardCharsets.UTF_8);
+        String gateRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateRequest.java"), StandardCharsets.UTF_8);
+        String gateResult = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateResult.java"), StandardCharsets.UTF_8);
+        String gateStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeGateStore.java"), StandardCharsets.UTF_8);
+        String contextBuilder = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeContextBuilder.java"), StandardCharsets.UTF_8);
+        String compatibility = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityService.java"), StandardCharsets.UTF_8);
+        String profile = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityProfile.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String groupService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java"), StandardCharsets.UTF_8);
+        String nativeService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String requestDto = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String dispatcher = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceDispatcher.java"), StandardCharsets.UTF_8);
+        String interaction = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceInteractionHandler.java"), StandardCharsets.UTF_8);
+        String container = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceContainerHandler.java"), StandardCharsets.UTF_8);
+        String compatibilityTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"), StandardCharsets.UTF_8);
+        String gateTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateServiceTest.java"), StandardCharsets.UTF_8);
+        String gateConfigTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateConfigTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateService.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateRequest.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateResult.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeContextBuilder.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityService.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeGateStore.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateConfigTest.java",
+                "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.6 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.6 Runtime Integration I",
+                "Optional Gate 原则",
+                "conditionGroupId == null / empty / unset",
+                "外层 ConditionGateService",
+                "VBD_REDSTONE",
+                "VBD_INTERACTION",
+                "ITEM_SUBMIT",
+                "CONTAINER_OPEN",
+                "CONTAINER_CHANGE",
+                "GET /api/webadmin/condition-groups/available",
+                "未配置条件组 = 不拦截，保持旧逻辑",
+                "backend reject incompatible bind",
+                "SignalListener condition gate",
+                "ActionRelay condition gate",
+                "RegionController enter / exit / stay condition gate",
+                "GameController / MissionSystem / PhaseController"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.6 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "groupId.isBlank()",
+                "ConditionGateResult.skippedResult()",
+                "WebAdminConditionGroupStore.loadWithStatus",
+                "condition_group_missing",
+                "condition_group_validation_failed",
+                "condition_group_incompatible",
+                "condition_gate_exception",
+                "ConditionEvaluationContext context = request",
+                "evaluator.evaluateTrace"
+        )) {
+            requireContains(gateService, marker, "8.6 gate service marker: " + marker);
+        }
+        requireContains(gateRequest, "Supplier<ConditionEvaluationContext>", "8.6 gate request uses lazy context supplier");
+        requireContains(gateResult, "boolean skipped", "8.6 gate result exposes skipped");
+        requireContains(gateResult, "failureReason", "8.6 gate result exposes failure reason");
+        requireContains(gateStore, "condition_runtime_gates.json", "8.6 runtime gate store is separate from legacy device JSON");
+        requireContains(gateStore, "VirtualBlockDeviceGateConfig", "8.6 VBD gate config model");
+
+        for (String marker : List.of(
+                "ConditionItemStackSnapshot",
+                "ConditionInventorySnapshot",
+                "ConditionContainerSnapshot",
+                "submitted_item",
+                "player_inventory",
+                "container",
+                "StateVariableStore.getSnapshot"
+        )) {
+            requireContains(contextBuilder, marker, "8.6 context snapshot builder marker: " + marker);
+        }
+        requireFalse(contextBuilder.contains("ItemSubmitInventoryAdapter"), "8.6 context builder must not pass live itemSubmit adapter into ConditionEngine");
+
+        for (String marker : List.of(
+                "analyzeNode(definition.root()",
+                "if (!node.enabled())",
+                "PLAYER_TYPES",
+                "STATE_VARIABLE_TYPES",
+                "context_player",
+                "itemKeys()",
+                "inventoryKeys()",
+                "containerKeys()",
+                "regionKeys()",
+                "signalHistoryKeys()",
+                "logicChainKeys()"
+        )) {
+            requireContains(compatibility, marker, "8.6 compatibility marker: " + marker);
+        }
+        for (String marker : List.of(
+                "VBD_REDSTONE",
+                "VBD_BLOCKSTATE",
+                "VBD_INTERACTION",
+                "ITEM_SUBMIT",
+                "CONTAINER_OPEN",
+                "CONTAINER_CLOSE",
+                "CONTAINER_CHANGE",
+                "playerContext",
+                "itemKeys",
+                "inventoryKeys",
+                "containerKeys"
+        )) {
+            requireContains(profile, marker, "8.6 compatibility profile marker: " + marker);
+        }
+
+        requireContains(server, "root + \"/available\"", "8.6 available list API route marker");
+        requireContains(groupService, "public Map<String, Object> available", "8.6 available list service marker");
+        requireContains(groupService, "ConditionRuntimeTargetType.parse", "8.6 available list target type parse marker");
+        requireContains(groupService, "compatibilityService.analyze", "8.6 available list compatibility marker");
+        requireContains(groupService, "incompatibleReasons", "8.6 available list returns diagnostic reasons");
+        requireContains(groupService, "optionalGateMessage", "8.6 available list optional gate message marker");
+
+        for (String field : List.of(
+                "redstoneConditionGroupId",
+                "blockStateConditionGroupId",
+                "interactionConditionGroupId",
+                "itemSubmitConditionGroupId",
+                "containerOpenConditionGroupId",
+                "containerCloseConditionGroupId",
+                "containerChangeConditionGroupId"
+        )) {
+            requireContains(requestDto, field, "8.6 request DTO condition gate field: " + field);
+            requireContains(nativeService, field, "8.6 native trigger service condition gate field: " + field);
+            requireContains(scripts, field, "8.6 frontend condition gate field: " + field);
+        }
+        requireContains(nativeService, "validateGateBinding", "8.6 backend rejects incompatible binding marker");
+        requireContains(nativeService, "compatibilityService.analyze", "8.6 backend compatibility validation marker");
+        requireContains(nativeService, "ConditionRuntimeGateStore.updateVirtualBlockDevice", "8.6 saves gate config through runtime gate store");
+        requireContains(nativeService, "fingerprintFor(device, gates)", "8.6 gate fields participate in expectedFingerprint");
+        requireContains(nativeService, "conditionGroupId", "8.6 audit/fingerprint includes condition group changed fields");
+
+        for (String marker : List.of(
+                "loadConditionGateOptions",
+                "conditionGateTargetTypes",
+                "conditionGatePicker",
+                "data-condition-runtime-gate-picker",
+                "data-condition-runtime-available-list",
+                "data-condition-runtime-incompatible-current",
+                "data-condition-runtime-clear-incompatible",
+                "clearVbdNativeConditionGate",
+                "v[key]===incompatible",
+                "未配置条件组 = 保持旧逻辑，不拦截",
+                "触发条件组 gate",
+                "itemSubmit gate",
+                "data-condition-runtime-field",
+                "暂无适用于此触发方式的条件组",
+                "只列出兼容条件组",
+                "vbdNativeTriggerPatchBody",
+                "/condition-groups/available"
+        )) {
+            requireContains(scripts, marker, "8.6 frontend picker marker: " + marker);
+        }
+        requireFalse(scripts.contains("conditionGateRawJson") || scripts.contains("condition-runtime-raw-json-editor"),
+                "8.6 WebAdmin picker must not introduce raw JSON editor");
+        requireFalse(scripts.contains("<span>条件组 gate</span>"),
+                "8.6 interaction UI must not render duplicate generic 条件组 gate picker labels");
+        requireContains(scripts, "interactionConditionGroupId:['触发条件组 gate'",
+                "8.6 interaction runtime gate label is distinct");
+        requireContains(scripts, "itemSubmitConditionGroupId:['itemSubmit gate'",
+                "8.6 itemSubmit gate label is distinct and compact");
+        requireFalse(scripts.contains("itemSubmit 提交 gate"),
+                "8.6 itemSubmit gate label stays compact");
+
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.VBD_REDSTONE",
+                "ConditionRuntimeTargetType.VBD_BLOCKSTATE",
+                "evaluateGate(",
+                "ConditionRuntimeGateStore.conditionGroupId",
+                "ConditionRuntimeContextBuilder.base",
+                "if (!gate.allowed()) {\n                return;\n            }",
+                "SignalBridgeServer.emit"
+        )) {
+            requireContains(dispatcher, marker, "8.6 VBD redstone/blockstate gate marker: " + marker);
+        }
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.VBD_INTERACTION",
+                "ConditionRuntimeTargetType.ITEM_SUBMIT",
+                "ConditionRuntimeContextBuilder.interaction",
+                "ConditionRuntimeContextBuilder.itemSubmit",
+                "evaluateItemSubmit",
+                "if (!gate.allowed())"
+        )) {
+            requireContains(interaction, marker, "8.6 interaction/itemSubmit gate marker: " + marker);
+        }
+        requireTrue(interaction.indexOf("ConditionRuntimeTargetType.ITEM_SUBMIT") >= 0
+                        && interaction.indexOf("ConditionRuntimeTargetType.ITEM_SUBMIT") < interaction.indexOf("evaluateItemSubmit"),
+                "8.6 itemSubmit gate runs before itemSubmit evaluation/consume path");
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.CONTAINER_OPEN",
+                "ConditionRuntimeTargetType.CONTAINER_CLOSE",
+                "ConditionRuntimeTargetType.CONTAINER_CHANGE",
+                "ConditionRuntimeContextBuilder.container",
+                "ConditionRuntimeGateStore.conditionGroupId",
+                "if (!gate.allowed())"
+        )) {
+            requireContains(container, marker, "8.6 container gate marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "blank conditionGroupId does not read store",
+                "blank conditionGroupId does not build EvaluationContext",
+                "missing group fails closed",
+                "invalid group fails closed",
+                "incompatible group fails closed",
+                "corrupt runtime gate store fails closed",
+                "condition_runtime_gate_store_unavailable",
+                "false condition gate blocks",
+                "context/evaluation exception fails closed",
+                "Inventory open runtime accepts and evaluates container condition",
+                "non-Inventory open runtime rejects container condition"
+        )) {
+            requireContains(gateTest, marker, "8.6 gate test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "always_true compatible",
+                "player not compatible with redstone",
+                "context player state rejected",
+                "variables.* context fields are not advertised",
+                "event.trigger metadata is provided",
+                "inventory not compatible with redstone",
+                "container compatible with change",
+                "without target Inventory capability",
+                "Inventory container open supports container snapshot group",
+                "Inventory container close supports container snapshot group",
+                "disabled incompatible player node ignored",
+                "incompatibility reason is Chinese"
+        )) {
+            requireContains(compatibilityTest, marker, "8.6 compatibility test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "backend rejects gate binding",
+                "condition_group_missing",
+                "condition_group_disabled",
+                "condition_group_validation_failed",
+                "condition_group_incompatible",
+                "compatible player group accepted by interaction gate backend",
+                "compatible player group accepted by itemSubmit gate backend",
+                "Inventory container open accepts container_slot_item_matches group",
+                "non-Inventory container open rejects container_slot_item_matches group",
+                "non-Inventory container close rejects container_slot_item_matches group"
+        )) {
+            requireContains(gateConfigTest, marker, "8.6 backend gate config test marker: " + marker);
+        }
+
+        String nonVbdSignal = readJavaDirectory(
+                root.resolve("src/main/java/com/zcpu/tzzmod/signal"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/signal/device")
+        );
+        String actionRuntime = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/action"));
+        String regionRuntime = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/region"));
+        String actionRelay = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/ModBlock/entity/ActionRelayBlockEntity.java"), StandardCharsets.UTF_8);
+        for (String runtime : List.of(nonVbdSignal, actionRuntime, regionRuntime, actionRelay)) {
+            requireFalse(runtime.contains("ConditionGateService") || runtime.contains("ConditionRuntimeGateStore")
+                            || runtime.contains("WebAdminConditionGroupStore") || runtime.contains("condition_runtime_gates.json"),
+                    "8.6 must not add SignalListener/ActionRelay/RegionController/Action runtime condition gates");
+        }
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
+                "8.6 must not add GameController/MissionSystem/PhaseController");
+        requireFalse(allMain.contains("condition-runtime-raw-json-editor") || allMain.contains("scriptExpression"),
+                "8.6 must not add raw JSON editor or generic script expression");
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {
