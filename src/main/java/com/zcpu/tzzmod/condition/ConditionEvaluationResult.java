@@ -213,6 +213,17 @@ public record ConditionEvaluationResult(
             case ConditionNodeType.CONTAINER_SLOT_EMPTY -> "容器槽位为空";
             case ConditionNodeType.CONTAINER_SLOT_ITEM_MATCHES -> "容器槽位物品匹配";
             case ConditionNodeType.CONTAINER_ITEM_COUNT_COMPARE -> "容器物品数量比较";
+            case ConditionNodeType.REGION_EXISTS -> "区域快照存在";
+            case ConditionNodeType.REGION_ENABLED -> "区域已启用";
+            case ConditionNodeType.PLAYER_IN_REGION -> "玩家在区域内";
+            case ConditionNodeType.REGION_PLAYER_COUNT_COMPARE -> "区域玩家数量比较";
+            case ConditionNodeType.SIGNAL_CHANNEL_EXISTS -> "信号频道快照存在";
+            case ConditionNodeType.SIGNAL_CHANNEL_CONSUMER_COUNT_COMPARE -> "信号消费者数量比较";
+            case ConditionNodeType.SIGNAL_EVENT_COUNT_COMPARE -> "信号事件数量比较";
+            case ConditionNodeType.LOGIC_CHAIN_CONTAINS_NODE -> "逻辑链包含节点";
+            case ConditionNodeType.LOGIC_CHAIN_CONTAINS_CHANNEL -> "逻辑链包含频道";
+            case ConditionNodeType.LOGIC_CHAIN_HAS_CYCLE -> "逻辑链存在循环";
+            case ConditionNodeType.LOGIC_CHAIN_NODE_COUNT_COMPARE -> "逻辑链节点数量比较";
             default -> node.id().isBlank() ? node.type() : node.id();
         };
     }

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.48.0-condition-state-variables`
-- 当前开发基线：`8.3 Item / Inventory / Container Conditions / 物品、背包、容器条件包`；本阶段只做 snapshot、condition-safe matcher 和只读条件，发布后建议版本为 `v1.49.0-condition-item-inventory-container`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.49.0-condition-item-inventory-container`
+- 当前开发基线：`8.4 Region / Signal / Logic Chain Conditions / 区域、信号、逻辑链条件包`；本阶段只做 condition-safe snapshot 和只读条件，发布后建议版本为 `v1.50.0-condition-region-signal-logic-chain`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -42,10 +42,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.2](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_2.md)
 - [8.3 Item / Inventory / Container Conditions Current Context](docs/CONDITION_ITEM_INVENTORY_CONTAINER_8_3_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.3](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_3.md)
+- [8.4 Region / Signal / Logic Chain Conditions Current Context](docs/CONDITION_REGION_SIGNAL_LOGIC_CHAIN_8_4_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.4](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_4.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.3；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座，以及物品 / 背包 / 容器 snapshot 条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.4；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件，以及 Region / Signal / Logic Chain snapshot 条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -127,6 +129,31 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.3 不做具体任务/关卡，不做 GameController / MissionSystem / PhaseController。
 - 8.3 不新增 MCP tool。8.3 不跑 MCP scenario。8.3 不生成截图。8.3 不启动 Minecraft。
 
+## 8.4 Region / Signal / Logic Chain Conditions
+
+8.4 在 8.0 Core、8.1 基础条件、8.2 状态变量系统和 8.3 物品 / 背包 / 容器条件之上加入区域、信号、逻辑链相关的只读条件能力。它使用 condition-safe snapshot，不直接读取 live RegionController、SignalBridge、SignalEventHistory、WebAdmin Logic Chain Viewer service、世界或在线玩家列表。
+
+8.4 已提供：
+
+- `ConditionRegionSnapshot`：区域快照，包含 regionId、displayName、enabled、world、playerIdsInside、boundsSummary、metadata。
+- `ConditionSignalChannelSnapshot`、`ConditionSignalHistorySnapshot`、`ConditionSignalEventSnapshot`。
+- `ConditionLogicChainSnapshot`、logic chain node / edge snapshot。
+- `ConditionEvaluationContext` 中的 `regionSnapshots`、`signalChannelSnapshots`、`signalHistorySnapshots`、`logicChainSnapshots`。
+- 区域条件：`region_exists`、`region_enabled`、`player_in_region`、`region_player_count_compare`。
+- 信号条件：`signal_channel_exists`、`signal_channel_consumer_count_compare`、`signal_event_count_compare`。
+- 逻辑链条件：`logic_chain_contains_node`、`logic_chain_contains_channel`、`logic_chain_has_cycle`、`logic_chain_node_count_compare`。
+- count compare 支持 `eq/ne/gt/gte/lt/lte`。
+- 中文显示名、中文描述、中文字段名、中文 validation error 和中文 failureReason。
+
+8.4 约束：
+
+- Condition 只读取 snapshot，不修改 region / signal / logic chain snapshot，不写 store，不 emit signal，不执行 action。
+- 8.4 仍不接入 runtime：VBD、SignalListener、RegionController、ActionRelay、Action、itemSubmit 等运行路径不会自动调用这些条件。
+- 8.4 不读取 live world，不读取 live RegionController，不读取 live SignalBridge / SignalEventHistory，不调用 live Logic Chain Viewer service，不自动构建全局逻辑链。
+- 8.4 不提供 WebAdmin condition editor。8.4 不提供 WebAdmin API。8.4 不提供 WebAdmin UI。不提供 raw JSON / NBT path 编辑器。
+- 8.4 不做具体任务/关卡，不做 GameController / MissionSystem / PhaseController。
+- 8.4 不新增 MCP tool。8.4 不跑 MCP scenario。8.4 不生成截图。8.4 不启动 Minecraft。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -152,7 +179,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - `reports/mcp`、`reports/mcp/screenshots`、responsive reports、scenario reports 都是本地测试输出，不提交。
 - MCP 不提供任意 shell、不提供 git mutation、不访问外部 host、不做 OS 鼠标键盘控制、不做 Minecraft GUI 坐标点击。
 - TestBridge 仅 loopback/local、需要 token、默认关闭。
-- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core, 8.1 Basic Player / Context Conditions, 8.2 State Variable System, or 8.3 Item / Inventory / Container Conditions requirements or new scope.
+- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core, 8.1 Basic Player / Context Conditions, 8.2 State Variable System, 8.3 Item / Inventory / Container Conditions, or 8.4 Region / Signal / Logic Chain Conditions requirements or new scope.
 
 ## 安全边界
 
