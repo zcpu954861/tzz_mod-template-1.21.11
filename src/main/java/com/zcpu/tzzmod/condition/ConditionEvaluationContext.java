@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.condition;
 
+import com.zcpu.tzzmod.condition.state.StateVariableRecord;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
+import com.zcpu.tzzmod.condition.state.StateVariableSnapshot;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +31,7 @@ public record ConditionEvaluationContext(
         String detail,
         long gameTime,
         int signalDepth,
+        StateVariableSnapshot stateVariables,
         Map<String, String> eventMetadata,
         Map<String, String> variables
 ) {
@@ -50,6 +54,7 @@ public record ConditionEvaluationContext(
         triggerType = safe(triggerType);
         detail = safe(detail);
         signalDepth = Math.max(0, signalDepth);
+        stateVariables = stateVariables == null ? StateVariableSnapshot.empty() : stateVariables;
         eventMetadata = copy(eventMetadata);
         variables = copy(variables);
     }
@@ -65,6 +70,19 @@ public record ConditionEvaluationContext(
         }
         if (key.startsWith("event.")) {
             return eventMetadata.getOrDefault(key.substring("event.".length()), "");
+        }
+        if (key.startsWith("state.global.")) {
+            String variableKey = key.substring("state.global.".length());
+            return stateVariables.get(StateVariableScope.GLOBAL, "global", variableKey)
+                    .map(StateVariableRecord::value)
+                    .orElse("");
+        }
+        if (key.startsWith("state.player.") && hasPlayerIdentity()) {
+            String variableKey = key.substring("state.player.".length());
+            String targetId = !playerId.isBlank() ? playerId : playerName;
+            return stateVariables.get(StateVariableScope.PLAYER, targetId, variableKey)
+                    .map(StateVariableRecord::value)
+                    .orElse("");
         }
         return switch (key) {
             case "playerId" -> playerId;
@@ -110,6 +128,9 @@ public record ConditionEvaluationContext(
         put(summary, "blockPos", blockPos);
         put(summary, "triggerType", triggerType);
         put(summary, "gameTime", Long.toString(gameTime));
+        if (stateVariables.size() > 0) {
+            put(summary, "stateVariables", stateVariables.summary());
+        }
         return Map.copyOf(summary);
     }
 
@@ -203,6 +224,7 @@ public record ConditionEvaluationContext(
         private String detail = "";
         private long gameTime = 0L;
         private int signalDepth = 0;
+        private StateVariableSnapshot stateVariables = StateVariableSnapshot.empty();
 
         public Builder player(String id, String name) {
             this.playerId = id;
@@ -325,6 +347,18 @@ public record ConditionEvaluationContext(
             return this;
         }
 
+        public Builder stateVariables(StateVariableSnapshot stateVariables) {
+            this.stateVariables = stateVariables == null ? StateVariableSnapshot.empty() : stateVariables;
+            return this;
+        }
+
+        public Builder stateVariable(StateVariableRecord record) {
+            if (record != null) {
+                this.stateVariables = this.stateVariables.with(record);
+            }
+            return this;
+        }
+
         public ConditionEvaluationContext build() {
             return new ConditionEvaluationContext(
                     playerId,
@@ -349,6 +383,7 @@ public record ConditionEvaluationContext(
                     detail,
                     gameTime,
                     signalDepth,
+                    stateVariables,
                     eventMetadata,
                     variables
             );

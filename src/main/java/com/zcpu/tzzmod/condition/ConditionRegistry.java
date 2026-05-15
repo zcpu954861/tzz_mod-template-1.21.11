@@ -1,5 +1,12 @@
 package com.zcpu.tzzmod.condition;
 
+import com.zcpu.tzzmod.condition.state.StateVariableCompareOperator;
+import com.zcpu.tzzmod.condition.state.StateVariableKey;
+import com.zcpu.tzzmod.condition.state.StateVariableRecord;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
+import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
+import com.zcpu.tzzmod.condition.state.StateVariableType;
+import com.zcpu.tzzmod.condition.state.StateVariableValidation;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -16,6 +23,7 @@ public final class ConditionRegistry {
     private static final String CATEGORY_PLAYER = "玩家条件";
     private static final String CATEGORY_TIME = "时间条件";
     private static final String CATEGORY_METADATA = "元数据条件";
+    private static final String CATEGORY_STATE = "状态变量条件";
     private static final Set<String> GAME_MODES = Set.of("survival", "creative", "adventure", "spectator");
     private static final Set<String> GAME_TIME_OPERATORS = Set.of("eq", "ne", "gt", "gte", "lt", "lte");
 
@@ -122,6 +130,11 @@ public final class ConditionRegistry {
         registry.register(new GameTimeCompareHandler());
         registry.register(new EventMetadataExistsHandler());
         registry.register(new EventMetadataEqualsHandler());
+        registry.register(new StateVariableExistsHandler());
+        registry.register(new StateVariableBoolEqualsHandler());
+        registry.register(new StateVariableIntCompareHandler());
+        registry.register(new StateVariableStringEqualsHandler());
+        registry.register(new StateVariableStringContainsHandler());
         return registry;
     }
 
@@ -817,6 +830,360 @@ public final class ConditionRegistry {
                                     : "事件元数据不匹配：" + key + "，期望 " + expected + "，实际 " + actual + "。"),
                     label(node, "事件元数据匹配")
             );
+        }
+    }
+
+    private record StateVariableExistsHandler() implements ConditionTypeHandler {
+        @Override
+        public ConditionTypeMetadata metadata() {
+            return stateVariableMetadata(
+                    ConditionNodeType.STATE_VARIABLE_EXISTS,
+                    "状态变量存在",
+                    "检查指定作用域和目标上的状态变量是否存在。"
+            );
+        }
+
+        @Override
+        public ConditionValidationResult validate(ConditionNode node) {
+            return validateStateVariableBase(node);
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluate(ConditionNode node, ConditionEvaluationContext context) {
+            ResolvedStateVariableTarget target = resolveStateVariableTarget(node, context);
+            if (!target.valid()) {
+                return leaf(node, context, false, "state_variable_target_missing", target.failureReason(), label(node, "状态变量存在"));
+            }
+            Optional<StateVariableRecord> record = context == null
+                    ? Optional.empty()
+                    : context.stateVariables().get(target.scope(), target.targetId(), target.key());
+            boolean matched = record.isPresent();
+            String path = target.displayPath();
+            return leaf(
+                    node,
+                    context,
+                    matched,
+                    matched ? "state_variable_exists" : "state_variable_missing",
+                    matched ? "状态变量存在：" + path + "。" : "状态变量不存在：" + path + "。",
+                    label(node, "状态变量存在")
+            );
+        }
+    }
+
+    private record StateVariableBoolEqualsHandler() implements ConditionTypeHandler {
+        @Override
+        public ConditionTypeMetadata metadata() {
+            return stateVariableMetadata(
+                    ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                    "布尔状态匹配",
+                    "检查布尔状态变量是否等于期望值。",
+                    field("expected", "期望值", "boolean", true, "true 或 false")
+            );
+        }
+
+        @Override
+        public ConditionValidationResult validate(ConditionNode node) {
+            return validateStateVariableBase(node)
+                    .merge(requireNonBlank(node, "expected", "期望值"))
+                    .merge(requireBooleanIfPresent(node, "expected", "期望值"));
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluate(ConditionNode node, ConditionEvaluationContext context) {
+            ResolvedStateVariableTarget target = resolveStateVariableTarget(node, context);
+            if (!target.valid()) {
+                return leaf(node, context, false, "state_variable_target_missing", target.failureReason(), label(node, "布尔状态匹配"));
+            }
+            Optional<StateVariableRecord> optionalRecord = findStateVariable(node, context, target, StateVariableType.BOOLEAN, "布尔状态匹配");
+            if (optionalRecord.isEmpty()) {
+                return missingOrTypeMismatch(node, context, target, StateVariableType.BOOLEAN, "布尔状态匹配");
+            }
+            boolean expected = Boolean.parseBoolean(config(node, "expected"));
+            boolean actual = Boolean.parseBoolean(optionalRecord.get().value());
+            boolean matched = actual == expected;
+            return leaf(
+                    node,
+                    context,
+                    matched,
+                    matched ? "state_variable_bool_equals" : "state_variable_bool_mismatch",
+                    matched
+                            ? "布尔状态匹配：" + target.displayPath() + " = " + actual + "。"
+                            : "布尔状态不匹配：" + target.displayPath() + " 当前 " + actual + "，期望 " + expected + "。",
+                    label(node, "布尔状态匹配")
+            );
+        }
+    }
+
+    private record StateVariableIntCompareHandler() implements ConditionTypeHandler {
+        @Override
+        public ConditionTypeMetadata metadata() {
+            return stateVariableMetadata(
+                    ConditionNodeType.STATE_VARIABLE_INT_COMPARE,
+                    "整数状态比较",
+                    "比较整数状态变量与目标整数。",
+                    field("operator", "比较方式", "enum:eq,ne,gt,gte,lt,lte", true, "eq/ne/gt/gte/lt/lte"),
+                    field("value", "目标整数", "long", true, "用于比较的目标整数")
+            );
+        }
+
+        @Override
+        public ConditionValidationResult validate(ConditionNode node) {
+            ConditionValidationResult result = validateStateVariableBase(node)
+                    .merge(requireNonBlank(node, "operator", "比较方式"))
+                    .merge(requireNonBlank(node, "value", "目标整数"));
+            if (!config(node, "operator").isBlank() && StateVariableCompareOperator.parse(config(node, "operator")).isEmpty()) {
+                result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_operator", "比较方式必须是 eq/ne/gt/gte/lt/lte"));
+            }
+            if (!config(node, "value").isBlank()) {
+                try {
+                    Long.parseLong(config(node, "value"));
+                } catch (NumberFormatException ex) {
+                    result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_state_integer", "目标整数必须是数字"));
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluate(ConditionNode node, ConditionEvaluationContext context) {
+            ResolvedStateVariableTarget target = resolveStateVariableTarget(node, context);
+            if (!target.valid()) {
+                return leaf(node, context, false, "state_variable_target_missing", target.failureReason(), label(node, "整数状态比较"));
+            }
+            Optional<StateVariableRecord> optionalRecord = findStateVariable(node, context, target, StateVariableType.INTEGER, "整数状态比较");
+            if (optionalRecord.isEmpty()) {
+                return missingOrTypeMismatch(node, context, target, StateVariableType.INTEGER, "整数状态比较");
+            }
+            StateVariableCompareOperator operator = StateVariableCompareOperator.parse(config(node, "operator")).orElse(StateVariableCompareOperator.EQ);
+            long expected = Long.parseLong(config(node, "value"));
+            long actual = Long.parseLong(optionalRecord.get().value());
+            boolean matched = operator.test(actual, expected);
+            return leaf(
+                    node,
+                    context,
+                    matched,
+                    matched ? "state_variable_int_compare" : "state_variable_int_compare_failed",
+                    matched
+                            ? "整数状态满足：" + target.displayPath() + " 当前 " + actual + "，要求 " + operator.symbol() + " " + expected + "。"
+                            : "整数状态不满足：" + target.displayPath() + " 当前 " + actual + "，要求 " + operator.symbol() + " " + expected + "。",
+                    label(node, "整数状态比较")
+            );
+        }
+    }
+
+    private record StateVariableStringEqualsHandler() implements ConditionTypeHandler {
+        @Override
+        public ConditionTypeMetadata metadata() {
+            return stateVariableMetadata(
+                    ConditionNodeType.STATE_VARIABLE_STRING_EQUALS,
+                    "文本状态匹配",
+                    "检查文本状态变量是否等于期望文本。",
+                    field("value", "期望文本", "string", true, "需要精确匹配的文本"),
+                    field("ignoreCase", "忽略大小写", "boolean", false, "默认 false")
+            );
+        }
+
+        @Override
+        public ConditionValidationResult validate(ConditionNode node) {
+            return validateStateVariableBase(node)
+                    .merge(requireNonBlank(node, "value", "期望文本"))
+                    .merge(requireBooleanIfPresent(node, "ignoreCase", "忽略大小写"));
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluate(ConditionNode node, ConditionEvaluationContext context) {
+            ResolvedStateVariableTarget target = resolveStateVariableTarget(node, context);
+            if (!target.valid()) {
+                return leaf(node, context, false, "state_variable_target_missing", target.failureReason(), label(node, "文本状态匹配"));
+            }
+            Optional<StateVariableRecord> optionalRecord = findStateVariable(node, context, target, StateVariableType.STRING, "文本状态匹配");
+            if (optionalRecord.isEmpty()) {
+                return missingOrTypeMismatch(node, context, target, StateVariableType.STRING, "文本状态匹配");
+            }
+            boolean ignoreCase = configBoolean(node, "ignoreCase", false);
+            String expected = config(node, "value");
+            String actual = optionalRecord.get().value();
+            boolean matched = ignoreCase ? actual.equalsIgnoreCase(expected) : actual.equals(expected);
+            return leaf(
+                    node,
+                    context,
+                    matched,
+                    matched ? "state_variable_string_equals" : "state_variable_string_mismatch",
+                    matched
+                            ? "文本状态匹配：" + target.displayPath() + "。"
+                            : "文本状态不匹配：" + target.displayPath() + "，期望 " + expected + "，实际 " + actual + "。",
+                    label(node, "文本状态匹配")
+            );
+        }
+    }
+
+    private record StateVariableStringContainsHandler() implements ConditionTypeHandler {
+        @Override
+        public ConditionTypeMetadata metadata() {
+            return stateVariableMetadata(
+                    ConditionNodeType.STATE_VARIABLE_STRING_CONTAINS,
+                    "文本状态包含",
+                    "检查文本状态变量是否包含指定文本。",
+                    field("value", "包含文本", "string", true, "需要包含的文本"),
+                    field("ignoreCase", "忽略大小写", "boolean", false, "默认 false")
+            );
+        }
+
+        @Override
+        public ConditionValidationResult validate(ConditionNode node) {
+            return validateStateVariableBase(node)
+                    .merge(requireNonBlank(node, "value", "包含文本"))
+                    .merge(requireBooleanIfPresent(node, "ignoreCase", "忽略大小写"));
+        }
+
+        @Override
+        public ConditionEvaluationResult evaluate(ConditionNode node, ConditionEvaluationContext context) {
+            ResolvedStateVariableTarget target = resolveStateVariableTarget(node, context);
+            if (!target.valid()) {
+                return leaf(node, context, false, "state_variable_target_missing", target.failureReason(), label(node, "文本状态包含"));
+            }
+            Optional<StateVariableRecord> optionalRecord = findStateVariable(node, context, target, StateVariableType.STRING, "文本状态包含");
+            if (optionalRecord.isEmpty()) {
+                return missingOrTypeMismatch(node, context, target, StateVariableType.STRING, "文本状态包含");
+            }
+            boolean ignoreCase = configBoolean(node, "ignoreCase", false);
+            String expected = config(node, "value");
+            String actual = optionalRecord.get().value();
+            boolean matched = ignoreCase
+                    ? actual.toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT))
+                    : actual.contains(expected);
+            return leaf(
+                    node,
+                    context,
+                    matched,
+                    matched ? "state_variable_string_contains" : "state_variable_string_contains_failed",
+                    matched
+                            ? "文本状态包含：" + target.displayPath() + " 包含 " + expected + "。"
+                            : "文本状态不包含：" + target.displayPath() + "，期望包含 " + expected + "，实际 " + actual + "。",
+                    label(node, "文本状态包含")
+            );
+        }
+    }
+
+    private static ConditionTypeMetadata stateVariableMetadata(String type, String displayName, String description, ConditionFieldSchema... extraFields) {
+        java.util.ArrayList<ConditionFieldSchema> fields = new java.util.ArrayList<>();
+        fields.add(field("scope", "作用域", "enum:GLOBAL,PLAYER", true, "GLOBAL=全局，PLAYER=玩家"));
+        fields.add(field("key", "变量键", "string", true, "例如 game.active、player.certified、mission.phase"));
+        fields.add(field("targetMode", "目标模式", "enum:global,context_player,explicit_target", true, "global=全局，context_player=触发玩家，explicit_target=显式目标"));
+        fields.add(field("targetId", "显式目标 ID", "string", false, "targetMode=explicit_target 时必填"));
+        fields.addAll(Arrays.asList(extraFields));
+        return metadata(type, displayName, description, CATEGORY_STATE, fields.toArray(new ConditionFieldSchema[0]));
+    }
+
+    private static ConditionValidationResult validateStateVariableBase(ConditionNode node) {
+        ConditionValidationResult result = requireNonBlank(node, "scope", "作用域")
+                .merge(requireNonBlank(node, "key", "变量键"))
+                .merge(requireNonBlank(node, "targetMode", "目标模式"));
+        StateVariableScope scope = StateVariableScope.parse(config(node, "scope")).orElse(null);
+        StateVariableTargetMode targetMode = StateVariableTargetMode.parse(config(node, "targetMode")).orElse(null);
+        if (!config(node, "scope").isBlank() && scope == null) {
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_scope", "状态变量作用域必须是 GLOBAL 或 PLAYER"));
+        }
+        if (!config(node, "targetMode").isBlank() && targetMode == null) {
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_target_mode", "目标模式必须是 global、context_player 或 explicit_target"));
+        }
+        if (scope == StateVariableScope.GLOBAL && targetMode != null && targetMode != StateVariableTargetMode.GLOBAL) {
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_target_mode", "GLOBAL 作用域必须使用 global 目标模式"));
+        }
+        if (scope == StateVariableScope.PLAYER && targetMode == StateVariableTargetMode.GLOBAL) {
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_invalid_target_mode", "PLAYER 作用域不能使用 global 目标模式"));
+        }
+        for (StateVariableValidation.Issue issue : StateVariableValidation.validateKeyOnly(
+                scope == null ? StateVariableScope.GLOBAL : scope,
+                targetMode == StateVariableTargetMode.EXPLICIT_TARGET ? config(node, "targetId") : (scope == StateVariableScope.GLOBAL ? "global" : "placeholder"),
+                config(node, "key")
+        )) {
+            if ("missing_player_target".equals(issue.code()) && targetMode == StateVariableTargetMode.CONTEXT_PLAYER) {
+                continue;
+            }
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_" + issue.code(), issue.message()));
+        }
+        if (targetMode == StateVariableTargetMode.EXPLICIT_TARGET && config(node, "targetId").isBlank()) {
+            result = result.merge(ConditionValidationResult.error(node == null ? "" : node.id(), "", "condition_config_missing_target_id", "显式目标模式必须填写目标 ID"));
+        }
+        return result;
+    }
+
+    private static ResolvedStateVariableTarget resolveStateVariableTarget(ConditionNode node, ConditionEvaluationContext context) {
+        StateVariableScope scope = StateVariableScope.parse(config(node, "scope")).orElse(StateVariableScope.GLOBAL);
+        StateVariableTargetMode targetMode = StateVariableTargetMode.parse(config(node, "targetMode")).orElse(StateVariableTargetMode.GLOBAL);
+        String key = StateVariableValidation.normalizeKey(config(node, "key"));
+        if (scope == StateVariableScope.GLOBAL) {
+            return ResolvedStateVariableTarget.valid(scope, StateVariableValidation.GLOBAL_TARGET, key);
+        }
+        if (targetMode == StateVariableTargetMode.EXPLICIT_TARGET) {
+            return ResolvedStateVariableTarget.valid(scope, StateVariableValidation.normalizeTargetId(scope, config(node, "targetId")), key);
+        }
+        if (context == null || !context.hasPlayerIdentity()) {
+            return ResolvedStateVariableTarget.invalid(scope, "", key, "上下文缺少触发玩家，无法读取玩家状态变量：" + key + "。");
+        }
+        String targetId = !context.playerId().isBlank() ? context.playerId() : context.playerName();
+        return ResolvedStateVariableTarget.valid(scope, targetId, key);
+    }
+
+    private static Optional<StateVariableRecord> findStateVariable(
+            ConditionNode node,
+            ConditionEvaluationContext context,
+            ResolvedStateVariableTarget target,
+            StateVariableType expectedType,
+            String displayName
+    ) {
+        if (context == null) {
+            return Optional.empty();
+        }
+        Optional<StateVariableRecord> record = context.stateVariables().get(target.scope(), target.targetId(), target.key());
+        if (record.isEmpty() || record.get().type() != expectedType) {
+            return Optional.empty();
+        }
+        return record;
+    }
+
+    private static ConditionEvaluationResult missingOrTypeMismatch(
+            ConditionNode node,
+            ConditionEvaluationContext context,
+            ResolvedStateVariableTarget target,
+            StateVariableType expectedType,
+            String displayName
+    ) {
+        if (context == null) {
+            return leaf(node, context, false, "state_variable_context_missing", "上下文不存在，无法读取状态变量：" + target.displayPath() + "。", label(node, displayName));
+        }
+        Optional<StateVariableRecord> record = context.stateVariables().get(target.scope(), target.targetId(), target.key());
+        if (record.isEmpty()) {
+            return leaf(node, context, false, "state_variable_missing", "状态变量不存在：" + target.displayPath() + "。", label(node, displayName));
+        }
+        return leaf(
+                node,
+                context,
+                false,
+                "state_variable_type_mismatch",
+                "状态变量类型不匹配：" + target.displayPath() + " 期望 " + expectedType.displayName() + "，实际 " + record.get().type().displayName() + "。",
+                label(node, displayName)
+        );
+    }
+
+    private record ResolvedStateVariableTarget(
+            boolean valid,
+            StateVariableScope scope,
+            String targetId,
+            String key,
+            String failureReason
+    ) {
+        static ResolvedStateVariableTarget valid(StateVariableScope scope, String targetId, String key) {
+            return new ResolvedStateVariableTarget(true, scope, targetId, key, "");
+        }
+
+        static ResolvedStateVariableTarget invalid(StateVariableScope scope, String targetId, String key, String failureReason) {
+            return new ResolvedStateVariableTarget(false, scope, targetId, key, failureReason);
+        }
+
+        String displayPath() {
+            return new StateVariableKey(scope, targetId, key).displayPath();
         }
     }
 }

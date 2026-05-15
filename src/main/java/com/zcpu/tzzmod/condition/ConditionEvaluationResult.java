@@ -201,6 +201,11 @@ public record ConditionEvaluationResult(
             case ConditionNodeType.GAME_TIME_COMPARE -> "游戏时间比较";
             case ConditionNodeType.EVENT_METADATA_EXISTS -> "事件元数据存在";
             case ConditionNodeType.EVENT_METADATA_EQUALS -> "事件元数据匹配";
+            case ConditionNodeType.STATE_VARIABLE_EXISTS -> "状态变量存在";
+            case ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS -> "布尔状态匹配";
+            case ConditionNodeType.STATE_VARIABLE_INT_COMPARE -> "整数状态比较";
+            case ConditionNodeType.STATE_VARIABLE_STRING_EQUALS -> "文本状态匹配";
+            case ConditionNodeType.STATE_VARIABLE_STRING_CONTAINS -> "文本状态包含";
             default -> node.id().isBlank() ? node.type() : node.id();
         };
     }

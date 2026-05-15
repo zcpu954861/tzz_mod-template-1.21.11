@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
+import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
@@ -136,8 +137,10 @@ public final class StabilizationGuardTest {
         testWebAdminLogicChainViewer715();
         ConditionEngineCoreTest.run();
         ConditionBasicPlayerContextTest.run();
+        ConditionStateVariableTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
+        testConditionStateVariables82();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -5790,8 +5793,8 @@ public final class StabilizationGuardTest {
                 "8.1 ConditionEngine conditions must not integrate VBD/listener/region/action runtime stores");
         String lowerRegistry = registry.toLowerCase(java.util.Locale.ROOT);
         requireFalse(lowerRegistry.contains("item_") || lowerRegistry.contains("inventory_") || lowerRegistry.contains("container_")
-                        || lowerRegistry.contains("state_variable"),
-                "8.1 must not add item/inventory/container conditions or state variable system");
+                        || lowerRegistry.contains("itemstack"),
+                "8.1/8.2 must not add item/inventory/container conditions");
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
         requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
                         || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
@@ -5803,6 +5806,209 @@ public final class StabilizationGuardTest {
         requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
                 "8.1 docs must not claim concrete tasks or high-level game systems are implemented");
+    }
+
+    private static void testConditionStateVariables82() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_STATE_VARIABLES_8_2_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_2.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
+        String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
+        String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
+        String statePackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state"), null);
+        String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionStateVariableTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_STATE_VARIABLES_8_2_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_2.md",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableScope.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableType.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableRecord.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableStore.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableService.java",
+                "src/test/java/com/zcpu/tzzmod/condition/ConditionStateVariableTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.2 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.2 State Variable System",
+                "状态变量系统",
+                "scoreboard",
+                "player tag",
+                "fake player",
+                "Condition 只读取状态变量",
+                "StateVariableService",
+                "world-scoped",
+                "tzz/webadmin/state_variables.json",
+                "GLOBAL",
+                "PLAYER",
+                "BOOLEAN",
+                "INTEGER",
+                "STRING",
+                "state_variable_exists",
+                "state_variable_bool_equals",
+                "state_variable_int_compare",
+                "state_variable_string_equals",
+                "state_variable_string_contains",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做具体逃走中任务",
+                "不做任何游戏关卡",
+                "不接入 runtime",
+                "不做 WebAdmin condition editor",
+                "不提供状态变量 WebAdmin 页面/API",
+                "不做物品 / 背包 / 容器条件",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(context, marker, "8.2 context marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "State Variable System",
+                "GLOBAL",
+                "PLAYER",
+                "BOOLEAN",
+                "INTEGER",
+                "STRING",
+                "world-scoped store",
+                "state_variable_exists",
+                "state_variable_bool_equals",
+                "state_variable_int_compare",
+                "state_variable_string_equals",
+                "state_variable_string_contains",
+                "中文失败原因",
+                "missing player safe failure",
+                "wrong type safe failure",
+                "无 runtime integration",
+                "无 WebAdmin condition editor",
+                "无 State Variable WebAdmin 页面/API",
+                "无 GameController / MissionSystem",
+                "无具体任务 / 关卡",
+                "无 MCP scenario requirement",
+                "无截图要求",
+                "无 Minecraft 启动要求"
+        )) {
+            requireContains(matrix, marker, "8.2 capability matrix marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "8.2 State Variable System",
+                "GLOBAL / PLAYER",
+                "BOOLEAN / INTEGER / STRING",
+                "仍不接入 runtime",
+                "不做具体任务/关卡",
+                "不提供 WebAdmin condition editor",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(readme, marker, "README 8.2 marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "STATE_VARIABLE_EXISTS",
+                "STATE_VARIABLE_BOOL_EQUALS",
+                "STATE_VARIABLE_INT_COMPARE",
+                "STATE_VARIABLE_STRING_EQUALS",
+                "STATE_VARIABLE_STRING_CONTAINS"
+        )) {
+            requireContains(nodeTypes, marker, "8.2 node type marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "状态变量条件",
+                "状态变量存在",
+                "布尔状态匹配",
+                "整数状态比较",
+                "文本状态匹配",
+                "文本状态包含",
+                "作用域",
+                "目标模式",
+                "显式目标 ID",
+                "状态变量不存在",
+                "状态变量类型不匹配",
+                "上下文缺少触发玩家",
+                "context.stateVariables()",
+                "StateVariableCompareOperator"
+        )) {
+            requireContains(registry, marker, "8.2 registry marker present: " + marker);
+        }
+
+        requireContains(contextModel, "StateVariableSnapshot", "8.2 EvaluationContext carries state variable snapshot");
+        requireContains(contextModel, "stateVariables", "8.2 EvaluationContext exposes stateVariables");
+
+        for (String marker : List.of(
+                "StateVariableScope",
+                "GLOBAL",
+                "PLAYER",
+                "StateVariableType",
+                "BOOLEAN",
+                "INTEGER",
+                "STRING",
+                "StateVariableStore",
+                "FILE_NAME = \"state_variables.json\"",
+                "WebAdminStoragePaths.resolve(server).directory()",
+                "StateVariableService",
+                "expectedFingerprint",
+                "StateVariableValidation",
+                "状态变量键不能为空",
+                "状态变量值过长"
+        )) {
+            requireContains(statePackage, marker, "8.2 state package marker present: " + marker);
+        }
+
+        for (String marker : List.of(
+                "testCompleteScopeTypeLifecycleMatrix",
+                "testStoreAndService",
+                "testStoreCorruptionFallback",
+                "testExistsAndBooleanConditions",
+                "testIntegerCompareConditions",
+                "testStringConditions",
+                "testConditionFailureCoverageMatrix",
+                "testMissingAndTypeMismatchSafeFailures",
+                "testInvalidConfigValidation",
+                "testGroupIntegrationAndNoSideEffects",
+                "StateVariableScope.GLOBAL",
+                "StateVariableScope.PLAYER",
+                "stale delete fingerprint rejected",
+                "corrupt persisted record falls back",
+                "player int context target",
+                "exists missing player",
+                "string contains missing player",
+                "disabled state condition is skipped",
+                "condition evaluation does not change state variable fingerprint",
+                "state exists true",
+                "bool equals true",
+                "int eq",
+                "string contains true",
+                "condition evaluation has no side effects"
+        )) {
+            requireContains(tests, marker, "8.2 state variable test marker present: " + marker);
+        }
+
+        requireFalse(registry.contains("StateVariableService") || registry.contains("StateVariableStore"),
+                "8.2 condition evaluation must read only StateVariableSnapshot, not write through store/service");
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        requireFalse(runtimeMain.contains("StateVariableService") || runtimeMain.contains("StateVariableStore")
+                        || runtimeMain.contains("ConditionNodeType.STATE_VARIABLE"),
+                "8.2 must not wire state variables into existing runtime packages");
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("stateVariableEditor")
+                        || webadminMain.contains("/api/webadmin/state-variables") || webadminMain.contains("condition-groups/raw"),
+                "8.2 must not add WebAdmin condition editor, state variable UI/API, or raw JSON editor");
+        String lowerRegistry = registry.toLowerCase(java.util.Locale.ROOT);
+        requireFalse(lowerRegistry.contains("item_") || lowerRegistry.contains("inventory_") || lowerRegistry.contains("container_"),
+                "8.2 must not add item/inventory/container conditions");
+        requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.2 docs must not claim concrete tasks or high-level game systems are implemented");
     }
 
     private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {

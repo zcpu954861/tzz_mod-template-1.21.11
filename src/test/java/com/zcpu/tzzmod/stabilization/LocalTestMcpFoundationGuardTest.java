@@ -149,6 +149,14 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "does not run MCP scenarios", "README states 7.14 does not run MCP scenarios");
         requireContains(readme, "8.1 不启动 Minecraft", "README states 8.1 does not start Minecraft");
         requireContains(readme, "8.1 不提供 WebAdmin 条件可视化编辑器", "README states 8.1 has no condition editor");
+        requireContains(readme, "8.2 不提供 WebAdmin condition editor", "README states 8.2 has no condition editor");
+        requireContains(readme, "不提供状态变量 WebAdmin 页面/API", "README states 8.2 has no state variable WebAdmin page or API");
+        requireContains(readme, "8.2 仍不接入 runtime", "README states 8.2 has no runtime integration");
+        requireContains(readme, "8.2 不做具体任务/关卡", "README states 8.2 has no concrete tasks");
+        requireContains(readme, "8.2 不新增 MCP tool", "README states 8.2 has no new MCP tool");
+        requireContains(readme, "不跑 MCP scenario", "README states 8.2 does not run MCP scenarios");
+        requireContains(readme, "不生成截图", "README states 8.2 does not generate screenshots");
+        requireContains(readme, "不启动 Minecraft", "README states 8.2 does not start Minecraft");
         requireContains(readme, "MCP 不提供任意 shell", "README keeps no arbitrary shell boundary");
         requireContains(readme, "不提供 git mutation", "README keeps no git mutation boundary");
         requireContains(readme, "不提供 raw JSON / NBT path 编辑", "README keeps no raw JSON boundary");
@@ -186,18 +194,20 @@ public final class LocalTestMcpFoundationGuardTest {
                 "7.15 logic chain viewer must not add a new MCP tool");
         requireFalse(lowerTools.contains("condition_engine") || lowerTools.contains("condition-engine") || tools.contains("conditionEngine")
                         || lowerTools.contains("condition.") || lowerTools.contains("player_condition") || lowerTools.contains("webadmin.condition")
-                        || lowerTools.contains("minecraft.condition") || lowerTools.contains("game_controller")
+                        || lowerTools.contains("minecraft.condition") || lowerTools.contains("state_variable") || lowerTools.contains("state-variable")
+                        || tools.contains("stateVariable") || lowerTools.contains("game_controller")
                         || lowerTools.contains("mission_system") || lowerTools.contains("phase_controller"),
-                "8.1 ConditionEngine player/context conditions must not add MCP tools for conditions or high-level game systems");
+                "8.2 ConditionEngine state variables must not add MCP tools for conditions, state variables, or high-level game systems");
         String scenarios = read("tools/tzz-test-mcp/src/tools/scenario.ts");
         String lowerScenarios = scenarios.toLowerCase();
         requireFalse(lowerScenarios.contains("logic_chain") || lowerScenarios.contains("logic-chain") || scenarios.contains("logicChain") || scenarios.contains("logic-chains"),
                 "7.15 logic chain viewer must not add an MCP scenario");
         requireFalse(lowerScenarios.contains("condition_engine") || lowerScenarios.contains("condition-engine") || scenarios.contains("conditionEngine")
                         || lowerScenarios.contains("player_condition") || lowerScenarios.contains("webadmin.condition")
-                        || lowerScenarios.contains("minecraft.condition") || lowerScenarios.contains("game_controller")
+                        || lowerScenarios.contains("minecraft.condition") || lowerScenarios.contains("state_variable") || lowerScenarios.contains("state-variable")
+                        || scenarios.contains("stateVariable") || lowerScenarios.contains("game_controller")
                         || lowerScenarios.contains("mission_system") || lowerScenarios.contains("phase_controller"),
-                "8.1 ConditionEngine player/context conditions must not add MCP scenarios");
+                "8.2 ConditionEngine state variables must not add MCP scenarios");
 
         String server = read("tools/tzz-test-mcp/src/server.ts");
         requireContains(server, "tools/list", "MCP tools/list handler exists");
@@ -701,6 +711,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("pyautogui"), "MCP source does not expose pyautogui automation");
         requireFalse(source.contains("keyboard"), "MCP source does not expose OS keyboard automation");
         requireFalse(source.contains("ConditionEngine"), "MCP source does not enter ConditionEngine");
+        requireFalse(source.contains("StateVariable"), "MCP source does not enter State Variable System");
         requireFalse(source.contains("GameController"), "MCP source does not enter GameController");
         requireFalse(source.contains("MissionSystem"), "MCP source does not enter MissionSystem");
         requireFalse(source.contains("PhaseController"), "MCP source does not enter PhaseController");
