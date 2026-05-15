@@ -39,6 +39,17 @@ public final class ConditionNodeType {
     public static final String CONTAINER_SLOT_EMPTY = "container_slot_empty";
     public static final String CONTAINER_SLOT_ITEM_MATCHES = "container_slot_item_matches";
     public static final String CONTAINER_ITEM_COUNT_COMPARE = "container_item_count_compare";
+    public static final String REGION_EXISTS = "region_exists";
+    public static final String REGION_ENABLED = "region_enabled";
+    public static final String PLAYER_IN_REGION = "player_in_region";
+    public static final String REGION_PLAYER_COUNT_COMPARE = "region_player_count_compare";
+    public static final String SIGNAL_CHANNEL_EXISTS = "signal_channel_exists";
+    public static final String SIGNAL_CHANNEL_CONSUMER_COUNT_COMPARE = "signal_channel_consumer_count_compare";
+    public static final String SIGNAL_EVENT_COUNT_COMPARE = "signal_event_count_compare";
+    public static final String LOGIC_CHAIN_CONTAINS_NODE = "logic_chain_contains_node";
+    public static final String LOGIC_CHAIN_CONTAINS_CHANNEL = "logic_chain_contains_channel";
+    public static final String LOGIC_CHAIN_HAS_CYCLE = "logic_chain_has_cycle";
+    public static final String LOGIC_CHAIN_NODE_COUNT_COMPARE = "logic_chain_node_count_compare";
 
     private ConditionNodeType() {
     }

@@ -6,6 +6,7 @@ import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
+import com.zcpu.tzzmod.condition.ConditionRegionSignalLogicChainTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
@@ -140,10 +141,12 @@ public final class StabilizationGuardTest {
         ConditionBasicPlayerContextTest.run();
         ConditionStateVariableTest.run();
         ConditionItemInventoryContainerTest.run();
+        ConditionRegionSignalLogicChainTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
         testConditionItemInventoryContainer83();
+        testConditionRegionSignalLogicChain84();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -6158,6 +6161,164 @@ public final class StabilizationGuardTest {
         requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
                 "8.3 docs must not claim concrete tasks or high-level game systems are implemented");
+    }
+
+    private static void testConditionRegionSignalLogicChain84() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_REGION_SIGNAL_LOGIC_CHAIN_8_4_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_4.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
+        String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
+        String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
+        String regionLogicPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/regionlogic"), null);
+        String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
+        String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionRegionSignalLogicChainTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_REGION_SIGNAL_LOGIC_CHAIN_8_4_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_4.md",
+                "src/main/java/com/zcpu/tzzmod/condition/regionlogic/ConditionRegionSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/regionlogic/ConditionSignalChannelSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/regionlogic/ConditionSignalHistorySnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/regionlogic/ConditionLogicChainSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/regionlogic/ConditionRegionSignalLogicChainConditions.java",
+                "src/test/java/com/zcpu/tzzmod/condition/ConditionRegionSignalLogicChainTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.4 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.4 Region / Signal / Logic Chain Conditions",
+                "ConditionRegionSnapshot",
+                "ConditionSignalChannelSnapshot",
+                "ConditionSignalHistorySnapshot",
+                "ConditionLogicChainSnapshot",
+                "condition-safe snapshot",
+                "region_exists",
+                "region_enabled",
+                "player_in_region",
+                "region_player_count_compare",
+                "signal_channel_exists",
+                "signal_channel_consumer_count_compare",
+                "signal_event_count_compare",
+                "logic_chain_contains_node",
+                "logic_chain_contains_channel",
+                "logic_chain_has_cycle",
+                "logic_chain_node_count_compare",
+                "eq/ne/gt/gte/lt/lte",
+                "中文显示名",
+                "中文 validation error",
+                "中文 failureReason",
+                "不读取 live world",
+                "不读取 live RegionController",
+                "不读取 live SignalBridge",
+                "不读取 live SignalEventHistory",
+                "不调用 live Logic Chain Viewer service",
+                "不自动构建全局逻辑链",
+                "不接入 runtime",
+                "不做 WebAdmin condition editor",
+                "不做 WebAdmin API",
+                "不做 WebAdmin UI",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.4 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "REGION_EXISTS",
+                "REGION_ENABLED",
+                "PLAYER_IN_REGION",
+                "REGION_PLAYER_COUNT_COMPARE",
+                "SIGNAL_CHANNEL_EXISTS",
+                "SIGNAL_CHANNEL_CONSUMER_COUNT_COMPARE",
+                "SIGNAL_EVENT_COUNT_COMPARE",
+                "LOGIC_CHAIN_CONTAINS_NODE",
+                "LOGIC_CHAIN_CONTAINS_CHANNEL",
+                "LOGIC_CHAIN_HAS_CYCLE",
+                "LOGIC_CHAIN_NODE_COUNT_COMPARE"
+        )) {
+            requireContains(nodeTypes, marker, "8.4 node type marker: " + marker);
+        }
+        requireContains(registry, "ConditionRegionSignalLogicChainConditions.register", "8.4 registry registers region/signal/logic chain conditions");
+        requireContains(result, "区域快照存在", "8.4 result label region Chinese marker");
+        requireContains(result, "信号频道快照存在", "8.4 result label signal Chinese marker");
+        requireContains(result, "逻辑链包含节点", "8.4 result label logic chain Chinese marker");
+        requireContains(contextModel, "Map<String, ConditionRegionSnapshot> regionSnapshots", "8.4 context region snapshot map marker");
+        requireContains(contextModel, "Map<String, ConditionSignalChannelSnapshot> signalChannelSnapshots", "8.4 context signal channel snapshot map marker");
+        requireContains(contextModel, "Map<String, ConditionSignalHistorySnapshot> signalHistorySnapshots", "8.4 context signal history snapshot map marker");
+        requireContains(contextModel, "Map<String, ConditionLogicChainSnapshot> logicChainSnapshots", "8.4 context logic chain snapshot map marker");
+        requireContains(regionLogicPackage, "List.copyOf", "8.4 snapshot equivalent immutable copy marker");
+        requireContains(regionLogicPackage, "Map.copyOf", "8.4 snapshot immutable metadata marker");
+        requireContains(regionLogicPackage, "playerIdsInside", "8.4 region membership source marker");
+        requireContains(regionLogicPackage, "consumerCount", "8.4 signal consumer count source marker");
+        requireContains(regionLogicPackage, "ConditionSignalHistorySnapshot", "8.4 signal history snapshot marker");
+        requireContains(regionLogicPackage, "detectsCycle", "8.4 logic chain in-memory cycle marker");
+        requireContains(regionLogicPackage, "快照类型不匹配", "8.4 wrong snapshot type Chinese marker");
+        requireContains(regionLogicPackage, "比较方式必须是 eq/ne/gt/gte/lt/lte", "8.4 Chinese validation operator marker");
+
+        for (String marker : List.of(
+                "region snapshot exists",
+                "region enabled true",
+                "explicit playerId in region",
+                "context_player missing player",
+                "region player count eq",
+                "signal channel exists true",
+                "signal consumer count eq",
+                "signal event count eq",
+                "signal event optional channel filter",
+                "empty chain node count",
+                "logic chain node exists",
+                "logic chain downstream channel exists",
+                "logic chain hasCycle true",
+                "logic chain node count eq",
+                "group integration with region/signal/logic chain",
+                "evaluation does not modify region snapshot",
+                "evaluation does not modify signal snapshot",
+                "evaluation does not modify logic chain snapshot",
+                "Chinese display name"
+        )) {
+            requireContains(tests, marker, "8.4 test matrix marker: " + marker);
+        }
+
+        String forbiddenSource = regionLogicPackage + "\n" + contextModel;
+        for (String forbidden : List.of(
+                "RegionControllerStore",
+                "RegionControllerServer",
+                "SignalBridgeServer",
+                "SignalEventHistory",
+                "SignalListenerStore",
+                "SignalDeviceStore",
+                "WebAdminLogicChainService",
+                "WebAdminLogicChainMetadataStore",
+                "WebAdminDtos.LogicChain",
+                "MinecraftServer",
+                "ServerWorld",
+                "ServerPlayerEntity",
+                "ActionEngine.execute",
+                "SignalBridgeServer.emit",
+                "StateVariableService",
+                "StateVariableStore"
+        )) {
+            requireFalse(forbiddenSource.contains(forbidden), "8.4 regionlogic package must not use forbidden runtime/source: " + forbidden);
+        }
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        requireFalse(runtimeMain.contains("ConditionRegionSnapshot") || runtimeMain.contains("ConditionSignalChannelSnapshot")
+                        || runtimeMain.contains("ConditionSignalHistorySnapshot") || runtimeMain.contains("ConditionLogicChainSnapshot")
+                        || runtimeMain.contains("ConditionNodeType.REGION_EXISTS") || runtimeMain.contains("ConditionNodeType.SIGNAL_CHANNEL")
+                        || runtimeMain.contains("ConditionNodeType.LOGIC_CHAIN"),
+                "8.4 must not wire region/signal/logic chain conditions into existing runtime packages");
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
+                        || webadminMain.contains("regionConditionEditor") || webadminMain.contains("signalConditionEditor")
+                        || webadminMain.contains("logicChainConditionEditor") || webadminMain.contains("condition-groups/raw"),
+                "8.4 must not add WebAdmin condition editor/API/UI or raw JSON editor");
+        requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.4 docs must not claim concrete tasks or high-level game systems are implemented");
     }
 
     private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {

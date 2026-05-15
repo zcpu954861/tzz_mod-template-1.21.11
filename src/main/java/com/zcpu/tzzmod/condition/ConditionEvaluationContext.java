@@ -3,6 +3,10 @@ package com.zcpu.tzzmod.condition;
 import com.zcpu.tzzmod.condition.item.ConditionContainerSnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionInventorySnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionItemStackSnapshot;
+import com.zcpu.tzzmod.condition.regionlogic.ConditionLogicChainSnapshot;
+import com.zcpu.tzzmod.condition.regionlogic.ConditionRegionSnapshot;
+import com.zcpu.tzzmod.condition.regionlogic.ConditionSignalChannelSnapshot;
+import com.zcpu.tzzmod.condition.regionlogic.ConditionSignalHistorySnapshot;
 import com.zcpu.tzzmod.condition.state.StateVariableRecord;
 import com.zcpu.tzzmod.condition.state.StateVariableScope;
 import com.zcpu.tzzmod.condition.state.StateVariableSnapshot;
@@ -39,6 +43,10 @@ public record ConditionEvaluationContext(
         Map<String, ConditionItemStackSnapshot> itemSnapshots,
         Map<String, ConditionInventorySnapshot> inventorySnapshots,
         Map<String, ConditionContainerSnapshot> containerSnapshots,
+        Map<String, ConditionRegionSnapshot> regionSnapshots,
+        Map<String, ConditionSignalChannelSnapshot> signalChannelSnapshots,
+        Map<String, ConditionSignalHistorySnapshot> signalHistorySnapshots,
+        Map<String, ConditionLogicChainSnapshot> logicChainSnapshots,
         Map<String, String> eventMetadata,
         Map<String, String> variables
 ) {
@@ -65,6 +73,10 @@ public record ConditionEvaluationContext(
         itemSnapshots = copySnapshotMap(itemSnapshots);
         inventorySnapshots = copySnapshotMap(inventorySnapshots);
         containerSnapshots = copySnapshotMap(containerSnapshots);
+        regionSnapshots = copySnapshotMap(regionSnapshots);
+        signalChannelSnapshots = copySnapshotMap(signalChannelSnapshots);
+        signalHistorySnapshots = copySnapshotMap(signalHistorySnapshots);
+        logicChainSnapshots = copySnapshotMap(logicChainSnapshots);
         eventMetadata = copy(eventMetadata);
         variables = copy(variables);
     }
@@ -150,6 +162,18 @@ public record ConditionEvaluationContext(
         if (!containerSnapshots.isEmpty()) {
             put(summary, "containerSnapshots", Integer.toString(containerSnapshots.size()));
         }
+        if (!regionSnapshots.isEmpty()) {
+            put(summary, "regionSnapshots", Integer.toString(regionSnapshots.size()));
+        }
+        if (!signalChannelSnapshots.isEmpty()) {
+            put(summary, "signalChannelSnapshots", Integer.toString(signalChannelSnapshots.size()));
+        }
+        if (!signalHistorySnapshots.isEmpty()) {
+            put(summary, "signalHistorySnapshots", Integer.toString(signalHistorySnapshots.size()));
+        }
+        if (!logicChainSnapshots.isEmpty()) {
+            put(summary, "logicChainSnapshots", Integer.toString(logicChainSnapshots.size()));
+        }
         return Map.copyOf(summary);
     }
 
@@ -165,6 +189,22 @@ public record ConditionEvaluationContext(
         return Optional.ofNullable(containerSnapshots.get(safe(key)));
     }
 
+    public Optional<ConditionRegionSnapshot> regionSnapshot(String key) {
+        return Optional.ofNullable(regionSnapshots.get(safe(key)));
+    }
+
+    public Optional<ConditionSignalChannelSnapshot> signalChannelSnapshot(String key) {
+        return Optional.ofNullable(signalChannelSnapshots.get(safe(key)));
+    }
+
+    public Optional<ConditionSignalHistorySnapshot> signalHistorySnapshot(String key) {
+        return Optional.ofNullable(signalHistorySnapshots.get(safe(key)));
+    }
+
+    public Optional<ConditionLogicChainSnapshot> logicChainSnapshot(String key) {
+        return Optional.ofNullable(logicChainSnapshots.get(safe(key)));
+    }
+
     public String snapshotType(String key) {
         String safeKey = safe(key);
         if (itemSnapshots.containsKey(safeKey)) {
@@ -175,6 +215,18 @@ public record ConditionEvaluationContext(
         }
         if (containerSnapshots.containsKey(safeKey)) {
             return "容器快照";
+        }
+        if (regionSnapshots.containsKey(safeKey)) {
+            return "区域快照";
+        }
+        if (signalChannelSnapshots.containsKey(safeKey)) {
+            return "信号频道快照";
+        }
+        if (signalHistorySnapshots.containsKey(safeKey)) {
+            return "信号历史快照";
+        }
+        if (logicChainSnapshots.containsKey(safeKey)) {
+            return "逻辑链快照";
         }
         return "";
     }
@@ -286,6 +338,10 @@ public record ConditionEvaluationContext(
         private final Map<String, ConditionItemStackSnapshot> itemSnapshots = new LinkedHashMap<>();
         private final Map<String, ConditionInventorySnapshot> inventorySnapshots = new LinkedHashMap<>();
         private final Map<String, ConditionContainerSnapshot> containerSnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionRegionSnapshot> regionSnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionSignalChannelSnapshot> signalChannelSnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionSignalHistorySnapshot> signalHistorySnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionLogicChainSnapshot> logicChainSnapshots = new LinkedHashMap<>();
 
         public Builder player(String id, String name) {
             this.playerId = id;
@@ -444,6 +500,38 @@ public record ConditionEvaluationContext(
             return this;
         }
 
+        public Builder regionSnapshot(String key, ConditionRegionSnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.regionSnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
+        public Builder signalChannelSnapshot(String key, ConditionSignalChannelSnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.signalChannelSnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
+        public Builder signalHistorySnapshot(String key, ConditionSignalHistorySnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.signalHistorySnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
+        public Builder logicChainSnapshot(String key, ConditionLogicChainSnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.logicChainSnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
         public ConditionEvaluationContext build() {
             return new ConditionEvaluationContext(
                     playerId,
@@ -472,6 +560,10 @@ public record ConditionEvaluationContext(
                     itemSnapshots,
                     inventorySnapshots,
                     containerSnapshots,
+                    regionSnapshots,
+                    signalChannelSnapshots,
+                    signalHistorySnapshots,
+                    logicChainSnapshots,
                     eventMetadata,
                     variables
             );
