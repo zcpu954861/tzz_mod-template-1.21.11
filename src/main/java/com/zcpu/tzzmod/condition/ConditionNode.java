@@ -58,7 +58,7 @@ public record ConditionNode(
 
     private static String normalizeType(String value) {
         String type = safe(value).toLowerCase(Locale.ROOT);
-        return type.isBlank() ? ConditionNodeType.ALWAYS_TRUE : type;
+        return type;
     }
 
     private static String normalizeId(String value) {

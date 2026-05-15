@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "7.5-step3-pages-batch2";
+    private static final String ASSET_VERSION = "8.5-condition-editor-p0-3";
 
     private WebAdminFrontendShell() {
     }
@@ -13,11 +13,12 @@ public final class WebAdminFrontendShell {
                 <head>
                   <meta charset="utf-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <meta name="tzz-webadmin-asset-version" content="%s">
                   <title>游戏开发编辑平台 - 登录</title>
                   <link rel="icon" href="data:,">
                   <link rel="stylesheet" href="/assets/app.css?v=%s">
                 </head>
-                <body data-page="login">
+                <body data-page="login" data-asset-version="%s">
                   <main class="login-shell" data-ui="v75">
                     <section class="login-brand-v75" aria-label="TZZ Mod WebAdmin">
                       <span class="logo-mark" data-icon="logo" aria-hidden="true"></span>
@@ -51,7 +52,7 @@ public final class WebAdminFrontendShell {
                   <script src="/assets/app.js?v=%s"></script>
                 </body>
                 </html>
-                """.formatted(ASSET_VERSION, ASSET_VERSION);
+                """.formatted(ASSET_VERSION, ASSET_VERSION, ASSET_VERSION, ASSET_VERSION);
     }
 
     public static String appHtml() {
@@ -61,11 +62,12 @@ public final class WebAdminFrontendShell {
                 <head>
                   <meta charset="utf-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <meta name="tzz-webadmin-asset-version" content="%s">
                   <title>游戏开发编辑平台 - WebAdmin</title>
                   <link rel="icon" href="data:,">
                   <link rel="stylesheet" href="/assets/app.css?v=%s">
                 </head>
-                <body data-page="app">
+                <body data-page="app" data-asset-version="%s">
                   <main class="admin-shell" data-ui="v75">
                     <aside class="sidebar" data-ui="v75">
                       <div class="sidebar-brand" data-ui="v75"><span class="logo-mark" data-icon="logo" aria-hidden="true"></span><span><strong>游戏开发编辑平台</strong><small>TZZ Mod WebAdmin</small></span></div>
@@ -77,6 +79,7 @@ public final class WebAdminFrontendShell {
                           <div class="nav-section-title">事件与信号</div>
                           <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signalbridge-main"></span>SignalBridge</button>
                           <button class="nav-item" data-route="#/logic-chains"><span class="nav-icon" data-icon="action-binding"></span>逻辑链</button>
+                          <button class="nav-item" data-route="#/condition-groups"><span class="nav-icon" data-icon="doctor-overview"></span>条件组</button>
                           <button class="nav-item" data-route="#/listeners"><span class="nav-icon" data-icon="consumer-listener"></span>信号监听器</button>
                           <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
                           <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>
@@ -131,6 +134,6 @@ public final class WebAdminFrontendShell {
                   <script src="/assets/app.js?v=%s"></script>
                 </body>
                 </html>
-                """.formatted(ASSET_VERSION, ASSET_VERSION);
+                """.formatted(ASSET_VERSION, ASSET_VERSION, ASSET_VERSION, ASSET_VERSION);
     }
 }

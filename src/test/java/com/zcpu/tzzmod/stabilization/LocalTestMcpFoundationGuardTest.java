@@ -173,6 +173,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(readme, "8.4 不提供 WebAdmin condition editor", "README states 8.4 has no condition editor");
         requireContains(readme, "8.4 不提供 WebAdmin API", "README states 8.4 has no WebAdmin API");
         requireContains(readme, "8.4 不提供 WebAdmin UI", "README states 8.4 has no WebAdmin UI");
+        requireContains(readme, "8.5 WebAdmin Condition Editor", "README documents 8.5 WebAdmin condition editor");
+        requireContains(readme, "8.5 仍不接入 runtime", "README states 8.5 has no runtime integration");
+        requireContains(readme, "8.5 不新增 MCP tool", "README states 8.5 has no new MCP tool");
+        requireContains(readme, "8.5 不跑 MCP scenario", "README states 8.5 does not run MCP scenarios");
+        requireContains(readme, "8.5 不生成截图", "README states 8.5 does not generate screenshots");
+        requireContains(readme, "8.5 不启动 Minecraft", "README states 8.5 does not start Minecraft");
         requireContains(readme, "MCP 不提供任意 shell", "README keeps no arbitrary shell boundary");
         requireContains(readme, "不提供 git mutation", "README keeps no git mutation boundary");
         requireContains(readme, "不提供 raw JSON / NBT path 编辑", "README keeps no raw JSON boundary");
