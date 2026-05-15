@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.condition;
 
+import com.zcpu.tzzmod.condition.item.ConditionContainerSnapshot;
+import com.zcpu.tzzmod.condition.item.ConditionInventorySnapshot;
+import com.zcpu.tzzmod.condition.item.ConditionItemStackSnapshot;
 import com.zcpu.tzzmod.condition.state.StateVariableRecord;
 import com.zcpu.tzzmod.condition.state.StateVariableScope;
 import com.zcpu.tzzmod.condition.state.StateVariableSnapshot;
@@ -7,6 +10,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 public record ConditionEvaluationContext(
         String playerId,
@@ -32,6 +36,9 @@ public record ConditionEvaluationContext(
         long gameTime,
         int signalDepth,
         StateVariableSnapshot stateVariables,
+        Map<String, ConditionItemStackSnapshot> itemSnapshots,
+        Map<String, ConditionInventorySnapshot> inventorySnapshots,
+        Map<String, ConditionContainerSnapshot> containerSnapshots,
         Map<String, String> eventMetadata,
         Map<String, String> variables
 ) {
@@ -55,6 +62,9 @@ public record ConditionEvaluationContext(
         detail = safe(detail);
         signalDepth = Math.max(0, signalDepth);
         stateVariables = stateVariables == null ? StateVariableSnapshot.empty() : stateVariables;
+        itemSnapshots = copySnapshotMap(itemSnapshots);
+        inventorySnapshots = copySnapshotMap(inventorySnapshots);
+        containerSnapshots = copySnapshotMap(containerSnapshots);
         eventMetadata = copy(eventMetadata);
         variables = copy(variables);
     }
@@ -131,7 +141,42 @@ public record ConditionEvaluationContext(
         if (stateVariables.size() > 0) {
             put(summary, "stateVariables", stateVariables.summary());
         }
+        if (!itemSnapshots.isEmpty()) {
+            put(summary, "itemSnapshots", Integer.toString(itemSnapshots.size()));
+        }
+        if (!inventorySnapshots.isEmpty()) {
+            put(summary, "inventorySnapshots", Integer.toString(inventorySnapshots.size()));
+        }
+        if (!containerSnapshots.isEmpty()) {
+            put(summary, "containerSnapshots", Integer.toString(containerSnapshots.size()));
+        }
         return Map.copyOf(summary);
+    }
+
+    public Optional<ConditionItemStackSnapshot> itemSnapshot(String key) {
+        return Optional.ofNullable(itemSnapshots.get(safe(key)));
+    }
+
+    public Optional<ConditionInventorySnapshot> inventorySnapshot(String key) {
+        return Optional.ofNullable(inventorySnapshots.get(safe(key)));
+    }
+
+    public Optional<ConditionContainerSnapshot> containerSnapshot(String key) {
+        return Optional.ofNullable(containerSnapshots.get(safe(key)));
+    }
+
+    public String snapshotType(String key) {
+        String safeKey = safe(key);
+        if (itemSnapshots.containsKey(safeKey)) {
+            return "物品快照";
+        }
+        if (inventorySnapshots.containsKey(safeKey)) {
+            return "背包快照";
+        }
+        if (containerSnapshots.containsKey(safeKey)) {
+            return "容器快照";
+        }
+        return "";
     }
 
     public boolean hasPlayerIdentity() {
@@ -184,6 +229,19 @@ public record ConditionEvaluationContext(
         return Map.copyOf(copy);
     }
 
+    private static <T> Map<String, T> copySnapshotMap(Map<String, T> raw) {
+        Map<String, T> copy = new LinkedHashMap<>();
+        if (raw != null) {
+            raw.forEach((key, value) -> {
+                String safeKey = safe(key);
+                if (!safeKey.isBlank() && value != null) {
+                    copy.put(safeKey, value);
+                }
+            });
+        }
+        return Map.copyOf(copy);
+    }
+
     private static List<String> copyList(Collection<String> raw) {
         if (raw == null) {
             return List.of();
@@ -225,6 +283,9 @@ public record ConditionEvaluationContext(
         private long gameTime = 0L;
         private int signalDepth = 0;
         private StateVariableSnapshot stateVariables = StateVariableSnapshot.empty();
+        private final Map<String, ConditionItemStackSnapshot> itemSnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionInventorySnapshot> inventorySnapshots = new LinkedHashMap<>();
+        private final Map<String, ConditionContainerSnapshot> containerSnapshots = new LinkedHashMap<>();
 
         public Builder player(String id, String name) {
             this.playerId = id;
@@ -359,6 +420,30 @@ public record ConditionEvaluationContext(
             return this;
         }
 
+        public Builder itemSnapshot(String key, ConditionItemStackSnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.itemSnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
+        public Builder inventorySnapshot(String key, ConditionInventorySnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.inventorySnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
+        public Builder containerSnapshot(String key, ConditionContainerSnapshot snapshot) {
+            String safeKey = safe(key);
+            if (!safeKey.isBlank() && snapshot != null) {
+                this.containerSnapshots.put(safeKey, snapshot);
+            }
+            return this;
+        }
+
         public ConditionEvaluationContext build() {
             return new ConditionEvaluationContext(
                     playerId,
@@ -384,6 +469,9 @@ public record ConditionEvaluationContext(
                     gameTime,
                     signalDepth,
                     stateVariables,
+                    itemSnapshots,
+                    inventorySnapshots,
+                    containerSnapshots,
                     eventMetadata,
                     variables
             );

@@ -5,6 +5,7 @@ import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
+import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
@@ -138,9 +139,11 @@ public final class StabilizationGuardTest {
         ConditionEngineCoreTest.run();
         ConditionBasicPlayerContextTest.run();
         ConditionStateVariableTest.run();
+        ConditionItemInventoryContainerTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
+        testConditionItemInventoryContainer83();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -5791,10 +5794,7 @@ public final class StabilizationGuardTest {
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
                         || conditionCore.contains("RegionControllerStore") || conditionCore.contains("ActionRelayBlockEntity"),
                 "8.1 ConditionEngine conditions must not integrate VBD/listener/region/action runtime stores");
-        String lowerRegistry = registry.toLowerCase(java.util.Locale.ROOT);
-        requireFalse(lowerRegistry.contains("item_") || lowerRegistry.contains("inventory_") || lowerRegistry.contains("container_")
-                        || lowerRegistry.contains("itemstack"),
-                "8.1/8.2 must not add item/inventory/container conditions");
+        requireContains(context, "不做物品 / 背包 / 容器条件", "8.1 context keeps item/inventory/container deferred marker");
         String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
         requireFalse(runtimeMain.contains("import com.zcpu.tzzmod.condition") || runtimeMain.contains("new ConditionEvaluator")
                         || runtimeMain.contains("ConditionRegistry.defaultRegistry"),
@@ -6003,12 +6003,161 @@ public final class StabilizationGuardTest {
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("stateVariableEditor")
                         || webadminMain.contains("/api/webadmin/state-variables") || webadminMain.contains("condition-groups/raw"),
                 "8.2 must not add WebAdmin condition editor, state variable UI/API, or raw JSON editor");
-        String lowerRegistry = registry.toLowerCase(java.util.Locale.ROOT);
-        requireFalse(lowerRegistry.contains("item_") || lowerRegistry.contains("inventory_") || lowerRegistry.contains("container_"),
-                "8.2 must not add item/inventory/container conditions");
+        requireContains(context, "不做物品 / 背包 / 容器条件", "8.2 context keeps item/inventory/container deferred marker");
         requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
                 "8.2 docs must not claim concrete tasks or high-level game systems are implemented");
+    }
+
+    private static void testConditionItemInventoryContainer83() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_ITEM_INVENTORY_CONTAINER_8_3_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_3.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String nodeTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
+        String registry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionRegistry.java"), StandardCharsets.UTF_8);
+        String contextModel = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationContext.java"), StandardCharsets.UTF_8);
+        String itemPackage = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition/item"), null);
+        String result = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionEvaluationResult.java"), StandardCharsets.UTF_8);
+        String tests = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/ConditionItemInventoryContainerTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_ITEM_INVENTORY_CONTAINER_8_3_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_3.md",
+                "src/main/java/com/zcpu/tzzmod/condition/item/ConditionItemStackSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/item/ConditionInventorySnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/item/ConditionContainerSnapshot.java",
+                "src/main/java/com/zcpu/tzzmod/condition/item/ConditionItemMatcher.java",
+                "src/main/java/com/zcpu/tzzmod/condition/item/ConditionItemConditions.java",
+                "src/test/java/com/zcpu/tzzmod/condition/ConditionItemInventoryContainerTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.3 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.3 Item / Inventory / Container Conditions",
+                "ConditionItemStackSnapshot",
+                "ConditionInventorySnapshot",
+                "ConditionContainerSnapshot",
+                "ConditionItemMatcher",
+                "condition-safe",
+                "item_stack_exists",
+                "item_stack_matches",
+                "inventory_contains_item",
+                "inventory_item_count_compare",
+                "container_slot_empty",
+                "container_slot_item_matches",
+                "container_item_count_compare",
+                "minecraft:air",
+                "count <= 0",
+                "0-based",
+                "负数",
+                "越界",
+                "跨多个 slot 聚合",
+                "eq/ne/gt/gte/lt/lte",
+                "中文显示名",
+                "中文 validation error",
+                "中文 failureReason",
+                "不做任意 NBT path",
+                "不做 BlockEntity NBT path",
+                "不读取 live",
+                "不消耗物品",
+                "不移动物品",
+                "不写 store",
+                "不 emit signal",
+                "不执行 action",
+                "不接入 runtime",
+                "不做 WebAdmin condition editor",
+                "不做 WebAdmin API",
+                "不做 WebAdmin UI",
+                "不新增 MCP tool",
+                "不跑 MCP scenario",
+                "不生成截图",
+                "不启动 Minecraft"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.3 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "ITEM_STACK_EXISTS",
+                "ITEM_STACK_MATCHES",
+                "INVENTORY_CONTAINS_ITEM",
+                "INVENTORY_ITEM_COUNT_COMPARE",
+                "CONTAINER_SLOT_EMPTY",
+                "CONTAINER_SLOT_ITEM_MATCHES",
+                "CONTAINER_ITEM_COUNT_COMPARE"
+        )) {
+            requireContains(nodeTypes, marker, "8.3 node type marker: " + marker);
+        }
+        requireContains(registry, "ConditionItemConditions.register", "8.3 registry registers item/inventory/container conditions");
+        requireContains(result, "物品快照存在", "8.3 result label item Chinese marker");
+        requireContains(result, "背包包含物品", "8.3 result label inventory Chinese marker");
+        requireContains(result, "容器槽位为空", "8.3 result label container Chinese marker");
+        requireContains(contextModel, "Map<String, ConditionItemStackSnapshot> itemSnapshots", "8.3 context item snapshot map marker");
+        requireContains(contextModel, "Map<String, ConditionInventorySnapshot> inventorySnapshots", "8.3 context inventory snapshot map marker");
+        requireContains(contextModel, "Map<String, ConditionContainerSnapshot> containerSnapshots", "8.3 context container snapshot map marker");
+        requireContains(itemPackage, "List.copyOf", "8.3 snapshot equivalent immutable copy marker");
+        requireContains(itemPackage, "minecraft:air", "8.3 air empty semantics source marker");
+        requireContains(itemPackage, "count <= 0", "8.3 count empty semantics source marker");
+        requireContains(itemPackage, "matchingCount", "8.3 aggregate count source marker");
+        requireContains(itemPackage, "slot < 0 || slot >=", "8.3 invalid slot source marker");
+        requireContains(itemPackage, "物品匹配器为空", "8.3 Chinese validation/failure marker");
+        requireContains(itemPackage, "快照类型不匹配", "8.3 wrong snapshot type Chinese marker");
+
+        for (String marker : List.of(
+                "empty item snapshot",
+                "minecraft:air is empty",
+                "count <= 0 is empty",
+                "count eq",
+                "count ne",
+                "count gt",
+                "count gte",
+                "count lt",
+                "count lte",
+                "item exists true",
+                "item stack matches true",
+                "inventory contains aggregate true",
+                "inventory count eq",
+                "container slot empty true",
+                "container slot item matches",
+                "container count eq",
+                "group integration with item/inventory/container",
+                "evaluation does not modify item snapshot",
+                "evaluation does not modify inventory snapshot",
+                "evaluation does not modify container snapshot",
+                "Chinese display name"
+        )) {
+            requireContains(tests, marker, "8.3 test matrix marker: " + marker);
+        }
+
+        String forbiddenSource = itemPackage + "\n" + contextModel;
+        for (String forbidden : List.of(
+                "net.minecraft.item.ItemStack",
+                "net.minecraft.inventory.Inventory",
+                "net.minecraft.block.entity.BlockEntity",
+                "net.minecraft.server.world.ServerWorld",
+                "ItemSubmitEvaluator",
+                "ConsumePlanner",
+                "ContainerItemConditionSupport",
+                "SignalBridgeServer.emit",
+                "ActionEngine.execute",
+                "StateVariableService",
+                "StateVariableStore"
+        )) {
+            requireFalse(forbiddenSource.contains(forbidden), "8.3 condition item package must not use forbidden runtime/source: " + forbidden);
+        }
+        String runtimeMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"), root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        requireFalse(runtimeMain.contains("ConditionItemStackSnapshot") || runtimeMain.contains("ConditionInventorySnapshot")
+                        || runtimeMain.contains("ConditionContainerSnapshot") || runtimeMain.contains("ConditionNodeType.ITEM_STACK")
+                        || runtimeMain.contains("ConditionNodeType.INVENTORY_") || runtimeMain.contains("ConditionNodeType.CONTAINER_"),
+                "8.3 must not wire item/inventory/container conditions into existing runtime packages");
+        String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"), null);
+        requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("/api/webadmin/conditions")
+                        || webadminMain.contains("itemConditionEditor") || webadminMain.contains("condition-groups/raw"),
+                "8.3 must not add WebAdmin condition editor/API/UI or raw JSON editor");
+        requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
+                        || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
+                "8.3 docs must not claim concrete tasks or high-level game systems are implemented");
     }
 
     private static String readJavaDirectory(Path directory, Path excludedDirectory) throws IOException {
