@@ -2,6 +2,13 @@ package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityService;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
@@ -11,6 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.BlockState;
 import net.minecraft.inventory.Inventory;
@@ -27,6 +35,7 @@ public final class VirtualBlockDeviceContainerHandler {
     private static final Map<UUID, PendingOpen> PENDING_OPENS = new HashMap<>();
     private static final Map<UUID, OpenSession> OPEN_SESSIONS = new HashMap<>();
     private static final Map<String, Long> LAST_CHANGE_CHECKS = new HashMap<>();
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
     private static boolean registered;
 
     private VirtualBlockDeviceContainerHandler() {
@@ -185,6 +194,21 @@ public final class VirtualBlockDeviceContainerHandler {
             boolean changeCooldownReady = SignalDeviceStore.getRemainingContainerCooldownTicks(device, gameTime) <= 0L;
 
             ServerPlayerEntity player = playerForOpenSession(device.id());
+            Supplier<Inventory> inventorySupplier = containerInventorySupplier(world, pos);
+            ConditionGateResult gate = evaluateContainerGate(
+                    world,
+                    pos,
+                    device,
+                    null,
+                    inventorySupplier,
+                    ConditionRuntimeTargetType.CONTAINER_CHANGE,
+                    device.containerChangeChannel(),
+                    "container_change"
+            );
+            if (!gate.allowed()) {
+                SignalDeviceStore.recordVirtualContainerFingerprintState(world, device, fingerprint, "条件组阻断：" + gate.failureReason());
+                continue;
+            }
             boolean recordedFingerprint = false;
             if (hasChangeChannel && changeCooldownReady) {
                 ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
@@ -202,7 +226,7 @@ public final class VirtualBlockDeviceContainerHandler {
                 recordedFingerprint = true;
             }
 
-            Inventory inventory = ContainerItemConditionSupport.inventory(world, pos);
+            Inventory inventory = hasItemConditions ? inventorySupplier.get() : null;
             boolean itemConditionChanged = evaluateItemConditions(world, pos, device, inventory, player, gameTime);
             if (!recordedFingerprint) {
                 SignalDeviceStore.recordVirtualContainerFingerprintState(
@@ -311,6 +335,22 @@ public final class VirtualBlockDeviceContainerHandler {
         }
 
         String detail = "open".equals(eventType) ? "容器打开" : "容器关闭";
+        ConditionRuntimeTargetType targetType = "open".equals(eventType)
+                ? ConditionRuntimeTargetType.CONTAINER_OPEN
+                : ConditionRuntimeTargetType.CONTAINER_CLOSE;
+        ConditionGateResult gate = evaluateContainerGate(
+                world,
+                pos,
+                device,
+                player,
+                ContainerDeviceSupport.hasInventory(world, pos) ? containerInventorySupplier(world, pos) : null,
+                targetType,
+                channel,
+                detail
+        );
+        if (!gate.allowed()) {
+            return;
+        }
         ActionExecutionResult result = SignalBridgeServer.emit(new SignalEvent(
                 channel,
                 player,
@@ -323,6 +363,51 @@ public final class VirtualBlockDeviceContainerHandler {
                 detail
         ));
         SignalDeviceStore.recordVirtualContainerEvent(world, device, eventType, player, result, null);
+    }
+
+    private static ConditionGateResult evaluateContainerGate(
+            ServerWorld world,
+            BlockPos pos,
+            SignalDeviceData device,
+            ServerPlayerEntity player,
+            Supplier<Inventory> inventorySupplier,
+            ConditionRuntimeTargetType targetType,
+            String channel,
+            String detail
+    ) {
+        String conditionGroupId = ConditionRuntimeGateStore.conditionGroupId(world.getServer(), device.id(), targetType);
+        boolean hasContainerSnapshot = inventorySupplier != null;
+        return CONDITION_GATE_SERVICE.evaluate(
+                world.getServer(),
+                new ConditionGateRequest(
+                        conditionGroupId,
+                        targetType,
+                        device.id(),
+                        () -> ConditionRuntimeContextBuilder.container(
+                                world,
+                                pos,
+                                device,
+                                player,
+                                inventorySupplier == null ? null : inventorySupplier.get(),
+                                targetType,
+                                channel,
+                                detail
+                        ),
+                        new ConditionGroupCompatibilityService().profile(targetType, hasContainerSnapshot)
+                )
+        );
+    }
+
+    private static Supplier<Inventory> containerInventorySupplier(ServerWorld world, BlockPos pos) {
+        final boolean[] loaded = {false};
+        final Inventory[] cached = {null};
+        return () -> {
+            if (!loaded[0]) {
+                cached[0] = ContainerItemConditionSupport.inventory(world, pos);
+                loaded[0] = true;
+            }
+            return cached[0];
+        };
     }
 
     private record PendingOpen(

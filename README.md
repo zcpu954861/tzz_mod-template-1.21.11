@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.50.0-condition-region-signal-logic-chain`
-- 当前开发基线：`8.5 WebAdmin Condition Editor / WebAdmin 条件组编辑器 MVP`；本阶段只把 8.0-8.4 条件能力接入 WebAdmin 配置、校验和模拟评估，不挂载任何 runtime，发布后建议版本为 `v1.51.0-web-admin-condition-editor`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.51.0-web-admin-condition-editor`
+- 当前开发基线：`8.6 Runtime Integration I / VBD、itemSubmit、container 条件门禁`；本阶段只把 8.5 Condition Group 作为可选外层 gate 接入 virtual_block_device、interaction、itemSubmit、container open/close/change，不接入 SignalListener、ActionRelay、RegionController、Action、GameController 或 MissionSystem，发布后建议版本为 `v1.52.0-condition-runtime-vbd-item-container`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -46,10 +46,11 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.4](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_4.md)
 - [8.5 WebAdmin Condition Editor Current Context](docs/WEBADMIN_CONDITION_EDITOR_8_5_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.5](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md)
+- [8.6 Condition Runtime Gates Current Context](docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.5；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件，以及 WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP；仍不做具体逃走中任务，不接入现有运行时。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.6；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，并开始在 VBD / itemSubmit / container 上做可选外层 runtime gate；仍不做具体逃走中任务，不接入 SignalListener / ActionRelay / RegionController / Action gate。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -177,6 +178,29 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.5 不提供 raw JSON editor 作为主要入口，不做任意 NBT path 或通用脚本表达式。
 - 8.5 不新增 MCP tool。8.5 不跑 MCP scenario。8.5 不生成截图。8.5 不启动 Minecraft。
 
+## 8.6 Runtime Integration I
+
+8.6 在 8.5 条件组编辑器基础上，第一次把 Condition Group 接入低层运行时触发源。本阶段只做可选外层 gate：未配置 `conditionGroupId` 时不读取 `condition_groups.json`、不创建 `ConditionEvaluationContext`、不 evaluate，直接保持旧逻辑；配置后先由 `ConditionGateService` 判断，false 时阻断旧副作用，true 时进入原流程。
+
+8.6 已接入范围：
+
+- VBD redstone / BlockState gate。
+- VBD interaction gate。
+- VBD itemSubmit gate，位于 requirement 评估和 consume 前。
+- VBD container open / close / change gate；Inventory 容器的 open / close gate 可使用 container snapshot，非 Inventory 或无法解析目标时不显示且后端拒绝 container 条件；container change gate 覆盖直接 change channel 与 itemConditions emit 路径。
+- `ConditionRuntimeContextBuilder` 使用 condition-safe snapshot：`ConditionItemStackSnapshot`、`ConditionInventorySnapshot`、`ConditionContainerSnapshot`。
+- `ConditionGroupCompatibilityService` 根据 `VBD_REDSTONE`、`VBD_BLOCKSTATE`、`VBD_INTERACTION`、`ITEM_SUBMIT`、`CONTAINER_OPEN`、`CONTAINER_CLOSE`、`CONTAINER_CHANGE` profile 递归过滤 compatible groups；container open / close 会结合 `targetId` 对应绑定方块是否可提供 Inventory snapshot 动态过滤。
+- WebAdmin 只读 API：`GET /api/webadmin/condition-groups/available?targetType=<targetType>&targetId=<optional>`。
+- VBD 原生触发配置 modal 中的最小 condition group picker，文案明确“未配置条件组 = 不拦截，保持旧逻辑”。
+
+8.6 约束：
+
+- 后端保存时二次执行 compatibility 校验，不能只靠前端隐藏不兼容条件组。
+- condition false / missing group / invalid group / incompatible group / evaluation exception 均安全失败，并返回中文 failureReason。
+- itemSubmit 条件失败时不 consume；interaction 条件失败时不触发 success channel；container 条件失败时不 emit。
+- 不接入 SignalListener condition gate、ActionRelay condition gate、RegionController enter / exit / stay condition gate、Action 单条 action condition gate。
+- 不做 GameController / MissionSystem / PhaseController，不做具体任务 / 关卡，不提供 raw JSON editor、任意 NBT path 或通用脚本表达式。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -210,7 +234,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- 不提供 ConditionEngine runtime integration；8.5 WebAdmin Condition Editor 只负责条件组配置、校验和模拟评估，不把条件组挂载到运行时。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
+- ConditionEngine runtime integration 当前只开放 8.6 的 VBD / itemSubmit / container 可选外层 gate；SignalListener、ActionRelay、RegionController、Action gate 尚未接入。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
 
 ## 主要功能
 

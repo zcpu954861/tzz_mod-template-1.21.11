@@ -1028,6 +1028,21 @@ public final class WebAdminServer {
             WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
             return;
         }
+        if (path.equals(root + "/available")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, conditionGroupService.available(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    query.getOrDefault("targetType", ""),
+                    query.getOrDefault("targetId", "")
+            ));
+            return;
+        }
 
         String prefix = root + "/";
         String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";

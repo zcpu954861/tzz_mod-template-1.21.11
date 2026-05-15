@@ -2,6 +2,12 @@ package com.zcpu.tzzmod.signal.device;
 
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
@@ -46,6 +52,7 @@ import net.minecraft.util.math.Vec3d;
 public final class VirtualBlockDeviceInteractionHandler {
     private static final String MAIN_HAND_KEY = "main_hand";
     private static final String OFF_HAND_KEY = "off_hand";
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
     private static boolean registered;
 
     private VirtualBlockDeviceInteractionHandler() {
@@ -103,6 +110,21 @@ public final class VirtualBlockDeviceInteractionHandler {
             }
 
             if (device.interactChannel().isBlank() || !SignalChannel.isValid(device.interactChannel())) {
+                return NullSafety.requireNonNull(ActionResult.PASS);
+            }
+
+            ConditionGateResult gate = evaluateInteractionGate(
+                    serverWorld,
+                    serverPlayer,
+                    hand,
+                    hitResult.getSide().asString(),
+                    devicePos,
+                    device,
+                    ConditionRuntimeTargetType.VBD_INTERACTION,
+                    device.interactChannel(),
+                    "right_click"
+            );
+            if (!gate.allowed()) {
                 return NullSafety.requireNonNull(ActionResult.PASS);
             }
 
@@ -169,6 +191,22 @@ public final class VirtualBlockDeviceInteractionHandler {
         if (!itemSubmitMode && !hasItemMatcher) {
             return ActionResult.PASS;
         }
+        String successChannel = matcher.successChannel().isBlank() ? device.interactChannel() : matcher.successChannel();
+
+        ConditionGateResult interactionGate = evaluateInteractionGate(
+                world,
+                player,
+                hand,
+                sideName,
+                pos,
+                device,
+                ConditionRuntimeTargetType.VBD_INTERACTION,
+                successChannel,
+                itemSubmitMode ? "right_click_item_submit" : "right_click_item_matcher"
+        );
+        if (!interactionGate.allowed()) {
+            return ActionResult.PASS;
+        }
 
         InteractionItemMatch match = hasItemMatcher ? evaluateInteractionItemMatch(player, matcher) : InteractionItemMatch.itemSubmit();
         if (!itemSubmitMode && hasItemMatcher && !match.matched()) {
@@ -177,6 +215,20 @@ public final class VirtualBlockDeviceInteractionHandler {
 
         ConsumePlan consumePlan = new ConsumePlan();
         if (itemSubmitMode) {
+            ConditionGateResult itemSubmitGate = evaluateInteractionGate(
+                    world,
+                    player,
+                    hand,
+                    sideName,
+                    pos,
+                    device,
+                    ConditionRuntimeTargetType.ITEM_SUBMIT,
+                    successChannel,
+                    "item_submit"
+            );
+            if (!itemSubmitGate.allowed()) {
+                return ActionResult.PASS;
+            }
             ItemSubmitEvaluationResult submitEvaluation = evaluateItemSubmit(player, device, !inCooldown, consumePlan);
             if (!submitEvaluation.finalSuccess()) {
                 return fail(world, player, hand, sideName, device, matcher, inCooldown, "item_submit", -1, 0, submitEvaluation.failureReason());
@@ -211,7 +263,7 @@ public final class VirtualBlockDeviceInteractionHandler {
             return ActionResult.PASS;
         }
 
-        String channel = matcher.successChannel().isBlank() ? device.interactChannel() : matcher.successChannel();
+        String channel = successChannel;
         ActionExecutionResult result = null;
         if (!channel.isBlank() && SignalChannel.isValid(channel)) {
             result = SignalBridgeServer.emit(new SignalEvent(
@@ -260,6 +312,34 @@ public final class VirtualBlockDeviceInteractionHandler {
                 result
         );
         return ActionResult.PASS;
+    }
+
+    private static ConditionGateResult evaluateInteractionGate(
+            ServerWorld world,
+            ServerPlayerEntity player,
+            Hand hand,
+            String sideName,
+            BlockPos pos,
+            SignalDeviceData device,
+            ConditionRuntimeTargetType targetType,
+            String channel,
+            String detail
+    ) {
+        String conditionGroupId = ConditionRuntimeGateStore.conditionGroupId(world.getServer(), device.id(), targetType);
+        return CONDITION_GATE_SERVICE.evaluate(
+                world.getServer(),
+                new ConditionGateRequest(
+                        conditionGroupId,
+                        targetType,
+                        device.id(),
+                        () -> {
+                            if (targetType == ConditionRuntimeTargetType.ITEM_SUBMIT) {
+                                return ConditionRuntimeContextBuilder.itemSubmit(world, pos, device, player, hand, sideName, channel, detail);
+                            }
+                            return ConditionRuntimeContextBuilder.interaction(world, pos, device, player, hand, sideName, channel, detail);
+                        }
+                )
+        );
     }
 
     private static String stageInteractionConsumePlan(

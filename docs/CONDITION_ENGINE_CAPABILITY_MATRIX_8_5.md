@@ -62,7 +62,34 @@
 
 | 阶段 | 建议范围 |
 |---|---|
-| 8.6 | Condition Group runtime attach metadata 设计，先从只读挂载预览开始。 |
-| 8.7 | 小范围 runtime gate 接入，保持可回滚和诊断。 |
+| 8.6 | Runtime Integration I：VBD redstone / BlockState / interaction、itemSubmit、container open / close / change 的可选外层 condition gate。 |
+| 8.7 | SignalListener / ActionRelay / RegionController / Action gate 评估，继续保持可回滚和诊断。 |
 | 8.8 | 更完整 preview snapshot 表单、Doctor debug tree 与引用分析。 |
 | 8.9 | 条件模板、可视化调试器、复杂多人聚合条件准备。 |
+
+## 8.6 Runtime Gate Addendum
+
+8.6 不改变 8.5 Condition Group 配置模型，但新增 runtime gate 使用方式：
+
+| 能力 | 状态 | 说明 |
+|---|---|---|
+| Optional gate | 已实现 | `conditionGroupId` 为空时不读 store、不构造 context、不 evaluate，旧逻辑 100% 继续。 |
+| 外层 ConditionGateService | 已实现 | 配置条件组后只在旧触发入口外层判断；通过后进入旧流程，失败时不执行旧副作用。 |
+| Runtime context snapshot | 已实现 | VBD / interaction / itemSubmit / container 只向 ConditionEngine 提供 condition-safe snapshot。 |
+| Compatibility profile | 已实现 | `VBD_REDSTONE`、`VBD_BLOCKSTATE`、`VBD_INTERACTION`、`ITEM_SUBMIT`、`CONTAINER_OPEN`、`CONTAINER_CLOSE`、`CONTAINER_CHANGE`；container open / close 会按 target VBD 是否能提供 Inventory snapshot 动态暴露 `container` key。 |
+| Available list API | 已实现 | `GET /api/webadmin/condition-groups/available?targetType=<targetType>&targetId=<optional>` 只返回 compatible groups，并带 incompatible reason 诊断；目标缺失或非 Inventory 容器会中文说明不能使用容器槽位条件。 |
+| WebAdmin picker | 已实现 | VBD 原生触发配置中显示可用条件组；“未配置条件组 = 不拦截，保持旧逻辑”。 |
+| backend reject incompatible bind | 已实现 | 保存 VBD gate config 时后端再次校验 compatibility，手工构造不兼容请求会中文拒绝。 |
+| itemSubmit gate | 已实现 | gate 位于 requirement 评估和 consume 前；失败时不 consume。 |
+| container gate | 已实现 | open / close / change 失败时不 emit；change 覆盖 direct channel 与 itemConditions emit 路径。 |
+| interaction gate | 已实现 | 失败时不触发 success channel，不进入旧右键副作用。 |
+
+8.6 仍不接入：
+
+- SignalListener condition gate。
+- ActionRelay condition gate。
+- RegionController enter / exit / stay condition gate。
+- Action 单条 action condition gate。
+- GameController / MissionSystem / PhaseController。
+- 具体任务 / 关卡。
+- raw JSON editor、任意 NBT path、通用脚本表达式。
