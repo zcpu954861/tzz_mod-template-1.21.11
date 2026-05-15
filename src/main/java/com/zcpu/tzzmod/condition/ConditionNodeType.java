@@ -32,6 +32,13 @@ public final class ConditionNodeType {
     public static final String STATE_VARIABLE_INT_COMPARE = "state_variable_int_compare";
     public static final String STATE_VARIABLE_STRING_EQUALS = "state_variable_string_equals";
     public static final String STATE_VARIABLE_STRING_CONTAINS = "state_variable_string_contains";
+    public static final String ITEM_STACK_EXISTS = "item_stack_exists";
+    public static final String ITEM_STACK_MATCHES = "item_stack_matches";
+    public static final String INVENTORY_CONTAINS_ITEM = "inventory_contains_item";
+    public static final String INVENTORY_ITEM_COUNT_COMPARE = "inventory_item_count_compare";
+    public static final String CONTAINER_SLOT_EMPTY = "container_slot_empty";
+    public static final String CONTAINER_SLOT_ITEM_MATCHES = "container_slot_item_matches";
+    public static final String CONTAINER_ITEM_COUNT_COMPARE = "container_item_count_compare";
 
     private ConditionNodeType() {
     }

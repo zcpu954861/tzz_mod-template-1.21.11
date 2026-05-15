@@ -206,6 +206,13 @@ public record ConditionEvaluationResult(
             case ConditionNodeType.STATE_VARIABLE_INT_COMPARE -> "整数状态比较";
             case ConditionNodeType.STATE_VARIABLE_STRING_EQUALS -> "文本状态匹配";
             case ConditionNodeType.STATE_VARIABLE_STRING_CONTAINS -> "文本状态包含";
+            case ConditionNodeType.ITEM_STACK_EXISTS -> "物品快照存在";
+            case ConditionNodeType.ITEM_STACK_MATCHES -> "物品快照匹配";
+            case ConditionNodeType.INVENTORY_CONTAINS_ITEM -> "背包包含物品";
+            case ConditionNodeType.INVENTORY_ITEM_COUNT_COMPARE -> "背包物品数量比较";
+            case ConditionNodeType.CONTAINER_SLOT_EMPTY -> "容器槽位为空";
+            case ConditionNodeType.CONTAINER_SLOT_ITEM_MATCHES -> "容器槽位物品匹配";
+            case ConditionNodeType.CONTAINER_ITEM_COUNT_COMPARE -> "容器物品数量比较";
             default -> node.id().isBlank() ? node.type() : node.id();
         };
     }

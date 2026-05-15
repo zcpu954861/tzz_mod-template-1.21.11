@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.condition;
 
+import com.zcpu.tzzmod.condition.item.ConditionItemConditions;
 import com.zcpu.tzzmod.condition.state.StateVariableCompareOperator;
 import com.zcpu.tzzmod.condition.state.StateVariableKey;
 import com.zcpu.tzzmod.condition.state.StateVariableRecord;
@@ -135,6 +136,7 @@ public final class ConditionRegistry {
         registry.register(new StateVariableIntCompareHandler());
         registry.register(new StateVariableStringEqualsHandler());
         registry.register(new StateVariableStringContainsHandler());
+        ConditionItemConditions.register(registry);
         return registry;
     }
 

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.47.0-condition-basic-player-context`
-- 当前开发基线：`8.2 State Variable System / 状态变量系统`；本阶段只做状态变量底座，发布后建议版本为 `v1.48.0-condition-state-variables`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.48.0-condition-state-variables`
+- 当前开发基线：`8.3 Item / Inventory / Container Conditions / 物品、背包、容器条件包`；本阶段只做 snapshot、condition-safe matcher 和只读条件，发布后建议版本为 `v1.49.0-condition-item-inventory-container`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -40,10 +40,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.1](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_1.md)
 - [8.2 State Variable System Current Context](docs/CONDITION_STATE_VARIABLES_8_2_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.2](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_2.md)
+- [8.3 Item / Inventory / Container Conditions Current Context](docs/CONDITION_ITEM_INVENTORY_CONTAINER_8_3_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.3](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_3.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.2；当前提供无副作用判断核心、基础玩家 / 上下文条件和类型化状态变量底座，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.3；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座，以及物品 / 背包 / 容器 snapshot 条件，不做具体逃走中任务，不接入现有运行时，不做 WebAdmin 条件编辑器。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -100,6 +102,31 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 8.2 不做 item / inventory / container conditions，不做区域人数聚合，不做任务阶段条件，不做多人聚合条件。
 - 8.2 不新增 MCP tool，不跑 MCP scenario，不生成截图，不启动 Minecraft。
 
+## 8.3 Item / Inventory / Container Conditions
+
+8.3 在 8.0 Core、8.1 基础条件和 8.2 状态变量系统之上加入物品、背包、容器相关的只读条件能力。它使用 condition-safe snapshot，不直接读取 live `ItemStack`、玩家背包、方块实体或世界。
+
+8.3 已提供：
+
+- `ConditionItemStackSnapshot`、`ConditionInventorySnapshot`、`ConditionContainerSnapshot`。
+- `ConditionItemMatcher`，只支持 itemId equals 与 count compare。
+- `ConditionEvaluationContext` 中的 `itemSnapshots`、`inventorySnapshots`、`containerSnapshots`。
+- 物品条件：`item_stack_exists`、`item_stack_matches`。
+- 背包条件：`inventory_contains_item`、`inventory_item_count_compare`。
+- 容器条件：`container_slot_empty`、`container_slot_item_matches`、`container_item_count_compare`。
+- 空物品语义：空 itemId、`minecraft:air`、`count <= 0` 均视为空。
+- slot 使用 0-based；背包/容器数量统计跨多个 slot 聚合；count compare 支持 `eq/ne/gt/gte/lt/lte`。
+- 中文显示名、中文描述、中文字段名、中文 validation error 和中文失败原因。
+
+8.3 约束：
+
+- Condition 只读取 snapshot，不消耗物品、不移动物品、不修改 snapshot、不写 store、不 emit signal、不执行 action。
+- 8.3 仍不接入 runtime：VBD、interactionItem、itemSubmit、container、SignalListener、RegionController、ActionRelay 等运行路径不会自动调用这些条件。
+- 8.3 不提供 WebAdmin condition editor，不提供 WebAdmin API，不提供 WebAdmin UI，不提供 raw JSON / NBT path 编辑器。
+- 8.3 不做任意 NBT path、BlockEntity NBT path、通用脚本表达式或深层动态路径查询。
+- 8.3 不做具体任务/关卡，不做 GameController / MissionSystem / PhaseController。
+- 8.3 不新增 MCP tool。8.3 不跑 MCP scenario。8.3 不生成截图。8.3 不启动 Minecraft。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -125,7 +152,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - `reports/mcp`、`reports/mcp/screenshots`、responsive reports、scenario reports 都是本地测试输出，不提交。
 - MCP 不提供任意 shell、不提供 git mutation、不访问外部 host、不做 OS 鼠标键盘控制、不做 Minecraft GUI 坐标点击。
 - TestBridge 仅 loopback/local、需要 token、默认关闭。
-- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core, 8.1 Basic Player / Context Conditions, or 8.2 State Variable System requirements or new scope.
+- 7.14 stabilization does not generate screenshots and does not run MCP scenarios; MCP remains auxiliary and does not replace user acceptance. MCP screenshots/scenarios are not 8.0 ConditionEngine Core, 8.1 Basic Player / Context Conditions, 8.2 State Variable System, or 8.3 Item / Inventory / Container Conditions requirements or new scope.
 
 ## 安全边界
 
