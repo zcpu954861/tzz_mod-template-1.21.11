@@ -40,6 +40,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminInteractionItemMatcherService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateHistoryService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
@@ -95,6 +96,7 @@ public final class WebAdminServer {
     private final WebAdminInteractionItemMatcherService interactionItemMatcherService = new WebAdminInteractionItemMatcherService(permissionService, writeSecurityService, editLockService);
     private final WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permissionService, writeSecurityService, editLockService);
     private final WebAdminConditionCatalogService conditionCatalogService = new WebAdminConditionCatalogService();
+    private final WebAdminConditionGateHistoryService conditionGateHistoryService = new WebAdminConditionGateHistoryService();
     private final WebAdminConditionGroupService conditionGroupService = new WebAdminConditionGroupService(permissionService, writeSecurityService, editLockService);
     private final WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
@@ -289,6 +291,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/condition-types")) {
                 handleConditionTypes(exchange, auth, method);
+                return;
+            }
+            if (path.equals("/api/webadmin/condition-gates/history") || path.startsWith("/api/webadmin/condition-gates/history/")) {
+                runOnServerThread(() -> handleConditionGateHistory(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/condition-groups") || path.startsWith("/api/webadmin/condition-groups/")) {
@@ -998,6 +1004,52 @@ public final class WebAdminServer {
             return;
         }
         WebAdminJsonResponse.ok(exchange, conditionCatalogService.catalog());
+    }
+
+    private void handleConditionGateHistory(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/condition-gates/history";
+        if (path.equals(root)) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, conditionGateHistoryService.list(queryParams(exchange)));
+            return;
+        }
+
+        String tail = path.startsWith(root + "/") ? path.substring((root + "/").length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Condition gate history ID 不能为空。");
+            return;
+        }
+        String[] parts = tail.split("/");
+        String recordId = decodePathSegment(parts[0]);
+        if (recordId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Condition gate history ID 不能为空。");
+            return;
+        }
+        if (parts.length == 1) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, Object> detail = conditionGateHistoryService.detail(recordId);
+            if (detail == null) {
+                WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "条件 gate 历史记录不存在或已被淘汰。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, detail);
+            return;
+        }
+        if (parts.length == 2 && "replay".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, conditionGateHistoryService.replay(minecraftServer, recordId));
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Condition gate history 接口不存在。");
     }
 
     private void handleConditionGroups(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {

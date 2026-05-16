@@ -454,6 +454,11 @@ public final class WebAdminRegionControllerService {
                 "stay", ConditionRuntimeTargetType.REGION_STAY.id()
         ));
         data.put("conditionGateTargetId", controller.id());
+        data.put("recentConditionGates", Map.of(
+                "enter", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.REGION_ENTER, controller.id()),
+                "exit", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.REGION_EXIT, controller.id()),
+                "stay", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.REGION_STAY, controller.id())
+        ));
         data.put("enterActionCount", controller.enterActions().size());
         data.put("exitActionCount", controller.exitActions().size());
         data.put("stayActionCount", controller.stayActions().size());

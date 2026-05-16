@@ -808,26 +808,28 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     ) {
         ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig safeGates = gates == null ? ConditionRuntimeGateStore.VirtualBlockDeviceGateConfig.empty() : gates;
         Map<String, Object> triggers = new LinkedHashMap<>();
-        triggers.put("redstone_powered", withGate(redstone(device, runtime), ConditionRuntimeTargetType.VBD_REDSTONE, safeGates.redstoneConditionGroupId()));
-        triggers.put("blockstate", withGate(blockState(device, runtime), ConditionRuntimeTargetType.VBD_BLOCKSTATE, safeGates.blockStateConditionGroupId()));
-        triggers.put("right_click", withGate(rightClick(device), ConditionRuntimeTargetType.VBD_INTERACTION, safeGates.interactionConditionGroupId(), safeGates.itemSubmitConditionGroupId()));
-        triggers.put("container_open", withGate(containerOpen(device), ConditionRuntimeTargetType.CONTAINER_OPEN, safeGates.containerOpenConditionGroupId()));
-        triggers.put("container_close", withGate(containerClose(device), ConditionRuntimeTargetType.CONTAINER_CLOSE, safeGates.containerCloseConditionGroupId()));
-        triggers.put("container_change", withGate(containerChange(device), ConditionRuntimeTargetType.CONTAINER_CHANGE, safeGates.containerChangeConditionGroupId()));
+        triggers.put("redstone_powered", withGate(redstone(device, runtime), ConditionRuntimeTargetType.VBD_REDSTONE, device.id(), safeGates.redstoneConditionGroupId()));
+        triggers.put("blockstate", withGate(blockState(device, runtime), ConditionRuntimeTargetType.VBD_BLOCKSTATE, device.id(), safeGates.blockStateConditionGroupId()));
+        triggers.put("right_click", withGate(rightClick(device), ConditionRuntimeTargetType.VBD_INTERACTION, device.id(), safeGates.interactionConditionGroupId(), safeGates.itemSubmitConditionGroupId()));
+        triggers.put("container_open", withGate(containerOpen(device), ConditionRuntimeTargetType.CONTAINER_OPEN, device.id(), safeGates.containerOpenConditionGroupId()));
+        triggers.put("container_close", withGate(containerClose(device), ConditionRuntimeTargetType.CONTAINER_CLOSE, device.id(), safeGates.containerCloseConditionGroupId()));
+        triggers.put("container_change", withGate(containerChange(device), ConditionRuntimeTargetType.CONTAINER_CHANGE, device.id(), safeGates.containerChangeConditionGroupId()));
         return triggers;
     }
 
     private static Map<String, Object> withGate(
             Map<String, Object> data,
             ConditionRuntimeTargetType targetType,
+            String targetId,
             String conditionGroupId
     ) {
-        return withGate(data, targetType, conditionGroupId, "");
+        return withGate(data, targetType, targetId, conditionGroupId, "");
     }
 
     private static Map<String, Object> withGate(
             Map<String, Object> data,
             ConditionRuntimeTargetType targetType,
+            String targetId,
             String conditionGroupId,
             String itemSubmitConditionGroupId
     ) {
@@ -837,11 +839,14 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         target.put("conditionGroupId", groupId);
         target.put("conditionGateConfigured", !groupId.isBlank());
         target.put("conditionGateTargetType", targetType == null ? "" : targetType.id());
+        target.put("conditionGateTargetId", safe(targetId));
         target.put("conditionGateOptionalMessage", "未配置条件组 = 不拦截，保持旧逻辑");
         target.put("conditionGroupAvailableTargetType", targetType == null ? "" : targetType.id());
+        target.put("recentConditionGate", WebAdminConditionGateHistoryService.recentStatus(targetType, targetId));
         if (!itemSubmitGroupId.isBlank() || "right_click".equals(String.valueOf(target.get("type")))) {
             target.put("itemSubmitConditionGroupId", itemSubmitGroupId);
             target.put("itemSubmitConditionGateTargetType", ConditionRuntimeTargetType.ITEM_SUBMIT.id());
+            target.put("itemSubmitRecentConditionGate", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.ITEM_SUBMIT, targetId));
         }
         return target;
     }

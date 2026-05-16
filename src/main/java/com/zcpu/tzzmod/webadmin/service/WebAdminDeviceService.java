@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.webadmin.service;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.device.debug.DeviceDiagnostic;
 import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssue;
 import com.zcpu.tzzmod.signal.device.debug.DiagnosticSeverity;
@@ -238,6 +239,11 @@ public final class WebAdminDeviceService {
         summary.put("lastInteractionResult", device.lastInteractionResult());
         summary.put("lastInteractionItemResult", device.lastInteractionItemResult());
         summary.put("lastItemSubmitResult", device.lastItemSubmitResult());
+        if (SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(device.type())) {
+            summary.put("recentConditionGate", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.VBD_INTERACTION, device.id()));
+        } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
+            summary.put("recentConditionGate", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.ACTION_RELAY, device.id()));
+        }
         return summary;
     }
 

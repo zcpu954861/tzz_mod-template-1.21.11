@@ -1,7 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "8.6-runtime-gates";
+    private static final String ASSET_VERSION = "8.8-condition-debugger-detail-page";
+    private static final String LEGACY_RUNTIME_GATE_ASSET_MARKER = "8.6-runtime-gates";
 
     private WebAdminFrontendShell() {
     }
@@ -80,6 +81,7 @@ public final class WebAdminFrontendShell {
                           <button class="nav-item" data-route="#/signals"><span class="nav-icon" data-icon="signalbridge-main"></span>SignalBridge</button>
                           <button class="nav-item" data-route="#/logic-chains"><span class="nav-icon" data-icon="action-binding"></span>逻辑链</button>
                           <button class="nav-item" data-route="#/condition-groups"><span class="nav-icon" data-icon="doctor-overview"></span>条件组</button>
+                          <button class="nav-item" data-route="#/condition-debugger"><span class="nav-icon" data-icon="history"></span>条件调试</button>
                           <button class="nav-item" data-route="#/listeners"><span class="nav-icon" data-icon="consumer-listener"></span>信号监听器</button>
                           <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
                           <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>

@@ -9,6 +9,8 @@ import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
 import com.zcpu.tzzmod.condition.ConditionRegionSignalLogicChainTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateServiceTest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateHistoryServiceTest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateReplayServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityServiceTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
@@ -70,6 +72,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminActionRelayActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateConfigTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminConditionRuntimeDoctorServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -149,9 +152,12 @@ public final class StabilizationGuardTest {
         ConditionRegionSignalLogicChainTest.run();
         ConditionGroupCompatibilityServiceTest.run();
         ConditionGateServiceTest.run();
+        ConditionGateHistoryServiceTest.run();
+        ConditionGateReplayServiceTest.run();
         WebAdminConditionGateConfigTest.run();
         WebAdminConditionCatalogTest.run();
         WebAdminConditionGroupServiceTest.run();
+        WebAdminConditionRuntimeDoctorServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -160,6 +166,7 @@ public final class StabilizationGuardTest {
         testWebAdminConditionEditor85();
         testConditionRuntimeGates86();
         testConditionRuntimeReceiverGates87();
+        testConditionRuntimeDebugger88();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1183,6 +1190,7 @@ public final class StabilizationGuardTest {
                 const errors = [];
                 const requestedUrls = [];
                 const requestedRequests = [];
+                let failConditionDebuggerDetail = false;
                 function apiData(path, options={}) {
                   const url = String(path);
                   const method = String(options.method || 'GET').toUpperCase();
@@ -1198,6 +1206,10 @@ public final class StabilizationGuardTest {
                     { type:'signal_event_count_compare', displayName:'信号事件数量比较', description:'检查信号历史事件数。', category:'信号条件', suite:'region-signal-logic-chain', fields:[{ key:'signalHistoryKey', displayName:'信号历史快照键', kind:'string', required:true }, { key:'operator', displayName:'比较方式', kind:'enum:eq,ne,gt,gte,lt,lte', required:true }, { key:'count', displayName:'目标数量', kind:'integer', required:true }] },
                     { type:'logic_chain_has_cycle', displayName:'逻辑链存在循环', description:'检查逻辑链循环标记。', category:'逻辑链条件', suite:'region-signal-logic-chain', fields:[{ key:'logicChainKey', displayName:'逻辑链快照键', kind:'string', required:true }, { key:'expected', displayName:'期望循环状态', kind:'boolean', required:false }] }
                   ] };
+                  if (url === '/api/webadmin/condition-gates/history/smoke-record/replay') return { success:true, recordId:'smoke-record', readOnly:true, noSideEffects:true, noLiveWorldRead:true, originalResult:'BLOCKED', replayResult:'BLOCKED', resultConsistent:true, failureReason:'always_false 阻断', warnings:[], debugTree:{ matched:false, label:'Root 条件组', type:'group', nodeId:'root', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[{ matched:false, label:'永远不通过', type:'always_false', nodeId:'false-node', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[] }] } };
+                  if (url === '/api/webadmin/condition-gates/history/smoke-record') { if (failConditionDebuggerDetail) throw new Error('transient condition debugger detail failure'); return { id:'smoke-record', occurredAt:'2026-05-09T10:00:00Z', targetType:'SIGNAL_LISTENER', targetId:'test-listener', channel:'test.channel', conditionGroupId:'smoke.roundtrip', conditionGroupDisplayName:'Smoke 条件组', result:'BLOCKED', allowed:false, code:'CONDITION_FALSE', failureReason:'always_false 阻断', debugSummary:'Root 条件组未通过', evaluatedCount:2, durationNanos:123000, conditionFingerprint:'condition-fp', definitionFingerprint:'definition-fp', replayable:true, replayReadOnly:true, noActionExecution:true, noSignalEmit:true, noRawJsonEditor:true, contextSummary:{ player:'Owner', sourceType:'SIGNAL_LISTENER', channel:'test.channel', world:'minecraft:overworld', listenerId:'test-listener', itemSnapshotCount:0, inventorySnapshotCount:1, containerSnapshotCount:0, stateVariableCount:2 }, debugTree:{ matched:false, label:'Root 条件组', type:'group', nodeId:'root', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[{ matched:false, label:'永远不通过', type:'always_false', nodeId:'false-node', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[] }] } }; }
+                  if (url === '/api/webadmin/condition-gates/history/missing-record') return null;
+                  if (url.startsWith('/api/webadmin/condition-gates/history')) return { maxRecords:200, records:[{ id:'smoke-record', occurredAt:'2026-05-09T10:00:00Z', targetType:'SIGNAL_LISTENER', targetId:'test-listener', channel:'test.channel', conditionGroupId:'smoke.roundtrip', conditionGroupDisplayName:'Smoke 条件组', result:'BLOCKED', failureReason:'always_false 阻断', debugSummary:'Root 条件组未通过', evaluatedCount:2, durationNanos:123000, replayable:true, debuggerRoute:'#/condition-debugger/smoke-record' }] };
                   if (url === '/api/webadmin/condition-groups' && method === 'POST') return { success:true, message:'条件组已保存。', data:{ group:{ id:'smoke.request' }, routeTarget:'#/condition-groups/smoke.request' } };
                   if (url === '/api/webadmin/condition-groups') return { count:1, groups:[{ id:'smoke.roundtrip', displayName:'Smoke 条件组', note:'', iconKey:'doctor-overview', enabled:true, nodeCount:2, fingerprint:'condition-fp', updatedAt:'2026-05-09T10:00:00Z' }] };
                   if (url === '/api/webadmin/condition-groups/smoke.roundtrip') return { id:'smoke.roundtrip', displayName:'Smoke 条件组', note:'', iconKey:'doctor-overview', enabled:true, fingerprint:'condition-fp', expectedFingerprint:'condition-fp', lockStatus:{ locked:false }, groupDefinition:{ id:'smoke.roundtrip', version:1, displayName:'Smoke 条件组', note:'', tags:[], root:{ id:'root', type:'group', name:'', note:'', enabled:true, groupMode:'AND', config:{ values:{} }, children:[{ id:'context', type:'context_equals', name:'', note:'', enabled:true, groupMode:'AND', config:{ values:{ field:'channel', expected:'mission.start' } }, children:[] }] } }, validation:{ valid:true, issues:[] } };
@@ -1306,6 +1318,36 @@ public final class StabilizationGuardTest {
                     renderDoctorList('');
                     const filteredPage = appState.uiPages.doctor;
                     return { page1, page2, pageAfterNext, filtersAfterPage, filteredPage };
+                  };
+                  globalThis.__smokeConditionDebuggerDetail = async function(){
+                    appState.me = { username:'Owner', role:'OWNER' };
+                    appState.conditionDebuggerFilters = { search:'test-listener', targetType:'SIGNAL_LISTENER', result:'BLOCKED', conditionGroupId:'smoke.roundtrip', channel:'test.channel' };
+                    appState.uiPages = appState.uiPages || {};
+                    appState.uiPages.conditionDebugger = 1;
+                    location.hash = '#/condition-debugger';
+                    await route();
+                    const listHtml = String(document.getElementById('view').innerHTML || '');
+                    navigateTo('#/condition-debugger/smoke-record');
+                    const detailHash = String(location.hash || '');
+                    await route();
+                    const detailHtml = String(document.getElementById('view').innerHTML || '');
+                    await replayConditionGateHistory('smoke-record');
+                    const replayHtml = String(document.getElementById('view').innerHTML || '');
+                    const replayUrls = requestedRequests.filter(r => r.url.includes('/condition-gates/history')).map(r => r.method + ' ' + r.url);
+                    const replayBackKeepsReturnTo = replayHtml.includes('targetType=SIGNAL_LISTENER') && replayHtml.includes('result=BLOCKED') && replayHtml.includes('conditionGroupId=smoke.roundtrip');
+                    await route({silent:true});
+                    const refreshedHash = String(location.hash || '');
+                    const refreshedHtml = String(document.getElementById('view').innerHTML || '');
+                    failConditionDebuggerDetail = true;
+                    await route({silent:true});
+                    const transientHash = String(location.hash || '');
+                    const transientHtml = String(document.getElementById('view').innerHTML || '');
+                    failConditionDebuggerDetail = false;
+                    const returnTo = parseHashParams(location.hash).returnTo || '';
+                    goBackOrFallback(returnTo, '#/condition-debugger');
+                    await route();
+                    const backHtml = String(document.getElementById('view').innerHTML || '');
+                    return { listHtml, detailHash, detailHtml, replayHtml, replayUrls, replayBackKeepsReturnTo, refreshedHash, refreshedHtml, transientHash, transientHtml, backHtml, filters:JSON.stringify(appState.conditionDebuggerFilters) };
                   };
                   globalThis.__smokeToggleAdvanced = async function(kind,id){ await toggleAdvancedDetail(kind,id); return String(document.getElementById('view').innerHTML || ''); };
                   globalThis.__smokeModalSilent = async function(){
@@ -1553,6 +1595,10 @@ public final class StabilizationGuardTest {
                   '#/condition-groups/smoke.roundtrip',
                   '#/conditions',
                   '#/conditions/smoke.roundtrip',
+                  '#/condition-debugger',
+                  '#/condition-debugger/smoke-record',
+                  '#/condition-debugger?id=smoke-record',
+                  '#/condition-debugger/missing-record',
                   '#/doctor',
                   '#/diagnostics',
                   '#/signal-doctor',
@@ -1621,6 +1667,29 @@ public final class StabilizationGuardTest {
                       failures.push(`${route}: remained in loading-state`);
                     } else if (!html.trim()) {
                       failures.push(`${route}: rendered empty view`);
+                    }
+                    if (route === '#/condition-debugger') {
+                      if (!html.includes('data-condition-gate-list-route="true"') || !html.includes('data-condition-gate-history-table="true"') || !html.includes('data-condition-gate-row-click-navigates-detail="true"') || !html.includes('data-condition-gate-list-full-width="true"') || !html.includes('data-condition-gate-list-no-full-debug-rail="true"')) {
+                        failures.push(`${route}: condition debugger list is missing full-width list or row-click markers`);
+                      }
+                      if (!html.includes('#/condition-debugger/smoke-record') || html.includes('data-condition-gate-debug-detail="true"') || html.includes('请选择一条 gate 历史记录')) {
+                        failures.push(`${route}: condition debugger list still behaves like narrow selected-detail rail`);
+                      }
+                    }
+                    if (route === '#/condition-debugger/smoke-record' || route === '#/condition-debugger?id=smoke-record') {
+                      if (!html.includes('data-condition-gate-detail-route="true"') || !html.includes('data-condition-gate-detail-full-width="true"') || !html.includes('data-condition-gate-detail-summary="true"') || !html.includes('data-condition-gate-context-summary="true"') || !html.includes('data-condition-gate-debug-tree-section="true"') || !html.includes('data-condition-gate-replay-section="true"') || !html.includes('data-condition-gate-technical-collapsed-readonly="true"')) {
+                        failures.push(`${route}: condition debugger detail missing full-width section markers`);
+                      }
+                      if (!html.includes('wa-detail-shell') || !html.includes('data-detail-kind="condition-debugger"') || !html.includes('返回') || html.includes('请选择一条 gate 历史记录')) {
+                        failures.push(`${route}: condition debugger detail did not render independent detail shell`);
+                      }
+                      const routeUrls = context.__smokeRequestedUrls();
+                      if (!routeUrls.includes('/api/webadmin/condition-gates/history/smoke-record')) {
+                        failures.push(`${route}: did not execute condition debugger detail API`);
+                      }
+                    }
+                    if (route === '#/condition-debugger/missing-record' && !html.includes('data-condition-gate-not-found="true"')) {
+                      failures.push(`${route}: missing record did not render Chinese not-found state marker`);
                     }
                     if (settingsRoutes.has(route)) {
                       if (!html.includes('data-settings-layout="true"') || !html.includes('data-responsive-layout="true"') || !html.includes('data-settings-tabs="true"') || !html.includes('wa-tabs-scroll') || !html.includes('data-settings-status-rail="true"') || !html.includes('data-settings-switch-grid="true"')) {
@@ -1799,6 +1868,35 @@ public final class StabilizationGuardTest {
                     }
                   } catch (err) {
                     failures.push(`doctor pagination smoke: ${err.name}: ${err.message}`);
+                  }
+                  try {
+                    const debuggerDetail = await context.__smokeConditionDebuggerDetail();
+                    if (!debuggerDetail.listHtml.includes('data-condition-gate-list-no-full-debug-rail="true"') || !debuggerDetail.listHtml.includes('data-condition-gate-row-click-navigates-detail="true"')) {
+                      failures.push('condition debugger: list did not render full-width row navigation markers');
+                    }
+                    if (!debuggerDetail.detailHash.includes('#/condition-debugger/smoke-record') || !debuggerDetail.detailHash.includes('returnTo=')) {
+                      failures.push(`condition debugger: row/detail navigation did not preserve returnTo: ${debuggerDetail.detailHash}`);
+                    }
+                    if (!debuggerDetail.detailHtml.includes('data-condition-gate-detail-full-width="true"') || !debuggerDetail.detailHtml.includes('data-condition-gate-context-summary="true"') || !debuggerDetail.detailHtml.includes('data-condition-gate-debug-tree-section="true"') || !debuggerDetail.detailHtml.includes('data-condition-gate-technical-collapsed-readonly="true"')) {
+                      failures.push('condition debugger: detail page missing full-width detail sections');
+                    }
+                    if (!debuggerDetail.replayUrls.includes('POST /api/webadmin/condition-gates/history/smoke-record/replay') || !debuggerDetail.replayHtml.includes('data-condition-gate-replay-result="true"') || !debuggerDetail.replayHtml.includes('data-condition-gate-replay-readonly-marker="true"')) {
+                      failures.push(`condition debugger: replay did not stay in detail or missed readonly result markers: ${JSON.stringify(debuggerDetail.replayUrls)}`);
+                    }
+                    if (!debuggerDetail.replayBackKeepsReturnTo) {
+                      failures.push('condition debugger: replay rerender dropped returnTo from rendered back button');
+                    }
+                    if (debuggerDetail.refreshedHash !== debuggerDetail.detailHash || !debuggerDetail.refreshedHtml.includes('data-condition-gate-detail-refresh-stays-detail="true"')) {
+                      failures.push('condition debugger: silent refresh changed route or dropped detail preservation marker');
+                    }
+                    if (debuggerDetail.transientHash !== debuggerDetail.detailHash || !debuggerDetail.transientHtml.includes('data-condition-gate-detail-refresh-stays-detail="true"') || debuggerDetail.transientHtml.includes('data-condition-gate-not-found="true"')) {
+                      failures.push('condition debugger: transient silent detail failure replaced the current detail page');
+                    }
+                    if (!debuggerDetail.backHtml.includes('data-condition-gate-list-route="true"') || !debuggerDetail.filters.includes('"targetType":"SIGNAL_LISTENER"') || !debuggerDetail.filters.includes('"result":"BLOCKED"')) {
+                      failures.push('condition debugger: back-to-list did not preserve filters/list state');
+                    }
+                  } catch (err) {
+                    failures.push(`condition debugger detail smoke: ${err.name}: ${err.message}`);
                   }
                   try {
                     const modalSilent = await context.__smokeModalSilent();
@@ -7250,6 +7348,251 @@ public final class StabilizationGuardTest {
                 "8.7 must not add GameController/MissionSystem/PhaseController");
         requireFalse(allMain.contains("singleActionConditionGroupId") || allMain.contains("SignalReceiver condition gate"),
                 "8.7 must not add single Action gates or SignalReceiver output gate");
+    }
+
+    private static void testConditionRuntimeDebugger88() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_RUNTIME_DEBUGGER_8_8_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_8.md"), StandardCharsets.UTF_8);
+        String manualTest = Files.readString(root.resolve("docs/test/测试_8.8_WebAdmin条件模拟诊断回放验收.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String history = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistory.java"), StandardCharsets.UTF_8);
+        String historyRecord = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistoryRecord.java"), StandardCharsets.UTF_8);
+        String debugNode = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateDebugNode.java"), StandardCharsets.UTF_8);
+        String replayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayService.java"), StandardCharsets.UTF_8);
+        String replayResult = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayResult.java"), StandardCharsets.UTF_8);
+        String gateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateService.java"), StandardCharsets.UTF_8);
+        String webHistoryService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateHistoryService.java"), StandardCharsets.UTF_8);
+        String doctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java"), StandardCharsets.UTF_8);
+        String webAdminDoctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDoctorService.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+        String dtos = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminDtos.java"), StandardCharsets.UTF_8);
+        String vbdService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String listenerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerBasicConfigService.java"), StandardCharsets.UTF_8);
+        String relayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String historyTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistoryServiceTest.java"), StandardCharsets.UTF_8);
+        String replayTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayServiceTest.java"), StandardCharsets.UTF_8);
+        String doctorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorServiceTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONDITION_RUNTIME_DEBUGGER_8_8_CURRENT_CONTEXT.md",
+                "docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_8.md",
+                "docs/test/测试_8.8_WebAdmin条件模拟诊断回放验收.md",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistory.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistoryRecord.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayService.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayResult.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateDebugNode.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateHistoryService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java",
+                "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateHistoryServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateReplayServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.8 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.8 Condition Runtime Debugger / Doctor / Simulation",
+                "runtime history",
+                "debug tree",
+                "Replay 只读",
+                "不读取 live world / player / inventory / region / SignalBridge",
+                "不写 store、不 emit signal、不执行 action",
+                "内存环形缓冲",
+                "最大 200 条",
+                "未配置 conditionGroupId",
+                "SignalReceiver gate",
+                "单条 Action gate",
+                "GameController / MissionSystem / PhaseController",
+                "#/condition-debugger",
+                "/api/webadmin/condition-gates/history"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + manualTest + "\n" + readme, marker, "8.8 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "public static final int MAX_RECORDS = 200",
+                "result == null || result.skipped() || result.conditionGroupId().isBlank()",
+                "context.summary()",
+                "ConditionGateDebugNode.from",
+                "context,",
+                "definition",
+                "CONDITION_GATE_HISTORY_APPENDED",
+                "routeTarget(\"#/condition-debugger\")"
+        )) {
+            requireContains(history, marker, "8.8 history marker: " + marker);
+        }
+        for (String marker : List.of(
+                "contextSummary",
+                "debugTree",
+                "replayContext",
+                "definitionSnapshot",
+                "no live world/player/inventory/service references",
+                "compactDto",
+                "detailDto",
+                "replayReadOnly",
+                "noActionExecution",
+                "noSignalEmit",
+                "noRawJsonEditor"
+        )) {
+            requireContains(historyRecord, marker, "8.8 history record marker: " + marker);
+        }
+        requireContains(debugNode, "childResults", "8.8 debug node preserves child debug tree");
+        requireContains(gateService, "ConditionGateHistory.record", "8.8 gate service records configured gate results");
+        requireTrue(gateService.indexOf("groupId.isBlank()") < gateService.indexOf("ConditionGateHistory.record"),
+                "8.8 blank conditionGroupId still returns before history recording");
+
+        for (String marker : List.of(
+                "record.replayContext()",
+                "record.definitionSnapshot()",
+                "condition_gate_replay_group_deleted",
+                "boolean changed",
+                "历史快照",
+                "Replay 只使用历史 ConditionEvaluationContext 快照",
+                "Replay 不写 store、不 emit signal、不执行 action",
+                "ConditionGateDebugNode.from"
+        )) {
+            requireContains(replayService, marker, "8.8 replay service marker: " + marker);
+        }
+        for (String marker : List.of("boolean readOnly", "boolean noSideEffects", "boolean noLiveWorldRead", "originalResult", "replayResult", "resultConsistent")) {
+            requireContains(replayResult, marker, "8.8 replay result marker: " + marker);
+        }
+        requireFalse(replayService.contains("SignalBridgeServer.emit") || replayService.contains("ActionEngine.execute")
+                        || replayService.contains("SignalDeviceStore") || replayService.contains("RegionControllerStore")
+                        || replayService.contains("ConditionRuntimeContextBuilder") || replayService.contains("ServerPlayerEntity")
+                        || replayService.contains("ServerWorld") || replayService.contains("Inventory")
+                        || replayService.contains("StateVariableStore"),
+                "8.8 replay must not emit signals, execute actions, or read live runtime stores");
+
+        for (String marker : List.of(
+                "condition-runtime-missing-group",
+                "condition-runtime-disabled-group",
+                "condition-runtime-invalid-group",
+                "condition-runtime-incompatible-group",
+                "compatibility.message()",
+                "condition-runtime-always-false-node",
+                "continue;"
+        )) {
+            requireContains(doctorService, marker, "8.8 doctor service marker: " + marker);
+        }
+        requireContains(webAdminDoctorService, "conditionRuntimeDoctorService.inspect", "8.8 WebAdmin doctor includes condition runtime diagnostics");
+
+        for (String marker : List.of(
+                "/api/webadmin/condition-gates/history",
+                "handleConditionGateHistory",
+                "conditionGateHistoryService.list",
+                "conditionGateHistoryService.detail",
+                "conditionGateHistoryService.replay",
+                "该接口只支持 GET",
+                "该接口只支持 POST"
+        )) {
+            requireContains(server, marker, "8.8 WebAdmin API marker: " + marker);
+        }
+        for (String marker : List.of(
+                "readOnly",
+                "inMemory",
+                "worldScoped",
+                "maxRecords",
+                "targetType",
+                "conditionGroupId",
+                "recentStatus",
+                "#/condition-debugger/"
+        )) {
+            requireContains(webHistoryService, marker, "8.8 WebAdmin history service marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "#/condition-debugger",
+                "条件调试",
+                "data-condition-debugger-page",
+                "data-condition-gate-list-route",
+                "data-condition-gate-detail-route",
+                "data-condition-gate-detail-full-width",
+                "data-condition-gate-row-click-navigates-detail",
+                "data-condition-gate-not-found",
+                "data-condition-gate-history-table",
+                "data-condition-gate-detail-summary",
+                "data-condition-gate-context-summary",
+                "data-condition-gate-debug-tree-section",
+                "data-condition-gate-replay-section",
+                "data-condition-gate-replay-result",
+                "data-condition-gate-technical-collapsed-readonly",
+                "data-condition-gate-return-preserves-filters",
+                "data-condition-gate-scroll-preservation",
+                "data-condition-gate-detail-refresh-stays-detail",
+                "data-condition-gate-realtime-preserves-detail",
+                "data-condition-gate-replay-readonly",
+                "data-condition-gate-no-action-execution",
+                "data-condition-gate-no-signal-emit",
+                "data-condition-gate-no-consume",
+                "data-condition-gate-no-live-world-read",
+                "data-condition-gate-no-raw-json-editor",
+                "data-condition-gate-debug-tree",
+                "condition_gate_history_appended",
+                "conditionDebuggerFilters",
+                "conditionDebuggerDetailHash",
+                "replayConditionGateHistory",
+                "模拟重放",
+                "真实重放 Action"
+        )) {
+            requireContains(scripts + "\n" + shell, marker, "8.8 frontend marker: " + marker);
+        }
+        requireFalse(scripts.contains("data-condition-gate-debug-detail") || scripts.contains("conditionDebuggerDetailPanel("),
+                "8.8 condition debugger full detail must not remain in the old narrow right panel");
+        requireContains(realtime, "CONDITION_GATE_HISTORY_APPENDED", "8.8 realtime event type marker");
+        requireContains(dtos, "recentConditionGate", "8.8 DTO recent gate status marker");
+        for (String serviceSource : List.of(vbdService, listenerService, relayService, regionService)) {
+            requireContains(serviceSource, "recentConditionGate", "8.8 existing page service exposes recent condition gate status");
+        }
+
+        for (String marker : List.of(
+                "blank conditionGroupId records no runtime history",
+                "history ring buffer max records",
+                "history list API filters result and targetType",
+                "history detail API exposes debug tree",
+                "recent status links debugger"
+        )) {
+            requireContains(historyTest, marker, "8.8 history test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "replay allowed record succeeds",
+                "replay changed condition group succeeds from historical snapshot",
+                "replay deleted condition group fails safely",
+                "replay missing record fails safely",
+                "replay record without context snapshot fails safely",
+                "replay record without definition snapshot fails safely"
+        )) {
+            requireContains(replayTest, marker, "8.8 replay test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "condition-runtime-missing-group",
+                "condition-runtime-disabled-group",
+                "condition-runtime-invalid-group",
+                "condition-runtime-incompatible-group",
+                "context_player",
+                "容器快照",
+                "物品快照",
+                "背包快照",
+                "信号历史快照",
+                "condition-runtime-definition-missing",
+                "dynamic container open/close compatibility profile",
+                "doctor does not report deferred SignalReceiver or single Action gate as missing errors"
+        )) {
+            requireContains(doctorTest, marker, "8.8 doctor test marker: " + marker);
+        }
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireFalse(allMain.contains("singleActionConditionGroupId") || allMain.contains("SignalReceiver condition gate"),
+                "8.8 must not add single Action gates or SignalReceiver output gate");
+        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
+                "8.8 must not add GameController/MissionSystem/PhaseController");
+        requireFalse(scripts.contains("conditionGateRawJson") || scripts.contains("condition-runtime-raw-json-editor") || scripts.contains("rawJsonEditor"),
+                "8.8 condition debugger must not expose a raw JSON editor");
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {

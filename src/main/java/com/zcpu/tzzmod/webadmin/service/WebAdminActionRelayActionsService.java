@@ -329,6 +329,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("conditionGroupId", relay == null ? "" : relay.conditionGroupId());
         data.put("conditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id());
         data.put("conditionGateTargetId", device.id());
+        data.put("recentConditionGate", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.ACTION_RELAY, device.id()));
         data.put("expectedFingerprint", fingerprintFor(device, actions, relay == null ? "" : relay.conditionGroupId()));
         WebAdminEditLockStatusDto lockStatus = editLockService == null ? null : editLockService.status(
                 WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS,

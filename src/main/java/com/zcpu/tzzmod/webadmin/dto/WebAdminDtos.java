@@ -176,7 +176,8 @@ public final class WebAdminDtos {
             int actionCount,
             List<String> actionSummaries,
             String expectedFingerprint,
-            WebAdminEditLockStatusDto lockStatus
+            WebAdminEditLockStatusDto lockStatus,
+            Map<String, Object> recentConditionGate
     ) {
     }
 
