@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.region;
 
 import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.condition.ConditionGroupIds;
 import java.util.List;
 
 public record RegionControllerData(
@@ -10,12 +11,29 @@ public record RegionControllerData(
         boolean enabled,
         RegionTargetFilter targetFilter,
         int stayIntervalTicks,
+        String enterConditionGroupId,
+        String exitConditionGroupId,
+        String stayConditionGroupId,
         List<ActionConfig> enterActions,
         List<ActionConfig> exitActions,
         List<ActionConfig> stayActions
 ) {
     public static final int DEFAULT_STAY_INTERVAL_TICKS = 100;
     public static final int MIN_STAY_INTERVAL_TICKS = 20;
+
+    public RegionControllerData(
+            String id,
+            String name,
+            String regionId,
+            boolean enabled,
+            RegionTargetFilter targetFilter,
+            int stayIntervalTicks,
+            List<ActionConfig> enterActions,
+            List<ActionConfig> exitActions,
+            List<ActionConfig> stayActions
+    ) {
+        this(id, name, regionId, enabled, targetFilter, stayIntervalTicks, "", "", "", enterActions, exitActions, stayActions);
+    }
 
     public RegionControllerData normalized() {
         String cleanId = id == null ? "" : id.trim();
@@ -31,6 +49,9 @@ public record RegionControllerData(
                 enabled,
                 targetFilter == null ? RegionTargetFilter.all() : targetFilter.normalized(),
                 interval,
+                ConditionGroupIds.normalize(enterConditionGroupId),
+                ConditionGroupIds.normalize(exitConditionGroupId),
+                ConditionGroupIds.normalize(stayConditionGroupId),
                 enterActions == null ? List.of() : List.copyOf(enterActions),
                 exitActions == null ? List.of() : List.copyOf(exitActions),
                 stayActions == null ? List.of() : List.copyOf(stayActions)

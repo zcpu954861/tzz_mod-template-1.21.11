@@ -2,8 +2,8 @@ package com.zcpu.tzzmod.condition.runtime;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.zcpu.tzzmod.condition.ConditionGroupIds;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
-import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminStoragePaths;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -195,6 +195,7 @@ public final class ConditionRuntimeGateStore {
                 case CONTAINER_OPEN -> containerOpenConditionGroupId;
                 case CONTAINER_CLOSE -> containerCloseConditionGroupId;
                 case CONTAINER_CHANGE -> containerChangeConditionGroupId;
+                default -> "";
             };
         }
 
@@ -212,7 +213,7 @@ public final class ConditionRuntimeGateStore {
     }
 
     private static String normalizeGroupId(String value) {
-        return WebAdminConditionGroupStore.normalizeId(value);
+        return ConditionGroupIds.normalize(value);
     }
 
     private static String safe(String value) {

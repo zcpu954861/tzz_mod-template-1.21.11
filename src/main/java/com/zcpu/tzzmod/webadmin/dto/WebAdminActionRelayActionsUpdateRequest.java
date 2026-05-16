@@ -5,6 +5,7 @@ import java.util.List;
 
 public final class WebAdminActionRelayActionsUpdateRequest {
     public String deviceId = "";
+    public String conditionGroupId = "";
     public List<ActionEntry> actions = new ArrayList<>();
     public String expectedFingerprint = "";
     public String lockId = "";

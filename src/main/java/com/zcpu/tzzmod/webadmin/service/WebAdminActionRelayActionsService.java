@@ -4,9 +4,11 @@ import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
@@ -55,6 +57,7 @@ public final class WebAdminActionRelayActionsService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
 
     public WebAdminActionRelayActionsService(
             WebAdminPermissionService permissionService,
@@ -204,10 +207,10 @@ public final class WebAdminActionRelayActionsService {
             }
         }
 
-        Validation validation = validateRequest(server, request);
+        Validation validation = validateRequest(server, request, gateBindingValidator);
         if (!validation.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
-            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), requestSummary(validation.actions()));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), requestSummary(validation.actions(), request == null ? "" : request.conditionGroupId));
             return result;
         }
 
@@ -221,28 +224,31 @@ public final class WebAdminActionRelayActionsService {
             audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "expected_fingerprint_missing"));
             return result;
         }
-        if (!fingerprintMatches(relayTarget.device(), relayTarget.relay().actions(), request.expectedFingerprint)) {
-            WebAdminWriteResult result = conflictDetected(target, relayTarget.device(), relayTarget.relay().actions(), request.expectedFingerprint);
+        if (!fingerprintMatches(relayTarget.device(), relayTarget.relay().actions(), relayTarget.relay().conditionGroupId(), request.expectedFingerprint)) {
+            WebAdminWriteResult result = conflictDetected(target, relayTarget.device(), relayTarget.relay().actions(), relayTarget.relay().conditionGroupId(), request.expectedFingerprint);
             audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "fingerprint_conflict"));
             return result;
         }
 
         List<ActionConfig> beforeActions = normalizeActions(relayTarget.relay().actions());
         List<ActionConfig> afterActions = validation.actions();
-        if (beforeActions.equals(afterActions)) {
+        String beforeConditionGroupId = relayTarget.relay().conditionGroupId();
+        String afterConditionGroupId = WebAdminConditionGroupStore.normalizeId(request.conditionGroupId);
+        if (beforeActions.equals(afterActions) && beforeConditionGroupId.equals(afterConditionGroupId)) {
             WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的 Action 列表变化。");
             audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), currentSummary(relayTarget.device(), relayTarget.relay()));
             releaseLockAfterWrite(request, user, session, remoteAddress);
             return result;
         }
 
+        relayTarget.relay().setConditionGroupId(afterConditionGroupId);
         relayTarget.relay().replaceActions(afterActions);
         SignalDeviceData updated = SignalDeviceStore.updateActions(relayTarget.world(), relayTarget.pos(), relayTarget.relay());
         SignalDeviceStore.forceFlushDirty(server);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("actionList", baseData(updated == null ? relayTarget.device() : updated, relayTarget.relay(), user, session));
-        data.put("changedFields", List.of("actions"));
+        data.put("changedFields", changedFields(beforeActions, afterActions, beforeConditionGroupId, afterConditionGroupId));
         data.put("actionCountBefore", beforeActions.size());
         data.put("actionCountAfter", afterActions.size());
         WebAdminWriteResult result = new WebAdminWriteResult(
@@ -259,22 +265,33 @@ public final class WebAdminActionRelayActionsService {
                 Map.of(),
                 data
         );
-        WebAdminAuditEvent auditEvent = audit(writeContext, result, currentSummary(relayTarget.device(), beforeActions), currentSummary(updated == null ? relayTarget.device() : updated, afterActions));
-        publishRealtime(updated == null ? relayTarget.device() : updated, auditEvent, user, beforeActions, afterActions);
+        WebAdminAuditEvent auditEvent = audit(
+                writeContext,
+                result,
+                currentSummary(relayTarget.device(), beforeActions, beforeConditionGroupId),
+                currentSummary(updated == null ? relayTarget.device() : updated, afterActions, afterConditionGroupId)
+        );
+        publishRealtime(updated == null ? relayTarget.device() : updated, auditEvent, user, beforeActions, afterActions, afterConditionGroupId);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
     }
 
-    public static boolean fingerprintMatches(SignalDeviceData device, List<ActionConfig> actions, String expectedFingerprint) {
-        return !isBlank(expectedFingerprint) && fingerprintFor(device, actions).equals(expectedFingerprint);
+    public static boolean fingerprintMatches(SignalDeviceData device, List<ActionConfig> actions, String conditionGroupId, String expectedFingerprint) {
+        return !isBlank(expectedFingerprint) && fingerprintFor(device, actions, conditionGroupId).equals(expectedFingerprint);
     }
 
     public static String fingerprintFor(SignalDeviceData rawDevice, List<ActionConfig> rawActions) {
+        return fingerprintFor(rawDevice, rawActions, "");
+    }
+
+    public static String fingerprintFor(SignalDeviceData rawDevice, List<ActionConfig> rawActions, String conditionGroupId) {
         SignalDeviceData device = rawDevice == null ? null : rawDevice.normalized();
         if (device == null) {
             return "";
         }
-        String input = "action_relay_actions|" + device.id() + "|" + device.type() + "|" + device.channel() + "|" + actionFingerprintList(rawActions);
+        String input = "action_relay_actions|" + device.id() + "|" + device.type() + "|" + device.channel()
+                + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(conditionGroupId)
+                + "|" + actionFingerprintList(rawActions);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
@@ -284,7 +301,7 @@ public final class WebAdminActionRelayActionsService {
     }
 
     public static List<WebAdminValidationError> validateActionEntries(List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries) {
-        return validateRequest(null, requestFor(entries)).errors();
+        return validateRequest(null, requestFor(entries), new WebAdminConditionGateBindingValidator()).errors();
     }
 
     private static WebAdminActionRelayActionsUpdateRequest requestFor(List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries) {
@@ -309,7 +326,10 @@ public final class WebAdminActionRelayActionsService {
         data.put("snapshotActionCount", device.actionCount());
         data.put("actions", actionDtos(actions));
         data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
-        data.put("expectedFingerprint", fingerprintFor(device, actions));
+        data.put("conditionGroupId", relay == null ? "" : relay.conditionGroupId());
+        data.put("conditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id());
+        data.put("conditionGateTargetId", device.id());
+        data.put("expectedFingerprint", fingerprintFor(device, actions, relay == null ? "" : relay.conditionGroupId()));
         WebAdminEditLockStatusDto lockStatus = editLockService == null ? null : editLockService.status(
                 WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS,
                 device.id(),
@@ -321,6 +341,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("physicalDeviceDeleteAllowed", false);
         data.put("notes", List.of(
                 "Action 列表属于 action_relay BlockEntity 配置，不会创建或删除真实方块。",
+                "未配置条件组 = 保持旧继电器逻辑，不拦截；配置后仅作为整条 Action 列表外层 gate。",
                 "command action 是地图玩法控制能力；WebAdmin 只硬阻断 ban/kick/op/stop/whitelist 等服务器管理高风险命令。",
                 "sound action 当前底层只存储 sound id；per-action cooldown/requiresOp 字段会保留，但执行语义以现有 ActionEngine 为准。"
         ));
@@ -346,8 +367,22 @@ public final class WebAdminActionRelayActionsService {
         return List.copyOf(result);
     }
 
-    private static Validation validateRequest(MinecraftServer server, WebAdminActionRelayActionsUpdateRequest request) {
+    private static Validation validateRequest(
+            MinecraftServer server,
+            WebAdminActionRelayActionsUpdateRequest request,
+            WebAdminConditionGateBindingValidator gateBindingValidator
+    ) {
         List<WebAdminValidationError> errors = new ArrayList<>();
+        WebAdminConditionGateBindingValidator validator = gateBindingValidator == null
+                ? new WebAdminConditionGateBindingValidator()
+                : gateBindingValidator;
+        validator.validate(
+                server,
+                errors,
+                "conditionGroupId",
+                request == null ? "" : request.conditionGroupId,
+                ConditionRuntimeTargetType.ACTION_RELAY
+        );
         List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries = request == null || request.actions == null
                 ? List.of()
                 : request.actions;
@@ -628,7 +663,8 @@ public final class WebAdminActionRelayActionsService {
             WebAdminAuditEvent auditEvent,
             WebAdminUser user,
             List<ActionConfig> beforeActions,
-            List<ActionConfig> afterActions
+            List<ActionConfig> afterActions,
+            String conditionGroupId
     ) {
         String deviceId = device.id();
         String routeTarget = "#/devices/" + encode(deviceId);
@@ -641,6 +677,7 @@ public final class WebAdminActionRelayActionsService {
                 .summary("Action Relay 动作列表已更新。")
                 .routeTarget(routeTarget)
                 .payload("targetType", "action_relay_actions")
+                .payload("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId))
                 .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent actionConfigEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_CONFIG_CHANGED)
@@ -654,6 +691,7 @@ public final class WebAdminActionRelayActionsService {
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
                 .payload("actionCount", device.actionCount())
+                .payload("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId))
                 .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent actionEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_CHANGED)
@@ -666,6 +704,7 @@ public final class WebAdminActionRelayActionsService {
                 .routeTarget("#/actions")
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceId", deviceId)
+                .payload("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId))
                 .payload("affectedChannels", affectedChannels));
         WebAdminRealtimeEvent deviceConfigEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.DEVICE_CONFIG_CHANGED)
                 .deviceId(deviceId)
@@ -677,6 +716,7 @@ public final class WebAdminActionRelayActionsService {
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
                 .payload("actionCount", device.actionCount())
+                .payload("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId))
                 .payload("affectedChannels", affectedChannels)
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
@@ -688,6 +728,7 @@ public final class WebAdminActionRelayActionsService {
                 .routeTarget(routeTarget)
                 .payload("targetType", "action_relay_actions")
                 .payload("deviceType", device.type())
+                .payload("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId))
                 .payload("affectedChannels", affectedChannels)
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
@@ -745,12 +786,13 @@ public final class WebAdminActionRelayActionsService {
             WebAdminWriteTarget target,
             SignalDeviceData device,
             List<ActionConfig> actions,
+            String conditionGroupId,
             String expectedFingerprint
     ) {
         Map<String, Object> conflict = new LinkedHashMap<>();
         conflict.put("expectedFingerprint", expectedFingerprint);
-        conflict.put("currentFingerprint", fingerprintFor(device, actions));
-        conflict.put("currentActionList", currentSummary(device, actions));
+        conflict.put("currentFingerprint", fingerprintFor(device, actions, conditionGroupId));
+        conflict.put("currentActionList", currentSummary(device, actions, conditionGroupId));
         return new WebAdminWriteResult(
                 false,
                 WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
@@ -768,10 +810,14 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static Map<String, Object> currentSummary(SignalDeviceData device, ActionRelayBlockEntity relay) {
-        return currentSummary(device, relay == null ? List.of() : relay.actions());
+        return currentSummary(device, relay == null ? List.of() : relay.actions(), relay == null ? "" : relay.conditionGroupId());
     }
 
     private static Map<String, Object> currentSummary(SignalDeviceData device, List<ActionConfig> actions) {
+        return currentSummary(device, actions, "");
+    }
+
+    private static Map<String, Object> currentSummary(SignalDeviceData device, List<ActionConfig> actions, String conditionGroupId) {
         Map<String, Object> summary = new LinkedHashMap<>();
         if (device == null) {
             return summary;
@@ -780,17 +826,39 @@ public final class WebAdminActionRelayActionsService {
         summary.put("deviceId", device.id());
         summary.put("deviceType", WebAdminReadonlySupport.deviceType(device));
         summary.put("channel", device.channel());
+        summary.put("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId));
         summary.put("actionCount", normalizedActions.size());
         summary.put("actions", auditActionSummaryList(normalizedActions));
-        summary.put("expectedFingerprint", fingerprintFor(device, normalizedActions));
+        summary.put("expectedFingerprint", fingerprintFor(device, normalizedActions, conditionGroupId));
         return summary;
     }
 
     private static Map<String, Object> requestSummary(List<ActionConfig> actions) {
+        return requestSummary(actions, "");
+    }
+
+    private static Map<String, Object> requestSummary(List<ActionConfig> actions, String conditionGroupId) {
         Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("conditionGroupId", WebAdminConditionGroupStore.normalizeId(conditionGroupId));
         summary.put("actionCount", actions == null ? 0 : actions.size());
         summary.put("actions", auditActionSummaryList(actions));
         return summary;
+    }
+
+    private static List<String> changedFields(
+            List<ActionConfig> beforeActions,
+            List<ActionConfig> afterActions,
+            String beforeConditionGroupId,
+            String afterConditionGroupId
+    ) {
+        List<String> fields = new ArrayList<>();
+        if (!normalizeActions(beforeActions).equals(normalizeActions(afterActions))) {
+            fields.add("actions");
+        }
+        if (!WebAdminConditionGroupStore.normalizeId(beforeConditionGroupId).equals(WebAdminConditionGroupStore.normalizeId(afterConditionGroupId))) {
+            fields.add("conditionGroupId");
+        }
+        return List.copyOf(fields);
     }
 
     private static List<String> actionSummaryList(List<ActionConfig> actions) {

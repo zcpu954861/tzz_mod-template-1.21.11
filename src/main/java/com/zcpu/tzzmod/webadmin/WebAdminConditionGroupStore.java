@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 import com.zcpu.tzzmod.condition.ConditionGroupDefinition;
+import com.zcpu.tzzmod.condition.ConditionGroupIds;
 import com.zcpu.tzzmod.condition.ConditionGroupMode;
 import com.zcpu.tzzmod.condition.ConditionNode;
 import com.zcpu.tzzmod.condition.ConditionNodeConfig;
@@ -85,24 +86,7 @@ public final class WebAdminConditionGroupStore {
     }
 
     public static String normalizeId(String value) {
-        String raw = safe(value).trim().toLowerCase(java.util.Locale.ROOT);
-        StringBuilder builder = new StringBuilder();
-        boolean lastDash = false;
-        for (int i = 0; i < raw.length() && builder.length() < 96; i++) {
-            char c = raw.charAt(i);
-            boolean accepted = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' || c == ':';
-            if (accepted) {
-                builder.append(c);
-                lastDash = c == '-';
-            } else if (Character.isWhitespace(c) && !lastDash && builder.length() > 0) {
-                builder.append('-');
-                lastDash = true;
-            }
-        }
-        while (builder.length() > 0 && builder.charAt(builder.length() - 1) == '-') {
-            builder.deleteCharAt(builder.length() - 1);
-        }
-        return builder.toString();
+        return ConditionGroupIds.normalize(value);
     }
 
     public static String fingerprintFor(ConditionGroupEntry entry) {

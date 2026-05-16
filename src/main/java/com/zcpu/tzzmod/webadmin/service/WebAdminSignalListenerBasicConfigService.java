@@ -1,9 +1,11 @@
 package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
@@ -33,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.server.MinecraftServer;
@@ -44,6 +47,7 @@ public final class WebAdminSignalListenerBasicConfigService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
 
     public WebAdminSignalListenerBasicConfigService(
             WebAdminPermissionService permissionService,
@@ -139,7 +143,14 @@ public final class WebAdminSignalListenerBasicConfigService {
             audit(context, result, currentSummary(listener), Map.of("attempt", "fingerprint_conflict"));
             return result;
         }
-        List<WebAdminValidationError> errors = validateRequest(request);
+        List<WebAdminValidationError> errors = new ArrayList<>(validateRequest(request));
+        gateBindingValidator.validate(
+                server,
+                errors,
+                "conditionGroupId",
+                request == null ? "" : request.conditionGroupId,
+                ConditionRuntimeTargetType.SIGNAL_LISTENER
+        );
         if (!errors.isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
             audit(context, result, currentSummary(listener), requestSummary(request));
@@ -148,14 +159,18 @@ public final class WebAdminSignalListenerBasicConfigService {
         boolean enabled = (Boolean) request.enabled;
         String channel = SignalChannel.normalize(request.channel);
         int cooldownTicks = toInteger(request.cooldownTicks);
-        if (listener.enabled() == enabled && listener.channel().equals(channel) && listener.cooldownTicks() == cooldownTicks) {
+        String conditionGroupId = WebAdminConditionGroupStore.normalizeId(request.conditionGroupId);
+        if (listener.enabled() == enabled
+                && listener.channel().equals(channel)
+                && listener.cooldownTicks() == cooldownTicks
+                && listener.conditionGroupId().equals(conditionGroupId)) {
             WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的 Listener 基础配置变化。");
             audit(context, result, currentSummary(listener), currentSummary(listener));
             releaseLockAfterWrite(request, listener, user, session, remoteAddress);
             return result;
         }
 
-        SignalListenerData updated = SignalListenerStore.updateBasicConfigForWebAdmin(server, listener.id(), enabled, channel, cooldownTicks);
+        SignalListenerData updated = SignalListenerStore.updateBasicConfigForWebAdmin(server, listener.id(), enabled, channel, cooldownTicks, conditionGroupId);
         SignalListenerStore.flushDirty(server);
         if (updated == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 不存在或已被删除。");
@@ -181,7 +196,7 @@ public final class WebAdminSignalListenerBasicConfigService {
                 data
         );
         WebAdminAuditEvent auditEvent = audit(context, result, currentSummary(listener), currentSummary(updated));
-        publishRealtime(updated, auditEvent, changedFields, user);
+        publishRealtime(listener, updated, auditEvent, changedFields, user);
         releaseLockAfterWrite(request, updated, user, session, remoteAddress);
         return result;
     }
@@ -198,6 +213,9 @@ public final class WebAdminSignalListenerBasicConfigService {
                 listener.enabled(),
                 listener.channel(),
                 listener.cooldownTicks(),
+                listener.conditionGroupId(),
+                ConditionRuntimeTargetType.SIGNAL_LISTENER.id(),
+                listener.id(),
                 listener.actions().size(),
                 actionSummaries(listener),
                 fingerprintFor(listener),
@@ -221,6 +239,7 @@ public final class WebAdminSignalListenerBasicConfigService {
                 + listener.enabled() + "|"
                 + SignalChannel.normalize(listener.channel()) + "|"
                 + listener.cooldownTicks() + "|"
+                + WebAdminConditionGroupStore.normalizeId(listener.conditionGroupId()) + "|"
                 + WebAdminJsonResponse.GSON.toJson(listener.actions());
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -274,12 +293,15 @@ public final class WebAdminSignalListenerBasicConfigService {
     }
 
     private void publishRealtime(
+            SignalListenerData before,
             SignalListenerData listener,
             WebAdminAuditEvent auditEvent,
             List<String> changedFields,
             WebAdminUser user
     ) {
         String routeTarget = "#/signals/" + encode(listener.channel());
+        String previousChannel = before == null ? "" : before.channel();
+        List<String> affectedChannels = affectedChannels(previousChannel, listener.channel());
         WebAdminRealtimeEvent configEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.CONFIG_CHANGED)
                 .channel(listener.channel())
                 .sourceType("signal_listener")
@@ -289,6 +311,9 @@ public final class WebAdminSignalListenerBasicConfigService {
                 .payload("targetType", "signal_listener_basic_config")
                 .payload("listenerId", listener.id())
                 .payload("changedFields", changedFields)
+                .payload("previousChannel", previousChannel)
+                .payload("affectedChannels", affectedChannels)
+                .payload("conditionGroupId", listener.conditionGroupId())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEvent listenerEvent = WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.SIGNAL_LISTENER_CONFIG_CHANGED)
                 .channel(listener.channel())
@@ -300,7 +325,10 @@ public final class WebAdminSignalListenerBasicConfigService {
                 .payload("changedFields", changedFields)
                 .payload("enabled", listener.enabled())
                 .payload("channel", listener.channel())
+                .payload("previousChannel", previousChannel)
+                .payload("affectedChannels", affectedChannels)
                 .payload("cooldownTicks", listener.cooldownTicks())
+                .payload("conditionGroupId", listener.conditionGroupId())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .channel(listener.channel())
@@ -310,7 +338,22 @@ public final class WebAdminSignalListenerBasicConfigService {
                 .routeTarget(routeTarget)
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
-                .payload("listenerEventId", listenerEvent == null ? "" : listenerEvent.id()));
+                .payload("listenerEventId", listenerEvent == null ? "" : listenerEvent.id())
+                .payload("previousChannel", previousChannel)
+                .payload("affectedChannels", affectedChannels));
+    }
+
+    private static List<String> affectedChannels(String beforeChannel, String afterChannel) {
+        LinkedHashSet<String> channels = new LinkedHashSet<>();
+        String before = SignalChannel.normalize(beforeChannel);
+        String after = SignalChannel.normalize(afterChannel);
+        if (!before.isBlank()) {
+            channels.add(before);
+        }
+        if (!after.isBlank()) {
+            channels.add(after);
+        }
+        return List.copyOf(channels);
     }
 
     private void releaseLockAfterWrite(
@@ -379,6 +422,9 @@ public final class WebAdminSignalListenerBasicConfigService {
         if (before.cooldownTicks() != after.cooldownTicks()) {
             fields.add("cooldownTicks");
         }
+        if (!before.conditionGroupId().equals(after.conditionGroupId())) {
+            fields.add("conditionGroupId");
+        }
         return List.copyOf(fields);
     }
 
@@ -392,6 +438,7 @@ public final class WebAdminSignalListenerBasicConfigService {
         summary.put("enabled", listener.enabled());
         summary.put("channel", listener.channel());
         summary.put("cooldownTicks", listener.cooldownTicks());
+        summary.put("conditionGroupId", listener.conditionGroupId());
         summary.put("actionCount", listener.actions().size());
         return summary;
     }
@@ -404,6 +451,7 @@ public final class WebAdminSignalListenerBasicConfigService {
         summary.put("enabled", String.valueOf(request.enabled));
         summary.put("channel", SignalChannel.normalize(request.channel));
         summary.put("cooldownTicks", String.valueOf(request.cooldownTicks));
+        summary.put("conditionGroupId", WebAdminConditionGroupStore.normalizeId(request.conditionGroupId));
         return summary;
     }
 

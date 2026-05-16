@@ -54,6 +54,9 @@ public final class RegionControllerStore {
                 true,
                 RegionTargetFilter.all(),
                 RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS,
+                "",
+                "",
+                "",
                 List.of(),
                 List.of(),
                 List.of()
@@ -97,6 +100,9 @@ public final class RegionControllerStore {
                 enabled,
                 controller.targetFilter(),
                 controller.stayIntervalTicks(),
+                controller.enterConditionGroupId(),
+                controller.exitConditionGroupId(),
+                controller.stayConditionGroupId(),
                 controller.enterActions(),
                 controller.exitActions(),
                 controller.stayActions()
@@ -111,6 +117,9 @@ public final class RegionControllerStore {
                 controller.enabled(),
                 filter == null ? RegionTargetFilter.all() : filter,
                 controller.stayIntervalTicks(),
+                controller.enterConditionGroupId(),
+                controller.exitConditionGroupId(),
+                controller.stayConditionGroupId(),
                 controller.enterActions(),
                 controller.exitActions(),
                 controller.stayActions()
@@ -125,6 +134,9 @@ public final class RegionControllerStore {
                 controller.enabled(),
                 controller.targetFilter(),
                 ticks,
+                controller.enterConditionGroupId(),
+                controller.exitConditionGroupId(),
+                controller.stayConditionGroupId(),
                 controller.enterActions(),
                 controller.exitActions(),
                 controller.stayActions()
@@ -142,6 +154,9 @@ public final class RegionControllerStore {
                 updatedController.enabled(),
                 updatedController.targetFilter(),
                 updatedController.stayIntervalTicks(),
+                updatedController.enterConditionGroupId(),
+                updatedController.exitConditionGroupId(),
+                updatedController.stayConditionGroupId(),
                 controller.enterActions(),
                 controller.exitActions(),
                 controller.stayActions()
@@ -168,6 +183,9 @@ public final class RegionControllerStore {
                     controller.enabled(),
                     controller.targetFilter(),
                     controller.stayIntervalTicks(),
+                    controller.enterConditionGroupId(),
+                    controller.exitConditionGroupId(),
+                    controller.stayConditionGroupId(),
                     enterActions,
                     exitActions,
                     stayActions
@@ -186,6 +204,9 @@ public final class RegionControllerStore {
                 controller.enabled(),
                 controller.targetFilter(),
                 controller.stayIntervalTicks(),
+                controller.enterConditionGroupId(),
+                controller.exitConditionGroupId(),
+                controller.stayConditionGroupId(),
                 triggerType == RegionTriggerType.ENTER ? List.of() : controller.enterActions(),
                 triggerType == RegionTriggerType.EXIT ? List.of() : controller.exitActions(),
                 triggerType == RegionTriggerType.STAY ? List.of() : controller.stayActions()
@@ -204,6 +225,9 @@ public final class RegionControllerStore {
                 controller.enabled(),
                 controller.targetFilter(),
                 controller.stayIntervalTicks(),
+                controller.enterConditionGroupId(),
+                controller.exitConditionGroupId(),
+                controller.stayConditionGroupId(),
                 triggerType == RegionTriggerType.ENTER ? safeActions : controller.enterActions(),
                 triggerType == RegionTriggerType.EXIT ? safeActions : controller.exitActions(),
                 triggerType == RegionTriggerType.STAY ? safeActions : controller.stayActions()

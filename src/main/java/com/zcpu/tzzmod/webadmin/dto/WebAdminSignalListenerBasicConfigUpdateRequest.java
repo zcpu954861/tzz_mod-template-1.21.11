@@ -5,6 +5,7 @@ public final class WebAdminSignalListenerBasicConfigUpdateRequest {
     public Object enabled;
     public String channel = "";
     public Object cooldownTicks;
+    public String conditionGroupId = "";
     public String expectedFingerprint = "";
     public String lockId = "";
 }

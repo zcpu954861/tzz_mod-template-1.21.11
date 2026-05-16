@@ -6,6 +6,11 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.device.ActionRelayDispatcher;
 import com.zcpu.tzzmod.signal.device.SignalReceiverDispatcher;
 import java.util.HashMap;
@@ -19,6 +24,7 @@ public final class SignalBridgeServer {
 
     private static final ThreadLocal<Integer> CURRENT_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final Map<String, Long> LAST_TRIGGER_TICKS = new HashMap<>();
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
 
     private SignalBridgeServer() {
     }
@@ -73,6 +79,7 @@ public final class SignalBridgeServer {
         int executedCount = 0;
         int skippedCooldownCount = 0;
         int skippedEmptyCount = 0;
+        int skippedConditionCount = 0;
         int failedCount = 0;
         int previousDepth = CURRENT_DEPTH.get();
         CURRENT_DEPTH.set(depth);
@@ -86,6 +93,25 @@ public final class SignalBridgeServer {
                 if (isCoolingDown(listener, event.gameTime())) {
                     skippedCooldownCount++;
                     lastResult = ActionExecutionResult.success(Text.literal("信号监听器正在冷却：" + safeName(listener)));
+                    continue;
+                }
+
+                ConditionGateResult gate = CONDITION_GATE_SERVICE.evaluate(event.world().getServer(), new ConditionGateRequest(
+                        listener.conditionGroupId(),
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER,
+                        listener.id(),
+                        () -> ConditionRuntimeContextBuilder.signalListener(event, listener)
+                ));
+                if (!gate.allowed()) {
+                    skippedConditionCount++;
+                    lastResult = ActionExecutionResult.success(Text.literal("监听器条件阻断：" + gate.failureReason()));
+                    Tzz_mod.LOGGER.info(
+                            "[SignalBridge] listener condition gate blocked listener={} channel={} code={} reason={}",
+                            listener.id(),
+                            channel,
+                            gate.code(),
+                            gate.failureReason()
+                    );
                     continue;
                 }
 
@@ -131,6 +157,7 @@ public final class SignalBridgeServer {
                 failedCount,
                 depth,
                 resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, receiverCount, relayResult)
+                        + conditionSkipSuffix(skippedConditionCount)
         );
         return lastResult;
     }
@@ -284,5 +311,9 @@ public final class SignalBridgeServer {
             builder.append("，动作继电器跳过或失败：").append(relayResult.failedCount());
         }
         return builder.toString();
+    }
+
+    private static String conditionSkipSuffix(int skippedConditionCount) {
+        return skippedConditionCount <= 0 ? "" : "，条件阻断监听器：" + skippedConditionCount;
     }
 }

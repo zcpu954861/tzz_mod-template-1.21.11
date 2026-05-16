@@ -499,15 +499,7 @@ public final class RegionControllerCommand {
             return 0;
         }
 
-        ActionContext context = new ActionContext(
-                player,
-                player.getCommandSource().getWorld(),
-                new Vec3d(player.getX(), player.getY(), player.getZ()),
-                ActionSourceType.REGION_CONTROLLER,
-                controller.id(),
-                ItemStack.EMPTY
-        );
-        ActionExecutionResult result = ActionEngine.executeAll(context, actions);
+        ActionExecutionResult result = RegionControllerTracker.executeActionsForTest(player, controller, triggerType);
         if (result.success()) {
             source.sendFeedback(() -> title("测试动作已执行")
                     .append(Text.literal("：").formatted(Formatting.GRAY))
@@ -515,7 +507,7 @@ public final class RegionControllerCommand {
                     .append(Text.literal(" -> ").formatted(Formatting.GRAY))
                     .append(controllerName(controller)), false);
         } else {
-            source.sendFeedback(() -> error("测试动作执行失败。"), false);
+            source.sendFeedback(() -> error(result.message() == null ? "测试动作执行失败。" : result.message().getString()), false);
         }
         return result.success() ? 1 : 0;
     }

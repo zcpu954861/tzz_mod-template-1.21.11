@@ -159,6 +159,7 @@ public final class StabilizationGuardTest {
         testConditionRegionSignalLogicChain84();
         testWebAdminConditionEditor85();
         testConditionRuntimeGates86();
+        testConditionRuntimeReceiverGates87();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -2575,7 +2576,7 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(signalDeviceStore, marker, "7.7 physical device replacement cleanup marker present: " + marker);
         }
-        requireContains(actionService, "Validation validation = validateRequest(server, request);",
+        requireContains(actionService, "Validation validation = validateRequest(server, request, gateBindingValidator);",
                 "7.7 action relay validates request before stale fingerprint conflict classification");
         requireContains(actionService, "affectedSignalChannels(device, beforeActions, afterActions)",
                 "7.7 action relay realtime includes affected signal action channels");
@@ -5715,7 +5716,8 @@ public final class StabilizationGuardTest {
             requireContains(tests, marker, "8.0 condition core test marker present: " + marker);
         }
 
-        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime"));
         requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
                 "8.0 ConditionEngine core must not execute actions or emit signals");
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
@@ -5928,7 +5930,8 @@ public final class StabilizationGuardTest {
             requireContains(tests, marker, "8.1 condition test marker present: " + marker);
         }
 
-        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"));
+        String conditionCore = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/condition"),
+                root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime"));
         requireFalse(conditionCore.contains("ActionEngine.execute") || conditionCore.contains("SignalBridgeServer.emit"),
                 "8.1 ConditionEngine conditions must not execute actions or emit signals");
         requireFalse(conditionCore.contains("SignalDeviceStore") || conditionCore.contains("SignalListenerStore")
@@ -7045,15 +7048,208 @@ public final class StabilizationGuardTest {
         String regionRuntime = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/region"));
         String actionRelay = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/ModBlock/entity/ActionRelayBlockEntity.java"), StandardCharsets.UTF_8);
         for (String runtime : List.of(nonVbdSignal, actionRuntime, regionRuntime, actionRelay)) {
-            requireFalse(runtime.contains("ConditionGateService") || runtime.contains("ConditionRuntimeGateStore")
-                            || runtime.contains("WebAdminConditionGroupStore") || runtime.contains("condition_runtime_gates.json"),
-                    "8.6 must not add SignalListener/ActionRelay/RegionController/Action runtime condition gates");
+            requireFalse(runtime.contains("ConditionRuntimeGateStore") || runtime.contains("condition_runtime_gates.json"),
+                    "8.6/8.7 receiver-side gates must not reuse the VBD runtime gate store inside receiver runtimes");
         }
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
         requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
                 "8.6 must not add GameController/MissionSystem/PhaseController");
         requireFalse(allMain.contains("condition-runtime-raw-json-editor") || allMain.contains("scriptExpression"),
                 "8.6 must not add raw JSON editor or generic script expression");
+    }
+
+    private static void testConditionRuntimeReceiverGates87() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONDITION_RUNTIME_RECEIVER_GATES_8_7_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String targetTypes = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeTargetType.java"), StandardCharsets.UTF_8);
+        String profile = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityProfile.java"), StandardCharsets.UTF_8);
+        String builder = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeContextBuilder.java"), StandardCharsets.UTF_8);
+        String signalBridge = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalBridgeServer.java"), StandardCharsets.UTF_8);
+        String signalData = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalListenerData.java"), StandardCharsets.UTF_8);
+        String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerBasicConfigService.java"), StandardCharsets.UTF_8);
+        String dtos = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminDtos.java"), StandardCharsets.UTF_8);
+        String signalConfigSurface = signalService + "\n" + dtos;
+        String relay = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/ModBlock/entity/ActionRelayBlockEntity.java"), StandardCharsets.UTF_8);
+        String relayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String regionData = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerData.java"), StandardCharsets.UTF_8);
+        String regionTracker = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerTracker.java"), StandardCharsets.UTF_8);
+        String regionCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerCommand.java"), StandardCharsets.UTF_8);
+        String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String compatibilityTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"), StandardCharsets.UTF_8);
+        String gateConfigTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateConfigTest.java"), StandardCharsets.UTF_8);
+        String availableListTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupServiceTest.java"), StandardCharsets.UTF_8);
+
+        for (String marker : List.of(
+                "8.7 Receiver-side Runtime Gates",
+                "SignalListener gate",
+                "ActionRelay gate",
+                "RegionController enter / exit / stay gate",
+                "未配置 conditionGroupId",
+                "单条 Action condition gate",
+                "SignalReceiver redstone output gate",
+                "GameController / MissionSystem / PhaseController"
+        )) {
+            requireContains(context, marker, "8.7 context marker: " + marker);
+        }
+        for (String marker : List.of("SIGNAL_LISTENER", "ACTION_RELAY", "REGION_ENTER", "REGION_EXIT", "REGION_STAY")) {
+            requireContains(targetTypes, marker, "8.7 target type exists: " + marker);
+            requireContains(profile, marker, "8.7 compatibility profile exists: " + marker);
+        }
+        for (String marker : List.of(
+                "signalListener(SignalEvent event, SignalListenerData listener)",
+                "actionRelay(",
+                "regionController(",
+                "regionSnapshot(\"region\"",
+                "regionSnapshot(\"current_region\""
+        )) {
+            requireContains(builder, marker, "8.7 context builder marker: " + marker);
+        }
+        for (String marker : List.of(
+                "String conditionGroupId",
+                "ConditionGroupIds.normalize(conditionGroupId)"
+        )) {
+            requireContains(signalData, marker, "8.7 SignalListener data marker: " + marker);
+        }
+        for (String runtimeData : List.of(signalData, regionData, relay)) {
+            requireFalse(runtimeData.contains("WebAdminConditionGroupStore"),
+                    "8.7 receiver runtime data normalizes conditionGroupId without depending on WebAdminConditionGroupStore");
+        }
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.SIGNAL_LISTENER",
+                "ConditionRuntimeContextBuilder.signalListener",
+                "if (!gate.allowed())",
+                "skippedConditionCount",
+                "conditionSkipSuffix"
+        )) {
+            requireContains(signalBridge, marker, "8.7 SignalListener runtime gate marker: " + marker);
+        }
+        requireTrue(signalBridge.indexOf("ConditionRuntimeTargetType.SIGNAL_LISTENER") < signalBridge.indexOf("executeListenerActions"),
+                "8.7 SignalListener gate runs before listener actions");
+        requireTrue(signalBridge.indexOf("if (!gate.allowed())") < signalBridge.indexOf("LAST_TRIGGER_TICKS.put"),
+                "8.7 SignalListener blocked gate does not advance cooldown timestamp");
+
+        for (String marker : List.of(
+                "CONDITION_GROUP_ID_KEY",
+                "conditionGroupId()",
+                "setConditionGroupId",
+                "ConditionRuntimeTargetType.ACTION_RELAY",
+                "ConditionRuntimeContextBuilder.actionRelay",
+                "if (!gate.allowed())",
+                "if (!manual)"
+        )) {
+            requireContains(relay, marker, "8.7 ActionRelay runtime gate marker: " + marker);
+        }
+        requireTrue(relay.indexOf("ConditionRuntimeTargetType.ACTION_RELAY") < relay.indexOf("ActionContext context = new ActionContext"),
+                "8.7 ActionRelay gate runs before action context/actions");
+        requireTrue(relay.indexOf("if (!gate.allowed())") < relay.indexOf("updateLastRun"),
+                "8.7 ActionRelay blocked gate returns before run history update");
+
+        for (String marker : List.of(
+                "enterConditionGroupId",
+                "exitConditionGroupId",
+                "stayConditionGroupId"
+        )) {
+            requireContains(regionData, marker, "8.7 RegionController data marker: " + marker);
+            requireContains(regionService, marker, "8.7 RegionController WebAdmin marker: " + marker);
+        }
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.REGION_ENTER",
+                "ConditionRuntimeTargetType.REGION_EXIT",
+                "ConditionRuntimeTargetType.REGION_STAY",
+                "ConditionRuntimeContextBuilder.regionController",
+                "executeActionsForTest",
+                "conditionGroupIdFor"
+        )) {
+            requireContains(regionTracker, marker, "8.7 RegionController runtime marker: " + marker);
+        }
+        requireContains(regionCommand, "RegionControllerTracker.executeActionsForTest", "8.7 /tzz regionctl test uses gate-aware helper");
+        requireTrue(regionTracker.indexOf("if (!gate.allowed())") < regionTracker.indexOf("ActionEngine.executeAll"),
+                "8.7 RegionController gate runs before action list");
+        requireTrue(regionTracker.contains("executeActions(player, controller, RegionTriggerType.STAY);\n        state.lastStayTriggerTicks.put(controller.id(), currentTick);")
+                        || regionTracker.contains("executeActions(player, controller, RegionTriggerType.STAY);\r\n        state.lastStayTriggerTicks.put(controller.id(), currentTick);"),
+                "8.7 Region stay records interval tick even when gate blocks action list");
+
+        for (String marker : List.of(
+                "WebAdminConditionGateBindingValidator",
+                "ConditionRuntimeTargetType.SIGNAL_LISTENER",
+                "conditionGroupId",
+                "conditionGateTargetType",
+                "conditionGateTargetId"
+        )) {
+            requireContains(signalConfigSurface, marker, "8.7 SignalListener WebAdmin config marker: " + marker);
+        }
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.ACTION_RELAY",
+                "conditionGroupId",
+                "setConditionGroupId",
+                "validateRequest(server, request, gateBindingValidator)",
+                "fingerprintFor(device, actions,",
+                "未配置条件组 = 保持旧继电器逻辑"
+        )) {
+            requireContains(relayService, marker, "8.7 ActionRelay WebAdmin config marker: " + marker);
+        }
+        for (String marker : List.of(
+                "ConditionRuntimeTargetType.REGION_ENTER",
+                "ConditionRuntimeTargetType.REGION_EXIT",
+                "ConditionRuntimeTargetType.REGION_STAY",
+                "conditionRuntimeGates",
+                "未配置条件组 = 保持旧区域控制器逻辑"
+        )) {
+            requireContains(regionService, marker, "8.7 RegionController WebAdmin config marker: " + marker);
+        }
+        for (String marker : List.of(
+                "loadRuntimeConditionGateOptions",
+                "runtimeConditionGatePicker",
+                "draft.conditionGroupId=document.getElementById('runtime-condition-conditionGroupId')?.value??''",
+                "<option value=\"\" ${current?'':'selected'}>未配置条件组</option>",
+                "conditionGroupId:'外层条件组'",
+                "enterConditionGroupId:'进入动作条件组'",
+                "conditionGroupId:String(draft.conditionGroupId||'')",
+                "enterConditionGroupId:String(draft.enterConditionGroupId||'')",
+                "exitConditionGroupId:String(draft.exitConditionGroupId||'')",
+                "stayConditionGroupId:String(draft.stayConditionGroupId||'')",
+                "SIGNAL_LISTENER",
+                "ACTION_RELAY",
+                "REGION_ENTER",
+                "REGION_EXIT",
+                "REGION_STAY",
+                "未配置条件组 = 保持旧逻辑，不拦截",
+                "data-region-controller-condition-gates"
+        )) {
+            requireContains(scripts, marker, "8.7 frontend condition gate marker: " + marker);
+        }
+        for (String marker : List.of(
+                "generic SignalListener profile rejects player-dependent condition",
+                "generic ActionRelay profile rejects player-dependent condition",
+                "Region enter supports region snapshot key",
+                "Region stay supports current_region snapshot key"
+        )) {
+            requireContains(compatibilityTest, marker, "8.7 compatibility test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "8.7 backend rejects receiver gate binding",
+                "always_true group accepted by SignalListener receiver gate backend",
+                "always_true group accepted by ActionRelay receiver gate backend",
+                "player group accepted by Region stay gate backend"
+        )) {
+            requireContains(gateConfigTest, marker, "8.7 backend gate config test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "SignalListener available excludes player context group",
+                "ActionRelay available includes relayId context group",
+                "REGION_ENTER",
+                "REGION_EXIT",
+                "REGION_STAY"
+        )) {
+            requireContains(availableListTest, marker, "8.7 available-list test marker: " + marker);
+        }
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
+                "8.7 must not add GameController/MissionSystem/PhaseController");
+        requireFalse(allMain.contains("singleActionConditionGroupId") || allMain.contains("SignalReceiver condition gate"),
+                "8.7 must not add single Action gates or SignalReceiver output gate");
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {

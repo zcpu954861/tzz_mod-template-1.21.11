@@ -9,6 +9,12 @@ import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.ConditionGroupIds;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -33,9 +39,11 @@ public class ActionRelayBlockEntity extends BlockEntity {
     public static final int ACTIVE_TICKS = 10;
 
     private static final Gson GSON = new Gson();
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
     private static final String CHANNEL_KEY = "Channel";
     private static final String ENABLED_KEY = "Enabled";
     private static final String COOLDOWN_TICKS_KEY = "CooldownTicks";
+    private static final String CONDITION_GROUP_ID_KEY = "ConditionGroupId";
     private static final String ACTIONS_KEY = "Actions";
     private static final String LAST_RUN_GAME_TIME_KEY = "LastRunGameTime";
     private static final String LAST_RUN_WALL_TIME_KEY = "LastRunWallTimeMillis";
@@ -49,6 +57,7 @@ public class ActionRelayBlockEntity extends BlockEntity {
     private String channel = "";
     private boolean enabled = true;
     private int cooldownTicks = 0;
+    private String conditionGroupId = "";
     private List<ActionConfig> actions = List.of();
     private long lastRunGameTime = 0L;
     private long lastRunWallTimeMillis = 0L;
@@ -73,6 +82,10 @@ public class ActionRelayBlockEntity extends BlockEntity {
 
     public int cooldownTicks() {
         return cooldownTicks;
+    }
+
+    public String conditionGroupId() {
+        return conditionGroupId;
     }
 
     public List<ActionConfig> actions() {
@@ -123,6 +136,11 @@ public class ActionRelayBlockEntity extends BlockEntity {
 
     public void setCooldownTicks(int cooldownTicks) {
         this.cooldownTicks = clampCooldownTicks(cooldownTicks);
+        markDirty();
+    }
+
+    public void setConditionGroupId(String conditionGroupId) {
+        this.conditionGroupId = ConditionGroupIds.normalize(conditionGroupId);
         markDirty();
     }
 
@@ -184,6 +202,17 @@ public class ActionRelayBlockEntity extends BlockEntity {
         }
         if (!manual && remainingCooldownTicks(world.getTime()) > 0L) {
             return ActionExecutionResult.failure(Text.literal("动作继电器正在冷却"));
+        }
+        if (!manual) {
+            ConditionGateResult gate = CONDITION_GATE_SERVICE.evaluate(world.getServer(), new ConditionGateRequest(
+                    conditionGroupId,
+                    ConditionRuntimeTargetType.ACTION_RELAY,
+                    sourceId(world, pos),
+                    () -> ConditionRuntimeContextBuilder.actionRelay(world, pos, null, this, event)
+            ));
+            if (!gate.allowed()) {
+                return ActionExecutionResult.failure(Text.literal("动作继电器条件阻断：" + gate.failureReason()));
+            }
         }
 
         ActionContext context = new ActionContext(
@@ -259,6 +288,7 @@ public class ActionRelayBlockEntity extends BlockEntity {
         channel = SignalChannel.normalize(view.getString(CHANNEL_KEY, ""));
         enabled = view.getBoolean(ENABLED_KEY, true);
         cooldownTicks = clampCooldownTicks(view.getInt(COOLDOWN_TICKS_KEY, 0));
+        conditionGroupId = ConditionGroupIds.normalize(view.getString(CONDITION_GROUP_ID_KEY, ""));
         actions = parseActions(view.getString(ACTIONS_KEY, "[]"));
         lastRunGameTime = Math.max(0L, view.getLong(LAST_RUN_GAME_TIME_KEY, 0L));
         lastRunWallTimeMillis = Math.max(0L, view.getLong(LAST_RUN_WALL_TIME_KEY, 0L));
@@ -276,6 +306,7 @@ public class ActionRelayBlockEntity extends BlockEntity {
         view.putString(CHANNEL_KEY, channel);
         view.putBoolean(ENABLED_KEY, enabled);
         view.putInt(COOLDOWN_TICKS_KEY, cooldownTicks);
+        view.putString(CONDITION_GROUP_ID_KEY, conditionGroupId);
         view.putString(ACTIONS_KEY, GSON.toJson(actions));
         view.putLong(LAST_RUN_GAME_TIME_KEY, lastRunGameTime);
         view.putLong(LAST_RUN_WALL_TIME_KEY, lastRunWallTimeMillis);
