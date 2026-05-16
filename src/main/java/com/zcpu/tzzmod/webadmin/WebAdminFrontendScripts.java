@@ -126,9 +126,9 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const TZZ_WEBADMIN_ASSET_VERSION='8.6-runtime-gates';
+                const TZZ_WEBADMIN_ASSET_VERSION='8.8-condition-debugger-detail-page';
                 if(typeof window!=='undefined')window.__TZZ_WEBADMIN_ASSET_VERSION=TZZ_WEBADMIN_ASSET_VERSION;
-                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,vbdNativeTriggerEdit:null,vbdNativeTriggerLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,containerTemplateSession:null,containerTemplateSessionLockTimer:null,containerTemplateSessionStatusTimer:null,containerTemplateCancelConfirm:null,singleItemSubmitSession:null,singleItemSubmitSessionLockTimer:null,singleItemSubmitSessionStatusTimer:null,singleItemSubmitCancelConfirm:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,signalListenerActionsEdit:null,signalListenerActionsLockTimer:null,regionControllerEdit:null,regionControllerLockTimer:null,logicChainMetadataEdit:null,logicChainMetadataLockTimer:null,conditionGroupEdit:null,conditionGroupLockTimer:null,conditionNodeEditor:null,conditionNodeEditorRerenderTimer:null,conditionCatalog:null,currentConditionGroup:null,conditionPreviewForms:{},conditionPreviewResult:null,conditionGroupLockNotice:null,currentLogicChainGraph:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},logicChainFilters:{search:'',status:'ALL',saved:'ALL',expanded:{}},conditionFilters:{search:'',enabled:'ALL',suite:'ALL'},logicChainCanvas:{zoom:1,panX:0,panY:0,selectedNodeId:'',focusNodeId:'',graphKey:'',collapsedChannels:{}},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL'},regionControllerFilters:{search:'',enabled:'ALL',target:'ALL',event:'ALL'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
+                const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,vbdNativeTriggerEdit:null,vbdNativeTriggerLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,containerTemplateSession:null,containerTemplateSessionLockTimer:null,containerTemplateSessionStatusTimer:null,containerTemplateCancelConfirm:null,singleItemSubmitSession:null,singleItemSubmitSessionLockTimer:null,singleItemSubmitSessionStatusTimer:null,singleItemSubmitCancelConfirm:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,signalListenerActionsEdit:null,signalListenerActionsLockTimer:null,regionControllerEdit:null,regionControllerLockTimer:null,logicChainMetadataEdit:null,logicChainMetadataLockTimer:null,conditionGroupEdit:null,conditionGroupLockTimer:null,conditionNodeEditor:null,conditionNodeEditorRerenderTimer:null,conditionCatalog:null,currentConditionGroup:null,conditionPreviewForms:{},conditionPreviewResult:null,conditionGroupLockNotice:null,currentLogicChainGraph:null,conditionDebuggerData:null,conditionDebuggerDetail:null,conditionDebuggerReplay:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},logicChainFilters:{search:'',status:'ALL',saved:'ALL',expanded:{}},conditionFilters:{search:'',enabled:'ALL',suite:'ALL'},conditionDebuggerFilters:{search:'',targetType:'ALL',result:'ALL',conditionGroupId:'',channel:''},logicChainCanvas:{zoom:1,panX:0,panY:0,selectedNodeId:'',focusNodeId:'',graphKey:'',collapsedChannels:{}},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL'},regionControllerFilters:{search:'',enabled:'ALL',target:'ALL',event:'ALL'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;appState.modalCloseHandler=null;appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalDiscardConfirmOpen=false;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -431,10 +431,12 @@ public final class WebAdminFrontendScripts {
                 }
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return location.hash||'#/dashboard';}
-                function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/listeners/')||h.startsWith('#/signal-listeners/')||h.startsWith('#/logic-chains/')||h.startsWith('#/condition-groups/')||h.startsWith('#/conditions/')||h.startsWith('#/regions/')||h.startsWith('#/region-controllers/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/logic-chains','#/condition-groups','#/conditions','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
-                function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;const source=currentRouteHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
-                function navigateTo(targetHash){location.hash=withReturnContext(targetHash);}
+                function conditionDebuggerDetailIdFromHash(hash){const h=String(hash||'');if(h.startsWith('#/condition-debugger/'))return detailRoute(h.substring('#/condition-debugger/'.length),'#/condition-debugger').id;if(h.startsWith('#/condition-debugger?'))return parseHashParams(h).id||'';return '';}
+                function isConditionDebuggerDetailHash(hash){return !isBlank(conditionDebuggerDetailIdFromHash(hash));}
+                function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/listeners/')||h.startsWith('#/signal-listeners/')||h.startsWith('#/logic-chains/')||h.startsWith('#/condition-groups/')||h.startsWith('#/conditions/')||isConditionDebuggerDetailHash(h)||h.startsWith('#/regions/')||h.startsWith('#/region-controllers/')||h.startsWith('#/actions/');}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/logic-chains','#/condition-groups','#/conditions','#/condition-debugger','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;let source=currentRouteHash();if(source.startsWith('#/condition-debugger')&&!isConditionDebuggerDetailHash(source))source=conditionDebuggerListHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
+                function navigateTo(targetHash){captureConditionDebuggerListState(targetHash);location.hash=withReturnContext(targetHash);}
                 function safeDecodeRoutePart(value){try{return decodeURIComponent(String(value||''));}catch(_){return String(value||'');}}
                 function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), encodedId=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', id=safeDecodeRoutePart(encodedId), params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
                 function goBackOrFallback(returnTo,fallback){location.hash=isValidReturnHash(returnTo)?returnTo:fallback;}
@@ -653,6 +655,7 @@ public final class WebAdminFrontendScripts {
                   if(hash==='#/conditions'||hash==='#/condition-groups') return renderConditionGroupsPage(options);
                   if(hash.startsWith('#/conditions/')) return renderConditionGroupDetail(hash.substring('#/conditions/'.length),options);
                   if(hash.startsWith('#/condition-groups/')) return renderConditionGroupDetail(hash.substring('#/condition-groups/'.length),options);
+                  if(hash.startsWith('#/condition-debugger')) return renderConditionDebuggerPage(hash.substring('#/condition-debugger'.length),options);
                   if(hash==='#/logic-chains') return renderLogicChainsPage(options);
                   if(isLogicChainResolveRoute(hash)) return renderLogicChainResolve(hash,options);
                   if(hash.startsWith('#/logic-chains/')) return renderLogicChainDetail(hash.substring('#/logic-chains/'.length),options);
@@ -688,6 +691,7 @@ public final class WebAdminFrontendScripts {
                   if(!r)return false;
                   if(r==='#/signals')return h==='#/signals'||h==='#/signalbridge'||h.startsWith('#/signals/');
                   if(r==='#/logic-chains')return h==='#/logic-chains'||h.startsWith('#/logic-chains/');
+                  if(r==='#/condition-debugger')return h==='#/condition-debugger'||h.startsWith('#/condition-debugger?')||h.startsWith('#/condition-debugger/');
                   if(r==='#/condition-groups')return h==='#/conditions'||h==='#/condition-groups'||h.startsWith('#/condition-groups/')||h.startsWith('#/conditions/');
                   if(r==='#/listeners')return h==='#/listeners'||h==='#/signal-listeners';
                   if(r==='#/history')return h.startsWith('#/history')||h.startsWith('#/events');
@@ -703,8 +707,8 @@ public final class WebAdminFrontendScripts {
                   return h===r||h.startsWith(r+'/')||h.startsWith(r+'?');
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
-                const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','selection_started','selection_completed','selection_cancelled','selection_failed','container_template_session_started','container_template_session_opened','container_template_session_saved','container_template_session_cancelled','container_template_session_failed','container_template_session_expired','single_item_submit_template_session_started','single_item_submit_template_session_opened','single_item_submit_template_session_saved','single_item_submit_template_session_cancelled','single_item_submit_template_session_failed','single_item_submit_template_session_expired','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','logic_chain_metadata_changed','condition_group_changed','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
-                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','logicChains','conditionGroups','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
+                const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','selection_started','selection_completed','selection_cancelled','selection_failed','container_template_session_started','container_template_session_opened','container_template_session_saved','container_template_session_cancelled','container_template_session_failed','container_template_session_expired','single_item_submit_template_session_started','single_item_submit_template_session_opened','single_item_submit_template_session_saved','single_item_submit_template_session_cancelled','single_item_submit_template_session_failed','single_item_submit_template_session_expired','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','logic_chain_metadata_changed','condition_group_changed','condition_gate_history_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
+                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','logicChains','conditionGroups','conditionDebugger','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
                   if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
@@ -965,6 +969,16 @@ public final class WebAdminFrontendScripts {
                     add('dashboard','conditionGroups','config');
                     if(event?.payload?.conditionGroupId)add(`conditionGroupDetail:${event.payload.conditionGroupId}`);
                   }
+                  if(isAny('condition_gate_history_appended')){
+                    add('dashboard','conditionDebugger','history','doctor');
+                    const gateTargetType=String(event?.payload?.targetType||'');
+                    const gateTargetId=event?.payload?.targetId||'';
+                    const gateDeviceId=event?.deviceId||event?.payload?.deviceId||(['ACTION_RELAY','VBD_REDSTONE','VBD_BLOCKSTATE','VBD_INTERACTION','ITEM_SUBMIT','CONTAINER_OPEN','CONTAINER_CLOSE','CONTAINER_CHANGE'].includes(gateTargetType)?gateTargetId:'');
+                    if(gateDeviceId)addDeviceDetailRouteKeys(add,gateDeviceId,event?.sourceType||gateTargetType||'');
+                    if(event?.payload?.conditionGroupId)add(`conditionGroupDetail:${event.payload.conditionGroupId}`);
+                    if(gateTargetType==='SIGNAL_LISTENER'&&(event?.payload?.listenerId||gateTargetId))add(`listenerDetail:${event?.payload?.listenerId||gateTargetId}`);
+                    if(gateTargetType.startsWith('REGION_')&&gateTargetId)add(`regionControllerDetail:${gateTargetId}`);
+                  }
                   if(starts('doctor_')||isAny('doctor_changed'))add('dashboard','doctor','settings');
                   if(starts('webadmin_user_')||isAny('webadmin_user_connected','webadmin_user_disconnected','user_changed'))add('dashboard','users');
                   if(starts('webadmin_audit_')||isAny('write_audit_appended')){
@@ -1041,6 +1055,7 @@ public final class WebAdminFrontendScripts {
                   if(h.startsWith('#/region-controllers/'))return `regionControllerDetail:${routeDetailId(h,'#/region-controllers/')}`;
                   if(h.startsWith('#/actions/'))return `actionDetail:${routeDetailId(h,'#/actions/')}`;
                   if(h.startsWith('#/history')||h.startsWith('#/events'))return 'history';
+                  if(h.startsWith('#/condition-debugger'))return 'conditionDebugger';
                   if(h==='#/dashboard')return 'dashboard';
                   if(h==='#/devices')return 'devices';
                   if(h==='#/virtual-block-devices'||h==='#/block-devices')return 'virtualBlockDevices';
@@ -1863,8 +1878,9 @@ public final class WebAdminFrontendScripts {
                 function vbdNativeTriggerCompactCard(detail,type,options={}){
                   const trigger=vbdNativeTriggerMap(detail)[type]||{}, clickable=!options.inConfigModal;
                   const title=labelNativeTriggerType(type), primary=vbdNativeTriggerPrimarySummary(type,trigger), recent=vbdNativeTriggerRecentSummary(type,trigger), note=vbdNativeTriggerShortSummary(type,trigger);
-                  const clickAttrs=clickable?`type="button" ${htmlHandler(`openVbdNativeTriggerReadonlyModal(${jsString(detail.id)},${jsString(type)})`)} onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVbdNativeTriggerReadonlyModal(${esc(jsString(detail.id))},${esc(jsString(type))});}" data-vbd-native-trigger-card-click="readonly-detail" data-vbd-native-trigger-open-readonly-detail="true"`:'type="button" disabled data-vbd-native-trigger-card-click="readonly-detail-disabled"';
-                  return `<button class="wa-native-trigger-compact-card" ${clickAttrs} data-vbd-native-trigger-compact-card="true" data-vbd-native-trigger-card-summary="true" data-vbd-native-trigger-card-type="${esc(type)}" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-active="true"><span class="wa-native-trigger-compact-head"><strong>${esc(title)}</strong><span class="pill ok">已启用 / 已配置</span></span><span class="wa-native-trigger-compact-line"><small>主项</small><b>${primary}</b></span><span class="wa-native-trigger-compact-line"><small>最近</small><b>${recent}</b></span><span class="muted">${note}</span></button>`;
+                  const clickAttrs=clickable?`role="button" tabindex="0" ${htmlHandler(`openVbdNativeTriggerReadonlyModal(${jsString(detail.id)},${jsString(type)})`)} onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openVbdNativeTriggerReadonlyModal(${esc(jsString(detail.id))},${esc(jsString(type))});}" data-vbd-native-trigger-card-click="readonly-detail" data-vbd-native-trigger-open-readonly-detail="true"`:'role="button" tabindex="-1" aria-disabled="true" data-vbd-native-trigger-card-click="readonly-detail-disabled"';
+                  const itemSubmitGate=type==='right_click'?`<span class="wa-native-trigger-compact-line"><small>itemSubmit gate</small>${conditionGateRecentStatusInline(trigger.itemSubmitRecentConditionGate)}</span>`:'';
+                  return `<article class="wa-native-trigger-compact-card" ${clickAttrs} data-vbd-native-trigger-compact-card="true" data-vbd-native-trigger-card-summary="true" data-vbd-native-trigger-card-type="${esc(type)}" data-vbd-native-trigger-summary-selected="true" data-vbd-native-trigger-summary-active="true"><span class="wa-native-trigger-compact-head"><strong>${esc(title)}</strong><span class="pill ok">已启用 / 已配置</span></span><span class="wa-native-trigger-compact-line"><small>主项</small><b>${primary}</b></span><span class="wa-native-trigger-compact-line"><small>最近</small><b>${recent}</b></span>${conditionGateRecentStatusInline(trigger.recentConditionGate)}${itemSubmitGate}<span class="muted">${note}</span></article>`;
                 }
                 function vbdNativeTriggerPrimarySummary(type,t){
                   if(type==='redstone_powered')return esc(labelChannel(t.channel)||t.modeDisplayName||t.mode||'redstone');
@@ -2850,7 +2866,7 @@ public final class WebAdminFrontendScripts {
                   const note=lockedByOther?`<p class="readonly-note" data-action-relay-lock-held="true">${esc(actionRelayLockMessage(data.lockStatus))}</p>`:(data.actionsEditable===false?`<p class="readonly-note danger">${esc(data.unsupportedReason||'当前 action_relay 不可编辑。')}</p>`:`<p class="muted">Action 列表只属于已放置 action_relay 的配置；不会创建或删除世界方块。</p>`);
                   const buttonLabel=lockedByOther?'只读查看 Action 列表':(data.actionsEditable===false?'查看 Action 状态':'编辑 Action 列表');
                   const handler=lockedByOther?htmlHandler(`openActionRelayActionsReadonlyModal(${jsString(detail.id)})`):(canEditActionRelayActions()?htmlHandler(`openActionRelayActionsModal(${jsString(detail.id)})`):'disabled');
-                  return `<div class="wa-action-readonly-card" data-action-relay-detail-card="true">${rows}${actions.length>6?`<p class="muted">还有 ${esc(actions.length-6)} 条动作未展示。</p>`:''}${note}<div class="inline-actions">${waButton(buttonLabel,'action-relay',handler,lockedByOther?'ghost':'primary')}</div></div>`;
+                  return `<div class="wa-action-readonly-card" data-action-relay-detail-card="true">${rows}${conditionGateRecentStatusCard(data.recentConditionGate)}${actions.length>6?`<p class="muted">还有 ${esc(actions.length-6)} 条动作未展示。</p>`:''}${note}<div class="inline-actions">${waButton(buttonLabel,'action-relay',handler,lockedByOther?'ghost':'primary')}</div></div>`;
                 }
                 function actionRelayRuntimeStatusHtml(data){
                   const state=String(data?.loadedState||''), reason=data?.unsupportedReason||'', block=data?.blockId?`当前方块：${data.blockId}`:'', be=data?.blockEntityType?`方块实体：${data.blockEntityType}`:'', count=Number(data?.snapshotActionCount??data?.actionCount??0);
@@ -4030,6 +4046,7 @@ public final class WebAdminFrontendScripts {
                   appState.regionFilters=appState.regionFilters||{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL',sort:'NAME'};
                   appState.regionControllerFilters=appState.regionControllerFilters||{search:'',enabled:'ALL',target:'ALL',event:'ALL'};
                   appState.conditionFilters=appState.conditionFilters||{search:'',enabled:'ALL',suite:'ALL'};
+                  appState.conditionDebuggerFilters=appState.conditionDebuggerFilters||{search:'',targetType:'ALL',result:'ALL',conditionGroupId:'',channel:''};
                   appState.advancedDetailOpen=appState.advancedDetailOpen||{};
                   if(appState.selectionCreateVirtualBlock===undefined)appState.selectionCreateVirtualBlock=null;
                   if(appState.virtualBlockDelete===undefined)appState.virtualBlockDelete=null;
@@ -4202,6 +4219,7 @@ public final class WebAdminFrontendScripts {
                   if(key==='regionControllers')renderRegionControllerList('');
                   if(key==='logicChains')renderLogicChainList('');
                   if(key==='conditionGroups')renderConditionGroupList('');
+                  if(key==='conditionDebugger')renderConditionDebuggerList('');
                 }
                 function waPagination(key,page){
                   if(page.total<=page.pageSize)return `<div class="wa-pagination"><span class="wa-page-meta">共 ${esc(page.total)} 条 · 每页 ${esc(page.pageSize)} 条</span></div>`;
@@ -4659,7 +4677,7 @@ public final class WebAdminFrontendScripts {
                       detailCard(`动作列表（共 ${actions.length} 个）`,signalListenerActionSummaryCard(actionInfo),'','detail-card-stretchable'),
                       detailCard('最近事件',listenerRecentEvents(recent,channel))
                     ],[
-                      detailCard('冷却状态',detailInfoGrid([['启用状态',listenerStatus],['冷却时间',formatTicks(cooldown)||'0 tick'],['最后触发',safeHtml(fmtTime(listener.lastTriggeredAt))],['绑定频道',safeHtml(channel?channelButton(channel):'<span class="muted">未绑定</span>')]]),'','detail-card-stretchable'),
+                      detailCard('冷却与条件 gate',`${detailInfoGrid([['启用状态',listenerStatus],['冷却时间',formatTicks(cooldown)||'0 tick'],['最后触发',safeHtml(fmtTime(listener.lastTriggeredAt))],['绑定频道',safeHtml(channel?channelButton(channel):'<span class="muted">未绑定</span>')]])}${conditionGateRecentStatusCard(cfg.recentConditionGate)}`,'','detail-card-stretchable'),
                       detailCard('操作工具',`<div class="wa-quick-grid">${editAction}${listener.id?waButton('查看逻辑链','action-binding',navigationAttr(logicChainResolveHash('listener',listener.id)),'ghost'):''}${canEditSignalListenerActions()?waButton('添加动作','plus',lockHeldByOther(actionInfo.lockStatus)?'disabled data-signal-listener-action-lock-disabled="true"':htmlHandler(`openSignalListenerActionAddModal(${jsString(actionInfo.listenerId||listener.id)},false)`),'primary'):waButton('添加动作','plus','disabled','ghost')}${deleteAction}${waButton('导出监听器','download','disabled','ghost')}</div><p class="wa-disabled-note">虚拟监听器删除使用危险确认窗口；动作列表编辑使用独立窗口，不提供 matcher / itemSubmit / ConditionEngine。</p>`)
                     ],[
                       advancedDetailCard('listeners',listener.id||listenerId,advancedRows,[
@@ -5481,7 +5499,7 @@ public final class WebAdminFrontendScripts {
                   const manageAttrs=locked?lockAttrs:htmlHandler(`openRegionControllerActionListModal(${jsString(detail.id)},${jsString(trigger)})`);
                   const addAttrs=locked?lockAttrs:htmlHandler(`openRegionControllerActionAddModal(${jsString(detail.id)},${jsString(trigger)})`);
                   const lockBadge=locked?`<span class="wa-lock-badge" data-region-controller-lock-badge="true">${esc(lockMsg)}</span>`:(currentLock?`<span class="wa-lock-badge" data-region-controller-lock-current="true">正在编辑 · 锁到期：${esc(formatDateTime(lock.expiresAt))}</span>`:'');
-                  return `<div class="region-controller-action-summary" data-region-controller-action-summary-card="true" data-region-controller-action-preview-hidden="true"><div class="wa-detail-stat-grid">${detailStatGrid([{label:'动作数量',value:actions.length,sub:label,icon:'action-binding',kind:actions.length?'ok':'warning'},{label:'类型摘要',value:typeSummary,sub:'在管理动作中查看明细',icon:'action-total'}])}</div><p class="muted">动作明细不在详情页展开；点击“管理动作”查看和维护当前列表。</p><div class="inline-actions">${waButton('管理动作','action-relay',manageAttrs,locked?'ghost is-locked':'primary')}${canEditRegionController()?waButton('添加动作','plus',addAttrs,locked?'ghost is-locked':'ghost'):''}${lockBadge}</div></div>`;
+                  return `<div class="region-controller-action-summary" data-region-controller-action-summary-card="true" data-region-controller-action-preview-hidden="true"><div class="wa-detail-stat-grid">${detailStatGrid([{label:'动作数量',value:actions.length,sub:label,icon:'action-binding',kind:actions.length?'ok':'warning'},{label:'类型摘要',value:typeSummary,sub:'在管理动作中查看明细',icon:'action-total'}])}</div>${conditionGateRecentStatusCard((detail.recentConditionGates||{})[trigger])}<p class="muted">动作明细不在详情页展开；点击“管理动作”查看和维护当前列表。</p><div class="inline-actions">${waButton('管理动作','action-relay',manageAttrs,locked?'ghost is-locked':'primary')}${canEditRegionController()?waButton('添加动作','plus',addAttrs,locked?'ghost is-locked':'ghost'):''}${lockBadge}</div></div>`;
                 }
                 async function acquireRegionControllerLock(controllerId){
                   return await api('/api/webadmin/edit-locks/acquire',{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:JSON.stringify({targetType:'region_controller_config',targetId:controllerId})});
@@ -5562,6 +5580,183 @@ public final class WebAdminFrontendScripts {
                 function conditionTypeOptions(selected){return conditionTypeList().filter(t=>t.type!=='group').map(t=>`<option value="${esc(t.type)}" ${String(t.type)===String(selected)?'selected':''}>${esc(t.displayName||t.type)} · ${esc(t.type)}</option>`).join('');}
                 function conditionGroupHash(id){return `#/condition-groups/${encodeURIComponent(String(id||''))}`;}
                 function conditionGroupStatusPill(enabled){return `<span class="pill ${enabled?'ok':'warning'}">${enabled?'启用':'停用'}</span>`;}
+                function conditionGateResultLabel(value){return {ALLOWED:'通过',BLOCKED:'阻断',ERROR:'错误',SKIPPED:'跳过',UNKNOWN:'未知',UNCONFIGURED_OR_NO_HISTORY:'暂无记录'}[String(value||'').toUpperCase()]||String(value||'未知');}
+                function conditionGateResultTone(value){const v=String(value||'').toUpperCase();if(v==='ALLOWED')return 'ok';if(v==='ERROR')return 'error';if(v==='BLOCKED')return 'warning';return 'info';}
+                function conditionGateRecentStatusInline(record){
+                  const r=record||{}, status=String(r.status||'UNCONFIGURED_OR_NO_HISTORY');
+                  const title=r.recordId?`最近一次条件判断：${conditionGateResultLabel(status)} · ${r.conditionGroupId||'未记录条件组'}`:'暂无最近条件判断记录';
+                  const action=r.recordId?`<button class="link-button" ${navigationAttr(r.debuggerRoute||conditionDebuggerDetailHash(r.recordId))}>查看详情</button>`:'';
+                  return `<span class="condition-gate-recent-inline" data-condition-gate-recent-status="true" title="${esc(title)}">${textPill(conditionGateResultLabel(status),conditionGateResultTone(status))}${r.failureReason?`<small>${esc(r.failureReason)}</small>`:''}${action}</span>`;
+                }
+                function conditionGateRecentStatusCard(record){
+                  const r=record||{}, status=String(r.status||'UNCONFIGURED_OR_NO_HISTORY'), route=r.recordId?(r.debuggerRoute||conditionDebuggerDetailHash(r.recordId)):'#/condition-debugger';
+                  return `<article class="readonly-note condition-gate-recent-card" data-condition-gate-recent-status="true" data-condition-gate-debugger-link="true"><strong>最近一次条件判断：${esc(conditionGateResultLabel(status))}</strong><span>${esc(r.failureReason||r.debugSummary||r.message||'暂无最近条件判断记录。')}</span><div class="inline-actions">${r.recordId?waButton('查看 debug detail','history',navigationAttr(route),'ghost'):waButton('打开条件调试器','history',navigationAttr('#/condition-debugger'),'ghost')}${r.conditionGroupId?waButton('跳转条件组','doctor-overview',navigationAttr(conditionGroupHash(r.conditionGroupId)),'ghost'):''}</div></article>`;
+                }
+                function conditionDebuggerDetailHash(id){return `#/condition-debugger/${encodeURIComponent(String(id||''))}`;}
+                function conditionDebuggerListHash(){
+                  const f=appState.conditionDebuggerFilters||{}, params=new URLSearchParams(), page=Number(appState.uiPages?.conditionDebugger||1);
+                  if(f.targetType&&f.targetType!=='ALL')params.set('targetType',f.targetType);
+                  if(f.result&&f.result!=='ALL')params.set('result',f.result);
+                  if(!isBlank(f.conditionGroupId))params.set('conditionGroupId',f.conditionGroupId);
+                  if(!isBlank(f.channel))params.set('channel',f.channel);
+                  if(!isBlank(f.search))params.set('targetId',f.search);
+                  if(page>1)params.set('page',String(page));
+                  const query=params.toString();
+                  return query?`#/condition-debugger?${query}`:'#/condition-debugger';
+                }
+                function applyConditionDebuggerRouteParams(params){
+                  waEnsureState();
+                  const p=params||{}, f=appState.conditionDebuggerFilters;
+                  if(Object.prototype.hasOwnProperty.call(p,'targetType'))f.targetType=p.targetType||'ALL';
+                  if(Object.prototype.hasOwnProperty.call(p,'result'))f.result=p.result||'ALL';
+                  if(Object.prototype.hasOwnProperty.call(p,'conditionGroupId'))f.conditionGroupId=p.conditionGroupId||'';
+                  if(Object.prototype.hasOwnProperty.call(p,'channel'))f.channel=p.channel||'';
+                  if(Object.prototype.hasOwnProperty.call(p,'targetId'))f.search=p.targetId||'';
+                  if(Object.prototype.hasOwnProperty.call(p,'search'))f.search=p.search||'';
+                  if(Object.prototype.hasOwnProperty.call(p,'page'))appState.uiPages.conditionDebugger=Math.max(1,Number(p.page)||1);
+                }
+                function conditionDebuggerRouteInfo(queryTail=''){
+                  const tail=String(queryTail||'');
+                  if(tail.startsWith('/')){
+                    const route=detailRoute(tail.substring(1),'#/condition-debugger');
+                    return {id:route.id,returnTo:route.returnTo,fallback:route.fallback||'#/condition-debugger',legacy:false,params:parseHashParams(tail)};
+                  }
+                  const params=parseHashParams(tail), returnTo=params.returnTo||'';
+                  return {id:params.id||'',returnTo:isValidReturnHash(returnTo)?returnTo:'',fallback:'#/condition-debugger',legacy:!!params.id,params};
+                }
+                function captureConditionDebuggerListState(targetHash=''){
+                  const current=currentRouteHash();
+                  if(!current.startsWith('#/condition-debugger')||isConditionDebuggerDetailHash(current)||!isConditionDebuggerDetailHash(targetHash))return;
+                  appState.conditionDebuggerListViewState=captureViewState();
+                  appState.conditionDebuggerListViewState.filters={...(appState.conditionDebuggerFilters||{})};
+                  appState.conditionDebuggerListViewState.page=Number(appState.uiPages?.conditionDebugger||1);
+                }
+                function restoreConditionDebuggerListState(options={}){
+                  if(options.silent)return;
+                  const state=appState.conditionDebuggerListViewState;
+                  if(!state)return;
+                  if(state.filters)appState.conditionDebuggerFilters={...state.filters};
+                  if(state.page)appState.uiPages.conditionDebugger=state.page;
+                  restoreViewState(state);
+                }
+                function conditionDebuggerFilterQuery(){
+                  const f=appState.conditionDebuggerFilters||{};
+                  const params=new URLSearchParams();
+                  params.set('limit','200');
+                  if(f.targetType&&f.targetType!=='ALL')params.set('targetType',f.targetType);
+                  if(f.result&&f.result!=='ALL')params.set('result',f.result);
+                  if(!isBlank(f.conditionGroupId))params.set('conditionGroupId',f.conditionGroupId);
+                  if(!isBlank(f.channel))params.set('channel',f.channel);
+                  if(!isBlank(f.search))params.set('targetId',f.search);
+                  return params.toString();
+                }
+                async function renderConditionDebuggerPage(queryTail='',options={}){
+                  const route=conditionDebuggerRouteInfo(queryTail);
+                  if(route.id)return renderConditionDebuggerDetail(queryTail,options);
+                  applyConditionDebuggerRouteParams(route.params);
+                  appState.conditionDebuggerSelectedId='';
+                  appState.conditionDebuggerDetail=null;
+                  if(!options.silent)setView(loading('正在加载条件调试器...'));
+                  try{
+                    const data=await api(`/api/webadmin/condition-gates/history?${conditionDebuggerFilterQuery()}`);
+                    appState.conditionDebuggerData=data||{records:[]};
+                    renderConditionDebuggerList('',options);
+                  }catch(err){if(options.silent){toast('条件调试器实时刷新失败，已保留当前页面。');return;}setView(`<section class="wa-page">${waPageHead('条件调试','加载失败',waButton('重试','refresh',htmlHandler('renderConditionDebuggerPage()'),'ghost'))}${errorBlock(err.message||'条件 gate history 加载失败')}</section>`);}
+                }
+                function renderConditionDebuggerList(focusId,options={}){
+                  waEnsureState();
+                  const data=appState.conditionDebuggerData||{records:[]}, records=data.records||[], f=appState.conditionDebuggerFilters||{};
+                  const page=waPageItems('conditionDebugger',records,12);
+                  const allowed=records.filter(r=>r.result==='ALLOWED').length, blocked=records.filter(r=>r.result==='BLOCKED').length, errors=records.filter(r=>r.result==='ERROR').length;
+                  const html=`<section class="wa-page condition-debugger-page" data-condition-debugger-page="true" data-condition-gate-history-route="true" data-condition-gate-list-route="true" data-condition-gate-return-preserves-filters="true" data-condition-gate-scroll-preservation="true" data-condition-gate-replay-readonly="true" data-condition-gate-no-raw-json-editor="true">
+                    ${waPageHead('条件调试','查看 8.6 / 8.7 runtime gate 最近判断、调试树、失败原因和只读模拟重放。',`${waButton('刷新','refresh',htmlHandler('renderConditionDebuggerPage(location.hash.substring(\"#/condition-debugger\".length),{silent:true})'),'ghost')}${waButton('真实重放 Action','play','disabled title="模拟重放不会执行 action 或发出 signal。"','ghost')}`)}
+                    <section class="wa-card-grid wa-metrics-5">
+                      ${waMetric('历史记录',records.length,`内存环形缓冲上限 ${data.maxRecords||200}`,'history')}
+                      ${waMetric('通过',allowed,'result=ALLOWED','check-pass','ok')}
+                      ${waMetric('阻断',blocked,'result=BLOCKED','warning-issue',blocked?'warning':'')}
+                      ${waMetric('错误',errors,'result=ERROR','critical-issue',errors?'error':'')}
+                      ${waMetric('Replay','只读','不写 store / 不执行 action','doctor-overview','info')}
+                    </section>
+                    <section class="condition-debugger-list-layout" data-condition-gate-list-full-width="true" data-condition-gate-list-no-full-debug-rail="true">
+                      <div class="wa-table-card condition-debugger-list-card">
+                        <div class="wa-filter-bar" data-condition-gate-history-filters="true">
+                          <label class="filter-field search-control"><span>目标 ID</span><input class="input" id="condition-debugger-search" value="${esc(f.search||'')}" placeholder="搜索 targetId"></label>
+                          <label class="filter-field"><span>目标类型</span>${waSelect('condition-debugger-target',['ALL','VBD_REDSTONE','VBD_BLOCKSTATE','VBD_INTERACTION','ITEM_SUBMIT','CONTAINER_OPEN','CONTAINER_CLOSE','CONTAINER_CHANGE','SIGNAL_LISTENER','ACTION_RELAY','REGION_ENTER','REGION_EXIT','REGION_STAY'],f.targetType||'ALL',conditionGateTargetLabel)}</label>
+                          <label class="filter-field"><span>结果</span>${waSelect('condition-debugger-result',['ALL','ALLOWED','BLOCKED','ERROR'],f.result||'ALL',v=>v==='ALL'?'全部':conditionGateResultLabel(v))}</label>
+                          <label class="filter-field"><span>条件组</span><input class="input" id="condition-debugger-group" value="${esc(f.conditionGroupId||'')}" placeholder="condition.group.id"></label>
+                          <label class="filter-field"><span>频道</span><input class="input" id="condition-debugger-channel" value="${esc(f.channel||'')}" placeholder="mission.start"></label>
+                          ${waButton('应用筛选','refresh',htmlHandler('applyConditionDebuggerFilters()'),'ghost')}
+                        </div>
+                        ${page.items.length?conditionDebuggerTable(page.items):empty(records.length?'没有匹配当前筛选条件的 gate 历史。':'暂无 runtime gate 历史。配置 conditionGroupId 后的判断会记录最近 200 条。')}
+                        ${waPagination('conditionDebugger',page)}
+                      </div>
+                    </section>
+                  </section>`;
+                  const rendered=setView(html,options);
+                  if(rendered){bindConditionDebuggerFilters(focusId);restoreConditionDebuggerListState(options);}
+                }
+                function conditionGateTargetLabel(value){return {ALL:'全部',VBD_REDSTONE:'VBD 红石',VBD_BLOCKSTATE:'VBD 方块状态',VBD_INTERACTION:'VBD 右键交互',ITEM_SUBMIT:'物品提交',CONTAINER_OPEN:'容器打开',CONTAINER_CLOSE:'容器关闭',CONTAINER_CHANGE:'容器变化',SIGNAL_LISTENER:'信号监听器',ACTION_RELAY:'动作继电器',REGION_ENTER:'区域进入',REGION_EXIT:'区域离开',REGION_STAY:'区域停留'}[String(value||'')]||String(value||'');}
+                function conditionDebuggerTable(items){return `<div class="wa-table-scroll"><table class="wa-table" data-condition-gate-history-table="true" data-condition-gate-row-click-navigates-detail="true"><thead><tr><th>时间</th><th>目标</th><th>条件组</th><th>结果</th><th>失败原因</th><th>耗时 / 节点</th><th>操作</th></tr></thead><tbody>${items.map(r=>{const route=conditionDebuggerDetailHash(r.id||'');return `<tr class="wa-clickable-row" ${navDataAttr(route,'查看 gate 调试详情')} data-condition-gate-row-detail-route="${esc(route)}"><td>${fmtTime(r.occurredAt)}</td><td><strong>${esc(conditionGateTargetLabel(r.targetType))}</strong><span class="device-subtitle">${esc(r.targetId||'-')} ${r.channel?`· ${esc(r.channel)}`:''}</span></td><td>${r.conditionGroupId?`<button class="link-button" ${navigationAttr(conditionGroupHash(r.conditionGroupId))}>${esc(r.conditionGroupDisplayName||r.conditionGroupId)}</button>`:'<span class="muted">未记录</span>'}</td><td>${textPill(conditionGateResultLabel(r.result),conditionGateResultTone(r.result))}</td><td class="truncate" title="${esc(r.failureReason||r.debugSummary||'')}">${esc(r.failureReason||r.debugSummary||'暂无')}</td><td>${esc(Math.round(Number(r.durationNanos||0)/1000))} μs<span class="device-subtitle">${esc(r.evaluatedCount||0)} nodes</span></td><td><div class="wa-action-cell">${waButton('详情','history',navigationAttr(route),'ghost')}${r.replayable?waButton('模拟重放','play',htmlHandler(`event.stopPropagation();replayConditionGateHistory(${jsString(r.id||'')})`),'ghost'):waButton('不可重放','play','disabled','ghost')}</div></td></tr>`;}).join('')}</tbody></table></div>`;}
+                async function renderConditionDebuggerDetail(queryTail='',options={}){
+                  const route=conditionDebuggerRouteInfo(queryTail), id=route.id;
+                  if(isBlank(id))return renderConditionDebuggerPage('',options);
+                  appState.conditionDebuggerSelectedId=id;
+                  if(!options.silent)setView(loading('正在加载条件调试详情...'));
+                  const detail=await settle(`/api/webadmin/condition-gates/history/${encodeURIComponent(id)}`);
+                  if(!detail.ok&&options.silent&&detail.error?.status!==404){
+                    toast('条件调试详情实时刷新失败，已保留当前页面。');
+                    return;
+                  }
+                  if(!detail.ok||!detail.data||isBlank(detail.data.id)){
+                    appState.conditionDebuggerDetail=null;
+                    renderConditionDebuggerNotFound(id,route,options);
+                    return;
+                  }
+                  appState.conditionDebuggerDetail=detail.data;
+                  renderConditionDebuggerDetailPage(detail.data,route,options);
+                }
+                function renderConditionDebuggerNotFound(id,route,options={}){
+                  const html=`<section class="wa-page wa-detail-shell condition-debugger-detail-page" data-condition-gate-detail-route="true" data-condition-gate-detail-full-width="true" data-condition-gate-not-found="true">
+                    ${detailHeader({back:backButton(route,'返回列表'),iconName:'history',kicker:'条件调试 / 记录已不可用',title:'未找到 gate history 记录',subtitle:`记录 ${id} 不存在，或已被最近历史环形缓冲淘汰。`,badges:[textPill('Not Found','warning')],actions:[waButton('返回列表','history',htmlHandler(`goBackOrFallback(${jsString(route.returnTo)},${jsString(route.fallback||'#/condition-debugger')})`),'ghost')]})}
+                    ${empty('未找到这条条件调试记录。请返回列表确认记录是否仍在最近 history ring buffer 中。')}
+                  </section>`;
+                  setView(html,options);
+                }
+                function renderConditionDebuggerDetailPage(record,route,options={}){
+                  const replay=appState.conditionDebuggerReplay&&appState.conditionDebuggerReplay.recordId===record.id?appState.conditionDebuggerReplay:null;
+                  const result=String(record.result||'UNKNOWN');
+                  const replayActions=`${record.replayable!==false?waButton('模拟重放','play',htmlHandler(`replayConditionGateHistory(${jsString(record.id)})`),'primary'):waButton('模拟重放','play','disabled title="该记录缺少 snapshot，不能模拟重放。"','ghost')}${waButton('刷新','refresh',htmlHandler('route({silent:true})'),'ghost')}`;
+                  const groupLink=record.conditionGroupId?safeHtml(`<button class="link-button" ${navigationAttr(conditionGroupHash(record.conditionGroupId))}>${esc(record.conditionGroupDisplayName||record.conditionGroupId)}</button>`):'未记录';
+                  const html=`<section class="wa-page wa-detail-shell condition-debugger-detail-page" data-detail-kind="condition-debugger" data-condition-gate-detail-route="true" data-condition-gate-detail-full-width="true" data-condition-gate-detail-refresh-stays-detail="true" data-condition-gate-realtime-preserves-detail="true" data-condition-gate-replay-readonly="true" data-condition-gate-no-action-execution="true" data-condition-gate-no-signal-emit="true" data-condition-gate-no-consume="true" data-condition-gate-no-live-world-read="true" data-condition-gate-no-raw-json-editor="true">
+                    ${detailHeader({back:backButton(route,'返回列表'),iconName:'history',kicker:'条件调试 / 8.8 Runtime Debugger',title:`${conditionGateTargetLabel(record.targetType)} · ${conditionGateResultLabel(result)}`,subtitle:`${record.targetId||'未记录目标'} · ${formatDateTime(record.occurredAt)}`,copyValue:record.id,badges:[textPill(conditionGateResultLabel(result),conditionGateResultTone(result)),`<span class="pill info">只读 replay</span>`,record.replayable===false?`<span class="pill warning">不可重放</span>`:''],actions:[replayActions]})}
+                    ${detailTabs(['结果摘要','Context 摘要','Debug Tree','Replay / 模拟重放','完整详情'],'结果摘要')}
+                    <section class="wa-detail-first-row condition-debugger-detail-summary-row" data-condition-gate-detail-summary="true">
+                      ${detailCard('结果摘要',`${detailStatGrid([{label:'结果',value:conditionGateResultLabel(result),sub:record.code||'',icon:'check-pass',kind:conditionGateResultTone(result)},{label:'评估节点',value:record.evaluatedCount||0,sub:'evaluatedCount',icon:'doctor-overview'},{label:'耗时',value:`${Math.round(Number(record.durationNanos||0)/1000)} μs`,sub:'duration',icon:'history'},{label:'Replay',value:record.replayable===false?'不可重放':'可重放',sub:'历史 snapshot',icon:'play',kind:record.replayable===false?'warning':'ok'}])}<div class="condition-failure-summary ${conditionGateResultTone(result)}">${esc(record.failureReason||record.debugSummary||'本次判断没有失败原因。')}</div>`,replayActions)}
+                      ${detailCard('目标与条件组',detailInfoGrid([['记录 ID',record.id],['目标类型',conditionGateTargetLabel(record.targetType)],['目标 ID',record.targetId||'-'],['频道',record.channel||'-'],['条件组',groupLink],['发生时间',formatDateTime(record.occurredAt)]]))}
+                    </section>
+                    <section class="condition-debugger-detail-stack" data-condition-gate-detail-sections="true">
+                      ${detailCard('Replay / 模拟重放',conditionReplayDetailSection(record,replay),replayActions,'condition-replay-card')}
+                      ${detailCard('Context 摘要',conditionContextSummary(record.contextSummary,'detail'),'', 'condition-context-card')}
+                      ${detailCard('Debug Tree',`<div data-condition-gate-debug-tree-section="true">${conditionGateDebugTree(record.debugTree,0)}</div>`,'', 'condition-debug-tree-card')}
+                      <div data-condition-gate-technical-readonly="true" data-condition-gate-technical-collapsed-readonly="true" data-condition-gate-technical-json-not-primary="true">${advancedDetailCard('condition-debugger',record.id,conditionTechnicalRows(record),conditionTechnicalGroups(record,replay))}</div>
+                    </section>
+                  </section>`;
+                  setView(html,options);
+                }
+                function conditionReplayDetailSection(record,replay){
+                  const readonly='<p class="readonly-note ok" data-condition-gate-replay-readonly-marker="true">模拟重放只读取历史 snapshot，不读取 live world / player / inventory / region / SignalBridge，不写 store、不 emit signal、不执行 action、不 consume item。</p>';
+                  if(!replay)return `<section data-condition-gate-replay-section="true">${readonly}${empty(record.replayable===false?'该记录缺少 replay snapshot，不能模拟重放。':'点击“模拟重放”后，结果会在本详情页内显示。')}</section>`;
+                  return `<section data-condition-gate-replay-section="true" data-condition-gate-replay-result="true">${readonly}<div class="identity-grid">${row('只读',esc(replay.readOnly?'是':'否'))}${row('无副作用',esc(replay.noSideEffects?'是':'否'))}${row('不读取 live world',esc(replay.noLiveWorldRead?'是':'否'))}${row('原结果',esc(conditionGateResultLabel(replay.originalResult)))}${row('Replay 结果',esc(conditionGateResultLabel(replay.replayResult)))}${row('一致',esc(replay.resultConsistent?'是':'否'))}${row('失败原因',esc(replay.failureReason||'暂无'))}</div>${(replay.warnings||[]).map(w=>`<p class="readonly-note warning">${esc(w)}</p>`).join('')}${conditionGateDebugTree(replay.debugTree,0)}</section>`;
+                }
+                function conditionTechnicalRows(record){return [['recordId',record.id],['targetType',record.targetType],['targetId',record.targetId],['conditionGroupId',record.conditionGroupId],['conditionFingerprint',record.conditionFingerprint],['definitionFingerprint',record.definitionFingerprint],['code',record.code],['replayReadOnly',record.replayReadOnly],['noActionExecution',record.noActionExecution],['noSignalEmit',record.noSignalEmit],['noRawJsonEditor',record.noRawJsonEditor]];}
+                function conditionTechnicalGroups(record,replay){return [{title:'记录字段',rows:advancedRowsFromObject(record,'record',72)},{title:'上下文 snapshot',rows:advancedRowsFromObject(record.contextSummary||{},'context',72)},{title:'Replay flags',rows:advancedRowsFromObject(replay||{},'replay',48)}];}
+                function conditionContextLabel(key){return {player:'玩家',playerName:'玩家名',playerUuid:'玩家 UUID',sourceType:'来源类型',sourceId:'来源 ID',channel:'频道',world:'世界',deviceId:'设备 ID',listenerId:'监听器 ID',relayId:'动作继电器 ID',regionId:'区域 ID',actionId:'Action ID',itemSnapshotCount:'物品快照数',inventorySnapshotCount:'背包快照数',containerSnapshotCount:'容器快照数',stateVariableCount:'状态变量数'}[String(key||'')]||key;}
+                function conditionContextValue(value){if(value===null||value===undefined||value==='')return '暂无';if(Array.isArray(value))return `${value.length} 项`;if(typeof value==='object'){try{return JSON.stringify(value);}catch(_){return String(value);}}return String(value);}
+                function conditionContextSummary(summary,mode='compact'){const entries=Object.entries(summary||{});if(!entries.length)return empty('该记录没有上下文摘要。');if(mode==='detail')return `<div class="condition-context-summary-grid" data-condition-gate-context-summary="true">${entries.map(([k,v])=>`<article class="condition-context-item"><span>${esc(conditionContextLabel(k))}</span><strong>${esc(conditionContextValue(v))}</strong><small>${esc(k)}</small></article>`).join('')}</div>`;return `<div class="identity-grid" data-condition-gate-context-summary="true">${entries.map(([k,v])=>row(esc(conditionContextLabel(k)),esc(conditionContextValue(v)))).join('')}</div>`;}
+                function conditionGateDebugTree(node,depth=0){if(!node)return empty('暂无调试树。');const children=(node.childResults||[]).map(child=>conditionGateDebugTree(child,depth+1)).join('');const tone=node.error?'error':(node.matched?'ok':'warning'), label=node.label||node.type||node.nodeId||'条件节点';return `<details class="condition-debug-tree" data-condition-gate-debug-tree="true" data-condition-gate-debug-tree-node="true" data-depth="${esc(depth)}"${depth===0?' open':''}><summary>${textPill(node.error?'错误':(node.matched?'通过':'未通过'),tone)} <span>${esc(label)}</span><small>${esc(node.type||node.nodeId||'')}</small></summary><div class="identity-grid">${row('nodeId',esc(node.nodeId||'-'))}${row('type',esc(node.type||'-'))}${row('reasonCode',esc(node.reasonCode||'-'))}${row('failureReason',esc(node.failureReason||node.message||'-'))}${row('debugSummary',esc(node.debugSummary||'-'))}</div>${children?`<div class="condition-node-children">${children}</div>`:''}</details>`;}
+                function bindConditionDebuggerFilters(focusId){['condition-debugger-search','condition-debugger-target','condition-debugger-result','condition-debugger-group','condition-debugger-channel'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener(id==='condition-debugger-search'||id==='condition-debugger-group'||id==='condition-debugger-channel'?'input':'change',()=>{if(id==='condition-debugger-search')appState.conditionDebuggerFilters.search=el.value;if(id==='condition-debugger-target')appState.conditionDebuggerFilters.targetType=el.value;if(id==='condition-debugger-result')appState.conditionDebuggerFilters.result=el.value;if(id==='condition-debugger-group')appState.conditionDebuggerFilters.conditionGroupId=el.value;if(id==='condition-debugger-channel')appState.conditionDebuggerFilters.channel=el.value;appState.uiPages.conditionDebugger=1;renderConditionDebuggerList(id);});});restoreFocusEnd(focusId);}
+                function applyConditionDebuggerFilters(){appState.conditionDebuggerFilters.search=document.getElementById('condition-debugger-search')?.value||'';appState.conditionDebuggerFilters.targetType=document.getElementById('condition-debugger-target')?.value||'ALL';appState.conditionDebuggerFilters.result=document.getElementById('condition-debugger-result')?.value||'ALL';appState.conditionDebuggerFilters.conditionGroupId=document.getElementById('condition-debugger-group')?.value||'';appState.conditionDebuggerFilters.channel=document.getElementById('condition-debugger-channel')?.value||'';appState.uiPages.conditionDebugger=1;appState.conditionDebuggerSelectedId='';appState.conditionDebuggerDetail=null;const hash=conditionDebuggerListHash();location.hash=hash;renderConditionDebuggerPage(hash.substring('#/condition-debugger'.length),{silent:true});}
+                async function replayConditionGateHistory(id){try{const recordId=String(id||'');const result=await api(`/api/webadmin/condition-gates/history/${encodeURIComponent(recordId)}/replay`,{method:'POST',headers:{'X-TZZ-WebAdmin-CSRF':csrfToken()},body:'{}'});appState.conditionDebuggerReplay=result;toast(result.success?'模拟重放完成。':(result.failureReason||'模拟重放失败。'));const current=currentRouteHash();if(conditionDebuggerDetailIdFromHash(current)===recordId)await renderConditionDebuggerDetail(current.substring('#/condition-debugger'.length),{silent:true});else navigateTo(conditionDebuggerDetailHash(recordId));}catch(err){toast(err.message||'模拟重放失败。');}}
                 async function renderConditionGroupsPage(options={}){
                   if(!options.silent)setView(loading('正在加载条件组...'));
                   try{
@@ -5569,12 +5764,12 @@ public final class WebAdminFrontendScripts {
                     appState.conditionGroupsData=list;appState.conditionCatalog=catalog;
                     const groups=list.groups||[], enabled=groups.filter(g=>g.enabled!==false).length;
                     const html=`<section class="wa-page condition-editor-page" data-condition-editor-page="true">
-                      ${waPageHead('条件组','WebAdmin 条件组编辑器：创建、验证并预览条件组；8.6 可作为 VBD / itemSubmit / container 外层 gate 配置。',`${waButton('刷新','refresh',htmlHandler('renderConditionGroupsPage({silent:true})'),'ghost')}${canEditConditionGroups()?waButton('新建条件组','check-pass',htmlHandler('openConditionGroupCreateModal()'),'primary'):waButton('需要 EDITOR / OWNER','settings','disabled title="只有 EDITOR 或 OWNER 可以编辑条件组。"','ghost')}`)}
+                      ${waPageHead('条件组','WebAdmin 条件组编辑器：创建、验证并预览条件组；8.6 / 8.7 已作为 VBD、itemSubmit、container、SignalListener、ActionRelay、RegionController 外层 gate 配置。',`${waButton('刷新','refresh',htmlHandler('renderConditionGroupsPage({silent:true})'),'ghost')}${canEditConditionGroups()?waButton('新建条件组','check-pass',htmlHandler('openConditionGroupCreateModal()'),'primary'):waButton('需要 EDITOR / OWNER','settings','disabled title="只有 EDITOR 或 OWNER 可以编辑条件组。"','ghost')}`)}
                       <div class="wa-card-grid wa-metrics-4">
                         ${waMetric('条件组数量',groups.length,'世界存档内 condition_groups.json','doctor-overview')}
                         ${waMetric('启用条件组',enabled,'可被兼容触发方式选择','check-pass','ok')}
                         ${waMetric('条件类型',catalog.count||0,'来自 ConditionRegistry，只读目录','signalbridge-main')}
-                        ${waMetric('运行时接入','8.6 VBD / itemSubmit / container','SignalListener / Action / Region 延后','warning-issue','ok')}
+                        ${waMetric('运行时接入','8.6 / 8.7 gate','VBD / Listener / Relay / Region','warning-issue','ok')}
                       </div>
                       <div class="condition-editor-layout">
                         <section class="wa-table-card condition-group-list-card">${conditionGroupListPanel(groups)}</section>
@@ -5626,7 +5821,7 @@ public final class WebAdminFrontendScripts {
                     else actions.push(waButton(locked?'已被锁定':'只读查看','settings',`disabled title="${esc(locked?lockMessage(lock,'条件组'): '需要 EDITOR / OWNER 权限。')}"`,'ghost'));
                     const validation=conditionValidationPanel(detail.validation);
                     const html=`<section class="wa-page condition-editor-page" data-condition-group-detail="true">
-                    ${detailHeader({back:backButton(route,'返回条件组列表'),iconName:detail.iconKey||'doctor-overview',kicker:'条件组 / 8.6 Runtime Gate Ready',title:detail.displayName||detail.id,subtitle:'可被 VBD / itemSubmit / container 兼容触发方式作为外层 gate 选择；其它运行时接入延后。',copyValue:detail.id,badges:[conditionGroupStatusPill(detail.enabled!==false),`<span class="pill info">fingerprint ${esc((detail.fingerprint||'').slice(0,10))}</span>`],actions})}
+                    ${detailHeader({back:backButton(route,'返回条件组列表'),iconName:detail.iconKey||'doctor-overview',kicker:'条件组 / 8.8 Runtime Debug Ready',title:detail.displayName||detail.id,subtitle:'可被 8.6 / 8.7 已接入目标作为外层 gate 选择；条件调试器只读展示最近判断与 replay。',copyValue:detail.id,badges:[conditionGroupStatusPill(detail.enabled!==false),`<span class="pill info">fingerprint ${esc((detail.fingerprint||'').slice(0,10))}</span>`],actions})}
                       ${lockLine}
                       <div class="condition-detail-grid">
                         <main class="condition-node-panel">

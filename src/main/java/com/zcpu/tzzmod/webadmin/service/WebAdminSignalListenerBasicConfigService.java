@@ -206,6 +206,10 @@ public final class WebAdminSignalListenerBasicConfigService {
         if (listener == null) {
             return null;
         }
+        Map<String, Object> recentConditionGate = WebAdminConditionGateHistoryService.recentStatus(
+                ConditionRuntimeTargetType.SIGNAL_LISTENER,
+                listener.id()
+        );
         return new WebAdminDtos.SignalListenerBasicConfigDto(
                 listener.id(),
                 listener.id(),
@@ -224,7 +228,8 @@ public final class WebAdminSignalListenerBasicConfigService {
                         listener.id(),
                         user,
                         session
-                )
+                ),
+                recentConditionGate
         );
     }
 

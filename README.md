@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.51.0-web-admin-condition-editor`
-- 当前开发基线：`8.6 Runtime Integration I / VBD、itemSubmit、container 条件门禁`；本阶段只把 8.5 Condition Group 作为可选外层 gate 接入 virtual_block_device、interaction、itemSubmit、container open/close/change，不接入 SignalListener、ActionRelay、RegionController、Action、GameController 或 MissionSystem，发布后建议版本为 `v1.52.0-condition-runtime-vbd-item-container`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.53.0-condition-runtime-receiver-region-gates`
+- 当前开发基线：`8.8 Condition Runtime Debugger / Doctor / Simulation`；本阶段不继续扩 runtime gate，只为 8.6 / 8.7 已接入的 VBD、itemSubmit、container、SignalListener、ActionRelay、RegionController gate 增加 runtime history、debug tree、Doctor diagnostics、只读 replay / simulation 和 WebAdmin `#/condition-debugger`，发布后建议版本为 `v1.54.0-condition-runtime-debugger-doctor-simulation`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -47,10 +47,13 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [8.5 WebAdmin Condition Editor Current Context](docs/WEBADMIN_CONDITION_EDITOR_8_5_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.5](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md)
 - [8.6 Condition Runtime Gates Current Context](docs/CONDITION_RUNTIME_GATES_8_6_CURRENT_CONTEXT.md)
+- [8.7 Receiver-side Runtime Gates Current Context](docs/CONDITION_RUNTIME_RECEIVER_GATES_8_7_CURRENT_CONTEXT.md)
+- [8.8 Condition Runtime Debugger Current Context](docs/CONDITION_RUNTIME_DEBUGGER_8_8_CURRENT_CONTEXT.md)
+- [ConditionEngine Capability Matrix 8.8](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_8.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.6；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，并开始在 VBD / itemSubmit / container 上做可选外层 runtime gate；仍不做具体逃走中任务，不接入 SignalListener / ActionRelay / RegionController / Action gate。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.8；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 只增加 runtime history / Doctor / replay / WebAdmin 条件调试器；仍不做具体逃走中任务，不接入 SignalReceiver gate、单条 Action gate。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -201,6 +204,45 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不接入 SignalListener condition gate、ActionRelay condition gate、RegionController enter / exit / stay condition gate、Action 单条 action condition gate。
 - 不做 GameController / MissionSystem / PhaseController，不做具体任务 / 关卡，不提供 raw JSON editor、任意 NBT path 或通用脚本表达式。
 
+## 8.7 Receiver-side Runtime Gates
+
+8.7 将 Condition Group gate 接到接收端 / 执行端，仍保持“未配置 conditionGroupId = 保持旧逻辑，不拦截”的 Optional Gate 原则。
+
+8.7 已接入范围：
+
+- SignalListener gate：收到 signal 且旧逻辑准备执行 action list 时，先判断可选 `conditionGroupId`。
+- ActionRelay gate：非手动 signal 触发且旧逻辑准备执行 action list 时，先判断可选 `conditionGroupId`。
+- RegionController enter / exit / stay gate：分别使用 `enterConditionGroupId`、`exitConditionGroupId`、`stayConditionGroupId`。
+- WebAdmin picker：SignalListener、ActionRelay、RegionController 配置入口只列出 compatible groups，保存仍由后端二次校验。
+
+8.7 约束：
+
+- gate false 不执行 action list，不 emit 下游 signal，不执行 command/message/sound。
+- SignalListener gate false 不更新时间冷却。
+- ActionRelay 手动触发保持旧语义。
+- RegionController gate false 不阻断 inside / outside tracking；stay gate false 后仍推进 stay interval。
+- 不做 SignalReceiver gate、单条 Action gate、GameController / MissionSystem / PhaseController。
+
+## 8.8 Condition Runtime Debugger / Doctor / Simulation
+
+8.8 不继续扩 runtime gate，只让 8.6 / 8.7 gate 可观察、可诊断、可复现。
+
+8.8 已实现方向：
+
+- Runtime history：`ConditionGateHistory` 记录 configured gate 的 allowed / blocked / error，最大 200 条，内存环形缓冲。
+- Debug detail：WebAdmin `#/condition-debugger` 展示 target、condition group、result、failureReason、context summary、debug tree。
+- Replay 只读：`POST /api/webadmin/condition-gates/history/{id}/replay` 使用历史 snapshot，不写 store、不 emit signal、不执行 action、不读取 live world / player / inventory / region / SignalBridge。
+- Doctor 增强：检查 missing / disabled / invalid / incompatible gate binding，覆盖 context_player、container、inventory、signal history、logic chain snapshot 不兼容和 always_false warning。
+- WebAdmin 新入口：sidebar “条件调试”，route 为 `#/condition-debugger`。
+- 现有页面最近 gate 状态：VBD、SignalListener、ActionRelay、RegionController 页面显示最近一次条件判断和 debug detail 链接。
+
+8.8 约束：
+
+- history 是进程内调试缓冲，不持久化，不写设备 JSON。
+- replay 如果 condition group changed，会提示 fingerprint mismatch 并使用历史快照评估；如果 group deleted，会中文 safe failure。
+- Doctor 不自动修改配置，不自动清空 conditionGroupId，不把未配置 gate 视为错误。
+- 仍不做 SignalReceiver gate、单条 Action gate、GameController / MissionSystem / PhaseController、具体任务 / 关卡、raw JSON editor、任意 NBT path、通用脚本表达式、MCP scenario、启动 Minecraft 或截图矩阵。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -234,7 +276,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- ConditionEngine runtime integration 当前只开放 8.6 的 VBD / itemSubmit / container 可选外层 gate；SignalListener、ActionRelay、RegionController、Action gate 尚未接入。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
+- ConditionEngine runtime integration 当前已开放 8.6 的 VBD / itemSubmit / container 可选外层 gate，以及 8.7 的 SignalListener / ActionRelay / RegionController 外层 gate；8.8 只提供 runtime debugger / Doctor / replay，不接入 SignalReceiver gate 或单条 Action gate。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
 
 ## 主要功能
 
