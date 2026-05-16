@@ -4,7 +4,15 @@ import com.zcpu.tzzmod.condition.ConditionEvaluationContext;
 import com.zcpu.tzzmod.condition.item.ConditionContainerSnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionInventorySnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionItemStackSnapshot;
+import com.zcpu.tzzmod.condition.regionlogic.ConditionRegionSnapshot;
 import com.zcpu.tzzmod.condition.state.StateVariableStore;
+import com.zcpu.tzzmod.map.MapDataStore;
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
+import com.zcpu.tzzmod.region.RegionControllerData;
+import com.zcpu.tzzmod.region.RegionTriggerType;
+import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.signal.SignalEvent;
+import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.device.ItemSubmitRequirementData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.item.ConsumePlan;
@@ -18,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -100,6 +109,87 @@ public final class ConditionRuntimeContextBuilder {
         return builder.build();
     }
 
+    public static ConditionEvaluationContext signalListener(SignalEvent event, SignalListenerData listener) {
+        ServerWorld world = event == null ? null : event.world();
+        String channel = SignalChannel.normalize(event == null ? "" : event.channel());
+        ConditionEvaluationContext.Builder builder = signalEventBuilder(
+                world,
+                event,
+                ConditionRuntimeTargetType.SIGNAL_LISTENER,
+                channel,
+                event == null ? "" : event.detail()
+        );
+        if (listener != null) {
+            builder.listenerId(listener.id());
+        }
+        return builder.build();
+    }
+
+    public static ConditionEvaluationContext actionRelay(
+            ServerWorld world,
+            BlockPos pos,
+            SignalDeviceData device,
+            ActionRelayBlockEntity relay,
+            SignalEvent event
+    ) {
+        String deviceId = device == null ? "" : device.id();
+        String relayId = !deviceId.isBlank()
+                ? deviceId
+                : world == null || pos == null ? "" : ActionRelayBlockEntity.sourceId(world, pos);
+        String contextDeviceId = !deviceId.isBlank() ? deviceId : relayId;
+        ConditionEvaluationContext.Builder builder = signalEventBuilder(
+                world,
+                event,
+                ConditionRuntimeTargetType.ACTION_RELAY,
+                SignalChannel.normalize(event == null ? (relay == null ? "" : relay.channel()) : event.channel()),
+                event == null ? "" : event.detail()
+        )
+                .deviceId(contextDeviceId)
+                .blockPos(pos == null ? "" : pos.toShortString())
+                .variable("relayId", relayId);
+        return builder.build();
+    }
+
+    public static ConditionEvaluationContext regionController(
+            MinecraftServer server,
+            ServerPlayerEntity player,
+            RegionControllerData controller,
+            RegionTriggerType triggerType,
+            MapDataStore.PlannerRegionData region
+    ) {
+        ServerWorld world = player == null ? null : player.getCommandSource().getWorld();
+        ConditionRuntimeTargetType targetType = switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> ConditionRuntimeTargetType.REGION_ENTER;
+            case EXIT -> ConditionRuntimeTargetType.REGION_EXIT;
+            case STAY -> ConditionRuntimeTargetType.REGION_STAY;
+        };
+        String bucket = switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> "enter";
+            case EXIT -> "exit";
+            case STAY -> "stay";
+        };
+        String regionId = controller == null ? "" : controller.regionId();
+        ConditionEvaluationContext.Builder builder = ConditionEvaluationContext.builder()
+                .worldId(world == null ? "" : world.getRegistryKey().getValue().toString())
+                .source("region_controller", controller == null ? "" : controller.id())
+                .regionId(regionId)
+                .triggerType(targetType.id())
+                .detail(bucket)
+                .eventMetadata("trigger", targetType.id())
+                .eventMetadata("detail", bucket)
+                .eventMetadata("actionBucket", bucket)
+                .gameTime(world == null ? 0L : world.getTime())
+                .regionSnapshot("region", regionSnapshot(server, region, controller))
+                .regionSnapshot("current_region", regionSnapshot(server, region, controller));
+        addPlayer(builder, player);
+        if (world != null) {
+            builder.stateVariables(StateVariableStore.getSnapshot(world.getServer()));
+        } else if (server != null) {
+            builder.stateVariables(StateVariableStore.getSnapshot(server));
+        }
+        return builder.build();
+    }
+
     private static ConditionEvaluationContext.Builder baseBuilder(
             ServerWorld world,
             BlockPos pos,
@@ -126,6 +216,85 @@ public final class ConditionRuntimeContextBuilder {
             builder.stateVariables(StateVariableStore.getSnapshot(world.getServer()));
         }
         return builder;
+    }
+
+    private static ConditionEvaluationContext.Builder signalEventBuilder(
+            ServerWorld world,
+            SignalEvent event,
+            ConditionRuntimeTargetType targetType,
+            String channel,
+            String detail
+    ) {
+        String worldId = world == null ? "" : world.getRegistryKey().getValue().toString();
+        String sourceType = event == null || event.sourceType() == null ? "" : event.sourceType().id();
+        String sourceId = event == null ? "" : event.sourceId();
+        ConditionEvaluationContext.Builder builder = ConditionEvaluationContext.builder()
+                .worldId(worldId)
+                .source(sourceType, sourceId)
+                .channel(channel)
+                .triggerType(targetType == null ? "" : targetType.id())
+                .detail(detail)
+                .eventMetadata("trigger", targetType == null ? "" : targetType.id())
+                .eventMetadata("detail", detail)
+                .gameTime(event == null ? (world == null ? 0L : world.getTime()) : event.gameTime())
+                .signalDepth(com.zcpu.tzzmod.signal.SignalBridgeServer.currentDepth());
+        if (world != null) {
+            builder.stateVariables(StateVariableStore.getSnapshot(world.getServer()));
+        }
+        return builder;
+    }
+
+    private static ConditionRegionSnapshot regionSnapshot(
+            MinecraftServer server,
+            MapDataStore.PlannerRegionData region,
+            RegionControllerData controller
+    ) {
+        String regionId = region == null ? (controller == null ? "" : controller.regionId()) : region.id();
+        String worldId = region == null ? "" : region.dimensionId();
+        List<String> playerIdsInside = new ArrayList<>();
+        if (server != null && region != null) {
+            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                if (player == null) {
+                    continue;
+                }
+                String playerWorld = player.getCommandSource().getWorld().getRegistryKey().getValue().toString();
+                if (worldId.equals(playerWorld) && region.containsBlock(player.getBlockX(), player.getBlockZ())) {
+                    playerIdsInside.add(player.getUuidAsString());
+                }
+            }
+        }
+        return new ConditionRegionSnapshot(
+                regionId,
+                region == null ? "" : region.name(),
+                controller == null || controller.enabled(),
+                worldId,
+                playerIdsInside,
+                regionBoundsSummary(region),
+                Map.of("controllerId", controller == null ? "" : controller.id())
+        );
+    }
+
+    private static String regionBoundsSummary(MapDataStore.PlannerRegionData region) {
+        if (region == null || region.points() == null || region.points().isEmpty()) {
+            return "";
+        }
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (com.zcpu.tzzmod.map.RegionGeometry.Point point : region.points()) {
+            if (point == null) {
+                continue;
+            }
+            minX = Math.min(minX, point.x());
+            maxX = Math.max(maxX, point.x());
+            minZ = Math.min(minZ, point.z());
+            maxZ = Math.max(maxZ, point.z());
+        }
+        if (minX == Integer.MAX_VALUE) {
+            return "";
+        }
+        return minX + "," + minZ + " -> " + maxX + "," + maxZ;
     }
 
     private static void addPlayer(ConditionEvaluationContext.Builder builder, ServerPlayerEntity player) {

@@ -79,6 +79,21 @@ public final class WebAdminConditionGateConfigTest {
                 compatibility.profile(ConditionRuntimeTargetType.CONTAINER_CLOSE, false));
         requireTrue(!errors.isEmpty(), "non-Inventory container close rejects container_slot_item_matches group");
         requireContains(errors.getFirst().message(), "容器快照", "non-Inventory container close rejection explains snapshot");
+
+        WebAdminConditionGateBindingValidator receiverValidator = new WebAdminConditionGateBindingValidator(storePath);
+        requireReceiverGateError(receiverValidator, "player", ConditionRuntimeTargetType.SIGNAL_LISTENER, "condition_group_incompatible", "触发玩家");
+        requireReceiverGateError(receiverValidator, "player", ConditionRuntimeTargetType.ACTION_RELAY, "condition_group_incompatible", "触发玩家");
+        errors.clear();
+        receiverValidator.validate(null, errors, "conditionGroupId", "allow", ConditionRuntimeTargetType.SIGNAL_LISTENER);
+        requireTrue(errors.isEmpty(), "always_true group accepted by SignalListener receiver gate backend");
+        receiverValidator.validate(null, errors, "conditionGroupId", "allow", ConditionRuntimeTargetType.ACTION_RELAY);
+        requireTrue(errors.isEmpty(), "always_true group accepted by ActionRelay receiver gate backend");
+        receiverValidator.validate(null, errors, "enterConditionGroupId", "player", ConditionRuntimeTargetType.REGION_ENTER);
+        requireTrue(errors.isEmpty(), "player group accepted by Region enter gate backend");
+        receiverValidator.validate(null, errors, "exitConditionGroupId", "player", ConditionRuntimeTargetType.REGION_EXIT);
+        requireTrue(errors.isEmpty(), "player group accepted by Region exit gate backend");
+        receiverValidator.validate(null, errors, "stayConditionGroupId", "player", ConditionRuntimeTargetType.REGION_STAY);
+        requireTrue(errors.isEmpty(), "player group accepted by Region stay gate backend");
     }
 
     private static void requireGateError(
@@ -94,6 +109,21 @@ public final class WebAdminConditionGateConfigTest {
         WebAdminValidationError error = errors.getFirst();
         requireEquals(expectedCode, error.code(), "backend gate rejection code: " + groupId);
         requireContains(error.message(), expectedChineseMessage, "backend gate rejection Chinese message: " + groupId);
+    }
+
+    private static void requireReceiverGateError(
+            WebAdminConditionGateBindingValidator validator,
+            String groupId,
+            ConditionRuntimeTargetType targetType,
+            String expectedCode,
+            String expectedChineseMessage
+    ) {
+        List<WebAdminValidationError> errors = new ArrayList<>();
+        validator.validate(null, errors, "conditionGroupId", groupId, targetType);
+        requireTrue(!errors.isEmpty(), "8.7 backend rejects receiver gate binding: " + groupId + " target=" + targetType.id());
+        WebAdminValidationError error = errors.getFirst();
+        requireEquals(expectedCode, error.code(), "8.7 receiver backend gate rejection code: " + groupId);
+        requireContains(error.message(), expectedChineseMessage, "8.7 receiver backend gate rejection Chinese message: " + groupId);
     }
 
     private static WebAdminConditionGroupStore.ConditionGroupEntry entry(String id, ConditionGroupDefinition definition, boolean enabled) {

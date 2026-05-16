@@ -58,6 +58,7 @@ public final class SignalListenerStore {
                 SignalChannel.normalize(channel),
                 enabled,
                 Math.max(SignalListenerData.MIN_COOLDOWN_TICKS, cooldownTicks),
+                "",
                 List.of()
         ).normalized();
         state.listeners.add(listener);
@@ -95,6 +96,7 @@ public final class SignalListenerStore {
                 listener.channel(),
                 enabled,
                 listener.cooldownTicks(),
+                listener.conditionGroupId(),
                 listener.actions()
         ).normalized());
         if (updated != null) {
@@ -114,6 +116,7 @@ public final class SignalListenerStore {
                 listener.channel(),
                 listener.enabled(),
                 ticks,
+                listener.conditionGroupId(),
                 listener.actions()
         ).normalized());
         if (updated != null) {
@@ -136,11 +139,23 @@ public final class SignalListenerStore {
         return replaceReturning(server, listenerRef, listener -> withBasicConfigForWebAdmin(listener, enabled, channel, cooldownTicks));
     }
 
+    public static synchronized SignalListenerData updateBasicConfigForWebAdmin(
+            MinecraftServer server,
+            String listenerRef,
+            boolean enabled,
+            String channel,
+            int cooldownTicks,
+            String conditionGroupId
+    ) {
+        return replaceReturning(server, listenerRef, listener -> withBasicConfigForWebAdmin(listener, enabled, channel, cooldownTicks, conditionGroupId));
+    }
+
     public static SignalListenerData withBasicConfigForWebAdmin(
             SignalListenerData listener,
             boolean enabled,
             String channel,
-            int cooldownTicks
+            int cooldownTicks,
+            String conditionGroupId
     ) {
         if (listener == null) {
             return null;
@@ -151,8 +166,24 @@ public final class SignalListenerStore {
                 SignalChannel.normalize(channel),
                 enabled,
                 cooldownTicks,
+                conditionGroupId,
                 listener.actions()
         ).normalized();
+    }
+
+    public static SignalListenerData withBasicConfigForWebAdmin(
+            SignalListenerData listener,
+            boolean enabled,
+            String channel,
+            int cooldownTicks
+    ) {
+        return withBasicConfigForWebAdmin(
+                listener,
+                enabled,
+                channel,
+                cooldownTicks,
+                listener == null ? "" : listener.conditionGroupId()
+        );
     }
 
     public static synchronized boolean addAction(MinecraftServer server, String listenerRef, ActionConfig action) {
@@ -165,6 +196,7 @@ public final class SignalListenerStore {
                 listener.channel(),
                 listener.enabled(),
                 listener.cooldownTicks(),
+                listener.conditionGroupId(),
                 appendAction(listener.actions(), action)
         ).normalized());
         if (updated != null) {
@@ -184,6 +216,7 @@ public final class SignalListenerStore {
                 listener.channel(),
                 listener.enabled(),
                 listener.cooldownTicks(),
+                listener.conditionGroupId(),
                 List.of()
         ).normalized());
         if (updated != null) {
@@ -208,6 +241,7 @@ public final class SignalListenerStore {
                 listener.channel(),
                 listener.enabled(),
                 listener.cooldownTicks(),
+                listener.conditionGroupId(),
                 safeActions
         ).normalized());
         if (updated != null) {

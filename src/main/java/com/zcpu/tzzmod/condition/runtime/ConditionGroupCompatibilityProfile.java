@@ -155,6 +155,87 @@ public record ConditionGroupCompatibilityProfile(
                     Set.of(),
                     Set.of()
             );
+            case SIGNAL_LISTENER -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "channel",
+                            "listenerId",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "signalDepth"
+                    ),
+                    set("trigger", "detail"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
+            case ACTION_RELAY -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "channel",
+                            "deviceId",
+                            "relayId",
+                            "blockPos",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "signalDepth"
+                    ),
+                    set("trigger", "detail"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
+            case REGION_ENTER, REGION_EXIT, REGION_STAY -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    true,
+                    true,
+                    true,
+                    withPlayer(set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "regionId",
+                            "triggerType",
+                            "detail",
+                            "gameTime"
+                    )),
+                    set("trigger", "detail", "actionBucket"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    set("region", "current_region"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
         };
     }
 

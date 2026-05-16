@@ -1,339 +1,500 @@
 # AGENTS.md
 
-## 当前优先上下文
+## 0. 文件定位
 
-这是 TZZ Mod / WebAdmin 项目的 Codex 工作说明。
+这是 TZZ Mod / WebAdmin 项目的长期 Codex 工作说明。
 
-开始任何任务前，优先阅读：
+本文件只写长期有效的协作规则、工程边界、测试规则和安全规则。
+**不要在本文件里写死当前阶段号、当前版本号、当前分支名、当前 tag、当前 commit hash 或某个阶段的临时范围。**
 
-`docs/WEBADMIN_UI_REFACTOR_7_5_CURRENT_CONTEXT.md`
-
-如果历史文档与该 current context 冲突，以 current context 为准。
-
-历史 5.x / 6.x / 7.0-7.4 文档只作背景，不代表当前 7.5 UI Refactor 的真实范围、当前实现状态、图标规则或页面落地范围。
+阶段专用信息应写入对应的 `docs/*_CURRENT_CONTEXT.md`、阶段提示词、验收文档或用户当前消息中。
 
 ---
 
-## 当前项目状态
+## 1. 开始任何任务前必须做
 
-当前工作重点：
+开始任务前，Codex 必须先确认当前真实状态，而不是根据历史记忆猜测。
 
-`7.5 WebAdmin UI Refactor`
+必须执行或读取：
 
-当前 Step 1 已围绕以下页面和基础层推进：
+1. 当前用户消息 / 当前任务提示词。
+2. 与当前任务相关的 `docs/*_CURRENT_CONTEXT.md`。
+3. 与当前任务相关的 capability matrix / test plan / README 段落。
+4. 当前分支、HEAD、远端状态、工作区状态：
 
-- 登录页
-- App Shell / sidebar / topbar
-- Dashboard / 总览页
-- SignalBridge
-- Receivers / 接收器
-- image2 / 矢量化图标体系
-- silent refresh
-- responsive layout
-- disabled / unavailable operations
-- current context 与浏览器验收文档
+```powershell
+git status --short --branch
+git rev-parse --short HEAD
+git branch --show-current
+```
 
-后续任务开始前，应先确认当前分支和工作树状态，不要基于旧文档猜测当前能力。
+如果任务涉及从稳定基线开新分支、merge、tag、release，还必须按用户或 ChatGPT 给出的具体基线执行：
 
----
+```powershell
+git fetch origin --prune --tags
+git rev-parse --short origin/master
+```
 
-## 工作边界
-
-除非用户明确要求，禁止：
-
-- 修改 Figma
-- 新增后端 API
-- 新增业务功能
-- 启用没有后端支持的写操作
-- 一次性做 18 页全量落地
-- 做子详情页
-- 实现 matcher / itemSubmit
-- 实现 Scratch-like editor
-- 实现 ConditionEngine
-- 大规模拆分前端文件
-- commit / push / merge / tag
-
-如果用户要求 checkpoint commit，也必须先运行构建和稳定性测试。
+如果当前仓库状态与用户 / ChatGPT 给出的基线不一致，必须停止并报告，不要自行猜测或强行继续。
 
 ---
 
-## WebAdmin 前端规则
+## 2. 项目长期目标
+
+TZZ Mod 的长期目标不是单一功能模组，也不是普通后台面板，而是逐步成为面向 Minecraft 小游戏开发的 **小游戏 IDE**。
+
+目标包括：
+
+- 用 WebAdmin / 游戏内工具帮助管理员快速搭建小游戏。
+- 让“全员逃走中”类小游戏从原本复杂的数据包 / 命令方块 / scoreboard 工作流，压缩到约 2–3 天可完成基础构建。
+- 通过可视化编辑、模板、条件系统、状态变量、触发器、动作系统、诊断和预览降低开发门槛。
+- 逐步提供简单版本控制能力，例如草稿、发布、变更历史、diff、快照、恢复、回滚、安全恢复点。
+- 不实现复杂 Git 分支 / merge / rebase 这类高级版本控制功能，保持服务器管理员可理解、可操作。
+
+所有新增功能都应服务于：
+
+```text
+降低配置成本
+减少重复劳动
+提升可调试性
+提升可复用性
+避免破坏旧逻辑
+```
+
+---
+
+## 3. 长期架构边界
+
+项目核心系统包括但不限于：
+
+- SignalBridge：事件总线 / channel 联动。
+- ActionEngine：统一动作执行。
+- RegionController：区域 enter / exit / stay 控制。
+- SignalDevice / VirtualBlockDevice：世界方块和虚拟设备触发源。
+- itemSubmit / container / interaction：物品、容器、交互触发能力。
+- ConditionEngine：只读条件判断 / gate。
+- StateVariable：全局 / 玩家状态变量。
+- WebAdmin：配置、编辑、调试、可视化、未来文档与模板中心。
+- 未来 GameController / MissionSystem / PhaseController：高层小游戏流程编排。
+
+关键原则：
+
+```text
+ConditionEngine 只判断，不写状态，不发信号，不执行动作。
+SignalBridge 是事件总线，不是状态数据库。
+StateVariable / GameState 保存状态。
+Action / Controlled Action 修改世界或玩家。
+GameController / MissionSystem 负责未来玩法流程编排。
+```
+
+---
+
+## 4. 阶段边界规则
+
+每个阶段必须严格遵守用户 / ChatGPT 当前提示词中的范围。
+
+除非当前任务明确要求，禁止擅自扩展到：
+
+- 具体逃走中任务 / 关卡。
+- GameController / MissionSystem / PhaseController。
+- 新 runtime integration。
+- 新 WebAdmin API。
+- 新 WebAdmin UI。
+- 新 action 类型。
+- 新 raw JSON editor。
+- 任意 NBT path / 脚本表达式。
+- MCP scenario。
+- 启动 Minecraft。
+- 生成截图矩阵。
+- Figma 修改。
+- commit / push / merge / tag。
+
+如果某个功能“看起来顺手能做”，但不在当前阶段范围内，必须作为 deferred 记录，不要直接实现。
+
+---
+
+## 5. 子智能体规则
+
+对非平凡实现、审查、返修、checkpoint 前检查、merge/tag 前检查，必须使用子智能体。
+子智能体不是可选项。
+
+要求：
+
+- 根据任务复杂度创建合适数量的只读子智能体。
+- 复杂阶段通常至少 5 个；涉及 UI + runtime + tests 的阶段可使用 6 个或更多。
+- 子智能体负责审查、发现风险、提出建议。
+- 代码修改由主智能体最终整合。
+- 子智能体不得 commit / push / merge / tag。
+- 子智能体不得在未经主智能体整合的情况下并行修改同一文件。
+- 如果 Codex 环境无法真实使用子智能体，必须停止并报告，不能假装完成。
+
+最终报告必须包含：
+
+```text
+子智能体角色
+审查轮次
+每个子智能体结论
+阻断项
+建议项
+主智能体采纳 / 不采纳原因
+```
+
+常见子智能体角色：
+
+- 阶段边界 / 架构审查。
+- 旧逻辑兼容审查。
+- Runtime context / snapshot 审查。
+- WebAdmin UI / UX 审查。
+- API / 权限 / CSRF / audit / realtime 审查。
+- 测试 / guard / docs / Git 卫生审查。
+
+---
+
+## 6. WebAdmin 前端规则
 
 WebAdmin 是 Minecraft / Mod 内置 Web 服务，不是独立前端站点。
 
-当前前端资源主要在：
+当前前端资源主要在 Java 字符串资源中，例如：
 
 - `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java`
 - `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java`
 - `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java`
 
-不要假设存在 React / Vite / npm 前端工程。
+不要假设存在 React / Vite / 独立前端工程，除非当前仓库代码已经明确存在。
 
-Codex 通常无法启动真实 Minecraft WebAdmin 服务访问 `http://127.0.0.1:18080/`，因此真实浏览器验收由用户执行。
+Codex 通常无法启动真实 Minecraft WebAdmin 服务访问本地浏览器，因此真实 UI 体验由用户人工验收。
+但 Codex 仍必须完成代码层验证：
 
-Codex 仍必须完成：
+- Java build。
+- WebAdmin 相关单元测试 / service test。
+- stabilization guard。
+- JS syntax check，如涉及前端脚本。
+- render / route / marker smoke test，如项目已有。
+- `git diff --check`。
 
-- Java build
-- `stabilizationGuardTest`
-- `git diff --check`
-- JS syntax check（如果涉及生成的前端脚本）
-- render smoke test（如果可行）
-- 测试 Markdown 更新
-- 代码层面的响应式、点击跳转、silent refresh、disabled 状态实现
-
-不要把“无法访问 18080”当作跳过代码层验证的理由。
+不能把“无法访问真实 WebAdmin”当作跳过验证的理由。
 
 ---
 
-## 设计规则
+## 7. WebAdmin UI / UX 规则
 
-Figma `1536×864` 只是视觉参考，不是固定尺寸。
+WebAdmin 必须保持一致的暗色后台风格。
 
-禁止：
+通用要求：
 
-- 写死 `1536×864`
-- 4K 下缩成小画布
-- 小窗口下卡片重叠
-- 表格压分页
-- 按钮压输入框
-- 右侧栏越界
-- 用大量 absolute 定位硬搬 Figma
-- 把 Figma 截图当背景图嵌进前端
+- 用户可见主文案使用中文。
+- 技术 ID 只能作为副文本。
+- edit lock 不能只靠 toast；被锁定时按钮应 disabled 或明确显示锁状态。
+- validation error 不清空用户输入。
+- 删除确认不要求用户输入完整 ID / 名称，除非当前任务明确要求。
+- 复杂编辑使用 modal / drawer / 单独编辑面板，不在主页面无限堆表单。
+- action list / condition node list / requirement list 默认使用紧凑 summary card。
+- 点击整张卡片或整行应进入详情 / 编辑，不能只依赖很小的文字按钮。
+- 未保存修改关闭时必须 dirty confirm。
+- realtime refresh 不应闪屏、跳顶、关闭 modal、清空输入、重置筛选或分页。
 
-前端必须根据浏览器窗口自由拉伸：
+响应式要求：
 
-- 大屏内容自然扩展
-- 表格列可变宽
-- right rail 保持合理宽度，不无限拉宽
-- 小屏 right rail 可下移
-- 表格容器可横向滚动
-- 筛选栏可换行
-- 分页始终在表格下方
-
----
-
-## Modal 规则
-
-凡是涉及以下操作：
-
-- 修改参数
-- 修改配置
-- 写入数据
-- 保存设置
-- 危险确认
-
-后续都必须使用统一 Modal：
-
-- animated modal
-- backdrop blur / 毛玻璃遮罩
-- 固定设计尺寸
-- viewport 约束
-- body 内部滚动
-- header/footer 固定
-- danger action 使用红色语义
-- 不在主页面直接展开复杂编辑表单
-- 不在表格行内做复杂编辑
-
-没有完整后端支持的写操作不能因为 UI 已经画出按钮就启用。
+- 不写死固定分辨率。
+- 不把 Figma 截图当背景图。
+- 大屏自然扩展。
+- 小屏可滚动、可换行。
+- 表格容器可横向滚动。
+- modal / drawer 受 viewport 约束，内部滚动。
+- 输入框、下拉框、按钮不得互相覆盖或撑破容器。
 
 ---
 
-## 图标规则
+## 8. Modal 规则
 
-WebAdmin 自定义图标应使用当前 7.5 认可的 image2 / 矢量化图标体系。
+凡是涉及以下操作，应优先使用统一 modal / drawer：
 
-当前偏好：
+- 修改参数。
+- 修改配置。
+- 写入数据。
+- 保存设置。
+- 危险确认。
+- 子节点 / 子组 / action / requirement 的详细编辑。
 
-- 2D
-- 扁平化
-- 简约
-- 科技风
-- 深色后台适配
-- 透明背景
-- 无背景底图
-- 无圆形底 / 方形底画进图标资产
-- UI 圆底、hover、glow 由 CSS 控制
+统一 modal 要求：
 
-禁止：
-
-- emoji
-- 字母占位
-- 纯字符图标
-- 旧图标染色
-- 无色旧图标
-- 3D 立体风
-- Minecraft 方块风 WebAdmin 图标
-- 用 image2 重画 Minecraft 原版方块 / 物品材质
-
-Minecraft 原版方块 / 物品图标必须使用原版材质资源。
+- 有打开 / 关闭动画。
+- 有 backdrop blur / 遮罩。
+- 固定设计尺寸但受 viewport 约束。
+- body 内部滚动。
+- header / footer 保持可用。
+- danger action 使用红色语义。
+- rerender / validation / realtime 后尽量保留滚动位置。
+- 不在表格行内做复杂编辑。
+- 不在主页面展开大量复杂表单。
 
 ---
 
-## 后端边界
+## 9. WebAdmin 写操作规则
 
-UI 中很多按钮只是产品方向，不代表后端已实现。
+没有完整后端支持的写操作必须 disabled / unavailable。
+不能因为 UI 有按钮就新增 API 或发送写请求。
 
-没有完整后端支持的操作必须：
+高风险写操作必须具备：
 
-- disabled
-- unavailable
-- 不发送 `POST`
-- 不发送 `PATCH`
-- 不发送 `DELETE`
-- 不假装功能可用
-- 不打开真实编辑表单
+- 权限检查。
+- CSRF / same-origin。
+- edit lock。
+- expectedFingerprint。
+- validation。
+- `WebAdminWriteResult` 或项目等价写结果。
+- audit。
+- realtime event。
+- 错误处理和中文提示。
+- 保存失败不清空输入。
 
-高风险写操作必须等以下能力完整后才允许启用：
-
-- 权限检查
-- CSRF / same-origin
-- audit
-- edit lock
-- `WebAdminWriteResult`
-- 回滚 / 错误处理边界
-
-不要因为 Figma 或 UI 中有按钮就新增 API 或启用写操作。
+写操作必须保持世界隔离。世界级配置应优先放在世界存档下的 `tzz/webadmin/` 或当前项目约定位置，不要随意写入全局 config。
 
 ---
 
-## Realtime / Silent Refresh 规则
+## 10. Realtime / Silent Refresh 规则
 
 WebAdmin realtime / silent refresh 必须非扰动。
 
 禁止：
 
-- 整页 reload
-- 白屏 / 黑屏闪烁
-- 重置滚动位置
-- 重置筛选条件
-- 重置输入内容
-- 重置分页
-- 关闭已打开 modal
-- 重建整个 app shell
+- 整页 reload。
+- 白屏 / 黑屏闪烁。
+- 重置滚动位置。
+- 重置筛选条件。
+- 重置输入内容。
+- 重置分页。
+- 关闭已打开 modal。
+- 重建整个 app shell。
+- 用户正在编辑时静默覆盖草稿。
 
 允许：
 
-- route-level silent refresh
-- stale-while-revalidate
-- visible row detail cache
-- document hidden 时暂停或标记 dirty
-- visible 后静默刷新一次
-
-Receivers 页面当前要求：
-
-- 接收器列表可通过现有详情数据源补齐 `pulseTicks`
-- 默认值应来自当前代码常量，不要猜
-- 修改 pulseTicks 后应通过 silent refresh 更新
-- 不新增后端 API
+- route-level silent refresh。
+- stale-while-revalidate。
+- visible row detail cache。
+- document hidden 时暂停刷新或标记 dirty。
+- visible 后静默刷新一次。
+- 保存成功后局部刷新详情。
 
 ---
 
-## 常用验证命令
+## 11. Condition / Runtime Gate 规则
 
-修改代码后通常需要运行：
+当任务涉及 ConditionEngine 或 runtime gate 时，必须遵守：
+
+- 未配置 conditionGroupId 时，旧逻辑必须完全不变。
+- 未配置 conditionGroupId 时，不读取 condition group store，不构造 EvaluationContext，不 evaluate。
+- 配置 conditionGroupId 后，只能作为外层 gate。
+- gate true 后进入旧逻辑原流程。
+- gate false 后不进入旧副作用逻辑。
+- gate false 不 emit signal、不 consume item、不执行 action、不移动物品、不写状态。
+- missing / disabled / invalid / incompatible group 的处理必须安全且中文可读。
+- 不兼容的 condition group 不能出现在可用列表。
+- 后端也必须拒绝 incompatible binding，不能只靠前端隐藏。
+- available list / compatibility profile / runtime builder 必须保持一致。
+
+不得为了接入 condition 改写旧业务语义，例如 itemSubmit consume、container change detection、SignalBridge emit、RegionController enter/exit/stay、ActionEngine action order 等。
+
+---
+
+## 12. 文档与帮助中心方向
+
+系统越来越复杂，后续需要 WebAdmin 内置文档 / 帮助中心 / 知识库。
+
+每个复杂阶段都应尽量补充：
+
+- context 文档。
+- capability matrix。
+- 用户可见 help text。
+- 字段中文说明。
+- 示例配置。
+- 常见错误原因。
+- Doctor / debugger 可跳转的解释材料。
+
+未来文档中心应覆盖：
+
+- SignalBridge / channel。
+- SignalEmitter / SignalReceiver / ActionRelay / VirtualBlockDevice。
+- SignalListener。
+- RegionController。
+- ActionEngine。
+- ConditionEngine / condition group。
+- StateVariable。
+- item / inventory / container conditions。
+- Region / Signal / LogicChain conditions。
+- runtime gate。
+- WebAdmin 编辑流程。
+- 常见配置模板。
+- 常见故障排查。
+- 简单版本历史 / rollback 使用方式。
+
+不要把文档中心硬塞进不相关阶段；可以作为独立阶段推进。
+
+---
+
+## 13. 图标规则
+
+WebAdmin 自定义图标应使用项目当前认可的图标体系。
+
+偏好：
+
+- 2D。
+- 扁平化。
+- 简约。
+- 科技风。
+- 深色后台适配。
+- 透明背景。
+- UI 圆底、hover、glow 由 CSS 控制。
+
+禁止：
+
+- emoji。
+- 字母占位。
+- 纯字符图标。
+- 旧图标简单染色。
+- 3D 立体风。
+- 把 Minecraft 方块风用于 WebAdmin 自定义图标。
+- 用生成模型重画 Minecraft 原版方块 / 物品材质。
+
+Minecraft 原版方块 / 物品图标必须使用原版材质资源。
+
+---
+
+## 14. 测试与验证命令
+
+常规修改后通常需要运行：
+
+```powershell
+cd tools\tzz-test-mcp
+npm run build
+npm test
+```
+
+回到仓库根目录：
 
 ```powershell
 .\gradlew.bat clean build
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
+.\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
 ```
 
+如果当前阶段未涉及 MCP，是否运行 MCP 命令以用户 / ChatGPT 当前提示词为准。
+如果 Gradle guard 因并行测试编译目录竞争失败，顺序重跑；仍失败则停止报告。
+
 如果涉及前端脚本生成，应尽量执行：
 
-- JS syntax check
-- render smoke test
-- icon registry smoke test
-- 关键页面 mock render
+- JS syntax check。
+- route / handler / marker guard。
+- render smoke test，如可行。
+- 关键 UI 文案 / CSS marker 检查。
 
-如果 PATH 上的 `node.exe` 不可用，可使用 Codex / 环境中可用的 bundled Node，但必须在报告中说明。
-
----
-
-## Git 规则
-
-除非用户明确要求：
-
-- 不 commit
-- 不 push
-- 不 merge
-- 不 tag
-
-如果用户要求 checkpoint commit：
-
-1. 先运行构建和稳定性测试。
-2. 只暂存本轮相关文件。
-3. 不提交 `logs/`。
-4. 报告 commit hash、commit message、git status。
-5. 不 push / merge / tag，除非用户明确要求。
+不要启动 Minecraft、跑 MCP scenario 或生成截图矩阵，除非当前任务明确要求。
 
 ---
 
-## 测试文档规则
+## 15. 测试文档规则
 
-WebAdmin / API / service 阶段需要测试时，优先创建或更新 Markdown 测试文件。
+WebAdmin / API / runtime 阶段需要人工验收时，测试文档应由 ChatGPT 提供或由当前任务明确要求。
 
-测试文件必须包含：
+测试文档应包含：
 
-- 新世界前置条件
-- 数据准备步骤
-- 精确命令
-- 浏览器验收步骤
-- 失败判定
-- disabled / unavailable 边界
-- 响应式检查
-- Console / Network 检查
+- 前置条件。
+- 数据准备步骤。
+- 精确命令或 UI 步骤。
+- 浏览器验收步骤。
+- 游戏内验收步骤，如涉及 runtime。
+- 失败判定。
+- disabled / unavailable 边界。
+- 响应式检查。
+- console / network 检查。
+- checkpoint 通过标准。
 
 不要使用裸父命令作为测试命令，例如：
 
-- `/tzz signal`
-- `/tzz regionctl`
+```text
+/tzz signal
+/tzz regionctl
+```
 
-命令必须来自当前代码注册，或者明确要求使用 TAB 补全确认当前精确命令。不要根据历史记忆猜命令。
-
----
-
-## 当前 7.5 Step 1 相关文件
-
-当前 Step 1 常见相关文件包括：
-
-- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java`
-- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java`
-- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java`
-- `src/main/resources/assets/tzz_mod/webadmin/icons/`
-- `docs/WEBADMIN_UI_REFACTOR_7_5_CURRENT_CONTEXT.md`
-- `测试_7.5_WebAdmin前端重构第一阶段浏览器验收.md`
-
-`logs/` 如未跟踪，默认不要处理、不要删除、不要提交。
+命令必须来自当前代码注册，或者明确要求用 TAB 补全确认当前精确命令。不要根据历史记忆猜命令。
 
 ---
 
-## 旧文档使用说明
+## 16. Git 规则
 
-旧文档仍可作为历史背景，但不代表当前 7.5 UI Refactor 状态。
+除非用户明确要求：
 
-可能误导当前阶段的文档包括但不限于：
+- 不 commit。
+- 不 push。
+- 不 merge。
+- 不 tag。
 
-- 6.x readonly / realtime / write foundation 文档
-- 7.0-7.4 editing / listener config 文档
-- 7.0-7.4 regression test 文档
-- 早期 WebAdmin 设计草稿
+checkpoint commit 规则：
 
-如果旧文档与当前代码或 `docs/WEBADMIN_UI_REFACTOR_7_5_CURRENT_CONTEXT.md` 冲突，以 current context 和当前代码为准。
+1. 用户确认可以 checkpoint 后才执行。
+2. checkpoint 前必须运行当前提示词要求的验证命令。
+3. 禁止 `git add .`。
+4. 只能显式暂存本阶段相关文件。
+5. 不提交 `logs/`。
+6. 不提交 `reports/mcp/`、screenshots、node_modules、build、run、`.gradle/`。
+7. 报告 commit hash、message、验证结果、git status。
+8. checkpoint 只 push feature 分支，不 merge、不 tag、不 push master，除非用户明确要求。
+
+merge/tag 规则：
+
+1. 必须先核验 feature HEAD 和 origin/master。
+2. feature 最终验证。
+3. no-ff merge 到 master。
+4. master 合并后验证。
+5. push master。
+6. create annotated tag。
+7. push tag。
+8. 最终核验 master/tag。
+9. 任一步失败都停止，不继续后续步骤。
+10. 失败发布状态不得强行 push；必要时回到 feature 修复并 reset 本地 master。
 
 ---
 
-## 子智能体
+## 17. Git 卫生
 
-我允许你自主规划我下达的任务,指令,合理灵活运用子智能体提升效率,任何你认为可行的时候都可以,子智能体全权由你,你需要多少个都可以,没有类似两个的上限
+长期规则：
 
-在对话结束前,关闭子智能体,下次对话开始需要时重新创建
+- `logs/` 如未跟踪，默认不要处理、不要删除、不要提交。
+- 不提交 `reports/mcp/`。
+- 不提交 screenshots。
+- 不提交 node_modules。
+- 不提交 build。
+- 不提交 run。
+- 不提交 `.gradle/`。
+- 不提交临时生成文件，除非当前任务明确要求纳入版本控制。
 
-你可以自行使用子智能体辅助，但必须遵守：
-- 子智能体由你协调,可以修改,读取
-- 代码修改只能由主智能体最终整合
-- 不允许多个子智能体同时修改同一个文件
-- 不允许子智能体在未经许可情况下新增后端 API / 业务功能
-- 不允许子智能体 commit / push / merge / tag
-- 所有子智能体结果必须由主智能体汇总后统一落地
+每次报告必须说明：
+
+```text
+当前分支
+HEAD
+git status --short --branch
+验证结果
+是否 commit / push / merge / tag
+logs/ 是否未处理
+是否有无关文件
+```
 
 ---
+
+## 18. 旧文档使用说明
+
+旧文档可以作为历史背景，但不代表当前阶段真实范围。
+
+如果旧文档与以下来源冲突，以后者为准：
+
+1. 用户当前消息。
+2. ChatGPT 当前阶段提示词。
+3. 最新 `docs/*_CURRENT_CONTEXT.md`。
+4. 当前代码。
+5. 当前测试结果。
+
+不要因为旧文档里写了某个版本、阶段或禁止项，就覆盖当前任务的明确要求。
+如果不确定，停止并询问用户或报告冲突。

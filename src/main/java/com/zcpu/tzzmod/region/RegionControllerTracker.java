@@ -2,7 +2,13 @@ package com.zcpu.tzzmod.region;
 
 import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
+import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import java.util.HashMap;
@@ -18,6 +24,7 @@ import net.minecraft.util.math.Vec3d;
 
 public final class RegionControllerTracker {
     private static final Map<UUID, PlayerRegionState> PLAYER_STATES = new HashMap<>();
+    private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
 
     private RegionControllerTracker() {
     }
@@ -115,11 +122,23 @@ public final class RegionControllerTracker {
         state.lastStayTriggerTicks.put(controller.id(), currentTick);
     }
 
-    private static void executeActions(ServerPlayerEntity player, RegionControllerData controller, RegionTriggerType triggerType) {
+    private static ActionExecutionResult executeActions(ServerPlayerEntity player, RegionControllerData controller, RegionTriggerType triggerType) {
         if (controller.actionsFor(triggerType).isEmpty()) {
-            return;
+            return ActionExecutionResult.success(net.minecraft.text.Text.literal("区域控制器没有配置动作"));
         }
 
+        MinecraftServer server = player.getCommandSource().getServer();
+        MapDataStore.PlannerRegionData region = server == null ? null : MapDataStore.getPlannerRegion(server, controller.regionId());
+        String conditionGroupId = conditionGroupIdFor(controller, triggerType);
+        ConditionGateResult gate = CONDITION_GATE_SERVICE.evaluate(server, new ConditionGateRequest(
+                conditionGroupId,
+                targetTypeFor(triggerType),
+                controller.id(),
+                () -> ConditionRuntimeContextBuilder.regionController(server, player, controller, triggerType, region)
+        ));
+        if (!gate.allowed()) {
+            return ActionExecutionResult.failure(net.minecraft.text.Text.literal("区域控制器条件阻断：" + gate.failureReason()));
+        }
         ActionContext context = new ActionContext(
                 player,
                 player.getCommandSource().getWorld(),
@@ -128,8 +147,35 @@ public final class RegionControllerTracker {
                 controller.id(),
                 ItemStack.EMPTY
         );
-        ActionEngine.executeAll(context, controller.actionsFor(triggerType));
+        ActionExecutionResult result = ActionEngine.executeAll(context, controller.actionsFor(triggerType));
         WebAdminRealtimeEventBus.publishRegionRuntimeEvent(controller, triggerType, player);
+        return result;
+    }
+
+    public static ActionExecutionResult executeActionsForTest(ServerPlayerEntity player, RegionControllerData controller, RegionTriggerType triggerType) {
+        if (player == null || controller == null || triggerType == null) {
+            return ActionExecutionResult.failure(net.minecraft.text.Text.literal("区域控制器测试缺少上下文"));
+        }
+        return executeActions(player, controller, triggerType);
+    }
+
+    private static String conditionGroupIdFor(RegionControllerData controller, RegionTriggerType triggerType) {
+        if (controller == null || triggerType == null) {
+            return "";
+        }
+        return switch (triggerType) {
+            case ENTER -> controller.enterConditionGroupId();
+            case EXIT -> controller.exitConditionGroupId();
+            case STAY -> controller.stayConditionGroupId();
+        };
+    }
+
+    private static ConditionRuntimeTargetType targetTypeFor(RegionTriggerType triggerType) {
+        return switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> ConditionRuntimeTargetType.REGION_ENTER;
+            case EXIT -> ConditionRuntimeTargetType.REGION_EXIT;
+            case STAY -> ConditionRuntimeTargetType.REGION_STAY;
+        };
     }
 
     private static final class PlayerRegionState {

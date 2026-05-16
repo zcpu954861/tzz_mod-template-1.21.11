@@ -22,6 +22,7 @@ public final class ConditionGroupCompatibilityServiceTest {
         testUnavailableRegionSignalLogicSnapshots();
         testNestedGroupsAndDisabledNodes();
         testChineseIncompatibilityReasons();
+        testReceiverSideRuntimeGateProfiles();
     }
 
     private static void testAlwaysTrueCompatibleWithAllProfiles() {
@@ -144,6 +145,36 @@ public final class ConditionGroupCompatibilityServiceTest {
         requireFalse(result.compatible(), "Chinese reason incompatible result");
         requireTrue(result.reasons().stream().anyMatch(ConditionGroupCompatibilityServiceTest::containsChinese), "incompatibility reason is Chinese");
         requireContains(result.message(), "触发玩家", "incompatibility message Chinese");
+    }
+
+    private static void testReceiverSideRuntimeGateProfiles() {
+        ConditionGroupDefinition playerTag = definition("player_tag", leaf(ConditionNodeType.PLAYER_HAS_TAG, config("tag", "runner")));
+        ConditionGroupDefinition contextPlayerState = definition("context_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "context_player", "expected", "true")));
+        ConditionGroupDefinition explicitPlayerState = definition("explicit_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "explicit_target", "targetId", "player-1", "expected", "true")));
+        ConditionGroupDefinition region = definition("region_snapshot", leaf(ConditionNodeType.REGION_ENABLED, config("regionKey", "region")));
+        ConditionGroupDefinition currentRegion = definition("current_region_snapshot", leaf(ConditionNodeType.PLAYER_IN_REGION, config("regionKey", "current_region", "playerMode", "context_player")));
+        ConditionGroupDefinition heldItem = definition("held_item_receiver", leaf(ConditionNodeType.ITEM_STACK_EXISTS, config("itemKey", "held_item")));
+        ConditionGroupDefinition signalHistory = definition("signal_history_receiver", leaf(ConditionNodeType.SIGNAL_EVENT_COUNT_COMPARE,
+                config("signalHistoryKey", "history", "channel", "mission.start", "operator", "gte", "count", "1")));
+        ConditionGroupDefinition listenerContext = definition("listener_context", leaf(ConditionNodeType.LISTENER_ID_EQUALS, config("listenerId", "listener-1")));
+        ConditionGroupDefinition relayContext = definition("relay_context", leaf(ConditionNodeType.DEVICE_ID_EQUALS, config("deviceId", "relay-1")));
+
+        requireIncompatible(playerTag, ConditionRuntimeTargetType.SIGNAL_LISTENER, "触发玩家", "generic SignalListener profile rejects player-dependent condition");
+        requireIncompatible(playerTag, ConditionRuntimeTargetType.ACTION_RELAY, "触发玩家", "generic ActionRelay profile rejects player-dependent condition");
+        requireIncompatible(contextPlayerState, ConditionRuntimeTargetType.SIGNAL_LISTENER, "context_player", "SignalListener rejects context_player state variable");
+        requireIncompatible(contextPlayerState, ConditionRuntimeTargetType.ACTION_RELAY, "context_player", "ActionRelay rejects context_player state variable");
+        requireCompatible(explicitPlayerState, ConditionRuntimeTargetType.SIGNAL_LISTENER, "SignalListener accepts explicit PLAYER state variable");
+        requireCompatible(explicitPlayerState, ConditionRuntimeTargetType.ACTION_RELAY, "ActionRelay accepts explicit PLAYER state variable");
+        requireCompatible(listenerContext, ConditionRuntimeTargetType.SIGNAL_LISTENER, "SignalListener profile exposes listenerId");
+        requireCompatible(relayContext, ConditionRuntimeTargetType.ACTION_RELAY, "ActionRelay profile exposes deviceId");
+        requireIncompatible(heldItem, ConditionRuntimeTargetType.REGION_ENTER, "物品快照", "Region profiles do not advertise item snapshots");
+        requireIncompatible(signalHistory, ConditionRuntimeTargetType.REGION_STAY, "信号历史快照", "Region profiles do not advertise signal history snapshots");
+        requireCompatible(playerTag, ConditionRuntimeTargetType.REGION_ENTER, "Region enter accepts player-dependent condition");
+        requireCompatible(contextPlayerState, ConditionRuntimeTargetType.REGION_EXIT, "Region exit accepts context_player state variable");
+        requireCompatible(region, ConditionRuntimeTargetType.REGION_ENTER, "Region enter supports region snapshot key");
+        requireCompatible(currentRegion, ConditionRuntimeTargetType.REGION_STAY, "Region stay supports current_region snapshot key");
     }
 
     private static void requireCompatible(ConditionGroupDefinition definition, ConditionRuntimeTargetType targetType, String message) {

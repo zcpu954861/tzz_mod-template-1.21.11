@@ -10,7 +10,12 @@ public enum ConditionRuntimeTargetType {
     ITEM_SUBMIT("ITEM_SUBMIT", "VBD itemSubmit"),
     CONTAINER_OPEN("CONTAINER_OPEN", "VBD 容器打开"),
     CONTAINER_CLOSE("CONTAINER_CLOSE", "VBD 容器关闭"),
-    CONTAINER_CHANGE("CONTAINER_CHANGE", "VBD 容器内容变化");
+    CONTAINER_CHANGE("CONTAINER_CHANGE", "VBD 容器内容变化"),
+    SIGNAL_LISTENER("SIGNAL_LISTENER", "Signal Listener 动作列表"),
+    ACTION_RELAY("ACTION_RELAY", "Action Relay 动作列表"),
+    REGION_ENTER("REGION_ENTER", "RegionController enter 动作列表"),
+    REGION_EXIT("REGION_EXIT", "RegionController exit 动作列表"),
+    REGION_STAY("REGION_STAY", "RegionController stay 动作列表");
 
     private final String id;
     private final String displayName;

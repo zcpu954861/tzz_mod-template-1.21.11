@@ -19,6 +19,9 @@ public final class WebAdminRegionControllerRequests {
         public String targetFilterType = "ALL";
         public String targetFilterValue = "";
         public Object stayIntervalTicks = 100;
+        public String enterConditionGroupId = "";
+        public String exitConditionGroupId = "";
+        public String stayConditionGroupId = "";
         public String expectedFingerprint = "";
         public String lockId = "";
     }

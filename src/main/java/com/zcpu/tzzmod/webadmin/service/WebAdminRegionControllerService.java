@@ -2,12 +2,14 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.region.RegionTargetFilter;
 import com.zcpu.tzzmod.region.RegionTriggerType;
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
@@ -53,6 +55,7 @@ public final class WebAdminRegionControllerService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
 
     public WebAdminRegionControllerService(
             WebAdminPermissionService permissionService,
@@ -169,7 +172,7 @@ public final class WebAdminRegionControllerService {
             audit(context, result, auditSummary(before), Map.of("attempt", "fingerprint_conflict"));
             return result;
         }
-        Validation parsed = validateUpdate(request, before);
+        Validation parsed = validateUpdate(server, request, before);
         if (!parsed.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, parsed.errors());
             audit(context, result, auditSummary(before), Map.of("attempt", "validation_failed"));
@@ -182,6 +185,9 @@ public final class WebAdminRegionControllerService {
                 parsed.enabled(),
                 parsed.targetFilter(),
                 parsed.stayIntervalTicks(),
+                parsed.enterConditionGroupId(),
+                parsed.exitConditionGroupId(),
+                parsed.stayConditionGroupId(),
                 before.enterActions(),
                 before.exitActions(),
                 before.stayActions()
@@ -412,6 +418,9 @@ public final class WebAdminRegionControllerService {
                 + "|enabled=" + controller.enabled()
                 + "|target=" + targetFilterFingerprint(controller.targetFilter())
                 + "|stay=" + controller.stayIntervalTicks()
+                + "|enterConditionGroupId=" + controller.enterConditionGroupId()
+                + "|exitConditionGroupId=" + controller.exitConditionGroupId()
+                + "|stayConditionGroupId=" + controller.stayConditionGroupId()
                 + "|enter=" + actionFingerprintList(controller.enterActions())
                 + "|exit=" + actionFingerprintList(controller.exitActions())
                 + "|stayActions=" + actionFingerprintList(controller.stayActions());
@@ -436,6 +445,15 @@ public final class WebAdminRegionControllerService {
         data.put("targetFilter", targetFilterDto(controller.targetFilter()));
         data.put("targetFilterLabel", targetFilterLabel(controller.targetFilter()));
         data.put("stayIntervalTicks", controller.stayIntervalTicks());
+        data.put("enterConditionGroupId", controller.enterConditionGroupId());
+        data.put("exitConditionGroupId", controller.exitConditionGroupId());
+        data.put("stayConditionGroupId", controller.stayConditionGroupId());
+        data.put("conditionGateTargetTypes", Map.of(
+                "enter", ConditionRuntimeTargetType.REGION_ENTER.id(),
+                "exit", ConditionRuntimeTargetType.REGION_EXIT.id(),
+                "stay", ConditionRuntimeTargetType.REGION_STAY.id()
+        ));
+        data.put("conditionGateTargetId", controller.id());
         data.put("enterActionCount", controller.enterActions().size());
         data.put("exitActionCount", controller.exitActions().size());
         data.put("stayActionCount", controller.stayActions().size());
@@ -450,6 +468,7 @@ public final class WebAdminRegionControllerService {
         data.put("defaultStayIntervalTicks", RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS);
         data.put("noRawJson", true);
         data.put("noConditionEngine", true);
+        data.put("conditionRuntimeGates", true);
         if (detailed) {
             data.put("actions", Map.of(
                     "enter", actionDtos(controller.enterActions()),
@@ -457,7 +476,8 @@ public final class WebAdminRegionControllerService {
                     "stay", actionDtos(controller.stayActions())
             ));
             data.put("notes", List.of(
-                    "RegionController 只编辑已有 enter / exit / stay action 列表，不新增 ConditionEngine、路径可视化或 raw JSON。",
+                    "RegionController 只编辑已有 enter / exit / stay action 列表和三个外层条件组 gate，不新增 ConditionEngine、路径可视化或 raw JSON。",
+                    "未配置条件组 = 保持旧区域控制器逻辑，不拦截；配置后仅阻断对应 enter / exit / stay Action 列表。",
                     "command action 会阻断 stop/op/ban/kick/whitelist 等危险服务器管理命令。",
                     "stayIntervalTicks 小于 " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " 会被拒绝。"
             ));
@@ -506,7 +526,7 @@ public final class WebAdminRegionControllerService {
         return validation.success() ? null : validation.result();
     }
 
-    private Validation validateUpdate(WebAdminRegionControllerRequests.UpdateRequest request, RegionControllerData before) {
+    private Validation validateUpdate(MinecraftServer server, WebAdminRegionControllerRequests.UpdateRequest request, RegionControllerData before) {
         List<WebAdminValidationError> errors = new ArrayList<>();
         String name = safe(request.name).trim();
         String regionId = safe(request.regionId).trim();
@@ -517,8 +537,21 @@ public final class WebAdminRegionControllerService {
         if (stayIntervalTicks < RegionControllerData.MIN_STAY_INTERVAL_TICKS) {
             errors.add(new WebAdminValidationError("stayIntervalTicks", "too_small", "stayIntervalTicks 不能小于 " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " ticks。", String.valueOf(stayIntervalTicks)));
         }
+        gateBindingValidator.validate(server, errors, "enterConditionGroupId", request.enterConditionGroupId, ConditionRuntimeTargetType.REGION_ENTER);
+        gateBindingValidator.validate(server, errors, "exitConditionGroupId", request.exitConditionGroupId, ConditionRuntimeTargetType.REGION_EXIT);
+        gateBindingValidator.validate(server, errors, "stayConditionGroupId", request.stayConditionGroupId, ConditionRuntimeTargetType.REGION_STAY);
         RegionTargetFilter filter = parseTargetFilter(request.targetFilterType, request.targetFilterValue, errors);
-        return new Validation(errors, enabled, name, regionId, filter, stayIntervalTicks);
+        return new Validation(
+                errors,
+                enabled,
+                name,
+                regionId,
+                filter,
+                stayIntervalTicks,
+                WebAdminConditionGroupStore.normalizeId(request.enterConditionGroupId),
+                WebAdminConditionGroupStore.normalizeId(request.exitConditionGroupId),
+                WebAdminConditionGroupStore.normalizeId(request.stayConditionGroupId)
+        );
     }
 
     private static void validateName(String value, List<WebAdminValidationError> errors) {
@@ -684,6 +717,9 @@ public final class WebAdminRegionControllerService {
         if (before.enabled() != after.enabled()) fields.add("enabled");
         if (!targetFilterFingerprint(before.targetFilter()).equals(targetFilterFingerprint(after.targetFilter()))) fields.add("targetFilter");
         if (before.stayIntervalTicks() != after.stayIntervalTicks()) fields.add("stayIntervalTicks");
+        if (!before.enterConditionGroupId().equals(after.enterConditionGroupId())) fields.add("enterConditionGroupId");
+        if (!before.exitConditionGroupId().equals(after.exitConditionGroupId())) fields.add("exitConditionGroupId");
+        if (!before.stayConditionGroupId().equals(after.stayConditionGroupId())) fields.add("stayConditionGroupId");
         return List.copyOf(fields);
     }
 
@@ -720,6 +756,9 @@ public final class WebAdminRegionControllerService {
         summary.put("enabled", normalized.enabled());
         summary.put("targetFilter", targetFilterLabel(normalized.targetFilter()));
         summary.put("stayIntervalTicks", normalized.stayIntervalTicks());
+        summary.put("enterConditionGroupId", normalized.enterConditionGroupId());
+        summary.put("exitConditionGroupId", normalized.exitConditionGroupId());
+        summary.put("stayConditionGroupId", normalized.stayConditionGroupId());
         summary.put("enterActionCount", normalized.enterActions().size());
         summary.put("exitActionCount", normalized.exitActions().size());
         summary.put("stayActionCount", normalized.stayActions().size());
@@ -807,6 +846,9 @@ public final class WebAdminRegionControllerService {
                 .routeTarget(routeTarget)
                 .payload("controllerId", controller.id())
                 .payload("action", action)
+                .payload("enterConditionGroupId", controller.enterConditionGroupId())
+                .payload("exitConditionGroupId", controller.exitConditionGroupId())
+                .payload("stayConditionGroupId", controller.stayConditionGroupId())
                 .payload("actor", user == null ? "" : user.username));
         WebAdminRealtimeEventBus.publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED)
                 .regionId(controller.regionId())
@@ -921,7 +963,10 @@ public final class WebAdminRegionControllerService {
             String name,
             String regionId,
             RegionTargetFilter targetFilter,
-            int stayIntervalTicks
+            int stayIntervalTicks,
+            String enterConditionGroupId,
+            String exitConditionGroupId,
+            String stayConditionGroupId
     ) {
     }
 
