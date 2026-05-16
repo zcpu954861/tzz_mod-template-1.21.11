@@ -131,10 +131,24 @@ public final class WebAdminConditionGroupService {
             String targetType,
             String targetId
     ) {
+        return available(server, user, session, Map.of(
+                "targetType", safe(targetType),
+                "targetId", safe(targetId)
+        ));
+    }
+
+    public Map<String, Object> available(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            Map<String, String> query
+    ) {
         WebAdminPermissionDecision decision = permissionService.decide(user, WebAdminOperationType.READ);
         if (!decision.allowed()) {
             return Map.of("groups", List.of(), "permissionDenied", true, "message", decision.message());
         }
+        String targetType = query == null ? "" : query.getOrDefault("targetType", "");
+        String targetId = query == null ? "" : query.getOrDefault("targetId", "");
         ConditionRuntimeTargetType runtimeTargetType = ConditionRuntimeTargetType.parse(targetType).orElse(null);
         if (runtimeTargetType == null) {
             return Map.of(
@@ -199,6 +213,11 @@ public final class WebAdminConditionGroupService {
         result.put("count", groups.size());
         result.put("targetType", runtimeTargetType.id());
         result.put("targetId", safe(targetId));
+        result.put("parentTargetType", safe(query == null ? "" : query.get("parentTargetType")));
+        result.put("parentTargetId", safe(query == null ? "" : query.get("parentTargetId")));
+        result.put("actionType", safe(query == null ? "" : query.get("actionType")));
+        result.put("actionIndex", safe(query == null ? "" : query.get("actionIndex")));
+        result.put("actionBucket", safe(query == null ? "" : query.get("actionBucket")));
         result.put("targetCapabilities", profile.summary());
         result.put("incompatibleCount", incompatible.size());
         result.put("incompatibleReasons", incompatible);

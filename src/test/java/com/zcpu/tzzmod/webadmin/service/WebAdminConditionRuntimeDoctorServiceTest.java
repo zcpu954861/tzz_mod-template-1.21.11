@@ -38,7 +38,11 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
                 binding("VIRTUAL_BLOCK_DEVICE", "vbd-disabled", "disabled", ConditionRuntimeTargetType.VBD_REDSTONE),
                 binding("VIRTUAL_BLOCK_DEVICE", "vbd-invalid", "invalid", ConditionRuntimeTargetType.VBD_REDSTONE),
                 binding("VIRTUAL_BLOCK_DEVICE", "vbd-definition-missing", "definition_missing", ConditionRuntimeTargetType.VBD_REDSTONE),
-                binding("SIGNAL_LISTENER", "listener-player", "player", ConditionRuntimeTargetType.SIGNAL_LISTENER)
+                binding("SIGNAL_LISTENER", "listener-player", "player", ConditionRuntimeTargetType.SIGNAL_LISTENER),
+                binding("SIGNAL_LISTENER_ACTION", "listener:listener-1:action:0", "missing", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
+                binding("ACTION_RELAY_ACTION", "relay:minecraft:overworld@1,2,3:action:0", "disabled", ConditionRuntimeTargetType.ACTION_RELAY_ACTION),
+                binding("REGION_CONTROLLER_ACTION", "region:region-1:enter:action:0", "invalid", ConditionRuntimeTargetType.REGION_ENTER_ACTION),
+                binding("SIGNAL_LISTENER_ACTION", "listener:listener-player:action:1", "player", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION)
         ));
 
         requireIssue(issues, "condition-runtime-missing-group", "ERROR", "不存在", "重新绑定");
@@ -46,6 +50,15 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         requireIssue(issues, "condition-runtime-invalid-group", "ERROR", "校验失败", "修复无效节点");
         requireIssue(issues, "condition-runtime-definition-missing", "ERROR", "groupDefinition", "gate");
         requireIssue(issues, "condition-runtime-incompatible-group", "ERROR", "触发玩家", "改绑");
+        requireTrue(issues.stream().anyMatch(issue -> issue.relatedObjectType().equals("SIGNAL_LISTENER_ACTION")
+                        && issue.id().contains("condition-runtime-missing-group")),
+                "doctor reports missing action condition group");
+        requireTrue(issues.stream().anyMatch(issue -> issue.relatedObjectType().equals("ACTION_RELAY_ACTION")
+                        && issue.id().contains("condition-runtime-disabled-group")),
+                "doctor reports disabled action condition group");
+        requireTrue(issues.stream().anyMatch(issue -> issue.relatedObjectType().equals("REGION_CONTROLLER_ACTION")
+                        && issue.id().contains("condition-runtime-invalid-group")),
+                "doctor reports invalid region action condition group");
         requireTrue(issues.stream().allMatch(issue -> containsChinese(issue.title()) && containsChinese(issue.message()) && containsChinese(issue.suggestion())),
                 "doctor diagnostics use Chinese title/message/suggestion");
     }
@@ -77,10 +90,13 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
 
         List<WebAdminDtos.DoctorIssueDto> issues = service.diagnoseBindings(groups, List.of(
                 binding("ACTION_RELAY", "relay-state", "context_player_state", ConditionRuntimeTargetType.ACTION_RELAY),
+                binding("ACTION_RELAY_ACTION", "relay-state:action:0", "context_player_state", ConditionRuntimeTargetType.ACTION_RELAY_ACTION),
                 binding("VIRTUAL_BLOCK_DEVICE", "vbd-container", "container", ConditionRuntimeTargetType.VBD_INTERACTION),
+                binding("SIGNAL_LISTENER_ACTION", "listener-container:action:0", "container", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
                 binding("REGION_CONTROLLER", "region-inventory", "inventory", ConditionRuntimeTargetType.REGION_ENTER),
                 binding("REGION_CONTROLLER", "region-item-stack", "item_stack", ConditionRuntimeTargetType.REGION_ENTER),
-                binding("REGION_CONTROLLER", "region-signal-history", "signal_history", ConditionRuntimeTargetType.REGION_STAY)
+                binding("REGION_CONTROLLER", "region-signal-history", "signal_history", ConditionRuntimeTargetType.REGION_STAY),
+                binding("REGION_CONTROLLER_ACTION", "region-signal-history:stay:action:0", "signal_history", ConditionRuntimeTargetType.REGION_STAY_ACTION)
         ));
 
         requireIssue(issues, "condition-runtime-incompatible-group", "ERROR", "context_player", "改绑");
@@ -88,8 +104,11 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         requireIssue(issues, "condition-runtime-incompatible-group", "ERROR", "背包快照", "改绑");
         requireIssue(issues, "condition-runtime-incompatible-group", "ERROR", "物品快照", "改绑");
         requireIssue(issues, "condition-runtime-incompatible-group", "ERROR", "信号历史快照", "改绑");
-        requireTrue(issues.stream().noneMatch(issue -> issue.message().contains("SignalReceiver") || issue.message().contains("单条 Action")),
-                "doctor does not report deferred SignalReceiver or single Action gate as missing errors");
+        requireTrue(issues.stream().noneMatch(issue -> issue.message().contains("SignalReceiver")
+                        || issue.message().contains("Signal Join")
+                        || issue.message().contains("Barrier")
+                        || issue.message().contains("Aggregator")),
+                "doctor does not report deferred SignalReceiver or Signal Join / Barrier / Aggregator as missing errors");
     }
 
     private static void testContainerOpenCloseDynamicProfileDiagnostics() {
@@ -123,6 +142,7 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         List<WebAdminDtos.DoctorIssueDto> issues = service.diagnoseBindings(groups, List.of(
                 binding("VIRTUAL_BLOCK_DEVICE", "vbd-always-false", "always_false", ConditionRuntimeTargetType.VBD_REDSTONE),
                 binding("SIGNAL_LISTENER", "listener-blank", "", ConditionRuntimeTargetType.SIGNAL_LISTENER),
+                binding("SIGNAL_LISTENER_ACTION", "listener:listener-blank:action:0", "", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
                 binding("ACTION_RELAY", "relay-allow", "allow", ConditionRuntimeTargetType.ACTION_RELAY)
         ));
 

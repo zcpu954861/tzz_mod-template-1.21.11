@@ -1080,18 +1080,18 @@ public final class WebAdminServer {
             WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
             return;
         }
+        // 8.9 action gate available-list marker: condition-groups/available queryMap.
         if (path.equals(root + "/available")) {
             if (!method.equalsIgnoreCase("GET")) {
                 WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
                 return;
             }
-            Map<String, String> query = queryParams(exchange);
+            Map<String, String> queryMap = queryParams(exchange);
             WebAdminJsonResponse.ok(exchange, conditionGroupService.available(
                     minecraftServer,
                     auth.user,
                     auth.session,
-                    query.getOrDefault("targetType", ""),
-                    query.getOrDefault("targetId", "")
+                    queryMap
             ));
             return;
         }
@@ -1859,6 +1859,38 @@ public final class WebAdminServer {
             request.controllerId = controllerId;
             request.triggerType = triggerType.name();
             WebAdminWriteResult result = regionControllerService.clearActions(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    controllerId,
+                    triggerType,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 4 && "actions".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("PATCH")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 PATCH。");
+                return;
+            }
+            com.zcpu.tzzmod.region.RegionTriggerType triggerType = parseRegionTriggerType(parts[2]);
+            if (triggerType == null) {
+                WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "triggerType 只支持 enter / exit / stay。");
+                return;
+            }
+            WebAdminRegionControllerRequests.ActionUpdateRequest request = readJson(exchange, WebAdminRegionControllerRequests.ActionUpdateRequest.class);
+            if (request == null) {
+                request = new WebAdminRegionControllerRequests.ActionUpdateRequest();
+            }
+            request.controllerId = controllerId;
+            request.triggerType = triggerType.name();
+            request.actionIndex = decodePathSegment(parts[3]);
+            WebAdminWriteResult result = regionControllerService.updateAction(
                     minecraftServer,
                     auth.user,
                     auth.session,

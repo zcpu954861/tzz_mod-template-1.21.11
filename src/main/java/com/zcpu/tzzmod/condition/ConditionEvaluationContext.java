@@ -147,6 +147,11 @@ public record ConditionEvaluationContext(
         put(summary, "listenerId", listenerId);
         put(summary, "regionId", regionId);
         put(summary, "actionId", actionId);
+        put(summary, "actionIndex", variables.getOrDefault("actionIndex", ""));
+        put(summary, "actionType", variables.getOrDefault("actionType", ""));
+        put(summary, "parentTargetType", variables.getOrDefault("parentTargetType", ""));
+        put(summary, "parentTargetId", variables.getOrDefault("parentTargetId", ""));
+        put(summary, "parentActionBucket", variables.getOrDefault("parentActionBucket", ""));
         put(summary, "blockPos", blockPos);
         put(summary, "triggerType", triggerType);
         put(summary, "gameTime", Long.toString(gameTime));

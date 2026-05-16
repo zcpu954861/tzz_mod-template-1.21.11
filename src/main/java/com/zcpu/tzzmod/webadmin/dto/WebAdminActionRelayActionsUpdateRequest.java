@@ -17,5 +17,6 @@ public final class WebAdminActionRelayActionsUpdateRequest {
         public Object requiresOp = Boolean.FALSE;
         public Object cooldownTicks = 0;
         public Object notifyOps = Boolean.FALSE;
+        public String conditionGroupId = "";
     }
 }

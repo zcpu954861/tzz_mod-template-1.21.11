@@ -279,6 +279,8 @@ public final class WebAdminConditionGroupServiceTest {
                 config("containerKey", "container", "itemId", "minecraft:stone", "operator", "gte", "count", "1"))), true));
         file.groups.put("relay", entry("relay", "继电器条件", definition("relay", ConditionNode.leaf("relay", ConditionNodeType.CONTEXT_EQUALS,
                 config("field", "relayId", "expected", "minecraft:overworld@1,2,3"))), true));
+        file.groups.put("action_metadata", entry("action_metadata", "动作元数据条件", definition("action_metadata", ConditionNode.leaf("action_metadata", ConditionNodeType.CONTEXT_EQUALS,
+                config("field", "actionType", "expected", "signal"))), true));
         file.groups.put("region", entry("region", "区域条件", definition("region", ConditionNode.leaf("region", ConditionNodeType.REGION_ENABLED,
                 config("regionKey", "region"))), true));
         file.groups.put("invalid", entry("invalid", "无效条件", definition("invalid", ConditionNode.leaf("invalid", "unknown_type")), true));
@@ -317,6 +319,35 @@ public final class WebAdminConditionGroupServiceTest {
         requireFalse(groupIds(actionRelay).contains("container"), "ActionRelay available excludes container snapshot group");
         requireFalse(groupIds(actionRelay).contains("region"), "ActionRelay available excludes region snapshot group");
 
+        Map<String, Object> listenerAction = service.available(null, editor, session, Map.of(
+                "targetType", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION.id(),
+                "targetId", "listener:listener-1:action:0",
+                "parentTargetType", ConditionRuntimeTargetType.SIGNAL_LISTENER.id(),
+                "parentTargetId", "listener-1",
+                "actionType", "signal",
+                "actionIndex", "0"
+        ));
+        requireTrue(groupIds(listenerAction).contains("always"), "SignalListener action available includes always group");
+        requireTrue(groupIds(listenerAction).contains("action_metadata"), "SignalListener action available includes action metadata group");
+        requireFalse(groupIds(listenerAction).contains("player"), "SignalListener action available excludes player context group");
+        requireFalse(groupIds(listenerAction).contains("container"), "SignalListener action available excludes container snapshot group");
+        requireEquals(ConditionRuntimeTargetType.SIGNAL_LISTENER.id(), listenerAction.get("parentTargetType"), "SignalListener action available echoes parent target type");
+        requireEquals("signal", listenerAction.get("actionType"), "SignalListener action available echoes action type");
+        requireEquals("0", listenerAction.get("actionIndex"), "SignalListener action available echoes action index");
+
+        Map<String, Object> relayAction = service.available(null, editor, session, Map.of(
+                "targetType", ConditionRuntimeTargetType.ACTION_RELAY_ACTION.id(),
+                "targetId", "relay:minecraft:overworld@1,2,3:action:0",
+                "parentTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id(),
+                "parentTargetId", "minecraft:overworld@1,2,3",
+                "actionType", "signal",
+                "actionIndex", "0"
+        ));
+        requireTrue(groupIds(relayAction).contains("action_metadata"), "ActionRelay action available includes action metadata group");
+        requireTrue(groupIds(relayAction).contains("relay"), "ActionRelay action available inherits relayId context group");
+        requireFalse(groupIds(relayAction).contains("player"), "ActionRelay action available excludes player context group");
+        requireFalse(groupIds(relayAction).contains("container"), "ActionRelay action available excludes container snapshot group");
+
         for (ConditionRuntimeTargetType regionTarget : List.of(
                 ConditionRuntimeTargetType.REGION_ENTER,
                 ConditionRuntimeTargetType.REGION_EXIT,
@@ -329,6 +360,23 @@ public final class WebAdminConditionGroupServiceTest {
             requireFalse(groupIds(regionAvailable).contains("container"), regionTarget.id() + " available excludes container snapshot group");
             requireFalse(groupIds(regionAvailable).contains("relay"), regionTarget.id() + " available excludes relay-only context group");
         }
+
+        Map<String, Object> regionAction = service.available(null, editor, session, Map.of(
+                "targetType", ConditionRuntimeTargetType.REGION_ENTER_ACTION.id(),
+                "targetId", "region:region-controller-1:enter:action:0",
+                "parentTargetType", ConditionRuntimeTargetType.REGION_ENTER.id(),
+                "parentTargetId", "region-controller-1",
+                "actionBucket", "enter",
+                "actionType", "signal",
+                "actionIndex", "0"
+        ));
+        requireTrue(groupIds(regionAction).contains("always"), "Region action available includes always group");
+        requireTrue(groupIds(regionAction).contains("player"), "Region action available includes player context group");
+        requireTrue(groupIds(regionAction).contains("region"), "Region action available includes region snapshot group");
+        requireTrue(groupIds(regionAction).contains("action_metadata"), "Region action available includes action metadata group");
+        requireFalse(groupIds(regionAction).contains("container"), "Region action available excludes container snapshot group");
+        requireFalse(groupIds(regionAction).contains("relay"), "Region action available excludes relay-only context group");
+        requireEquals("enter", regionAction.get("actionBucket"), "Region action available echoes action bucket");
 
         Map<String, Object> containerOpenUnresolved = service.available(null, editor, session, ConditionRuntimeTargetType.CONTAINER_OPEN.id(), "missing-vbd");
         requireFalse(groupIds(containerOpenUnresolved).contains("container"), "unresolved container open target excludes container snapshot group");

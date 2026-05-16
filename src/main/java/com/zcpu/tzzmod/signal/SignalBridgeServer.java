@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
@@ -25,6 +26,7 @@ public final class SignalBridgeServer {
     private static final ThreadLocal<Integer> CURRENT_DEPTH = ThreadLocal.withInitial(() -> 0);
     private static final Map<String, Long> LAST_TRIGGER_TICKS = new HashMap<>();
     private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
+    private static final ConditionActionGateService CONDITION_ACTION_GATE_SERVICE = new ConditionActionGateService();
 
     private SignalBridgeServer() {
     }
@@ -124,7 +126,7 @@ public final class SignalBridgeServer {
                         ItemStack.EMPTY
                 );
                 executedCount++;
-                lastResult = executeListenerActions(context, listener);
+                lastResult = executeListenerActions(context, event, listener);
                 LAST_TRIGGER_TICKS.put(listener.id(), event.gameTime());
 
                 if (!lastResult.success()) {
@@ -162,12 +164,29 @@ public final class SignalBridgeServer {
         return lastResult;
     }
 
-    private static ActionExecutionResult executeListenerActions(ActionContext context, SignalListenerData listener) {
+    private static ActionExecutionResult executeListenerActions(ActionContext context, SignalEvent event, SignalListenerData listener) {
         ActionExecutionResult lastResult = ActionExecutionResult.success(Text.literal("未执行动作"));
         List<ActionConfig> actions = listener == null ? List.of() : listener.actions();
         for (int index = 0; index < actions.size(); index++) {
             ActionConfig action = actions.get(index);
             if (action == null || !action.isUsable()) {
+                continue;
+            }
+            ConditionGateResult actionGate = CONDITION_ACTION_GATE_SERVICE.evaluate(
+                    event == null || event.world() == null ? null : event.world().getServer(),
+                    action,
+                    ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                    ConditionActionGateService.actionTargetId("listener", listener == null ? "" : listener.id(), index),
+                    ConditionRuntimeTargetType.SIGNAL_LISTENER,
+                    listener == null ? "" : listener.id(),
+                    "",
+                    index,
+                    () -> ConditionRuntimeContextBuilder.signalListener(event, listener)
+            );
+            if (!actionGate.allowed()) {
+                lastResult = ActionExecutionResult.success(Text.literal(
+                        "监听器第 " + (index + 1) + " 条 action 被条件阻断，已跳过：" + actionGate.failureReason()
+                ));
                 continue;
             }
             lastResult = ActionEngine.execute(context, action);

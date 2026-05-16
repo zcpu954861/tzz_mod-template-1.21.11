@@ -23,6 +23,7 @@ public final class ConditionGroupCompatibilityServiceTest {
         testNestedGroupsAndDisabledNodes();
         testChineseIncompatibilityReasons();
         testReceiverSideRuntimeGateProfiles();
+        testSingleActionRuntimeGateProfiles();
     }
 
     private static void testAlwaysTrueCompatibleWithAllProfiles() {
@@ -175,6 +176,61 @@ public final class ConditionGroupCompatibilityServiceTest {
         requireCompatible(contextPlayerState, ConditionRuntimeTargetType.REGION_EXIT, "Region exit accepts context_player state variable");
         requireCompatible(region, ConditionRuntimeTargetType.REGION_ENTER, "Region enter supports region snapshot key");
         requireCompatible(currentRegion, ConditionRuntimeTargetType.REGION_STAY, "Region stay supports current_region snapshot key");
+    }
+
+    private static void testSingleActionRuntimeGateProfiles() {
+        ConditionGroupDefinition playerTag = definition("action_player_tag", leaf(ConditionNodeType.PLAYER_HAS_TAG, config("tag", "runner")));
+        ConditionGroupDefinition contextPlayerState = definition("action_context_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "context_player", "expected", "true")));
+        ConditionGroupDefinition explicitPlayerState = definition("action_explicit_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "explicit_target", "targetId", "player-1", "expected", "true")));
+        ConditionGroupDefinition actionType = definition("action_type_context", leaf(ConditionNodeType.CONTEXT_EQUALS,
+                config("field", "actionType", "expected", "signal")));
+        ConditionGroupDefinition actionEventType = definition("action_type_event", leaf(ConditionNodeType.EVENT_METADATA_EXISTS,
+                config("key", "actionType")));
+        ConditionGroupDefinition parentTarget = definition("parent_target_context", leaf(ConditionNodeType.CONTEXT_EQUALS,
+                config("field", "parentTargetId", "expected", "listener-1")));
+        ConditionGroupDefinition region = definition("action_region_snapshot", leaf(ConditionNodeType.REGION_ENABLED, config("regionKey", "region")));
+        ConditionGroupDefinition currentRegion = definition("action_current_region_snapshot", leaf(ConditionNodeType.PLAYER_IN_REGION, config("regionKey", "current_region", "playerMode", "context_player")));
+        ConditionGroupDefinition container = definition("action_container_snapshot", leaf(ConditionNodeType.CONTAINER_SLOT_EMPTY,
+                config("containerKey", "container", "slot", "0")));
+        ConditionGroupDefinition signalHistory = definition("action_signal_history", leaf(ConditionNodeType.SIGNAL_EVENT_COUNT_COMPARE,
+                config("signalHistoryKey", "history", "channel", "mission.start", "operator", "gte", "count", "1")));
+
+        for (ConditionRuntimeTargetType targetType : List.of(
+                ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                ConditionRuntimeTargetType.REGION_ENTER_ACTION,
+                ConditionRuntimeTargetType.REGION_EXIT_ACTION,
+                ConditionRuntimeTargetType.REGION_STAY_ACTION
+        )) {
+            requireCompatible(actionType, targetType, targetType.id() + " exposes actionType context");
+            requireCompatible(actionEventType, targetType, targetType.id() + " exposes actionType event metadata");
+            requireCompatible(parentTarget, targetType, targetType.id() + " exposes parentTargetId context");
+            requireCompatible(explicitPlayerState, targetType, targetType.id() + " accepts explicit PLAYER state variable");
+            requireIncompatible(container, targetType, "容器快照", targetType.id() + " excludes container snapshot");
+            requireIncompatible(signalHistory, targetType, "信号历史快照", targetType.id() + " excludes signal history snapshot");
+        }
+
+        for (ConditionRuntimeTargetType noPlayerTarget : List.of(
+                ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                ConditionRuntimeTargetType.ACTION_RELAY_ACTION
+        )) {
+            requireIncompatible(playerTag, noPlayerTarget, "触发玩家", noPlayerTarget.id() + " rejects player context");
+            requireIncompatible(contextPlayerState, noPlayerTarget, "context_player", noPlayerTarget.id() + " rejects context_player state");
+            requireIncompatible(region, noPlayerTarget, "区域快照", noPlayerTarget.id() + " excludes region snapshot");
+        }
+
+        for (ConditionRuntimeTargetType regionActionTarget : List.of(
+                ConditionRuntimeTargetType.REGION_ENTER_ACTION,
+                ConditionRuntimeTargetType.REGION_EXIT_ACTION,
+                ConditionRuntimeTargetType.REGION_STAY_ACTION
+        )) {
+            requireCompatible(playerTag, regionActionTarget, regionActionTarget.id() + " accepts player-dependent condition");
+            requireCompatible(contextPlayerState, regionActionTarget, regionActionTarget.id() + " accepts context_player state");
+            requireCompatible(region, regionActionTarget, regionActionTarget.id() + " exposes region snapshot");
+            requireCompatible(currentRegion, regionActionTarget, regionActionTarget.id() + " exposes current_region snapshot");
+        }
     }
 
     private static void requireCompatible(ConditionGroupDefinition definition, ConditionRuntimeTargetType targetType, String message) {

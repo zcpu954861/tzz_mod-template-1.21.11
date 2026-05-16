@@ -236,6 +236,87 @@ public record ConditionGroupCompatibilityProfile(
                     Set.of(),
                     Set.of()
             );
+            case SIGNAL_LISTENER_ACTION -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    withAction(set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "channel",
+                            "listenerId",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "signalDepth"
+                    )),
+                    withActionMetadata(set("trigger", "detail")),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
+            case ACTION_RELAY_ACTION -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    withAction(set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "channel",
+                            "deviceId",
+                            "relayId",
+                            "blockPos",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "signalDepth"
+                    )),
+                    withActionMetadata(set("trigger", "detail")),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
+            case REGION_ENTER_ACTION, REGION_EXIT_ACTION, REGION_STAY_ACTION -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    true,
+                    true,
+                    true,
+                    withAction(withPlayer(set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "regionId",
+                            "triggerType",
+                            "detail",
+                            "gameTime"
+                    ))),
+                    withActionMetadata(set("trigger", "detail", "actionBucket")),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    set("region", "current_region"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
         };
     }
 
@@ -291,6 +372,34 @@ public record ConditionGroupCompatibilityProfile(
                 "gamemode",
                 "playerAlive",
                 "playerDead"
+        ));
+        return Set.copyOf(copy);
+    }
+
+    private static Set<String> withAction(Set<String> base) {
+        LinkedHashSet<String> copy = new LinkedHashSet<>(base);
+        copy.addAll(set(
+                "actionId",
+                "actionIndex",
+                "actionDisplayIndex",
+                "actionType",
+                "parentTargetType",
+                "parentTargetId",
+                "parentActionBucket"
+        ));
+        return Set.copyOf(copy);
+    }
+
+    private static Set<String> withActionMetadata(Set<String> base) {
+        LinkedHashSet<String> copy = new LinkedHashSet<>(base);
+        copy.addAll(set(
+                "actionId",
+                "actionIndex",
+                "actionDisplayIndex",
+                "actionType",
+                "parentTargetType",
+                "parentTargetId",
+                "parentActionBucket"
         ));
         return Set.copyOf(copy);
     }

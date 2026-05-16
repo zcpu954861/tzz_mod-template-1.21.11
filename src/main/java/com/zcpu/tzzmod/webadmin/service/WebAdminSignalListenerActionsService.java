@@ -2,9 +2,12 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
@@ -42,6 +45,7 @@ public final class WebAdminSignalListenerActionsService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
 
     public WebAdminSignalListenerActionsService(
             WebAdminPermissionService permissionService,
@@ -82,7 +86,7 @@ public final class WebAdminSignalListenerActionsService {
             audit(context, common, auditSummary(before), Map.of("attempt", "action_add_denied"));
             return common;
         }
-        ActionValidation validation = validateActionEntry(request == null ? null : request.action);
+        ActionValidation validation = validateActionEntry(server, request == null ? null : request.action);
         if (!validation.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
             audit(context, result, auditSummary(before), Map.of("attempt", "action_validation_failed"));
@@ -255,7 +259,7 @@ public final class WebAdminSignalListenerActionsService {
             audit(context, result, auditSummary(before), Map.of("attempt", "action_update_out_of_range", "index", index));
             return result;
         }
-        ActionValidation validation = validateActionEntry(request == null ? null : request.action);
+        ActionValidation validation = validateActionEntry(server, request == null ? null : request.action);
         if (!validation.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
             audit(context, result, auditSummary(before), Map.of("attempt", "action_update_validation_failed", "index", index));
@@ -301,7 +305,7 @@ public final class WebAdminSignalListenerActionsService {
         data.put("enabled", listener.enabled());
         data.put("cooldownTicks", listener.cooldownTicks());
         data.put("actionCount", listener.actions().size());
-        data.put("actions", actionDtos(listener.actions()));
+        data.put("actions", actionDtos(listener.actions(), listener.id()));
         data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
         data.put("expectedFingerprint", WebAdminSignalListenerBasicConfigService.fingerprintFor(listener));
         WebAdminEditLockStatusDto lockStatus = editLockService == null ? null : editLockService.status(
@@ -312,10 +316,13 @@ public final class WebAdminSignalListenerActionsService {
         );
         data.put("lockStatus", lockStatus);
         data.put("noRawJson", true);
-        data.put("noConditionEngine", true);
+        data.put("noConditionEngine", false);
+        data.put("conditionRuntimeGates", true);
+        data.put("singleActionConditionGates", true);
         data.put("noPathVisualization", true);
         data.put("notes", List.of(
                 "虚拟监听器动作列表按当前 ActionEngine 顺序执行，不改变 SignalBridge 运行时语义。",
+                "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
                 "command action 会阻断 stop/op/ban/kick/whitelist 等危险服务器管理命令，包括 execute ... run 嵌套形式。",
                 "本编辑器不提供 raw JSON、ConditionEngine 或路径可视化。"
         ));
@@ -365,7 +372,7 @@ public final class WebAdminSignalListenerActionsService {
         return null;
     }
 
-    private static ActionValidation validateActionEntry(WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
+    private ActionValidation validateActionEntry(MinecraftServer server, WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
         List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
@@ -377,17 +384,28 @@ public final class WebAdminSignalListenerActionsService {
         }
         ActionType type = parseActionType(entry.type);
         String value = normalizeActionValue(type, entry.value);
+        gateBindingValidator.validate(
+                server,
+                errors,
+                "action.conditionGroupId",
+                entry.conditionGroupId,
+                ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION
+        );
+        if (!errors.isEmpty()) {
+            return new ActionValidation(errors, null);
+        }
         return new ActionValidation(List.of(), new ActionConfig(
                 type,
                 value,
                 parseBoolean(entry.enabled, true),
                 parseBoolean(entry.requiresOp, false),
                 Math.max(0, parseInteger(entry.cooldownTicks, 0)),
-                parseBoolean(entry.notifyOps, false)
+                parseBoolean(entry.notifyOps, false),
+                WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId)
         ));
     }
 
-    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions) {
+    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions, String listenerId) {
         List<Map<String, Object>> result = new ArrayList<>();
         int index = 0;
         for (ActionConfig action : actions == null ? List.<ActionConfig>of() : actions) {
@@ -395,6 +413,7 @@ public final class WebAdminSignalListenerActionsService {
                 continue;
             }
             ActionConfig normalized = normalizeAction(action);
+            String actionTargetId = ConditionActionGateService.actionTargetId("listener", listenerId, index);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("index", index);
             entry.put("displayIndex", index + 1);
@@ -404,6 +423,13 @@ public final class WebAdminSignalListenerActionsService {
             entry.put("requiresOp", normalized.requiresOp());
             entry.put("cooldownTicks", normalized.cooldownTicks());
             entry.put("notifyOps", normalized.notifyOps());
+            entry.put("conditionGroupId", normalized.conditionGroupId());
+            entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION.id());
+            entry.put("actionConditionGateTargetId", actionTargetId);
+            entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
+                    ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                    actionTargetId
+            ));
             entry.put("summary", actionSummary(normalized));
             result.add(entry);
             index++;
@@ -419,7 +445,8 @@ public final class WebAdminSignalListenerActionsService {
                 action != null && action.enabled(),
                 action != null && action.requiresOp(),
                 Math.max(0, action == null ? 0 : action.cooldownTicks()),
-                action != null && action.notifyOps()
+                action != null && action.notifyOps(),
+                action == null ? "" : action.conditionGroupId()
         );
     }
 
@@ -440,7 +467,10 @@ public final class WebAdminSignalListenerActionsService {
         } else if (value.length() > 96) {
             value = value.substring(0, 96) + "...";
         }
-        return action.type().id() + ":" + value + " enabled=" + action.enabled();
+        return action.type().id()
+                + ":" + value
+                + " enabled=" + action.enabled()
+                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
     }
 
     private static Map<String, Object> auditSummary(SignalListenerData rawListener) {

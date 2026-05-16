@@ -52,6 +52,15 @@ public final class WebAdminRegionControllerRequests {
         public String lockId = "";
     }
 
+    public static final class ActionUpdateRequest {
+        public String controllerId = "";
+        public String triggerType = "";
+        public Object actionIndex = 0;
+        public WebAdminActionRelayActionsUpdateRequest.ActionEntry action = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        public String expectedFingerprint = "";
+        public String lockId = "";
+    }
+
     public static final class DeleteRequest {
         public String controllerId = "";
         public Boolean confirmed = Boolean.FALSE;

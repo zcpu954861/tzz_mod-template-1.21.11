@@ -1,6 +1,7 @@
 package com.zcpu.tzzmod.condition.runtime;
 
 import com.zcpu.tzzmod.condition.ConditionEvaluationContext;
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.condition.item.ConditionContainerSnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionInventorySnapshot;
 import com.zcpu.tzzmod.condition.item.ConditionItemStackSnapshot;
@@ -187,6 +188,75 @@ public final class ConditionRuntimeContextBuilder {
         } else if (server != null) {
             builder.stateVariables(StateVariableStore.getSnapshot(server));
         }
+        return builder.build();
+    }
+
+    public static ConditionEvaluationContext withActionMetadata(
+            ConditionEvaluationContext parent,
+            ActionConfig action,
+            ConditionRuntimeTargetType actionTargetType,
+            String actionTargetId,
+            ConditionRuntimeTargetType parentTargetType,
+            String parentTargetId,
+            String parentActionBucket,
+            int actionIndex
+    ) {
+        ConditionEvaluationContext safeParent = parent == null ? ConditionEvaluationContext.builder().build() : parent;
+        String actionId = safe(actionTargetId);
+        String actionType = action == null || action.type() == null ? "" : action.type().id();
+        String displayIndex = actionIndex < 0 ? "" : Integer.toString(actionIndex + 1);
+        ConditionEvaluationContext.Builder builder = ConditionEvaluationContext.builder()
+                .player(safeParent.playerId(), safeParent.playerName())
+                .playerTags(safeParent.playerTags())
+                .playerTeam(safeParent.playerTeam())
+                .playerGameMode(safeParent.playerGameMode())
+                .worldId(safeParent.worldId())
+                .source(safeParent.sourceType(), safeParent.sourceId())
+                .channel(safeParent.channel())
+                .deviceId(safeParent.deviceId())
+                .listenerId(safeParent.listenerId())
+                .regionId(safeParent.regionId())
+                .actionId(actionId)
+                .blockPos(safeParent.blockPos())
+                .itemStackSummary(safeParent.itemStackSummary())
+                .triggerType(actionTargetType == null ? safeParent.triggerType() : actionTargetType.id())
+                .detail(safe(parentActionBucket).isBlank() ? safeParent.detail() : safe(parentActionBucket))
+                .gameTime(safeParent.gameTime())
+                .signalDepth(safeParent.signalDepth())
+                .stateVariables(safeParent.stateVariables());
+        if (safeParent.playerOnline() != null) {
+            builder.playerOnline(safeParent.playerOnline());
+        }
+        if (safeParent.playerOp() != null) {
+            builder.playerOp(safeParent.playerOp());
+        }
+        if (safeParent.playerAlive() != null) {
+            builder.playerAlive(safeParent.playerAlive());
+        }
+        safeParent.itemSnapshots().forEach(builder::itemSnapshot);
+        safeParent.inventorySnapshots().forEach(builder::inventorySnapshot);
+        safeParent.containerSnapshots().forEach(builder::containerSnapshot);
+        safeParent.regionSnapshots().forEach(builder::regionSnapshot);
+        safeParent.signalChannelSnapshots().forEach(builder::signalChannelSnapshot);
+        safeParent.signalHistorySnapshots().forEach(builder::signalHistorySnapshot);
+        safeParent.logicChainSnapshots().forEach(builder::logicChainSnapshot);
+        safeParent.eventMetadata().forEach(builder::eventMetadata);
+        safeParent.variables().forEach(builder::variable);
+        builder.eventMetadata("trigger", actionTargetType == null ? "" : actionTargetType.id())
+                .eventMetadata("actionId", actionId)
+                .eventMetadata("actionIndex", actionIndex < 0 ? "" : Integer.toString(actionIndex))
+                .eventMetadata("actionDisplayIndex", displayIndex)
+                .eventMetadata("actionType", actionType)
+                .eventMetadata("parentTargetType", parentTargetType == null ? "" : parentTargetType.id())
+                .eventMetadata("parentTargetId", safe(parentTargetId))
+                .eventMetadata("parentActionBucket", safe(parentActionBucket))
+                .variable("actionId", actionId)
+                .variable("actionIndex", actionIndex < 0 ? "" : Integer.toString(actionIndex))
+                .variable("actionDisplayIndex", displayIndex)
+                .variable("actionType", actionType)
+                .variable("parentTargetType", parentTargetType == null ? "" : parentTargetType.id())
+                .variable("parentTargetId", safe(parentTargetId))
+                .variable("parentActionBucket", safe(parentActionBucket));
         return builder.build();
     }
 
@@ -454,5 +524,9 @@ public final class ConditionRuntimeContextBuilder {
             return "";
         }
         return Registries.ITEM.getId(stack.getItem()).toString();
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

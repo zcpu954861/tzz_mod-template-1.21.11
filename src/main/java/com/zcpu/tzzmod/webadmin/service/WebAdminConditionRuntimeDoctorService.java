@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.condition.ConditionValidationResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityProfile;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityService;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.region.RegionControllerData;
@@ -171,6 +172,20 @@ public final class WebAdminConditionRuntimeDoctorService {
         for (SignalListenerData raw : SignalListenerStore.getSnapshot(server)) {
             SignalListenerData listener = raw.normalized();
             bindings.add(new Binding("SIGNAL_LISTENER", listener.id(), listener.conditionGroupId(), ConditionRuntimeTargetType.SIGNAL_LISTENER, "channel:" + listener.channel()));
+            for (int index = 0; index < listener.actions().size(); index++) {
+                com.zcpu.tzzmod.action.ActionConfig action = listener.actions().get(index);
+                if (action == null) {
+                    continue;
+                }
+                String targetId = ConditionActionGateService.actionTargetId("listener", listener.id(), index);
+                bindings.add(new Binding(
+                        "SIGNAL_LISTENER_ACTION",
+                        targetId,
+                        action.conditionGroupId(),
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                        "channel:" + listener.channel()
+                ));
+            }
         }
 
         for (SignalDeviceData device : devicesById.values()) {
@@ -180,6 +195,21 @@ public final class WebAdminConditionRuntimeDoctorService {
             ActionRelayBlockEntity relay = SignalDeviceStore.getLoadedActionRelay(server, device);
             if (relay != null) {
                 bindings.add(new Binding("ACTION_RELAY", device.id(), relay.conditionGroupId(), ConditionRuntimeTargetType.ACTION_RELAY, "device:" + device.id()));
+                for (int index = 0; index < relay.actions().size(); index++) {
+                    com.zcpu.tzzmod.action.ActionConfig action = relay.actions().get(index);
+                    if (action == null) {
+                        continue;
+                    }
+                    String relayTargetId = device.id();
+                    String targetId = ConditionActionGateService.actionTargetId("relay", relayTargetId, index);
+                    bindings.add(new Binding(
+                            "ACTION_RELAY_ACTION",
+                            targetId,
+                            action.conditionGroupId(),
+                            ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                            "device:" + device.id()
+                    ));
+                }
             }
         }
 
@@ -188,8 +218,33 @@ public final class WebAdminConditionRuntimeDoctorService {
             bindings.add(new Binding("REGION_CONTROLLER", controller.id(), controller.enterConditionGroupId(), ConditionRuntimeTargetType.REGION_ENTER, "region:" + controller.regionId()));
             bindings.add(new Binding("REGION_CONTROLLER", controller.id(), controller.exitConditionGroupId(), ConditionRuntimeTargetType.REGION_EXIT, "region:" + controller.regionId()));
             bindings.add(new Binding("REGION_CONTROLLER", controller.id(), controller.stayConditionGroupId(), ConditionRuntimeTargetType.REGION_STAY, "region:" + controller.regionId()));
+            addRegionActionBindings(bindings, controller, "enter", controller.enterActions(), ConditionRuntimeTargetType.REGION_ENTER_ACTION);
+            addRegionActionBindings(bindings, controller, "exit", controller.exitActions(), ConditionRuntimeTargetType.REGION_EXIT_ACTION);
+            addRegionActionBindings(bindings, controller, "stay", controller.stayActions(), ConditionRuntimeTargetType.REGION_STAY_ACTION);
         }
         return List.copyOf(bindings);
+    }
+
+    private static void addRegionActionBindings(
+            List<Binding> bindings,
+            RegionControllerData controller,
+            String bucket,
+            List<com.zcpu.tzzmod.action.ActionConfig> actions,
+            ConditionRuntimeTargetType targetType
+    ) {
+        for (int index = 0; index < (actions == null ? List.<com.zcpu.tzzmod.action.ActionConfig>of() : actions).size(); index++) {
+            com.zcpu.tzzmod.action.ActionConfig action = actions.get(index);
+            if (action == null) {
+                continue;
+            }
+            bindings.add(new Binding(
+                    "REGION_CONTROLLER_ACTION",
+                    ConditionActionGateService.regionActionTargetId(controller.id(), bucket, index),
+                    action.conditionGroupId(),
+                    targetType,
+                    "region:" + controller.regionId()
+            ));
+        }
     }
 
     private Binding vbdContainerBinding(

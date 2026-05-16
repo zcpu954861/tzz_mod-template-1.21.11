@@ -10,6 +10,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionGroupIds;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
@@ -40,6 +41,7 @@ public class ActionRelayBlockEntity extends BlockEntity {
 
     private static final Gson GSON = new Gson();
     private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
+    private static final ConditionActionGateService CONDITION_ACTION_GATE_SERVICE = new ConditionActionGateService();
     private static final String CHANNEL_KEY = "Channel";
     private static final String ENABLED_KEY = "Enabled";
     private static final String COOLDOWN_TICKS_KEY = "CooldownTicks";
@@ -226,10 +228,33 @@ public class ActionRelayBlockEntity extends BlockEntity {
 
         int successCount = 0;
         int failureCount = 0;
+        int skippedByActionGateCount = 0;
         ActionExecutionResult last = ActionExecutionResult.failure(Text.literal("没有可执行动作"));
-        for (ActionConfig action : actions) {
+        for (int index = 0; index < actions.size(); index++) {
+            ActionConfig action = actions.get(index);
             if (action == null || !action.isUsable()) {
                 continue;
+            }
+            if (!manual) {
+                String relayTargetId = sourceId(world, pos);
+                ConditionGateResult actionGate = CONDITION_ACTION_GATE_SERVICE.evaluate(
+                        world.getServer(),
+                        action,
+                        ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                        ConditionActionGateService.actionTargetId("relay", relayTargetId, index),
+                        ConditionRuntimeTargetType.ACTION_RELAY,
+                        relayTargetId,
+                        "",
+                        index,
+                        () -> ConditionRuntimeContextBuilder.actionRelay(world, pos, null, this, event)
+                );
+                if (!actionGate.allowed()) {
+                    skippedByActionGateCount++;
+                    last = ActionExecutionResult.success(Text.literal(
+                            "动作继电器第 " + (index + 1) + " 条 action 被条件阻断，已跳过：" + actionGate.failureReason()
+                    ));
+                    continue;
+                }
             }
             last = ActionEngine.execute(context, action);
             if (last.success()) {
@@ -242,6 +267,8 @@ public class ActionRelayBlockEntity extends BlockEntity {
 
         if (successCount > 0 && failureCount == 0) {
             last = ActionExecutionResult.success(Text.literal("动作继电器已执行：" + successCount + " 个动作"));
+        } else if (successCount == 0 && failureCount == 0 && skippedByActionGateCount > 0) {
+            last = ActionExecutionResult.success(Text.literal("动作继电器已跳过 " + skippedByActionGateCount + " 条被条件阻断的 action"));
         }
         updateLastRun(world, event, last, successCount, failureCount);
         return last;
@@ -370,7 +397,8 @@ public class ActionRelayBlockEntity extends BlockEntity {
                 action.enabled(),
                 action.requiresOp(),
                 Math.max(0, action.cooldownTicks()),
-                action.notifyOps()
+                action.notifyOps(),
+                action.conditionGroupId()
         );
     }
 }
