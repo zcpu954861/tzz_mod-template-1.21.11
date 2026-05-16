@@ -30,6 +30,11 @@ public final class WebAdminConditionGateConfigTest {
         file.groups.put("disabled", entry("disabled", definition("disabled", ConditionNode.leaf("disabled", ConditionNodeType.ALWAYS_TRUE)), false));
         file.groups.put("invalid", entry("invalid", definition("invalid", ConditionNode.group("root", ConditionGroupMode.AND, List.of())), true));
         file.groups.put("player", entry("player", definition("player", ConditionNode.leaf("player", ConditionNodeType.PLAYER_EXISTS)), true));
+        file.groups.put("action_metadata", entry("action_metadata", definition("action_metadata", ConditionNode.leaf("action_metadata", ConditionNodeType.CONTEXT_EQUALS,
+                new com.zcpu.tzzmod.condition.ConditionNodeConfig(Map.of(
+                        "field", "actionType",
+                        "expected", "signal"
+                )))), true));
         file.groups.put("container", entry("container", definition("container", ConditionNode.leaf("container", ConditionNodeType.CONTAINER_SLOT_ITEM_MATCHES,
                 new com.zcpu.tzzmod.condition.ConditionNodeConfig(Map.of(
                         "containerKey", "container",
@@ -94,6 +99,30 @@ public final class WebAdminConditionGateConfigTest {
         requireTrue(errors.isEmpty(), "player group accepted by Region exit gate backend");
         receiverValidator.validate(null, errors, "stayConditionGroupId", "player", ConditionRuntimeTargetType.REGION_STAY);
         requireTrue(errors.isEmpty(), "player group accepted by Region stay gate backend");
+
+        requireReceiverGateError(receiverValidator, "player", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION, "condition_group_incompatible", "触发玩家");
+        requireReceiverGateError(receiverValidator, "player", ConditionRuntimeTargetType.ACTION_RELAY_ACTION, "condition_group_incompatible", "触发玩家");
+        requireReceiverGateError(receiverValidator, "container", ConditionRuntimeTargetType.REGION_ENTER_ACTION, "condition_group_incompatible", "容器快照");
+        for (ConditionRuntimeTargetType actionTarget : List.of(
+                ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                ConditionRuntimeTargetType.REGION_ENTER_ACTION,
+                ConditionRuntimeTargetType.REGION_EXIT_ACTION,
+                ConditionRuntimeTargetType.REGION_STAY_ACTION
+        )) {
+            errors.clear();
+            receiverValidator.validate(null, errors, "actions[0].conditionGroupId", "allow", actionTarget);
+            requireTrue(errors.isEmpty(), "always_true group accepted by 8.9 single action backend: " + actionTarget.id());
+            receiverValidator.validate(null, errors, "actions[0].conditionGroupId", "action_metadata", actionTarget);
+            requireTrue(errors.isEmpty(), "action metadata group accepted by 8.9 single action backend: " + actionTarget.id());
+        }
+        errors.clear();
+        receiverValidator.validate(null, errors, "actions[0].conditionGroupId", "player", ConditionRuntimeTargetType.REGION_ENTER_ACTION);
+        requireTrue(errors.isEmpty(), "player group accepted by Region enter single action backend");
+        receiverValidator.validate(null, errors, "actions[0].conditionGroupId", "player", ConditionRuntimeTargetType.REGION_EXIT_ACTION);
+        requireTrue(errors.isEmpty(), "player group accepted by Region exit single action backend");
+        receiverValidator.validate(null, errors, "actions[0].conditionGroupId", "player", ConditionRuntimeTargetType.REGION_STAY_ACTION);
+        requireTrue(errors.isEmpty(), "player group accepted by Region stay single action backend");
     }
 
     private static void requireGateError(

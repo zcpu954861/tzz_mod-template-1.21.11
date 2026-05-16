@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
@@ -324,7 +325,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("channel", device.channel());
         data.put("actionCount", relay == null ? device.actionCount() : actions.size());
         data.put("snapshotActionCount", device.actionCount());
-        data.put("actions", actionDtos(actions));
+        data.put("actions", actionDtos(actions, device.id()));
         data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
         data.put("conditionGroupId", relay == null ? "" : relay.conditionGroupId());
         data.put("conditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id());
@@ -343,16 +344,18 @@ public final class WebAdminActionRelayActionsService {
         data.put("notes", List.of(
                 "Action 列表属于 action_relay BlockEntity 配置，不会创建或删除真实方块。",
                 "未配置条件组 = 保持旧继电器逻辑，不拦截；配置后仅作为整条 Action 列表外层 gate。",
+                "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
                 "command action 是地图玩法控制能力；WebAdmin 只硬阻断 ban/kick/op/stop/whitelist 等服务器管理高风险命令。",
                 "sound action 当前底层只存储 sound id；per-action cooldown/requiresOp 字段会保留，但执行语义以现有 ActionEngine 为准。"
         ));
         return data;
     }
 
-    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions) {
+    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions, String deviceId) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (int index = 0; index < actions.size(); index++) {
             ActionConfig action = actions.get(index);
+            String actionTargetId = ConditionActionGateService.actionTargetId("relay", deviceId, index);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("index", index);
             entry.put("displayIndex", index + 1);
@@ -362,6 +365,13 @@ public final class WebAdminActionRelayActionsService {
             entry.put("requiresOp", action.requiresOp());
             entry.put("cooldownTicks", action.cooldownTicks());
             entry.put("notifyOps", action.notifyOps());
+            entry.put("conditionGroupId", action.conditionGroupId());
+            entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY_ACTION.id());
+            entry.put("actionConditionGateTargetId", actionTargetId);
+            entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
+                    ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                    actionTargetId
+            ));
             entry.put("summary", actionSummary(action));
             result.add(entry);
         }
@@ -377,13 +387,15 @@ public final class WebAdminActionRelayActionsService {
         WebAdminConditionGateBindingValidator validator = gateBindingValidator == null
                 ? new WebAdminConditionGateBindingValidator()
                 : gateBindingValidator;
-        validator.validate(
-                server,
-                errors,
-                "conditionGroupId",
-                request == null ? "" : request.conditionGroupId,
-                ConditionRuntimeTargetType.ACTION_RELAY
-        );
+        if (server != null) {
+            validator.validate(
+                    server,
+                    errors,
+                    "conditionGroupId",
+                    request == null ? "" : request.conditionGroupId,
+                    ConditionRuntimeTargetType.ACTION_RELAY
+            );
+        }
         List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries = request == null || request.actions == null
                 ? List.of()
                 : request.actions;
@@ -425,7 +437,17 @@ public final class WebAdminActionRelayActionsService {
             }
             String value = normalizeValue(type, entry.value);
             validateValue(server, errors, prefix + ".value", type, value);
-            actions.add(new ActionConfig(type, value, enabled, requiresOp, cooldownTicks, notifyOps));
+            String actionConditionGroupId = WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId);
+            if (server != null) {
+                validator.validate(
+                        server,
+                        errors,
+                        prefix + ".conditionGroupId",
+                        actionConditionGroupId,
+                        ConditionRuntimeTargetType.ACTION_RELAY_ACTION
+                );
+            }
+            actions.add(new ActionConfig(type, value, enabled, requiresOp, cooldownTicks, notifyOps, actionConditionGroupId));
         }
         return new Validation(List.copyOf(errors), errors.isEmpty() ? normalizeActions(actions) : List.copyOf(actions));
     }
@@ -596,7 +618,8 @@ public final class WebAdminActionRelayActionsService {
                     action.enabled(),
                     action.requiresOp(),
                     Math.max(0, action.cooldownTicks()),
-                    action.notifyOps()
+                    action.notifyOps(),
+                    action.conditionGroupId()
             ));
         }
         return List.copyOf(normalized);
@@ -873,7 +896,8 @@ public final class WebAdminActionRelayActionsService {
                         + "|enabled=" + action.enabled()
                         + "|requiresOp=" + action.requiresOp()
                         + "|cooldownTicks=" + action.cooldownTicks()
-                        + "|notifyOps=" + action.notifyOps())
+                        + "|notifyOps=" + action.notifyOps()
+                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId()))
                 .toList();
     }
 
@@ -904,7 +928,8 @@ public final class WebAdminActionRelayActionsService {
                 + ": " + value
                 + " requiresOp=" + action.requiresOp()
                 + " cooldownTicks=" + action.cooldownTicks()
-                + " notifyOps=" + action.notifyOps();
+                + " notifyOps=" + action.notifyOps()
+                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
     }
 
     private static Boolean parseBoolean(Object value) {

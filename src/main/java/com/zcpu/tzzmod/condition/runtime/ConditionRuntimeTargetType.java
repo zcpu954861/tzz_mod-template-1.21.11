@@ -15,7 +15,12 @@ public enum ConditionRuntimeTargetType {
     ACTION_RELAY("ACTION_RELAY", "Action Relay 动作列表"),
     REGION_ENTER("REGION_ENTER", "RegionController enter 动作列表"),
     REGION_EXIT("REGION_EXIT", "RegionController exit 动作列表"),
-    REGION_STAY("REGION_STAY", "RegionController stay 动作列表");
+    REGION_STAY("REGION_STAY", "RegionController stay 动作列表"),
+    SIGNAL_LISTENER_ACTION("SIGNAL_LISTENER_ACTION", "Signal Listener 单条 Action"),
+    ACTION_RELAY_ACTION("ACTION_RELAY_ACTION", "Action Relay 单条 Action"),
+    REGION_ENTER_ACTION("REGION_ENTER_ACTION", "RegionController enter 单条 Action"),
+    REGION_EXIT_ACTION("REGION_EXIT_ACTION", "RegionController exit 单条 Action"),
+    REGION_STAY_ACTION("REGION_STAY_ACTION", "RegionController stay 单条 Action");
 
     private final String id;
     private final String displayName;

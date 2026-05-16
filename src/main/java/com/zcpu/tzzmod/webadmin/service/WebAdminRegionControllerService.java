@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.map.MapDataStore;
 import com.zcpu.tzzmod.region.RegionControllerData;
@@ -236,7 +237,12 @@ public final class WebAdminRegionControllerService {
             audit(context, common, auditSummary(before), Map.of("attempt", "action_add_denied"));
             return common;
         }
-        ActionValidation actionValidation = validateActionEntry(request == null ? null : request.action);
+        ActionValidation actionValidation = validateActionEntry(
+                server,
+                request == null ? null : request.action,
+                actionTargetType(triggerType),
+                "action.conditionGroupId"
+        );
         if (!actionValidation.errors().isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, actionValidation.errors());
             audit(context, result, auditSummary(before), Map.of("attempt", "action_validation_failed"));
@@ -363,6 +369,71 @@ public final class WebAdminRegionControllerService {
         return result;
     }
 
+    public WebAdminWriteResult updateAction(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String controllerId,
+            RegionTriggerType triggerType,
+            WebAdminRegionControllerRequests.ActionUpdateRequest request,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        RegionControllerData before = RegionControllerStore.getController(server, safe(controllerId));
+        WebAdminWriteTarget target = before == null ? target(safe(controllerId), safe(controllerId)) : target(before);
+        WebAdminWriteContext context = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_REGION, target);
+        if (before == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "区域控制器不存在或已被删除。");
+            audit(context, result, Map.of(), Map.of("attempt", "action_update_missing"));
+            return result;
+        }
+        WebAdminWriteResult common = validateWriteCommon(user, session, csrfToken, sameOrigin, target, safe(controllerId), request == null ? "" : request.lockId, request == null ? "" : request.expectedFingerprint, before);
+        if (common != null) {
+            audit(context, common, auditSummary(before), Map.of("attempt", "action_update_denied"));
+            return common;
+        }
+        List<ActionConfig> actions = new ArrayList<>(actionsFor(before, triggerType));
+        int index = parseInteger(request == null ? null : request.actionIndex, -1);
+        if (index < 0 || index >= actions.size()) {
+            WebAdminWriteResult result = validation(target, "actionIndex", "out_of_range", "要编辑的 action 已不存在，请刷新后重试。", String.valueOf(index));
+            audit(context, result, auditSummary(before), Map.of("attempt", "action_update_out_of_range", "trigger", triggerKey(triggerType), "index", index));
+            return result;
+        }
+        ActionValidation actionValidation = validateActionEntry(
+                server,
+                request == null ? null : request.action,
+                actionTargetType(triggerType),
+                "action.conditionGroupId"
+        );
+        if (!actionValidation.errors().isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, actionValidation.errors());
+            audit(context, result, auditSummary(before), Map.of("attempt", "action_update_validation_failed", "trigger", triggerKey(triggerType), "index", index));
+            return result;
+        }
+        ActionConfig beforeAction = actions.get(index);
+        actions.set(index, actionValidation.action());
+        if (beforeAction != null && beforeAction.equals(actionValidation.action())) {
+            WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "没有检测到需要保存的 " + labelTrigger(triggerType) + " Action 变化。");
+            audit(context, result, auditSummary(before), auditSummary(before));
+            releaseLockAfterWrite(before.id(), request == null ? "" : request.lockId, user, session, remoteAddress);
+            return result;
+        }
+        RegionControllerStore.replaceActions(server, before.id(), triggerType, actions);
+        RegionControllerStore.flushDirty(server);
+        RegionControllerData after = RegionControllerStore.getController(server, before.id());
+        Map<String, Object> data = Map.of(
+                "controller", controllerData(server, after == null ? before : after, user, session, true),
+                "changedFields", List.of(triggerKey(triggerType) + "Actions"),
+                "actionIndex", index
+        );
+        WebAdminWriteResult result = writeOk(target, true, labelTrigger(triggerType) + " Action 已更新。", data);
+        WebAdminAuditEvent auditEvent = audit(context, result, auditSummary(before), auditSummary(after == null ? before : after));
+        publishRealtime(after == null ? before : after, "action_updated", auditEvent, user);
+        releaseLockAfterWrite(before.id(), request == null ? "" : request.lockId, user, session, remoteAddress);
+        return result;
+    }
+
     public WebAdminWriteResult delete(
             MinecraftServer server,
             WebAdminUser user,
@@ -453,6 +524,11 @@ public final class WebAdminRegionControllerService {
                 "exit", ConditionRuntimeTargetType.REGION_EXIT.id(),
                 "stay", ConditionRuntimeTargetType.REGION_STAY.id()
         ));
+        data.put("actionConditionGateTargetTypes", Map.of(
+                "enter", ConditionRuntimeTargetType.REGION_ENTER_ACTION.id(),
+                "exit", ConditionRuntimeTargetType.REGION_EXIT_ACTION.id(),
+                "stay", ConditionRuntimeTargetType.REGION_STAY_ACTION.id()
+        ));
         data.put("conditionGateTargetId", controller.id());
         data.put("recentConditionGates", Map.of(
                 "enter", WebAdminConditionGateHistoryService.recentStatus(ConditionRuntimeTargetType.REGION_ENTER, controller.id()),
@@ -472,17 +548,19 @@ public final class WebAdminRegionControllerService {
         data.put("minStayIntervalTicks", RegionControllerData.MIN_STAY_INTERVAL_TICKS);
         data.put("defaultStayIntervalTicks", RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS);
         data.put("noRawJson", true);
-        data.put("noConditionEngine", true);
+        data.put("noConditionEngine", false);
         data.put("conditionRuntimeGates", true);
+        data.put("singleActionConditionGates", true);
         if (detailed) {
             data.put("actions", Map.of(
-                    "enter", actionDtos(controller.enterActions()),
-                    "exit", actionDtos(controller.exitActions()),
-                    "stay", actionDtos(controller.stayActions())
+                    "enter", actionDtos(controller.enterActions(), controller.id(), "enter"),
+                    "exit", actionDtos(controller.exitActions(), controller.id(), "exit"),
+                    "stay", actionDtos(controller.stayActions(), controller.id(), "stay")
             ));
             data.put("notes", List.of(
                     "RegionController 只编辑已有 enter / exit / stay action 列表和三个外层条件组 gate，不新增 ConditionEngine、路径可视化或 raw JSON。",
                     "未配置条件组 = 保持旧区域控制器逻辑，不拦截；配置后仅阻断对应 enter / exit / stay Action 列表。",
+                    "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
                     "command action 会阻断 stop/op/ban/kick/whitelist 等危险服务器管理命令。",
                     "stayIntervalTicks 小于 " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " 会被拒绝。"
             ));
@@ -605,7 +683,12 @@ public final class WebAdminRegionControllerService {
         return RegionTargetFilter.all();
     }
 
-    private static ActionValidation validateActionEntry(WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
+    private ActionValidation validateActionEntry(
+            MinecraftServer server,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry entry,
+            ConditionRuntimeTargetType actionTargetType,
+            String conditionField
+    ) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
         List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
@@ -617,13 +700,24 @@ public final class WebAdminRegionControllerService {
         }
         ActionType type = parseActionType(entry.type);
         String value = normalizeActionValue(type, entry.value);
+        gateBindingValidator.validate(
+                server,
+                errors,
+                isBlank(conditionField) ? "action.conditionGroupId" : conditionField,
+                entry.conditionGroupId,
+                actionTargetType
+        );
+        if (!errors.isEmpty()) {
+            return new ActionValidation(errors, null);
+        }
         ActionConfig action = new ActionConfig(
                 type,
                 value,
                 parseBoolean(entry.enabled, true),
                 parseBoolean(entry.requiresOp, false),
                 Math.max(0, parseInteger(entry.cooldownTicks, 0)),
-                parseBoolean(entry.notifyOps, false)
+                parseBoolean(entry.notifyOps, false),
+                WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId)
         );
         return new ActionValidation(List.of(), action);
     }
@@ -665,13 +759,15 @@ public final class WebAdminRegionControllerService {
         return filter.type().name();
     }
 
-    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions) {
+    private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions, String controllerId, String bucket) {
         List<Map<String, Object>> result = new ArrayList<>();
         int index = 0;
         for (ActionConfig action : actions == null ? List.<ActionConfig>of() : actions) {
             if (action == null) {
                 continue;
             }
+            ConditionRuntimeTargetType actionTargetType = ConditionActionGateService.regionActionTargetType(bucket);
+            String actionTargetId = ConditionActionGateService.regionActionTargetId(controllerId, bucket, index);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("index", index);
             entry.put("displayIndex", index + 1);
@@ -681,6 +777,10 @@ public final class WebAdminRegionControllerService {
             entry.put("requiresOp", action.requiresOp());
             entry.put("cooldownTicks", action.cooldownTicks());
             entry.put("notifyOps", action.notifyOps());
+            entry.put("conditionGroupId", action.conditionGroupId());
+            entry.put("actionConditionGateTargetType", actionTargetType.id());
+            entry.put("actionConditionGateTargetId", actionTargetId);
+            entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(actionTargetType, actionTargetId));
             entry.put("summary", actionSummary(action));
             result.add(entry);
             index++;
@@ -746,7 +846,10 @@ public final class WebAdminRegionControllerService {
         } else if (value.length() > 96) {
             value = value.substring(0, 96) + "...";
         }
-        return action.type().id() + ":" + value + " enabled=" + action.enabled();
+        return action.type().id()
+                + ":" + value
+                + " enabled=" + action.enabled()
+                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
     }
 
     private static Map<String, Object> auditSummary(RegionControllerData controller) {
@@ -787,7 +890,8 @@ public final class WebAdminRegionControllerService {
                         + "|enabled=" + action.enabled()
                         + "|requiresOp=" + action.requiresOp()
                         + "|cooldownTicks=" + action.cooldownTicks()
-                        + "|notifyOps=" + action.notifyOps())
+                        + "|notifyOps=" + action.notifyOps()
+                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId()))
                 .toList();
     }
 
@@ -898,6 +1002,14 @@ public final class WebAdminRegionControllerService {
 
     private static String triggerKey(RegionTriggerType triggerType) {
         return labelTrigger(triggerType);
+    }
+
+    private static ConditionRuntimeTargetType actionTargetType(RegionTriggerType triggerType) {
+        return switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> ConditionRuntimeTargetType.REGION_ENTER_ACTION;
+            case EXIT -> ConditionRuntimeTargetType.REGION_EXIT_ACTION;
+            case STAY -> ConditionRuntimeTargetType.REGION_STAY_ACTION;
+        };
     }
 
     private static boolean parseBoolean(Object value, boolean fallback) {

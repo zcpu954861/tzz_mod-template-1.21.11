@@ -90,6 +90,12 @@ public final class WebAdminConditionGateHistoryService {
         data.put("occurredAt", record.occurredAt());
         data.put("targetType", record.targetTypeId());
         data.put("targetId", record.targetId());
+        data.put("gateLevel", record.gateLevel());
+        data.put("parentTargetType", record.parentTargetType());
+        data.put("parentTargetId", record.parentTargetId());
+        data.put("actionIndex", record.actionIndex());
+        data.put("actionDisplayIndex", record.actionDisplayIndex());
+        data.put("actionType", record.actionType());
         data.put("debuggerRoute", "#/condition-debugger/" + java.net.URLEncoder.encode(record.id(), java.nio.charset.StandardCharsets.UTF_8));
         data.put("dataConditionGateRecentStatus", true);
         return Map.copyOf(data);

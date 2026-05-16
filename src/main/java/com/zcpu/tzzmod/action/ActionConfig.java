@@ -1,5 +1,6 @@
 package com.zcpu.tzzmod.action;
 
+import com.zcpu.tzzmod.condition.ConditionGroupIds;
 import com.zcpu.tzzmod.signal.SignalChannel;
 
 public record ActionConfig(
@@ -8,8 +9,24 @@ public record ActionConfig(
         boolean enabled,
         boolean requiresOp,
         int cooldownTicks,
-        boolean notifyOps
+        boolean notifyOps,
+        String conditionGroupId
 ) {
+    public ActionConfig(
+            ActionType type,
+            String value,
+            boolean enabled,
+            boolean requiresOp,
+            int cooldownTicks,
+            boolean notifyOps
+    ) {
+        this(type, value, enabled, requiresOp, cooldownTicks, notifyOps, "");
+    }
+
+    public ActionConfig {
+        conditionGroupId = ConditionGroupIds.normalize(conditionGroupId);
+    }
+
     public static ActionConfig command(String command, boolean notifyOps) {
         return new ActionConfig(
                 ActionType.COMMAND,
@@ -17,7 +34,8 @@ public record ActionConfig(
                 true,
                 false,
                 0,
-                notifyOps
+                notifyOps,
+                ""
         );
     }
 
@@ -28,7 +46,8 @@ public record ActionConfig(
                 true,
                 false,
                 0,
-                notifyOps
+                notifyOps,
+                ""
         );
     }
 

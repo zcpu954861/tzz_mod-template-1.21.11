@@ -16,6 +16,14 @@ public record ConditionGateHistoryRecord(
         String targetTypeId,
         String targetTypeDisplayName,
         String targetId,
+        String gateLevel,
+        String parentTargetType,
+        String parentTargetId,
+        String parentTargetDisplayName,
+        int actionIndex,
+        int actionDisplayIndex,
+        String actionType,
+        String parentActionBucket,
         String sourceType,
         String sourceId,
         String channel,
@@ -51,6 +59,14 @@ public record ConditionGateHistoryRecord(
         targetTypeId = safe(targetTypeId);
         targetTypeDisplayName = safe(targetTypeDisplayName);
         targetId = safe(targetId);
+        gateLevel = safe(gateLevel).isBlank() ? "LIST" : safe(gateLevel).toUpperCase(java.util.Locale.ROOT);
+        parentTargetType = safe(parentTargetType);
+        parentTargetId = safe(parentTargetId);
+        parentTargetDisplayName = safe(parentTargetDisplayName);
+        actionIndex = Math.max(-1, actionIndex);
+        actionDisplayIndex = actionDisplayIndex <= 0 && actionIndex >= 0 ? actionIndex + 1 : Math.max(0, actionDisplayIndex);
+        actionType = safe(actionType);
+        parentActionBucket = safe(parentActionBucket);
         sourceType = safe(sourceType);
         sourceId = safe(sourceId);
         channel = safe(channel);
@@ -88,9 +104,23 @@ public record ConditionGateHistoryRecord(
         data.put("targetType", targetTypeId);
         data.put("targetTypeDisplayName", targetTypeDisplayName);
         data.put("targetId", targetId);
+        data.put("gateLevel", gateLevel);
+        data.put("parentTargetType", parentTargetType);
+        data.put("parentTargetId", parentTargetId);
+        data.put("parentTargetDisplayName", parentTargetDisplayName);
+        data.put("actionIndex", actionIndex);
+        data.put("actionDisplayIndex", actionDisplayIndex);
+        data.put("actionType", actionType);
+        data.put("parentActionBucket", parentActionBucket);
         data.put("sourceType", sourceType);
         data.put("sourceId", sourceId);
         data.put("channel", channel);
+        data.put("deviceId", deviceId);
+        data.put("listenerId", listenerId);
+        data.put("regionId", regionId);
+        data.put("actionId", actionId);
+        data.put("playerId", playerId);
+        data.put("playerName", playerName);
         data.put("conditionGroupId", conditionGroupId);
         data.put("conditionGroupDisplayName", conditionGroupDisplayName);
         data.put("conditionGroupFingerprint", conditionGroupFingerprint);

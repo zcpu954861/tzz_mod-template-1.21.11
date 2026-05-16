@@ -52,6 +52,16 @@ public final class ConditionGateHistory {
                     targetType.id(),
                     targetType.displayName(),
                     request == null ? "" : request.targetId(),
+                    request == null ? "LIST" : request.gateLevel(),
+                    request == null || request.parentTargetType() == null ? "" : request.parentTargetType().id(),
+                    request == null ? "" : request.parentTargetId(),
+                    request == null || request.parentTargetDisplayName().isBlank()
+                            ? (request == null || request.parentTargetType() == null ? "" : request.parentTargetType().displayName())
+                            : request.parentTargetDisplayName(),
+                    request == null ? -1 : request.actionIndex(),
+                    request == null ? 0 : request.actionDisplayIndex(),
+                    request == null ? "" : request.actionType(),
+                    request == null ? "" : request.parentActionBucket(),
                     context == null ? "" : context.sourceType(),
                     context == null ? "" : context.sourceId(),
                     context == null ? "" : context.channel(),
@@ -169,6 +179,11 @@ public final class ConditionGateHistory {
                     .payload("conditionGroupId", record.conditionGroupId())
                     .payload("targetType", record.targetTypeId())
                     .payload("targetId", record.targetId())
+                    .payload("gateLevel", record.gateLevel())
+                    .payload("parentTargetType", record.parentTargetType())
+                    .payload("parentTargetId", record.parentTargetId())
+                    .payload("actionIndex", Integer.toString(record.actionIndex()))
+                    .payload("actionType", record.actionType())
                     .payload("deviceId", recordDeviceId(record))
                     .payload("listenerId", record.listenerId().isBlank() ? listenerTargetId(record) : record.listenerId())
                     .payload("regionId", record.regionId())
@@ -188,6 +203,7 @@ public final class ConditionGateHistory {
         }
         ConditionRuntimeTargetType targetType = record.targetType();
         if (targetType == ConditionRuntimeTargetType.ACTION_RELAY
+                || targetType == ConditionRuntimeTargetType.ACTION_RELAY_ACTION
                 || targetType == ConditionRuntimeTargetType.VBD_REDSTONE
                 || targetType == ConditionRuntimeTargetType.VBD_BLOCKSTATE
                 || targetType == ConditionRuntimeTargetType.VBD_INTERACTION
@@ -201,7 +217,16 @@ public final class ConditionGateHistory {
     }
 
     private static String listenerTargetId(ConditionGateHistoryRecord record) {
-        return record != null && record.targetType() == ConditionRuntimeTargetType.SIGNAL_LISTENER ? record.targetId() : "";
+        if (record == null) {
+            return "";
+        }
+        if (record.targetType() == ConditionRuntimeTargetType.SIGNAL_LISTENER) {
+            return record.targetId();
+        }
+        if (record.targetType() == ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION) {
+            return record.parentTargetId();
+        }
+        return "";
     }
 
     private static String resultStatus(ConditionGateResult result, ConditionEvaluationTrace trace) {

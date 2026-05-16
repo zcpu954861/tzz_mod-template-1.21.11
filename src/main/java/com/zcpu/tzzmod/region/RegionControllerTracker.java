@@ -4,6 +4,8 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
+import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
@@ -25,6 +27,7 @@ import net.minecraft.util.math.Vec3d;
 public final class RegionControllerTracker {
     private static final Map<UUID, PlayerRegionState> PLAYER_STATES = new HashMap<>();
     private static final ConditionGateService CONDITION_GATE_SERVICE = new ConditionGateService();
+    private static final ConditionActionGateService CONDITION_ACTION_GATE_SERVICE = new ConditionActionGateService();
 
     private RegionControllerTracker() {
     }
@@ -147,9 +150,67 @@ public final class RegionControllerTracker {
                 controller.id(),
                 ItemStack.EMPTY
         );
-        ActionExecutionResult result = ActionEngine.executeAll(context, controller.actionsFor(triggerType));
+        ActionExecutionResult result = executeActionListWithSingleActionGates(
+                server,
+                player,
+                controller,
+                triggerType,
+                region,
+                context
+        );
         WebAdminRealtimeEventBus.publishRegionRuntimeEvent(controller, triggerType, player);
         return result;
+    }
+
+    private static ActionExecutionResult executeActionListWithSingleActionGates(
+            MinecraftServer server,
+            ServerPlayerEntity player,
+            RegionControllerData controller,
+            RegionTriggerType triggerType,
+            MapDataStore.PlannerRegionData region,
+            ActionContext context
+    ) {
+        List<ActionConfig> actions = controller.actionsFor(triggerType);
+        ActionExecutionResult lastResult = ActionExecutionResult.success(net.minecraft.text.Text.literal("未执行动作"));
+        int skippedByActionGateCount = 0;
+        int executedCount = 0;
+        String bucket = triggerKey(triggerType);
+        ConditionRuntimeTargetType actionTargetType = actionTargetTypeFor(triggerType);
+        for (int index = 0; index < actions.size(); index++) {
+            ActionConfig action = actions.get(index);
+            if (action == null || !action.isUsable()) {
+                continue;
+            }
+            ConditionGateResult actionGate = CONDITION_ACTION_GATE_SERVICE.evaluate(
+                    server,
+                    action,
+                    actionTargetType,
+                    ConditionActionGateService.regionActionTargetId(controller.id(), bucket, index),
+                    targetTypeFor(triggerType),
+                    controller.id(),
+                    bucket,
+                    index,
+                    () -> ConditionRuntimeContextBuilder.regionController(server, player, controller, triggerType, region)
+            );
+            if (!actionGate.allowed()) {
+                skippedByActionGateCount++;
+                lastResult = ActionExecutionResult.success(net.minecraft.text.Text.literal(
+                        "区域控制器第 " + (index + 1) + " 条 " + bucket + " action 被条件阻断，已跳过：" + actionGate.failureReason()
+                ));
+                continue;
+            }
+            lastResult = ActionEngine.execute(context, action);
+            if (!lastResult.success()) {
+                return lastResult;
+            }
+            executedCount++;
+        }
+        if (executedCount == 0 && skippedByActionGateCount > 0) {
+            return ActionExecutionResult.success(net.minecraft.text.Text.literal(
+                    "区域控制器已跳过 " + skippedByActionGateCount + " 条被条件阻断的 " + bucket + " action"
+            ));
+        }
+        return lastResult;
     }
 
     public static ActionExecutionResult executeActionsForTest(ServerPlayerEntity player, RegionControllerData controller, RegionTriggerType triggerType) {
@@ -175,6 +236,22 @@ public final class RegionControllerTracker {
             case ENTER -> ConditionRuntimeTargetType.REGION_ENTER;
             case EXIT -> ConditionRuntimeTargetType.REGION_EXIT;
             case STAY -> ConditionRuntimeTargetType.REGION_STAY;
+        };
+    }
+
+    private static ConditionRuntimeTargetType actionTargetTypeFor(RegionTriggerType triggerType) {
+        return switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> ConditionRuntimeTargetType.REGION_ENTER_ACTION;
+            case EXIT -> ConditionRuntimeTargetType.REGION_EXIT_ACTION;
+            case STAY -> ConditionRuntimeTargetType.REGION_STAY_ACTION;
+        };
+    }
+
+    private static String triggerKey(RegionTriggerType triggerType) {
+        return switch (triggerType == null ? RegionTriggerType.STAY : triggerType) {
+            case ENTER -> "enter";
+            case EXIT -> "exit";
+            case STAY -> "stay";
         };
     }
 
