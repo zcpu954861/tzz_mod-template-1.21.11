@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.action;
 
+import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationResult;
+import com.zcpu.tzzmod.condition.state.StateVariableStore;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
@@ -17,13 +20,21 @@ public final class ActionEngine {
     }
 
     public static ActionExecutionResult execute(ActionContext context, ActionConfig config) {
+        long started = System.nanoTime();
         if (context == null || config == null || !config.isUsable()) {
             return ActionExecutionResult.failure(Text.literal("动作配置为空"));
         }
 
         Text validationError = ActionValidator.validateForExecute(context, config);
         if (validationError != null) {
-            ActionExecutionResult result = ActionExecutionResult.failure(validationError);
+            ActionExecutionResult result = config.type() == ActionType.STATE_VARIABLE
+                    ? ActionExecutionResult.stateValidationFailure(
+                            config,
+                            context.player() == null ? "" : context.player().getUuidAsString(),
+                            validationError,
+                            Math.max(0L, System.nanoTime() - started)
+                    )
+                    : ActionExecutionResult.failure(validationError);
             ActionAuditLogger.log(context, config, result);
             return result;
         }
@@ -34,6 +45,7 @@ public final class ActionEngine {
                 case MESSAGE -> executeMessage(context, config);
                 case SOUND -> executeSound(context, config);
                 case SIGNAL -> executeSignal(context, config);
+                case STATE_VARIABLE -> executeStateVariable(context, config);
             };
 
             ActionAuditLogger.log(context, config, result);
@@ -131,6 +143,15 @@ public final class ActionEngine {
                 context.world().getTime()
         );
         return SignalBridgeServer.emit(event);
+    }
+
+    private static ActionExecutionResult executeStateVariable(ActionContext context, ActionConfig config) {
+        String contextPlayerId = context.player() == null ? "" : context.player().getUuidAsString();
+        StateVariableMutationRequest request = config.stateMutationRequest(contextPlayerId);
+        String actor = "action:" + (context.sourceType() == null ? "unknown" : context.sourceType().id())
+                + ":" + (context.sourceId() == null ? "" : context.sourceId());
+        StateVariableMutationResult result = StateVariableStore.mutate(context.world().getServer(), request, actor);
+        return ActionExecutionResult.stateMutation(result);
     }
 
     private static ServerCommandSource commandSource(ActionContext context) {

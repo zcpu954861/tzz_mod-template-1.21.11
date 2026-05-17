@@ -18,5 +18,15 @@ public final class WebAdminActionRelayActionsUpdateRequest {
         public Object cooldownTicks = 0;
         public Object notifyOps = Boolean.FALSE;
         public String conditionGroupId = "";
+        public String stateOperation = "";
+        public String stateScope = "";
+        public String stateTargetMode = "";
+        public String stateTargetId = "";
+        public String stateKey = "";
+        public String stateValueType = "";
+        public String stateValue = "";
+        public Object stateDelta = 0;
+        public Object stateCreateIfMissing = Boolean.FALSE;
+        public String stateInitialValue = "";
     }
 }

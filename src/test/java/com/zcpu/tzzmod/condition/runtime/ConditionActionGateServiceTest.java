@@ -10,6 +10,10 @@ import com.zcpu.tzzmod.condition.ConditionGroupMode;
 import com.zcpu.tzzmod.condition.ConditionNode;
 import com.zcpu.tzzmod.condition.ConditionNodeConfig;
 import com.zcpu.tzzmod.condition.ConditionNodeType;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationOperation;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
+import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
+import com.zcpu.tzzmod.condition.state.StateVariableType;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +31,7 @@ public final class ConditionActionGateServiceTest {
         testActionGateRecordsActionMetadata();
         testActionGateFalseBlocksOnlyCurrentActionDecision();
         testRuntimeLoopSemanticsSkipCurrentAndContinue();
+        testStateActionGateFalseSkipsStateActionExecutionDecision();
         testManualBypassSkipsActionGateEvaluation();
         testActionGateRejectsIncompatibleProfileBeforeContextBuild();
     }
@@ -237,6 +242,60 @@ public final class ConditionActionGateServiceTest {
         requireTrue(ConditionGateHistory.snapshot().isEmpty(), "ActionRelay manual bypass records no action gate history");
     }
 
+    private static void testStateActionGateFalseSkipsStateActionExecutionDecision() {
+        ConditionGateHistory.clearForTest();
+        ConditionActionGateService service = service(Map.of(
+                "deny", entry("deny", definition("deny", leaf(ConditionNodeType.ALWAYS_FALSE)), true)
+        ));
+        ActionConfig blockedStateAction = ActionConfig.stateVariable(
+                StateVariableMutationOperation.SET_VARIABLE,
+                StateVariableScope.GLOBAL,
+                StateVariableTargetMode.GLOBAL,
+                "",
+                "game.ready",
+                StateVariableType.BOOLEAN,
+                "true",
+                0,
+                true,
+                "",
+                "deny"
+        );
+        List<ActionConfig> actions = List.of(
+                blockedStateAction,
+                new ActionConfig(ActionType.MESSAGE, "after-state-block", true, false, 0, false, "")
+        );
+
+        List<String> executed = runActionLoop(
+                service,
+                actions,
+                ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                "listener",
+                "listener-1",
+                ConditionRuntimeTargetType.SIGNAL_LISTENER,
+                "listener-1",
+                "",
+                false
+        );
+
+        requireEquals(List.of("after-state-block"), executed, "single action gate false skips blocked state_variable action and continues");
+        requireTrue(ConditionGateHistory.latestFor(ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                        ConditionActionGateService.actionTargetId("listener", "listener-1", 0)).isPresent(),
+                "blocked state action gate records history");
+
+        List<String> manualExecuted = runActionLoop(
+                service,
+                actions,
+                ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                "relay",
+                "minecraft:overworld@1,2,3",
+                ConditionRuntimeTargetType.ACTION_RELAY,
+                "minecraft:overworld@1,2,3",
+                "",
+                true
+        );
+        requireTrue(manualExecuted.getFirst().startsWith("state_variable:"), "ActionRelay manual test intentionally bypasses state action gate");
+    }
+
     private static void testActionGateRejectsIncompatibleProfileBeforeContextBuild() {
         ConditionGateHistory.clearForTest();
         AtomicBoolean contextCalled = new AtomicBoolean(false);
@@ -321,9 +380,16 @@ public final class ConditionActionGateServiceTest {
                     continue;
                 }
             }
-            executed.add(action.value());
+            executed.add(actionLabel(action));
         }
         return List.copyOf(executed);
+    }
+
+    private static String actionLabel(ActionConfig action) {
+        if (action != null && action.type() == ActionType.STATE_VARIABLE) {
+            return action.type().id() + ":" + action.stateActionSummary();
+        }
+        return action == null ? "" : action.value();
     }
 
     private static WebAdminConditionGroupStore.ConditionGroupEntry entry(String id, ConditionGroupDefinition definition, boolean enabled) {

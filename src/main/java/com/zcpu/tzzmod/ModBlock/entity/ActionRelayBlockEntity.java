@@ -8,7 +8,6 @@ import com.zcpu.tzzmod.action.ActionContext;
 import com.zcpu.tzzmod.action.ActionEngine;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionSourceType;
-import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionGroupIds;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateRequest;
@@ -384,21 +383,6 @@ public class ActionRelayBlockEntity extends BlockEntity {
     }
 
     private static ActionConfig normalizeAction(ActionConfig action) {
-        ActionType type = action.type() == null ? ActionType.COMMAND : action.type();
-        String value = action.value() == null ? "" : action.value().trim();
-        if (type == ActionType.COMMAND) {
-            value = ActionConfig.normalizeCommand(value);
-        } else if (type == ActionType.SIGNAL) {
-            value = SignalChannel.normalize(value);
-        }
-        return new ActionConfig(
-                type,
-                value,
-                action.enabled(),
-                action.requiresOp(),
-                Math.max(0, action.cooldownTicks()),
-                action.notifyOps(),
-                action.conditionGroupId()
-        );
+        return action == null ? null : action.normalized();
     }
 }

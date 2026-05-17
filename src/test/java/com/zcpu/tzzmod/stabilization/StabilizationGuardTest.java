@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.stabilization;
 
 import com.google.gson.Gson;
 import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.action.ControlledStateActionServiceTest;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
@@ -75,6 +76,8 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateConfigTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionRuntimeDoctorServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminControlledStateActionServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
@@ -158,6 +161,9 @@ public final class StabilizationGuardTest {
         ConditionActionGateServiceTest.run();
         ConditionGateHistoryServiceTest.run();
         ConditionGateReplayServiceTest.run();
+        ControlledStateActionServiceTest.run();
+        WebAdminControlledStateActionServiceTest.run();
+        WebAdminStateVariableServiceTest.run();
         WebAdminConditionGateConfigTest.run();
         WebAdminConditionCatalogTest.run();
         WebAdminConditionGroupServiceTest.run();
@@ -175,6 +181,7 @@ public final class StabilizationGuardTest {
         testConditionRuntimeDebugger88();
         testConditionRuntimeSingleActionGates89();
         testSignalJoinBarrierAggregator810();
+        testControlledStateActions811();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -6268,8 +6275,8 @@ public final class StabilizationGuardTest {
         }
         String webadminMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin"));
         requireFalse(webadminMain.contains("conditionEngineEditor") || webadminMain.contains("stateVariableEditor")
-                        || webadminMain.contains("/api/webadmin/state-variables") || webadminMain.contains("condition-groups/raw"),
-                "8.2 must not add WebAdmin condition editor, state variable UI/API, or raw JSON editor");
+                        || webadminMain.contains("condition-groups/raw"),
+                "8.2 must not add WebAdmin condition editor, state variable editor, or raw JSON editor");
         requireContains(context, "不做物品 / 背包 / 容器条件", "8.2 context keeps item/inventory/container deferred marker");
         requireFalse(readme.contains("旧数据包任务已实现") || context.contains("旧数据包任务已实现")
                         || matrix.contains("GameController 已完成") || matrix.contains("MissionSystem 已完成"),
@@ -8015,6 +8022,288 @@ public final class StabilizationGuardTest {
                 "raw-json-textarea"
         )) {
             requireFalse(allMain.contains(forbidden), "8.10 must not add out-of-scope type: " + forbidden);
+        }
+    }
+
+    private static void testControlledStateActions811() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/CONTROLLED_STATE_ACTIONS_8_11_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/ACTION_ENGINE_CAPABILITY_MATRIX_8_11.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+        String actionConfig = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionConfig.java"), StandardCharsets.UTF_8);
+        String actionEngine = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionEngine.java"), StandardCharsets.UTF_8);
+        String actionResult = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionExecutionResult.java"), StandardCharsets.UTF_8);
+        String actionValidator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionValidator.java"), StandardCharsets.UTF_8);
+        String stateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state/StateVariableService.java"), StandardCharsets.UTF_8);
+        String stateStore = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state/StateVariableStore.java"), StandardCharsets.UTF_8);
+        String stateValidation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/state/StateVariableMutationValidation.java"), StandardCharsets.UTF_8);
+        String stateVariableWebAdminService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableService.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String relayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String listenerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerActionsService.java"), StandardCharsets.UTF_8);
+        String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String doctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java"), StandardCharsets.UTF_8);
+        String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventBus.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String test = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/action/ControlledStateActionServiceTest.java"), StandardCharsets.UTF_8);
+        String webadminTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminControlledStateActionServiceTest.java"), StandardCharsets.UTF_8);
+        String stateVariableWebAdminTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableServiceTest.java"), StandardCharsets.UTF_8);
+        String actionGateTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionActionGateServiceTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/CONTROLLED_STATE_ACTIONS_8_11_CURRENT_CONTEXT.md",
+                "docs/ACTION_ENGINE_CAPABILITY_MATRIX_8_11.md",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableMutationOperation.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableMutationRequest.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableMutationResult.java",
+                "src/main/java/com/zcpu/tzzmod/condition/state/StateVariableMutationValidation.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableService.java",
+                "src/test/java/com/zcpu/tzzmod/action/ControlledStateActionServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminControlledStateActionServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.11 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.11 Controlled State Actions",
+                "状态变量写入动作",
+                "StateVariableService",
+                "ActionEngine",
+                "GLOBAL",
+                "PLAYER",
+                "context_player",
+                "explicit_target",
+                "createIfMissing",
+                "clear missing",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做 SignalReceiver gate",
+                "不做 raw JSON editor",
+                "不跑 MCP scenario",
+                "不启动 Minecraft",
+                "不生成截图矩阵"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.11 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "STATE_VARIABLE(\"state_variable\")",
+                "case STATE_VARIABLE -> executeStateVariable",
+                "StateVariableStore.mutate",
+                "stateMutationRequest",
+                "stateAuditFingerprint",
+                "stateOperation",
+                "stateScope",
+                "stateTargetMode",
+                "stateKey",
+                "stateValueType",
+                "stateDelta",
+                "stateCreateIfMissing",
+                "StateVariableMutationValidation.validate"
+        )) {
+            requireContains(actionType + "\n" + actionConfig + "\n" + actionEngine + "\n" + actionValidator + "\n" + stateValidation, marker, "8.11 runtime model marker: " + marker);
+        }
+        requireContains(actionType, "@SerializedName(value = \"state_variable\"", "8.11 ActionType accepts public lowercase JSON id");
+        requireContains(actionEngine, "ActionExecutionResult.stateValidationFailure", "8.11 ActionEngine keeps structured state validation failures");
+        requireContains(actionResult, "oldValue", "8.11 ActionExecutionResult carries old value");
+        requireContains(actionResult, "newValue", "8.11 ActionExecutionResult carries new value");
+        requireContains(actionResult, "durationNanos", "8.11 ActionExecutionResult carries duration");
+        requireContains(stateService, "synchronized (lock())", "8.11 state mutation is synchronized per path");
+        requireContains(stateStore, "StateVariableMutationResult mutate", "8.11 StateVariableStore exposes mutation API");
+        requireContains(stateStore, "loadSnapshotWithStatus", "8.11 visibility fix exposes no-create state variable load status");
+        requireContains(stateService, "snapshotWithStatus", "8.11 visibility fix reads state variables under path lock");
+
+        for (String marker : List.of(
+                "/api/webadmin/state-variables",
+                "handleStateVariables",
+                "WebAdminStateVariableService",
+                "WebAdminOperationType.READ",
+                "StateVariableStore.getSnapshotWithStatus",
+                "GET",
+                "状态变量不存在。"
+        )) {
+            requireContains(server + "\n" + stateVariableWebAdminService, marker, "8.11 StateVariable WebAdmin API marker: " + marker);
+        }
+        requireFalse(stateVariableWebAdminService.contains("set(")
+                        || stateVariableWebAdminService.contains("remove(")
+                        || stateVariableWebAdminService.contains("mutate("),
+                "8.11 StateVariable visibility service must remain read-only");
+
+        for (String marker : List.of(
+                "state_variable",
+                "putStateActionFields",
+                "validateStateAction",
+                "stateActionSummary",
+                "actionFromEntry",
+                "allowedActionTypes",
+                "raw JSON、脚本、表达式或 NBT path"
+        )) {
+            requireContains(relayService + "\n" + listenerService + "\n" + regionService, marker, "8.11 WebAdmin backend marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-controlled-state-action-editor",
+                "data-state-action-no-raw-json",
+                "data-state-action-save-payload-typed",
+                "data-state-action-validation-preserves-input",
+                "data-state-action-scroll-preserved",
+                "data-state-action-operation",
+                "data-state-action-scope",
+                "data-state-action-target-mode",
+                "data-state-action-target-id",
+                "data-state-action-key",
+                "data-state-action-value-type",
+                "data-state-action-value",
+                "data-state-action-delta",
+                "data-state-action-create-if-missing",
+                "data-state-action-initial-value",
+                "data-state-action-raw-number-preserved",
+                "data-action-relay-state-action-fields",
+                "data-signal-listener-state-action-fields",
+                "data-region-controller-state-action-fields"
+        )) {
+            requireContains(scripts, marker, "8.11 frontend state action marker: " + marker);
+        }
+        for (String marker : List.of(
+                "data-route=\"#/state-variables\"",
+                "状态变量",
+                "#/state-variables",
+                "renderStateVariablesPage",
+                "renderStateVariableDetail",
+                "data-state-variable-page=\"true\"",
+                "data-state-variable-list=\"true\"",
+                "data-state-variable-list-loader=\"true\"",
+                "data-state-variable-detail-loader=\"true\"",
+                "data-state-variable-row-click-detail=\"true\"",
+                "data-state-variable-value-truncated=\"true\"",
+                "data-state-variable-readonly=\"true\"",
+                "data-state-variable-no-raw-json-primary=\"true\"",
+                "data-state-variable-silent-refresh-preserves-filters=\"true\"",
+                "stateVariableFilters:{search:'',scope:'ALL',type:'ALL',target:''}",
+                "stateActionRealtimeChanged",
+                "stateVariables"
+        )) {
+            requireContains(shell + "\n" + scripts, marker, "8.11 StateVariable WebAdmin visibility frontend marker: " + marker);
+        }
+        for (String marker : List.of(
+                "STATE_VARIABLE:'状态变量动作'",
+                "['ALL','COMMAND','MESSAGE','SOUND','SIGNAL','STATE_VARIABLE','UNKNOWN']",
+                "action-rail-type',['ALL','COMMAND','MESSAGE','SOUND','SIGNAL','STATE_VARIABLE','UNKNOWN']",
+                "STATE_VARIABLE:'state-variable'",
+                "STATE_VARIABLE:'info'"
+        )) {
+            requireContains(scripts, marker, "8.11 state action readonly action-list marker: " + marker);
+        }
+        requireFalse(scripts.contains("state-action-raw-json") || scripts.contains("stateActionRawJson"),
+                "8.11 state action editor must not expose raw JSON editor");
+
+        for (String marker : List.of(
+                "state-action-empty-key",
+                "state-action-invalid-config",
+                "context_player",
+                "explicit_target",
+                "状态变量动作"
+        )) {
+            requireContains(doctorService, marker, "8.11 Doctor marker: " + marker);
+        }
+        requireContains(realtime, "stateAction.", "8.11 realtime action execution includes state details");
+
+        for (String marker : List.of(
+                "testSetVariableMatrixAndFailures",
+                "testIntegerMutations",
+                "testToggleAndClear",
+                "testTargetModesAndMissingPlayer",
+                "testReadAfterWriteConditions",
+                "testActionExecutionResultDetails",
+                "testActionConfigJsonCompatibility",
+                "integer_overflow",
+                "clear missing no-op success",
+                "state action is usable with blank legacy value"
+        )) {
+            requireContains(test, marker, "8.11 controlled state action test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "testValidTypedStateActionRoundTrip",
+                "testInvalidStateActionValidation",
+                "testAuditSummariesRedactStateValues",
+                "testReadonlyStateActionVisibility",
+                "testActionEntryDoesNotExposeRawJsonSurface",
+                "validateActionEntries",
+                "actionFromEntry",
+                "putStateActionFields",
+                "invalid_delta"
+        )) {
+            requireContains(webadminTest, marker, "8.11 WebAdmin state action save-path test marker: " + marker);
+        }
+        for (String marker : List.of(
+                "testMissingStoreReadDoesNotCreateFile",
+                "testListAndDetailFilters",
+                "testReadAfterWriteVisibility",
+                "testBadFileFallbackDoesNotWrite",
+                "PLAYER context_player write visible",
+                "same PLAYER key for two targets shows as two records",
+                "bad file fallback does not write"
+        )) {
+            requireContains(stateVariableWebAdminTest, marker, "8.11 StateVariable WebAdmin visibility test marker: " + marker);
+        }
+        requireContains(actionGateTest, "testStateActionGateFalseSkipsStateActionExecutionDecision", "8.11 state action single gate regression test marker");
+        requireContains(actionGateTest, "ActionRelay manual test intentionally bypasses state action gate", "8.11 manual bypass behavior is locked by test");
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "ENTITY_STATE_VARIABLE_WRITE",
+                "BLOCK_STATE_VARIABLE_WRITE",
+                "DEVICE_STATE_VARIABLE_WRITE",
+                "REGION_STATE_VARIABLE_WRITE",
+                "TEAM_STATE_VARIABLE_WRITE",
+                "GAME_STATE_VARIABLE_WRITE",
+                "ActionFailurePolicy",
+                "FallbackAction",
+                "StopListPolicy",
+                "VariableChangedSignal",
+                "StateVariableChangedSignal",
+                "state-action-raw-json"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.11 must not add out-of-scope marker: " + forbidden);
+        }
+        String controlledStateMain = String.join("\n",
+                actionType,
+                actionConfig,
+                actionEngine,
+                actionResult,
+                stateService,
+                stateStore,
+                stateValidation,
+                relayService,
+                listenerService,
+                regionService,
+                doctorService,
+                realtime
+        );
+        for (String forbidden : List.of(
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "SchedulerAction",
+                "DelayAction",
+                "TimerAction",
+                "SignalReceiverGate",
+                "ActionFailurePolicy",
+                "FallbackAction",
+                "StopListPolicy",
+                "FailureChannel",
+                "VariableChangedSignal",
+                "StateVariableChangedSignal",
+                "ScriptAction",
+                "NbtPath",
+                "NBTPath",
+                "RawJsonEditor",
+                "rawJsonEditor"
+        )) {
+            requireFalse(controlledStateMain.contains(forbidden), "8.11 controlled state action code must not add forbidden capability: " + forbidden);
         }
     }
 

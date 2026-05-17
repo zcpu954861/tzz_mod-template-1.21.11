@@ -194,7 +194,7 @@ public final class SignalBridgeServer {
             if (!lastResult.success()) {
                 String reason = lastResult.message() == null ? "unknown" : lastResult.message().getString();
                 String type = action.type() == null ? "unknown" : action.type().id();
-                return ActionExecutionResult.failure(Text.literal(
+                return lastResult.withMessage(Text.literal(
                         "监听器动作执行失败：第 " + (index + 1) + " 条 " + type + " action，原因：" + reason
                 ));
             }

@@ -248,7 +248,7 @@ public final class ActionRelayCommand {
 
         sendHeader(source, Text.literal("已手动触发动作继电器").formatted(Formatting.GREEN));
         source.sendFeedback(() -> field("位置", posText(pos)), false);
-        source.sendFeedback(() -> field("说明", Text.literal("手动触发已绕过冷却检查。").formatted(Formatting.YELLOW)), false);
+        source.sendFeedback(() -> field("说明", Text.literal("手动触发已绕过冷却检查和条件 gate，仅用于测试。").formatted(Formatting.YELLOW)), false);
         source.sendFeedback(() -> field("结果", result.message()), false);
         return 1;
     }
@@ -334,6 +334,8 @@ public final class ActionRelayCommand {
                     .append(Text.literal(value).formatted(Formatting.LIGHT_PURPLE));
             case SIGNAL -> Text.literal("信号 ").formatted(Formatting.AQUA)
                     .append(channelText(value));
+            case STATE_VARIABLE -> Text.literal("状态变量 ").formatted(Formatting.LIGHT_PURPLE)
+                    .append(Text.literal(action.stateActionSummary()).formatted(Formatting.WHITE));
         };
     }
 }

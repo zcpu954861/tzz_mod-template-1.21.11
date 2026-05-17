@@ -910,6 +910,10 @@ public final class SignalCommand {
             return Text.literal("命令 ").formatted(Formatting.GREEN)
                     .append(commandText(value));
         }
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return Text.literal("状态变量 ").formatted(Formatting.LIGHT_PURPLE)
+                    .append(Text.literal(action.stateActionSummary()).formatted(Formatting.WHITE));
+        }
         return Text.literal(actionTypeLabel(action.type()) + " ").formatted(Formatting.GOLD)
                 .append(Text.literal(value).formatted(Formatting.WHITE));
     }
@@ -919,6 +923,7 @@ public final class SignalCommand {
             case MESSAGE -> "消息";
             case SOUND -> "音效";
             case SIGNAL -> "信号";
+            case STATE_VARIABLE -> "状态变量";
             case COMMAND -> "命令";
         };
     }

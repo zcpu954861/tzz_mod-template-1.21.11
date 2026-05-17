@@ -1497,6 +1497,7 @@ public final class WebAdminLogicChainService {
             case MESSAGE -> "消息";
             case SOUND -> "音效";
             case SIGNAL -> "发出频道";
+            case STATE_VARIABLE -> "状态变量";
         };
     }
 

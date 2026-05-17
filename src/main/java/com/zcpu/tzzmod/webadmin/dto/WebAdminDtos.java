@@ -317,6 +317,81 @@ public final class WebAdminDtos {
     ) {
     }
 
+    public record StateVariableSummaryDto(
+            int totalCount,
+            int globalCount,
+            int playerCount,
+            int booleanCount,
+            int integerCount,
+            int stringCount
+    ) {
+    }
+
+    public record StateVariableListEntryDto(
+            String id,
+            String scope,
+            String scopeLabel,
+            String targetId,
+            String targetLabel,
+            String key,
+            String type,
+            String typeLabel,
+            Object value,
+            String valueText,
+            String valuePreview,
+            int valueLength,
+            long version,
+            String fingerprint,
+            String fingerprintShort,
+            String updatedAt,
+            String updatedBy,
+            String displayPath,
+            String navigationTarget
+    ) {
+    }
+
+    public record StateVariableListDto(
+            List<StateVariableListEntryDto> variables,
+            int count,
+            StateVariableSummaryDto summary,
+            boolean worldScoped,
+            String storeFile,
+            boolean storePresent,
+            boolean storeDegraded,
+            String storeMessage,
+            boolean readOnly,
+            List<String> allowedScopes,
+            List<String> allowedTypes
+    ) {
+    }
+
+    public record StateVariableDetailDto(
+            String id,
+            String scope,
+            String scopeLabel,
+            String targetId,
+            String targetLabel,
+            String key,
+            String type,
+            String typeLabel,
+            Object value,
+            String valueText,
+            String valuePreview,
+            int valueLength,
+            long version,
+            String fingerprint,
+            String fingerprintShort,
+            String updatedAt,
+            String updatedBy,
+            String createdAt,
+            String displayPath,
+            String storagePathSummary,
+            boolean readOnly,
+            Map<String, String> copyTargets,
+            Map<String, Object> conditionSuggestion
+    ) {
+    }
+
     public record WebAdminUserSummaryDto(
             int totalCount,
             int onlineCount,

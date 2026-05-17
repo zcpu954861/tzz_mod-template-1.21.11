@@ -1,6 +1,12 @@
 package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
+import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
+import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
 import com.zcpu.tzzmod.condition.ConditionEvaluator;
 import com.zcpu.tzzmod.condition.ConditionNode;
 import com.zcpu.tzzmod.condition.ConditionNodeType;
@@ -49,7 +55,9 @@ public final class WebAdminConditionRuntimeDoctorService {
             ));
             return List.copyOf(issues);
         }
-        issues.addAll(diagnoseBindings(groups.file().groups, runtimeBindings(server)));
+        RuntimeBindingSnapshot snapshot = runtimeBindings(server);
+        issues.addAll(diagnoseBindings(groups.file().groups, snapshot.conditionBindings()));
+        issues.addAll(diagnoseStateActions(snapshot.stateActionBindings()));
         return List.copyOf(issues);
     }
 
@@ -146,8 +154,51 @@ public final class WebAdminConditionRuntimeDoctorService {
         return List.copyOf(issues);
     }
 
-    private List<Binding> runtimeBindings(MinecraftServer server) {
+    public List<WebAdminDtos.DoctorIssueDto> diagnoseStateActions(List<StateActionBinding> bindings) {
+        List<WebAdminDtos.DoctorIssueDto> issues = new ArrayList<>();
+        for (StateActionBinding rawBinding : bindings == null ? List.<StateActionBinding>of() : bindings) {
+            StateActionBinding binding = rawBinding == null ? StateActionBinding.empty() : rawBinding.normalized();
+            ActionConfig action = binding.action();
+            if (action == null || action.type() != ActionType.STATE_VARIABLE) {
+                continue;
+            }
+            StateVariableMutationRequest request = action.stateMutationRequest("");
+            for (StateVariableMutationValidation.Issue validationIssue : StateVariableMutationValidation.validate(request)) {
+                String code = switch (validationIssue.code()) {
+                    case "missing_key" -> "state-action-empty-key";
+                    case "missing_operation" -> "state-action-invalid-operation";
+                    case "operation_type_mismatch" -> "state-action-operation-type-mismatch";
+                    case "missing_target_id" -> "state-action-explicit-target-missing";
+                    default -> "state-action-invalid-config";
+                };
+                issues.add(stateActionIssue(
+                        binding,
+                        code,
+                        "ERROR",
+                        "状态变量动作配置无效",
+                        "目标 " + binding.targetId() + " 的状态变量动作配置无效：" + validationIssue.message(),
+                        "打开对应 Action 编辑器，使用结构化字段修正 operation / scope / targetMode / key / valueType。"
+                ));
+            }
+            if (action.stateMutationRequest("").scope() == StateVariableScope.PLAYER
+                    && action.stateMutationRequest("").targetMode() == StateVariableTargetMode.CONTEXT_PLAYER
+                    && !providesPlayerContext(binding.runtimeTargetType())) {
+                issues.add(stateActionIssue(
+                        binding,
+                        "state-action-context-player-without-player",
+                        "ERROR",
+                        "状态变量动作缺少触发玩家上下文",
+                        "目标 " + binding.targetId() + " 使用 PLAYER + context_player，但 " + binding.runtimeTargetType().displayName() + " 通常不提供触发玩家，运行时会安全失败且不写入状态变量。",
+                        "改用 explicit_target，或只在 RegionController / 未来带玩家上下文的触发源中使用 context_player。"
+                ));
+            }
+        }
+        return List.copyOf(issues);
+    }
+
+    private RuntimeBindingSnapshot runtimeBindings(MinecraftServer server) {
         List<Binding> bindings = new ArrayList<>();
+        List<StateActionBinding> stateActionBindings = new ArrayList<>();
         Map<String, SignalDeviceData> devicesById = SignalDeviceStore.getSnapshot(server).stream()
                 .map(SignalDeviceData::normalized)
                 .collect(java.util.stream.Collectors.toMap(
@@ -185,6 +236,13 @@ public final class WebAdminConditionRuntimeDoctorService {
                         ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
                         "channel:" + listener.channel()
                 ));
+                stateActionBindings.add(new StateActionBinding(
+                        "SIGNAL_LISTENER_ACTION",
+                        targetId,
+                        action,
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION,
+                        "channel:" + listener.channel()
+                ));
             }
         }
 
@@ -209,6 +267,13 @@ public final class WebAdminConditionRuntimeDoctorService {
                             ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
                             "device:" + device.id()
                     ));
+                    stateActionBindings.add(new StateActionBinding(
+                            "ACTION_RELAY_ACTION",
+                            targetId,
+                            action,
+                            ConditionRuntimeTargetType.ACTION_RELAY_ACTION,
+                            "device:" + device.id()
+                    ));
                 }
             }
         }
@@ -221,8 +286,11 @@ public final class WebAdminConditionRuntimeDoctorService {
             addRegionActionBindings(bindings, controller, "enter", controller.enterActions(), ConditionRuntimeTargetType.REGION_ENTER_ACTION);
             addRegionActionBindings(bindings, controller, "exit", controller.exitActions(), ConditionRuntimeTargetType.REGION_EXIT_ACTION);
             addRegionActionBindings(bindings, controller, "stay", controller.stayActions(), ConditionRuntimeTargetType.REGION_STAY_ACTION);
+            addRegionStateActionBindings(stateActionBindings, controller, "enter", controller.enterActions(), ConditionRuntimeTargetType.REGION_ENTER_ACTION);
+            addRegionStateActionBindings(stateActionBindings, controller, "exit", controller.exitActions(), ConditionRuntimeTargetType.REGION_EXIT_ACTION);
+            addRegionStateActionBindings(stateActionBindings, controller, "stay", controller.stayActions(), ConditionRuntimeTargetType.REGION_STAY_ACTION);
         }
-        return List.copyOf(bindings);
+        return new RuntimeBindingSnapshot(List.copyOf(bindings), List.copyOf(stateActionBindings));
     }
 
     private static void addRegionActionBindings(
@@ -241,6 +309,28 @@ public final class WebAdminConditionRuntimeDoctorService {
                     "REGION_CONTROLLER_ACTION",
                     ConditionActionGateService.regionActionTargetId(controller.id(), bucket, index),
                     action.conditionGroupId(),
+                    targetType,
+                    "region:" + controller.regionId()
+            ));
+        }
+    }
+
+    private static void addRegionStateActionBindings(
+            List<StateActionBinding> bindings,
+            RegionControllerData controller,
+            String bucket,
+            List<ActionConfig> actions,
+            ConditionRuntimeTargetType targetType
+    ) {
+        for (int index = 0; index < (actions == null ? List.<ActionConfig>of() : actions).size(); index++) {
+            ActionConfig action = actions.get(index);
+            if (action == null) {
+                continue;
+            }
+            bindings.add(new StateActionBinding(
+                    "REGION_CONTROLLER_ACTION",
+                    ConditionActionGateService.regionActionTargetId(controller.id(), bucket, index),
+                    action,
                     targetType,
                     "region:" + controller.regionId()
             ));
@@ -325,6 +415,33 @@ public final class WebAdminConditionRuntimeDoctorService {
         );
     }
 
+    private WebAdminDtos.DoctorIssueDto stateActionIssue(
+            StateActionBinding binding,
+            String code,
+            String severity,
+            String title,
+            String message,
+            String suggestion
+    ) {
+        return issue(
+                code + ":" + binding.runtimeTargetType().id() + ":" + binding.targetId(),
+                severity,
+                title,
+                message,
+                binding.targetType(),
+                binding.targetId(),
+                "状态变量动作",
+                suggestion,
+                binding.navigationTarget()
+        );
+    }
+
+    private static boolean providesPlayerContext(ConditionRuntimeTargetType targetType) {
+        return targetType == ConditionRuntimeTargetType.REGION_ENTER_ACTION
+                || targetType == ConditionRuntimeTargetType.REGION_EXIT_ACTION
+                || targetType == ConditionRuntimeTargetType.REGION_STAY_ACTION;
+    }
+
     private static boolean containsAlwaysFalse(ConditionNode node) {
         if (node == null || !node.enabled()) {
             return false;
@@ -372,6 +489,34 @@ public final class WebAdminConditionRuntimeDoctorService {
         static Binding empty() {
             return new Binding("", "", "", ConditionRuntimeTargetType.VBD_INTERACTION, "", null);
         }
+    }
+
+    public record StateActionBinding(
+            String targetType,
+            String targetId,
+            ActionConfig action,
+            ConditionRuntimeTargetType runtimeTargetType,
+            String navigationTarget
+    ) {
+        public StateActionBinding normalized() {
+            return new StateActionBinding(
+                    safe(targetType).isBlank() ? "SYSTEM" : safe(targetType),
+                    safe(targetId),
+                    action == null ? null : action.normalized(),
+                    runtimeTargetType == null ? ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION : runtimeTargetType,
+                    safe(navigationTarget)
+            );
+        }
+
+        static StateActionBinding empty() {
+            return new StateActionBinding("", "", null, ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION, "");
+        }
+    }
+
+    private record RuntimeBindingSnapshot(
+            List<Binding> conditionBindings,
+            List<StateActionBinding> stateActionBindings
+    ) {
     }
 
     private static String safe(String value) {

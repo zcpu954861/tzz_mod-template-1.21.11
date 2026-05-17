@@ -306,7 +306,7 @@ public final class WebAdminSignalListenerActionsService {
         data.put("cooldownTicks", listener.cooldownTicks());
         data.put("actionCount", listener.actions().size());
         data.put("actions", actionDtos(listener.actions(), listener.id()));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
         data.put("expectedFingerprint", WebAdminSignalListenerBasicConfigService.fingerprintFor(listener));
         WebAdminEditLockStatusDto lockStatus = editLockService == null ? null : editLockService.status(
                 WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS,
@@ -323,6 +323,7 @@ public final class WebAdminSignalListenerActionsService {
         data.put("notes", List.of(
                 "虚拟监听器动作列表按当前 ActionEngine 顺序执行，不改变 SignalBridge 运行时语义。",
                 "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
+                "状态变量动作使用结构化字段写入 GLOBAL / PLAYER StateVariable，不提供 raw JSON、脚本、表达式或 NBT path。",
                 "command action 会阻断 stop/op/ban/kick/whitelist 等危险服务器管理命令，包括 execute ... run 嵌套形式。",
                 "本编辑器不提供 raw JSON、ConditionEngine 或路径可视化。"
         ));
@@ -382,8 +383,6 @@ public final class WebAdminSignalListenerActionsService {
         if (entry == null) {
             return new ActionValidation(List.of(new WebAdminValidationError("action", "required", "Action 配置不能为空。", "")), null);
         }
-        ActionType type = parseActionType(entry.type);
-        String value = normalizeActionValue(type, entry.value);
         gateBindingValidator.validate(
                 server,
                 errors,
@@ -394,15 +393,7 @@ public final class WebAdminSignalListenerActionsService {
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }
-        return new ActionValidation(List.of(), new ActionConfig(
-                type,
-                value,
-                parseBoolean(entry.enabled, true),
-                parseBoolean(entry.requiresOp, false),
-                Math.max(0, parseInteger(entry.cooldownTicks, 0)),
-                parseBoolean(entry.notifyOps, false),
-                WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId)
-        ));
+        return new ActionValidation(List.of(), WebAdminActionRelayActionsService.actionFromEntry(entry));
     }
 
     private static List<Map<String, Object>> actionDtos(List<ActionConfig> actions, String listenerId) {
@@ -424,6 +415,7 @@ public final class WebAdminSignalListenerActionsService {
             entry.put("cooldownTicks", normalized.cooldownTicks());
             entry.put("notifyOps", normalized.notifyOps());
             entry.put("conditionGroupId", normalized.conditionGroupId());
+            WebAdminActionRelayActionsService.putStateActionFields(entry, normalized);
             entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
@@ -439,20 +431,15 @@ public final class WebAdminSignalListenerActionsService {
 
     private static ActionConfig normalizeAction(ActionConfig action) {
         ActionType type = action == null || action.type() == null ? ActionType.COMMAND : action.type();
-        return new ActionConfig(
-                type,
-                normalizeActionValue(type, action == null ? "" : action.value()),
-                action != null && action.enabled(),
-                action != null && action.requiresOp(),
-                Math.max(0, action == null ? 0 : action.cooldownTicks()),
-                action != null && action.notifyOps(),
-                action == null ? "" : action.conditionGroupId()
-        );
+        return action == null ? new ActionConfig(type, "", false, false, 0, false) : action.normalized();
     }
 
     private static String actionSummary(ActionConfig action) {
         if (action == null || action.type() == null) {
             return "unknown";
+        }
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + action.stateActionSummary();
         }
         return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + safe(action.value());
     }
@@ -462,6 +449,9 @@ public final class WebAdminSignalListenerActionsService {
             return "unknown";
         }
         String value = safe(action.value());
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
+        } else
         if (action.type() == ActionType.COMMAND) {
             value = "<command redacted length=" + value.length() + ">";
         } else if (value.length() > 96) {
