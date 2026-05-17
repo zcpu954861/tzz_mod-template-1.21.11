@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeContextBuilder;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
+import com.zcpu.tzzmod.signal.join.SignalJoinRuntimeService;
 import com.zcpu.tzzmod.signal.device.ActionRelayDispatcher;
 import com.zcpu.tzzmod.signal.device.SignalReceiverDispatcher;
 import java.util.HashMap;
@@ -69,7 +70,7 @@ public final class SignalBridgeServer {
 
         if (listeners.isEmpty()) {
             String message = noListenerMessage(receiverCount, relayResult);
-            recordHistory(event, channel, 0, 0, 0, 0, 0, depth, message);
+            recordAcceptedHistory(event, channel, 0, 0, 0, 0, 0, depth, message);
             return ActionExecutionResult.success(Text.literal("信号已发出：" + channel + "；" + message));
         }
 
@@ -131,7 +132,7 @@ public final class SignalBridgeServer {
 
                 if (!lastResult.success()) {
                     failedCount++;
-                    recordHistory(
+                    recordAcceptedHistory(
                             event,
                             channel,
                             listeners.size(),
@@ -145,23 +146,23 @@ public final class SignalBridgeServer {
                     return lastResult;
                 }
             }
+
+            recordAcceptedHistory(
+                    event,
+                    channel,
+                    listeners.size(),
+                    executedCount,
+                    skippedCooldownCount,
+                    skippedEmptyCount,
+                    failedCount,
+                    depth,
+                    resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, receiverCount, relayResult)
+                            + conditionSkipSuffix(skippedConditionCount)
+            );
+            return lastResult;
         } finally {
             CURRENT_DEPTH.set(previousDepth);
         }
-
-        recordHistory(
-                event,
-                channel,
-                listeners.size(),
-                executedCount,
-                skippedCooldownCount,
-                skippedEmptyCount,
-                failedCount,
-                depth,
-                resultMessage(listeners.size(), executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, receiverCount, relayResult)
-                        + conditionSkipSuffix(skippedConditionCount)
-        );
-        return lastResult;
     }
 
     private static ActionExecutionResult executeListenerActions(ActionContext context, SignalEvent event, SignalListenerData listener) {
@@ -276,6 +277,25 @@ public final class SignalBridgeServer {
                 depth,
                 historyMessage + detail
         ));
+    }
+
+    private static void recordAcceptedHistory(
+            SignalEvent event,
+            String channel,
+            int listenerCount,
+            int executedCount,
+            int skippedCooldownCount,
+            int skippedEmptyCount,
+            int failedCount,
+            int depth,
+            String resultMessage
+    ) {
+        recordHistory(event, channel, listenerCount, executedCount, skippedCooldownCount, skippedEmptyCount, failedCount, depth, resultMessage);
+        try {
+            SignalJoinRuntimeService.observeAcceptedSignal(event, channel, depth);
+        } catch (Exception exception) {
+            Tzz_mod.LOGGER.warn("[SignalBridge] Signal Join observer failed for channel={}: {}", channel, exception.getMessage());
+        }
     }
 
     private static String resultMessage(

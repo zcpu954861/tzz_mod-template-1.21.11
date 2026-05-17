@@ -13,6 +13,57 @@ RegionController 触发 signal
 
 SignalBridge 不新增方块、GUI 或网络 payload。它只负责服务端事件联动，适合让 RegionController、封锁卡、密码机、感应板以及未来工具共享同一套事件通道。
 
+## 8.10 Signal Join / Barrier / Aggregator
+
+8.10 增加多输入 signal 汇合能力：
+
+```text
+input A + input B -> Signal Join -> output C
+```
+
+Signal Join 是 SignalBridge 的 passive observer：
+
+- input signal 仍按旧 receiver / ActionRelay / SignalListener / history 流程分发。
+- Join 只观察 accepted signal，不阻断原始 signal。
+- 满足条件后用 `SignalBridgeServer.emit` 发出 output signal。
+- output signal 的 `sourceType` 为 `signal_join`，`sourceId` 为 join id。
+- 未配置 Join 时旧 SignalBridge 行为不变。
+
+配置保存到：
+
+```text
+<world-save-root>/tzz/webadmin/signal_joins.json
+```
+
+runtime pending / latched state 是内存态，服务器重启后清空。
+
+支持模式：
+
+- `ALL`：所有 input channel 至少触发一次后输出。
+- `ANY_N`：任意 N 个不同 input channel 触发后输出。
+- `COUNT`：匹配 input channel 的累计事件次数达到 threshold 后输出。
+
+支持 scope：
+
+- `GLOBAL`：所有事件共享一个 pending state。
+- `PLAYER`：按玩家隔离；没有 player context 的 signal 会被忽略并记录中文诊断。
+
+支持 reset policy：
+
+- `RESET_AFTER_EMIT`：输出后清空 pending state，可重复触发。
+- `LATCH_UNTIL_MANUAL_RESET`：输出后锁存，手动 reset 前不再重复输出。
+
+`timeoutTicks` 使用 lazy timeout：不启动 Scheduler，不后台扫描，不发 failure channel，只在下一次相关事件或 status 查询时清理过期 pending state。
+
+WebAdmin 入口：
+
+```text
+#/signal-joins
+#/signal-joins/{id}
+```
+
+Logic Chain Viewer 会把 Join 显示为 input channel 的 consumer，同时把 output channel 显示为下游；从 output channel 展开时，Join 会作为 producer/source 出现。
+
 ## 5.15 稳定化 / GUI 前置整理版
 
 5.15 标记为 `v1.17.0-stabilization-foundation`。这是 5.x 底层工具链稳定化版本，不是新玩法功能版本。

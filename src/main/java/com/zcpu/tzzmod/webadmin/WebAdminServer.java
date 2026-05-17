@@ -25,6 +25,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateReque
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest;
@@ -48,6 +49,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubm
 import com.zcpu.tzzmod.webadmin.service.WebAdminSelectionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
@@ -102,6 +104,7 @@ public final class WebAdminServer {
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
@@ -303,6 +306,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
                 runOnServerThread(() -> handleLogicChains(exchange, auth, path, method));
+                return;
+            }
+            if (path.equals("/api/webadmin/signal-joins") || path.startsWith("/api/webadmin/signal-joins/")) {
+                runOnServerThread(() -> handleSignalJoins(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/selection/")) {
@@ -996,6 +1003,159 @@ public final class WebAdminServer {
             return;
         }
         WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "逻辑链接口不存在。");
+    }
+
+    private void handleSignalJoins(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/signal-joins";
+        if (path.equals(root)) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, signalJoinService.list(minecraftServer, auth.user, auth.session));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminSignalJoinRequest request = readJson(exchange, WebAdminSignalJoinRequest.class);
+                if (request == null) {
+                    request = new WebAdminSignalJoinRequest();
+                }
+                WebAdminWriteResult result = signalJoinService.create(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        String prefix = root + "/";
+        String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Signal Join ID 不能为空。");
+            return;
+        }
+        String[] parts = tail.split("/");
+        String joinId = decodePathSegment(parts[0]);
+        if (joinId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Signal Join ID 不能为空。");
+            return;
+        }
+
+        if (parts.length == 1) {
+            if (method.equalsIgnoreCase("GET")) {
+                Map<String, Object> detail = signalJoinService.detail(minecraftServer, auth.user, auth.session, joinId);
+                if (Boolean.TRUE.equals(detail.get("notFound"))) {
+                    WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", String.valueOf(detail.getOrDefault("message", "Signal Join 不存在。")));
+                    return;
+                }
+                WebAdminJsonResponse.ok(exchange, detail);
+                return;
+            }
+            if (method.equalsIgnoreCase("PATCH")) {
+                WebAdminSignalJoinRequest request = readJson(exchange, WebAdminSignalJoinRequest.class);
+                if (request == null) {
+                    request = new WebAdminSignalJoinRequest();
+                }
+                request.id = joinId;
+                WebAdminWriteResult result = signalJoinService.update(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        joinId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            if (method.equalsIgnoreCase("DELETE")) {
+                WebAdminSignalJoinRequest request = readJson(exchange, WebAdminSignalJoinRequest.class);
+                if (request == null) {
+                    request = new WebAdminSignalJoinRequest();
+                }
+                request.id = joinId;
+                WebAdminWriteResult result = signalJoinService.delete(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        joinId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH / DELETE。");
+            return;
+        }
+
+        if (parts.length == 2 && "status".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, signalJoinService.status(minecraftServer, auth.user, joinId, queryParams(exchange).getOrDefault("scopeKey", "")));
+            return;
+        }
+
+        if (parts.length == 2 && "reset".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSignalJoinRequest request = readJson(exchange, WebAdminSignalJoinRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalJoinRequest();
+            }
+            request.id = joinId;
+            WebAdminWriteResult result = signalJoinService.reset(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    joinId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 2 && "delete".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSignalJoinRequest request = readJson(exchange, WebAdminSignalJoinRequest.class);
+            if (request == null) {
+                request = new WebAdminSignalJoinRequest();
+            }
+            request.id = joinId;
+            WebAdminWriteResult result = signalJoinService.delete(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    joinId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Join 接口不存在。");
     }
 
     private void handleConditionTypes(HttpExchange exchange, AuthContext auth, String method) throws IOException {

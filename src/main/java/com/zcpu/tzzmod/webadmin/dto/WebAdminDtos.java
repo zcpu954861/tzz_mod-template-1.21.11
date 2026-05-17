@@ -117,6 +117,7 @@ public final class WebAdminDtos {
             int listenerCount,
             int receiverCount,
             int actionRelayCount,
+            int signalJoinCount,
             int downstreamSignalCount,
             String doctorStatus
     ) {
@@ -144,6 +145,7 @@ public final class WebAdminDtos {
             int listenerCount,
             int receiverCount,
             int actionRelayCount,
+            int signalJoinCount,
             int downstreamSignalCount
     ) {
     }
@@ -191,6 +193,7 @@ public final class WebAdminDtos {
             List<SignalChannelEndpointDto> listeners,
             List<SignalChannelEndpointDto> receivers,
             List<SignalChannelEndpointDto> actionRelays,
+            List<SignalChannelEndpointDto> signalJoins,
             List<ActionListEntryDto> actions,
             List<String> downstreamSignals,
             List<SignalHistoryEntryDto> recentHistory,

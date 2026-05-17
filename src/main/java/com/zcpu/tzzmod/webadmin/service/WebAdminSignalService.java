@@ -12,6 +12,8 @@ import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.signal.join.SignalJoinDefinition;
+import com.zcpu.tzzmod.signal.join.SignalJoinStore;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -31,15 +33,16 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
+        List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions);
+        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions, joins);
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<WebAdminDtos.SignalChannelListEntryDto> result = new ArrayList<>();
         for (String channel : channels) {
             if (result.size() >= limit) {
                 break;
             }
-            ChannelCounts counts = counts(server, channel, devices, listeners, regions);
+            ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins);
             SignalEventRecord latest = latest(channel);
             String fallbackIcon = counts.doctorStatus().equals("OK") ? "signal" : "warning";
             WebAdminChannelMetadataStore.MetadataEntry metadata = metadataFile.channels.get(channel);
@@ -60,6 +63,7 @@ public final class WebAdminSignalService {
                     counts.listenerCount(),
                     counts.receiverCount(),
                     counts.actionRelayCount(),
+                    counts.signalJoinCount(),
                     counts.downstreamSignalCount(),
                     counts.doctorStatus()
             ));
@@ -72,8 +76,9 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
+        List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        ChannelCounts counts = counts(server, channel, devices, listeners, regions);
+        ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins);
         SignalEventRecord latest = latest(channel);
         WebAdminDtos.SignalChannelStatsDto stats = new WebAdminDtos.SignalChannelStatsDto(
                 latest == null ? "" : WebAdminReadonlySupport.isoTime(latest.wallTimeMillis()),
@@ -82,16 +87,18 @@ public final class WebAdminSignalService {
                 counts.listenerCount(),
                 counts.receiverCount(),
                 counts.actionRelayCount(),
+                counts.signalJoinCount(),
                 counts.downstreamSignalCount()
         );
-        List<WebAdminDtos.SignalChannelEndpointDto> sources = sourceEndpoints(channel, devices);
+        List<WebAdminDtos.SignalChannelEndpointDto> sources = sourceEndpoints(channel, devices, joins);
         List<WebAdminDtos.SignalChannelEndpointDto> listenerEndpoints = listenerEndpoints(channel, listeners);
         List<WebAdminDtos.SignalChannelEndpointDto> receivers = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         List<WebAdminDtos.SignalChannelEndpointDto> relays = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_ACTION_RELAY);
+        List<WebAdminDtos.SignalChannelEndpointDto> joinEndpoints = joinInputEndpoints(channel, joins);
         List<WebAdminDtos.ActionListEntryDto> actions = actionsForChannel(server, channel, devices, listeners, regions);
-        List<String> downstream = downstreamSignals(actions);
+        List<String> downstream = downstreamSignals(actions, channel, joins);
         List<WebAdminDtos.DoctorIssueDto> issues = new ArrayList<>();
-        if (counts.listenerCount() == 0 && counts.receiverCount() == 0 && counts.actionRelayCount() == 0) {
+        if (counts.listenerCount() == 0 && counts.receiverCount() == 0 && counts.actionRelayCount() == 0 && counts.signalJoinCount() == 0) {
             issues.add(new WebAdminDtos.DoctorIssueDto(
                     "channel_no_consumers",
                     "WARNING",
@@ -101,8 +108,8 @@ public final class WebAdminSignalService {
                     channel,
                     channel,
                     channel,
-                    "没有已配置的消费者。",
-                    "如该频道需要产生下游效果，请添加监听器 listener、接收器 signal_receiver 或动作继电器 action_relay。",
+            "没有已配置的消费者。",
+                    "如该频道需要产生下游效果，请添加监听器 listener、接收器 signal_receiver、动作继电器 action_relay 或 Signal Join。",
                     java.time.Instant.now().toString(),
                     "channel:" + channel
             ));
@@ -123,6 +130,7 @@ public final class WebAdminSignalService {
                 listenerEndpoints,
                 receivers,
                 relays,
+                joinEndpoints,
                 actions,
                 downstream,
                 WebAdminReadonlySupport.historyDtos(historyForChannel(channel), devices, 50),
@@ -138,7 +146,8 @@ public final class WebAdminSignalService {
         List<SignalDeviceData> devices = SignalDeviceStore.getSnapshot(server);
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
-        return knownChannels(server, devices, listeners, regions).contains(channel);
+        List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
+        return knownChannels(server, devices, listeners, regions, joins).contains(channel);
     }
 
     public List<WebAdminDtos.SignalHistoryEntryDto> history(MinecraftServer server, String channel, int requestedLimit) {
@@ -153,7 +162,8 @@ public final class WebAdminSignalService {
             MinecraftServer server,
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
-            List<RegionControllerData> regions
+            List<RegionControllerData> regions,
+            List<SignalJoinDefinition> joins
     ) {
         LinkedHashSet<String> channels = new LinkedHashSet<>();
         for (SignalDeviceData device : devices) {
@@ -170,6 +180,13 @@ public final class WebAdminSignalService {
             addActionChannels(channels, region.enterActions());
             addActionChannels(channels, region.exitActions());
             addActionChannels(channels, region.stayActions());
+        }
+        for (SignalJoinDefinition join : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition normalized = join.normalized();
+            add(channels, normalized.outputChannel);
+            for (String input : normalized.inputChannelNames()) {
+                add(channels, input);
+            }
         }
         for (SignalEventRecord record : SignalEventHistory.snapshot()) {
             add(channels, record.channel());
@@ -198,12 +215,14 @@ public final class WebAdminSignalService {
             String channel,
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
-            List<RegionControllerData> regions
+            List<RegionControllerData> regions,
+            List<SignalJoinDefinition> joins
     ) {
-        int sources = sourceEndpoints(channel, devices).size();
+        int sources = sourceEndpoints(channel, devices, joins).size();
         int listenerCount = 0;
         int receiverCount = 0;
         int relayCount = 0;
+        int joinCount = 0;
         int downstreamCount = 0;
         for (SignalListenerData listener : listeners) {
             if (SignalChannel.normalize(listener.channel()).equals(channel)) {
@@ -233,11 +252,20 @@ public final class WebAdminSignalService {
             downstreamCount += countSignalActionsTo(region.exitActions(), channel);
             downstreamCount += countSignalActionsTo(region.stayActions(), channel);
         }
-        String status = listenerCount + receiverCount + relayCount == 0 ? "WARNING" : "OK";
-        return new ChannelCounts(sources, listenerCount, receiverCount, relayCount, downstreamCount, status);
+        for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (join.inputChannelNames().contains(channel)) {
+                joinCount++;
+                if (!join.outputChannel.isBlank()) {
+                    downstreamCount++;
+                }
+            }
+        }
+        String status = listenerCount + receiverCount + relayCount + joinCount == 0 ? "WARNING" : "OK";
+        return new ChannelCounts(sources, listenerCount, receiverCount, relayCount, joinCount, downstreamCount, status);
     }
 
-    private List<WebAdminDtos.SignalChannelEndpointDto> sourceEndpoints(String channel, List<SignalDeviceData> devices) {
+    private List<WebAdminDtos.SignalChannelEndpointDto> sourceEndpoints(String channel, List<SignalDeviceData> devices, List<SignalJoinDefinition> joins) {
         List<WebAdminDtos.SignalChannelEndpointDto> endpoints = new ArrayList<>();
         for (SignalDeviceData raw : devices) {
             SignalDeviceData device = raw.normalized();
@@ -246,6 +274,12 @@ public final class WebAdminSignalService {
             }
             if (deviceReferencesChannel(device, channel)) {
                 endpoints.add(deviceEndpoint(device, "DEVICE", WebAdminReadonlySupport.deviceType(device)));
+            }
+        }
+        for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (SignalChannel.normalize(join.outputChannel).equals(channel)) {
+                endpoints.add(joinEndpoint(join, "SIGNAL_JOIN", "signal_join", join.outputChannel));
             }
         }
         return List.copyOf(endpoints);
@@ -286,6 +320,33 @@ public final class WebAdminSignalService {
             }
         }
         return List.copyOf(endpoints);
+    }
+
+    private List<WebAdminDtos.SignalChannelEndpointDto> joinInputEndpoints(String channel, List<SignalJoinDefinition> joins) {
+        List<WebAdminDtos.SignalChannelEndpointDto> endpoints = new ArrayList<>();
+        for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (join.inputChannelNames().contains(channel)) {
+                endpoints.add(joinEndpoint(join, "SIGNAL_JOIN", join.mode.name(), channel));
+            }
+        }
+        return List.copyOf(endpoints);
+    }
+
+    private WebAdminDtos.SignalChannelEndpointDto joinEndpoint(SignalJoinDefinition join, String type, String subType, String channel) {
+        return new WebAdminDtos.SignalChannelEndpointDto(
+                join.id,
+                join.displayName.isBlank() ? join.id : join.displayName,
+                type,
+                subType,
+                "",
+                null,
+                join.enabled,
+                channel,
+                0,
+                join.inputChannelNames().size(),
+                "signal_join:" + join.id
+        );
     }
 
     private WebAdminDtos.SignalChannelEndpointDto deviceEndpoint(SignalDeviceData device, String type, String subType) {
@@ -366,7 +427,7 @@ public final class WebAdminSignalService {
         }
     }
 
-    private List<String> downstreamSignals(List<WebAdminDtos.ActionListEntryDto> actions) {
+    private List<String> downstreamSignals(List<WebAdminDtos.ActionListEntryDto> actions, String sourceChannel, List<SignalJoinDefinition> joins) {
         LinkedHashSet<String> channels = new LinkedHashSet<>();
         for (WebAdminDtos.ActionListEntryDto action : actions) {
             if ("SIGNAL".equals(action.type())) {
@@ -375,6 +436,12 @@ public final class WebAdminSignalService {
                 if (index >= 0) {
                     add(channels, summary.substring(index + 1).trim());
                 }
+            }
+        }
+        for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (join.inputChannelNames().contains(sourceChannel)) {
+                add(channels, join.outputChannel);
             }
         }
         return List.copyOf(channels);
@@ -462,6 +529,7 @@ public final class WebAdminSignalService {
             int listenerCount,
             int receiverCount,
             int actionRelayCount,
+            int signalJoinCount,
             int downstreamSignalCount,
             String doctorStatus
     ) {

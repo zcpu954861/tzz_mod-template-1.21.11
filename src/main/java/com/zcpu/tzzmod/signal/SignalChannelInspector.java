@@ -6,6 +6,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.server.MinecraftServer;
+import com.zcpu.tzzmod.signal.join.SignalJoinDefinition;
+import com.zcpu.tzzmod.signal.join.SignalJoinStore;
 
 public final class SignalChannelInspector {
     private SignalChannelInspector() {
@@ -90,6 +92,17 @@ public final class SignalChannelInspector {
                 String channel = SignalChannel.normalize(listener.channel());
                 if (!channel.isBlank()) {
                     channels.add(channel);
+                }
+            }
+            for (SignalJoinDefinition join : SignalJoinStore.getSnapshot(server)) {
+                SignalJoinDefinition normalized = join.normalized();
+                if (!normalized.outputChannel.isBlank()) {
+                    channels.add(normalized.outputChannel);
+                }
+                for (String input : normalized.inputChannelNames()) {
+                    if (!input.isBlank()) {
+                        channels.add(input);
+                    }
                 }
             }
         }
