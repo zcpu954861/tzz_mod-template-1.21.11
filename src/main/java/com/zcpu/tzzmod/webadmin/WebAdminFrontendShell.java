@@ -83,6 +83,7 @@ public final class WebAdminFrontendShell {
                           <button class="nav-item" data-route="#/logic-chains"><span class="nav-icon" data-icon="action-binding"></span>逻辑链</button>
                           <button class="nav-item" data-route="#/condition-groups"><span class="nav-icon" data-icon="doctor-overview"></span>条件组</button>
                           <button class="nav-item" data-route="#/condition-debugger"><span class="nav-icon" data-icon="history"></span>条件调试</button>
+                          <button class="nav-item" data-route="#/state-variables"><span class="nav-icon" data-icon="state-variable"></span>状态变量</button>
                           <button class="nav-item" data-route="#/listeners"><span class="nav-icon" data-icon="consumer-listener"></span>信号监听器</button>
                           <button class="nav-item" data-route="#/receivers"><span class="nav-icon" data-icon="receiver-main"></span>接收器</button>
                           <button class="nav-item" data-route="#/history"><span class="nav-icon" data-icon="history"></span>事件历史</button>

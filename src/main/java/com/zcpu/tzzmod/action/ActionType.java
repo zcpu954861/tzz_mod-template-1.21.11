@@ -1,10 +1,14 @@
 package com.zcpu.tzzmod.action;
 
+import com.google.gson.annotations.SerializedName;
+
 public enum ActionType {
     COMMAND("command"),
     MESSAGE("message"),
     SOUND("sound"),
-    SIGNAL("signal");
+    SIGNAL("signal"),
+    @SerializedName(value = "state_variable", alternate = {"STATE_VARIABLE"})
+    STATE_VARIABLE("state_variable");
 
     private final String id;
 
@@ -22,7 +26,7 @@ public enum ActionType {
         }
 
         for (ActionType value : values()) {
-            if (value.id.equalsIgnoreCase(raw.trim())) {
+            if (value.id.equalsIgnoreCase(raw.trim()) || value.name().equalsIgnoreCase(raw.trim())) {
                 return value;
             }
         }

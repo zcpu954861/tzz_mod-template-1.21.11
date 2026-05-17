@@ -7,6 +7,11 @@ import com.zcpu.tzzmod.condition.ConditionNodeConfig;
 import com.zcpu.tzzmod.condition.ConditionNodeType;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityProfile;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
+import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationOperation;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
+import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
+import com.zcpu.tzzmod.condition.state.StateVariableType;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import java.util.LinkedHashMap;
@@ -22,6 +27,7 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         testContextSpecificCompatibilityDiagnostics();
         testContainerOpenCloseDynamicProfileDiagnostics();
         testAlwaysFalseWarningAndBlankGateNoIssue();
+        testControlledStateActionDiagnostics();
     }
 
     private static void testMissingDisabledInvalidAndIncompatibleBindings() {
@@ -154,6 +160,40 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         requireContains(issue.suggestion(), "确认这是预期", "always_false diagnostic suggestion");
     }
 
+    private static void testControlledStateActionDiagnostics() {
+        WebAdminConditionRuntimeDoctorService service = new WebAdminConditionRuntimeDoctorService();
+        List<WebAdminDtos.DoctorIssueDto> issues = service.diagnoseStateActions(List.of(
+                stateBinding("SIGNAL_LISTENER_ACTION", "listener:valid-global:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.GLOBAL, StateVariableTargetMode.GLOBAL, "", "game.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
+                stateBinding("REGION_CONTROLLER_ACTION", "region:valid-context:enter:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.PLAYER, StateVariableTargetMode.CONTEXT_PLAYER, "", "player.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.REGION_ENTER_ACTION),
+                stateBinding("SIGNAL_LISTENER_ACTION", "listener:one:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.GLOBAL, StateVariableTargetMode.GLOBAL, "", "", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
+                stateBinding("SIGNAL_LISTENER_ACTION", "listener:one:action:1",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.PLAYER, StateVariableTargetMode.CONTEXT_PLAYER, "", "player.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION),
+                stateBinding("REGION_CONTROLLER_ACTION", "region:one:enter:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.PLAYER, StateVariableTargetMode.EXPLICIT_TARGET, "", "player.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.REGION_ENTER_ACTION),
+                stateBinding("ACTION_RELAY_ACTION", "relay:one:action:0",
+                        new ActionConfig(ActionConfig.stateVariable(StateVariableMutationOperation.INCREMENT_VARIABLE, StateVariableScope.GLOBAL, StateVariableTargetMode.GLOBAL, "", "count", StateVariableType.STRING, "", 1, false, "", "").type(), "", true, false, 0, false, "", "increment_variable", "GLOBAL", "global", "", "count", "STRING", "", 1, false, ""),
+                        ConditionRuntimeTargetType.ACTION_RELAY_ACTION)
+        ));
+
+        requireIssue(issues, "state-action-empty-key", "ERROR", "状态变量动作配置无效", "结构化字段");
+        requireIssue(issues, "state-action-context-player-without-player", "ERROR", "context_player", "explicit_target");
+        requireIssue(issues, "state-action-explicit-target-missing", "ERROR", "显式目标", "结构化字段");
+        requireIssue(issues, "state-action-operation-type-mismatch", "ERROR", "INTEGER", "结构化字段");
+        requireTrue(issues.stream().noneMatch(issue -> issue.relatedObjectId().contains("valid-global")
+                        || issue.relatedObjectId().contains("valid-context")),
+                "valid global state action and Region context_player action produce no Doctor issue");
+        requireTrue(issues.stream().allMatch(issue -> containsChinese(issue.title()) && containsChinese(issue.message()) && containsChinese(issue.suggestion())),
+                "state action doctor diagnostics use Chinese");
+    }
+
     private static WebAdminConditionRuntimeDoctorService.Binding binding(
             String targetType,
             String targetId,
@@ -178,6 +218,15 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
                 "target:" + targetId,
                 ConditionGroupCompatibilityProfile.forTarget(runtimeTargetType, containerSnapshot)
         );
+    }
+
+    private static WebAdminConditionRuntimeDoctorService.StateActionBinding stateBinding(
+            String targetType,
+            String targetId,
+            ActionConfig action,
+            ConditionRuntimeTargetType runtimeTargetType
+    ) {
+        return new WebAdminConditionRuntimeDoctorService.StateActionBinding(targetType, targetId, action, runtimeTargetType, "target:" + targetId);
     }
 
     private static WebAdminConditionGroupStore.ConditionGroupEntry entry(String id, ConditionGroupDefinition definition, boolean enabled) {

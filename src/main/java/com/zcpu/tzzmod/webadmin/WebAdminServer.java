@@ -10,6 +10,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceExtendedConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminInteractionItemMatcherUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDeviceMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminConditionGroupPreviewRequest;
@@ -51,6 +52,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerActionsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
@@ -105,6 +107,7 @@ public final class WebAdminServer {
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
@@ -302,6 +305,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/condition-groups") || path.startsWith("/api/webadmin/condition-groups/")) {
                 runOnServerThread(() -> handleConditionGroups(exchange, auth, path, method));
+                return;
+            }
+            if (path.equals("/api/webadmin/state-variables") || path.startsWith("/api/webadmin/state-variables/")) {
+                runOnServerThread(() -> handleStateVariables(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
@@ -1332,6 +1339,30 @@ public final class WebAdminServer {
             return;
         }
         WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "条件组接口不存在。");
+    }
+
+    private void handleStateVariables(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/state-variables";
+        if (!method.equalsIgnoreCase("GET")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+            return;
+        }
+        if (path.equals(root)) {
+            WebAdminJsonResponse.ok(exchange, stateVariableService.list(minecraftServer, auth.user, queryParams(exchange)));
+            return;
+        }
+        String prefix = root + "/";
+        String id = path.startsWith(prefix) ? decodePathSegment(path.substring(prefix.length())) : "";
+        if (id.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "状态变量 ID 不能为空。");
+            return;
+        }
+        WebAdminDtos.StateVariableDetailDto detail = stateVariableService.detail(minecraftServer, auth.user, id);
+        if (detail == null) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "状态变量不存在。");
+            return;
+        }
+        WebAdminJsonResponse.ok(exchange, detail);
     }
 
     private void handleSelection(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {

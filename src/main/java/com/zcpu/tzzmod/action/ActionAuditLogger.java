@@ -26,15 +26,16 @@ public final class ActionAuditLogger {
 
         String value = config == null
                 ? ""
-                : config.value();
+                : actionValueForLog(config);
 
         if (result != null && result.success()) {
             Tzz_mod.LOGGER.info(
-                    "[ActionEngine] player={} source={} action={} value={}",
+                    "[ActionEngine] player={} source={} action={} value={} result={}",
                     playerName,
                     sourceType,
                     actionType,
-                    value
+                    value,
+                    resultDetailsForLog(result)
             );
         } else {
             String reason = result == null || result.message() == null
@@ -42,12 +43,13 @@ public final class ActionAuditLogger {
                     : result.message().getString();
 
             Tzz_mod.LOGGER.warn(
-                    "[ActionEngine] failed player={} source={} action={} value={} reason={}",
+                    "[ActionEngine] failed player={} source={} action={} value={} reason={} result={}",
                     playerName,
                     sourceType,
                     actionType,
                     value,
-                    reason
+                    reason,
+                    resultDetailsForLog(result)
             );
         }
         WebAdminRealtimeEventBus.publishActionExecution(context, config, result);
@@ -65,7 +67,7 @@ public final class ActionAuditLogger {
                 .append(Text.literal(" -> ").formatted(Formatting.GOLD))
                 .append(Text.literal(config.type() == null ? "unknown" : config.type().id()).formatted(Formatting.GREEN))
                 .append(Text.literal(": ").formatted(Formatting.GRAY))
-                .append(Text.literal(config.value() == null ? "" : config.value()).formatted(Formatting.WHITE));
+                .append(Text.literal(actionValueForLog(config)).formatted(Formatting.WHITE));
 
         if (!result.success()) {
             message.append(Text.literal(" 执行失败: ").formatted(Formatting.RED))
@@ -81,5 +83,30 @@ public final class ActionAuditLogger {
                 onlinePlayer.sendMessage(message, false);
             }
         }
+    }
+
+    private static String actionValueForLog(ActionConfig config) {
+        if (config == null) {
+            return "";
+        }
+        if (config.type() == ActionType.STATE_VARIABLE) {
+            return config.stateActionSummary();
+        }
+        return config.value() == null ? "" : config.value();
+    }
+
+    private static String resultDetailsForLog(ActionExecutionResult result) {
+        if (result == null) {
+            return "code=missing";
+        }
+        if (result.details() == null || result.details().isEmpty()) {
+            return "code=" + result.code() + " durationNanos=" + result.durationNanos();
+        }
+        return "code=" + result.code()
+                + " changed=" + result.details().getOrDefault("changed", "")
+                + " oldValue=" + result.details().getOrDefault("oldValue", "")
+                + " newValue=" + result.details().getOrDefault("newValue", "")
+                + " failureReason=" + result.details().getOrDefault("failureReason", "")
+                + " durationNanos=" + result.durationNanos();
     }
 }

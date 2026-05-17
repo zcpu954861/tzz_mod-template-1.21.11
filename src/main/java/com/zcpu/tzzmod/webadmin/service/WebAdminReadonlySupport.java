@@ -80,6 +80,7 @@ final class WebAdminReadonlySupport {
             case MESSAGE -> "MESSAGE";
             case SOUND -> "SOUND";
             case SIGNAL -> "SIGNAL";
+            case STATE_VARIABLE -> "STATE_VARIABLE";
         };
     }
 
@@ -90,6 +91,9 @@ final class WebAdminReadonlySupport {
         String value = action.value() == null ? "" : action.value().trim();
         if (action.type() == ActionType.COMMAND && value.length() > 80) {
             value = value.substring(0, 77) + "...";
+        }
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return "state_variable: " + action.stateActionSummary();
         }
         return actionType(action).toLowerCase(Locale.ROOT) + (value.isBlank() ? "" : ": " + value);
     }

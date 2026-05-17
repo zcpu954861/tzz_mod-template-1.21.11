@@ -4,6 +4,8 @@ import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
@@ -326,7 +328,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("actionCount", relay == null ? device.actionCount() : actions.size());
         data.put("snapshotActionCount", device.actionCount());
         data.put("actions", actionDtos(actions, device.id()));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
         data.put("conditionGroupId", relay == null ? "" : relay.conditionGroupId());
         data.put("conditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id());
         data.put("conditionGateTargetId", device.id());
@@ -345,6 +347,7 @@ public final class WebAdminActionRelayActionsService {
                 "Action 列表属于 action_relay BlockEntity 配置，不会创建或删除真实方块。",
                 "未配置条件组 = 保持旧继电器逻辑，不拦截；配置后仅作为整条 Action 列表外层 gate。",
                 "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
+                "状态变量动作通过结构化字段写入 GLOBAL / PLAYER StateVariable，不提供 raw JSON、脚本、表达式或 NBT path。",
                 "command action 是地图玩法控制能力；WebAdmin 只硬阻断 ban/kick/op/stop/whitelist 等服务器管理高风险命令。",
                 "sound action 当前底层只存储 sound id；per-action cooldown/requiresOp 字段会保留，但执行语义以现有 ActionEngine 为准。"
         ));
@@ -366,6 +369,7 @@ public final class WebAdminActionRelayActionsService {
             entry.put("cooldownTicks", action.cooldownTicks());
             entry.put("notifyOps", action.notifyOps());
             entry.put("conditionGroupId", action.conditionGroupId());
+            putStateActionFields(entry, action);
             entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY_ACTION.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
@@ -412,7 +416,7 @@ public final class WebAdminActionRelayActionsService {
             }
             ActionType type = parseType(entry.type);
             if (type == null) {
-                errors.add(new WebAdminValidationError(prefix + ".type", "invalid_type", "Action 类型必须是 command、signal、message 或 sound。", safe(entry.type)));
+                errors.add(new WebAdminValidationError(prefix + ".type", "invalid_type", "Action 类型必须是 command、signal、message、sound 或 state_variable。", safe(entry.type)));
                 continue;
             }
             Boolean enabled = parseBoolean(entry.enabled);
@@ -436,7 +440,7 @@ public final class WebAdminActionRelayActionsService {
                 cooldownTicks = 0;
             }
             String value = normalizeValue(type, entry.value);
-            validateValue(server, errors, prefix + ".value", type, value);
+            validateValue(server, errors, prefix + ".value", type, value, entry);
             String actionConditionGroupId = WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId);
             if (server != null) {
                 validator.validate(
@@ -447,7 +451,7 @@ public final class WebAdminActionRelayActionsService {
                         ConditionRuntimeTargetType.ACTION_RELAY_ACTION
                 );
             }
-            actions.add(new ActionConfig(type, value, enabled, requiresOp, cooldownTicks, notifyOps, actionConditionGroupId));
+            actions.add(actionFromEntry(entry, type, value, enabled, requiresOp, cooldownTicks, notifyOps, actionConditionGroupId));
         }
         return new Validation(List.copyOf(errors), errors.isEmpty() ? normalizeActions(actions) : List.copyOf(actions));
     }
@@ -457,8 +461,13 @@ public final class WebAdminActionRelayActionsService {
             List<WebAdminValidationError> errors,
             String field,
             ActionType type,
-            String value
+            String value,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry entry
     ) {
+        if (type == ActionType.STATE_VARIABLE) {
+            validateStateAction(errors, field.substring(0, Math.max(0, field.length() - ".value".length())), entry);
+            return;
+        }
         if (value.isBlank()) {
             errors.add(new WebAdminValidationError(field, "empty", "Action 内容不能为空。", value));
             return;
@@ -493,6 +502,8 @@ public final class WebAdminActionRelayActionsService {
                 } else if (!value.matches("[a-z0-9_.:-]+(/[a-z0-9_.:-]+)*")) {
                     errors.add(new WebAdminValidationError(field, "invalid_sound_id", "音效 ID 应使用 minecraft:entity.example 这类小写资源 ID。", value));
                 }
+            }
+            case STATE_VARIABLE -> {
             }
         }
     }
@@ -599,7 +610,112 @@ public final class WebAdminActionRelayActionsService {
         if (type == ActionType.SIGNAL) {
             return SignalChannel.normalize(value);
         }
+        if (type == ActionType.STATE_VARIABLE) {
+            return "";
+        }
         return value;
+    }
+
+    public static ActionConfig actionFromEntry(WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
+        ActionType type = parseType(entry == null ? "" : entry.type);
+        if (type == null) {
+            type = ActionType.COMMAND;
+        }
+        String value = normalizeValue(type, entry == null ? "" : entry.value);
+        return actionFromEntry(
+                entry,
+                type,
+                value,
+                parseBoolean(entry == null ? Boolean.TRUE : entry.enabled) != null ? parseBoolean(entry == null ? Boolean.TRUE : entry.enabled) : Boolean.TRUE,
+                parseBoolean(entry == null ? Boolean.FALSE : entry.requiresOp) != null ? parseBoolean(entry == null ? Boolean.FALSE : entry.requiresOp) : Boolean.FALSE,
+                parseInteger(entry == null ? 0 : entry.cooldownTicks) == null ? 0 : Math.max(0, parseInteger(entry == null ? 0 : entry.cooldownTicks)),
+                parseBoolean(entry == null ? Boolean.FALSE : entry.notifyOps) != null ? parseBoolean(entry == null ? Boolean.FALSE : entry.notifyOps) : Boolean.FALSE,
+                WebAdminConditionGroupStore.normalizeId(entry == null ? "" : entry.conditionGroupId)
+        );
+    }
+
+    private static ActionConfig actionFromEntry(
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry entry,
+            ActionType type,
+            String value,
+            boolean enabled,
+            boolean requiresOp,
+            int cooldownTicks,
+            boolean notifyOps,
+            String conditionGroupId
+    ) {
+        if (type != ActionType.STATE_VARIABLE) {
+            return new ActionConfig(type, value, enabled, requiresOp, cooldownTicks, notifyOps, conditionGroupId);
+        }
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry safeEntry = entry == null
+                ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry()
+                : entry;
+        return new ActionConfig(
+                ActionType.STATE_VARIABLE,
+                "",
+                enabled,
+                false,
+                cooldownTicks,
+                false,
+                conditionGroupId,
+                safe(safeEntry.stateOperation),
+                safe(safeEntry.stateScope),
+                safe(safeEntry.stateTargetMode),
+                safe(safeEntry.stateTargetId),
+                safe(safeEntry.stateKey),
+                safe(safeEntry.stateValueType),
+                safe(safeEntry.stateValue),
+                parseLong(safeEntry.stateDelta, 0L),
+                Boolean.TRUE.equals(parseBoolean(safeEntry.stateCreateIfMissing)),
+                safe(safeEntry.stateInitialValue)
+        );
+    }
+
+    private static void validateStateAction(
+            List<WebAdminValidationError> errors,
+            String prefix,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry entry
+    ) {
+        Boolean createIfMissing = parseBoolean(entry == null ? Boolean.FALSE : entry.stateCreateIfMissing);
+        if (createIfMissing == null) {
+            errors.add(new WebAdminValidationError(
+                    prefix + ".stateCreateIfMissing",
+                    "invalid_boolean",
+                    "变量不存在时自动创建字段必须是 boolean。",
+                    String.valueOf(entry == null ? "" : entry.stateCreateIfMissing)
+            ));
+        }
+        ActionConfig config = actionFromEntry(entry);
+        StateVariableMutationRequest request = config.stateMutationRequest("");
+        for (StateVariableMutationValidation.Issue issue : StateVariableMutationValidation.validate(request)) {
+            errors.add(new WebAdminValidationError(
+                    prefix + "." + issue.field(),
+                    issue.code(),
+                    issue.message(),
+                    issue.rejectedValue()
+            ));
+        }
+    }
+
+    public static void putStateActionFields(Map<String, Object> entry, ActionConfig action) {
+        if (entry == null || action == null) {
+            return;
+        }
+        entry.put("stateOperation", action.stateOperation());
+        entry.put("stateScope", action.stateScope());
+        entry.put("stateTargetMode", action.stateTargetMode());
+        entry.put("stateTargetId", action.stateTargetId());
+        entry.put("stateKey", action.stateKey());
+        entry.put("stateValueType", action.stateValueType());
+        entry.put("stateValue", action.stateValue());
+        entry.put("stateDelta", action.stateDelta());
+        entry.put("stateCreateIfMissing", action.stateCreateIfMissing());
+        entry.put("stateInitialValue", action.stateInitialValue());
+        entry.put("stateActionSummary", action.stateActionSummary());
+    }
+
+    public static String stateActionSummary(ActionConfig action) {
+        return action == null || action.type() != ActionType.STATE_VARIABLE ? "" : action.stateActionSummary();
     }
 
     private static List<ActionConfig> normalizeActions(List<ActionConfig> actions) {
@@ -611,16 +727,7 @@ public final class WebAdminActionRelayActionsService {
             if (action == null) {
                 continue;
             }
-            ActionType type = action.type() == null ? ActionType.COMMAND : action.type();
-            normalized.add(new ActionConfig(
-                    type,
-                    normalizeValue(type, action.value()),
-                    action.enabled(),
-                    action.requiresOp(),
-                    Math.max(0, action.cooldownTicks()),
-                    action.notifyOps(),
-                    action.conditionGroupId()
-            ));
+            normalized.add(action.normalized());
         }
         return List.copyOf(normalized);
     }
@@ -897,8 +1004,13 @@ public final class WebAdminActionRelayActionsService {
                         + "|requiresOp=" + action.requiresOp()
                         + "|cooldownTicks=" + action.cooldownTicks()
                         + "|notifyOps=" + action.notifyOps()
-                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId()))
+                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId())
+                        + stateFingerprintSuffix(action))
                 .toList();
+    }
+
+    private static String stateFingerprintSuffix(ActionConfig action) {
+        return action == null || action.type() != ActionType.STATE_VARIABLE ? "" : "|" + action.stateFingerprint();
     }
 
     private static List<String> auditActionSummaryList(List<ActionConfig> actions) {
@@ -910,6 +1022,9 @@ public final class WebAdminActionRelayActionsService {
             return "unknown";
         }
         String prefix = action.enabled() ? "" : "[disabled] ";
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return prefix + action.type().id() + ": " + action.stateActionSummary();
+        }
         return prefix + action.type().id() + ": " + safe(action.value());
     }
 
@@ -918,6 +1033,12 @@ public final class WebAdminActionRelayActionsService {
             return "unknown";
         }
         String prefix = action.enabled() ? "" : "[disabled] ";
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return prefix + action.type().id()
+                    + ": " + action.stateActionSummary()
+                    + " " + action.stateAuditFingerprint()
+                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        }
         String value = safe(action.value());
         if (action.type() == ActionType.COMMAND) {
             value = "<command redacted length=" + value.length() + ">";
@@ -963,6 +1084,24 @@ public final class WebAdminActionRelayActionsService {
             }
         }
         return null;
+    }
+
+    private static long parseLong(Object value, long fallback) {
+        if (value instanceof Number number) {
+            double doubleValue = number.doubleValue();
+            if (Double.isFinite(doubleValue) && Math.floor(doubleValue) == doubleValue
+                    && doubleValue >= Long.MIN_VALUE && doubleValue <= Long.MAX_VALUE) {
+                return number.longValue();
+            }
+        }
+        if (value instanceof String string) {
+            try {
+                return Long.parseLong(string.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private static boolean containsControl(String value) {

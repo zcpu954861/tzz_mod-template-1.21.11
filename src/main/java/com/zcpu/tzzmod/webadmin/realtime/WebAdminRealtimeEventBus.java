@@ -193,7 +193,7 @@ public final class WebAdminRealtimeEventBus {
         String actionType = config == null || config.type() == null ? "unknown" : config.type().id();
         boolean success = result != null && result.success();
         String message = result == null || result.message() == null ? "" : result.message().getString();
-        publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_EXECUTION_APPENDED)
+        WebAdminRealtimeEvent.Builder executionBuilder = WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_EXECUTION_APPENDED)
                 .actionId(sourceId)
                 .sourceType(sourceType)
                 .severity(success ? "INFO" : "WARNING")
@@ -203,8 +203,14 @@ public final class WebAdminRealtimeEventBus {
                 .payload("sourceType", sourceType)
                 .payload("actionType", actionType)
                 .payload("success", success)
-                .payload("message", message));
-        publish(WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_EXECUTED)
+                .payload("message", message)
+                .payload("code", result == null ? "" : result.code())
+                .payload("durationNanos", result == null ? 0L : result.durationNanos());
+        if (result != null && result.details() != null && !result.details().isEmpty()) {
+            result.details().forEach((key, value) -> executionBuilder.payload("stateAction." + key, value));
+        }
+        publish(executionBuilder);
+        WebAdminRealtimeEvent.Builder executedBuilder = WebAdminRealtimeEvent.builder(WebAdminRealtimeEventType.ACTION_EXECUTED)
                 .actionId(sourceId)
                 .sourceType(sourceType)
                 .severity(success ? "INFO" : "WARNING")
@@ -213,7 +219,11 @@ public final class WebAdminRealtimeEventBus {
                 .payload("sourceId", sourceId)
                 .payload("sourceType", sourceType)
                 .payload("actionType", actionType)
-                .payload("success", success));
+                .payload("success", success);
+        if (result != null && result.details() != null && !result.details().isEmpty()) {
+            result.details().forEach((key, value) -> executedBuilder.payload("stateAction." + key, value));
+        }
+        publish(executedBuilder);
     }
 
     public static void publishRegionControllerEvent(WebAdminRealtimeEventType type, RegionControllerData controller, String summary) {

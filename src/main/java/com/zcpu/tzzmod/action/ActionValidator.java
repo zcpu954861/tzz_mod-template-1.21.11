@@ -1,7 +1,9 @@
 package com.zcpu.tzzmod.action;
 
 import com.mojang.brigadier.ParseResults;
+import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
 import com.zcpu.tzzmod.signal.SignalChannel;
+import java.util.List;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -25,6 +27,13 @@ public final class ActionValidator {
             return SignalChannel.validationError(config.value());
         }
 
+        if (config.type() == ActionType.STATE_VARIABLE) {
+            Text error = validateStateAction(config, "");
+            if (error != null) {
+                return error;
+            }
+        }
+
         return null;
     }
 
@@ -37,7 +46,15 @@ public final class ActionValidator {
             return Text.literal("动作上下文缺少世界或位置");
         }
 
-        return validateCommon(context.player(), config, false);
+        Text common = validateCommon(context.player(), config, false);
+        if (common != null) {
+            return common;
+        }
+        if (config.type() == ActionType.STATE_VARIABLE) {
+            String contextPlayerId = context.player() == null ? "" : context.player().getUuidAsString();
+            return validateStateAction(config, contextPlayerId);
+        }
+        return null;
     }
 
     private static Text validateCommon(ServerPlayerEntity player, ActionConfig config, boolean requirePlayer) {
@@ -74,5 +91,20 @@ public final class ActionValidator {
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    private static Text validateStateAction(ActionConfig config, String contextPlayerId) {
+        List<StateVariableMutationValidation.Issue> issues = StateVariableMutationValidation.validate(
+                config == null ? null : config.stateMutationRequest(contextPlayerId)
+        );
+        if (!issues.isEmpty()) {
+            String message = issues.stream()
+                    .map(StateVariableMutationValidation.Issue::message)
+                    .filter(value -> value != null && !value.isBlank())
+                    .findFirst()
+                    .orElse("状态变量动作配置无效。");
+            return Text.literal(message);
+        }
+        return null;
     }
 }

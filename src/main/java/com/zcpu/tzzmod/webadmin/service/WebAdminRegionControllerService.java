@@ -544,7 +544,7 @@ public final class WebAdminRegionControllerService {
         data.put("orphanRegion", planner == null);
         data.put("expectedFingerprint", fingerprintFor(controller));
         data.put("lockStatus", editLockService == null ? null : editLockService.status(WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controller.id(), user, session));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
         data.put("minStayIntervalTicks", RegionControllerData.MIN_STAY_INTERVAL_TICKS);
         data.put("defaultStayIntervalTicks", RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS);
         data.put("noRawJson", true);
@@ -561,6 +561,7 @@ public final class WebAdminRegionControllerService {
                     "RegionController 只编辑已有 enter / exit / stay action 列表和三个外层条件组 gate，不新增 ConditionEngine、路径可视化或 raw JSON。",
                     "未配置条件组 = 保持旧区域控制器逻辑，不拦截；配置后仅阻断对应 enter / exit / stay Action 列表。",
                     "单条 Action 条件组为空 = 此 action 不单独判断，保持旧执行逻辑；配置后仅跳过当前 action 并继续后续 action。",
+                    "状态变量动作使用结构化字段写入 GLOBAL / PLAYER StateVariable，不提供 raw JSON、脚本、表达式或 NBT path。",
                     "command action 会阻断 stop/op/ban/kick/whitelist 等危险服务器管理命令。",
                     "stayIntervalTicks 小于 " + RegionControllerData.MIN_STAY_INTERVAL_TICKS + " 会被拒绝。"
             ));
@@ -698,8 +699,6 @@ public final class WebAdminRegionControllerService {
         if (entry == null) {
             return new ActionValidation(List.of(new WebAdminValidationError("action", "required", "Action 配置不能为空。", "")), null);
         }
-        ActionType type = parseActionType(entry.type);
-        String value = normalizeActionValue(type, entry.value);
         gateBindingValidator.validate(
                 server,
                 errors,
@@ -710,15 +709,7 @@ public final class WebAdminRegionControllerService {
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }
-        ActionConfig action = new ActionConfig(
-                type,
-                value,
-                parseBoolean(entry.enabled, true),
-                parseBoolean(entry.requiresOp, false),
-                Math.max(0, parseInteger(entry.cooldownTicks, 0)),
-                parseBoolean(entry.notifyOps, false),
-                WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId)
-        );
+        ActionConfig action = WebAdminActionRelayActionsService.actionFromEntry(entry);
         return new ActionValidation(List.of(), action);
     }
 
@@ -778,6 +769,7 @@ public final class WebAdminRegionControllerService {
             entry.put("cooldownTicks", action.cooldownTicks());
             entry.put("notifyOps", action.notifyOps());
             entry.put("conditionGroupId", action.conditionGroupId());
+            WebAdminActionRelayActionsService.putStateActionFields(entry, action);
             entry.put("actionConditionGateTargetType", actionTargetType.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(actionTargetType, actionTargetId));
@@ -833,6 +825,9 @@ public final class WebAdminRegionControllerService {
             return "unknown";
         }
         String prefix = action.enabled() ? "" : "[disabled] ";
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return prefix + action.type().id() + ": " + action.stateActionSummary();
+        }
         return prefix + action.type().id() + ": " + safe(action.value());
     }
 
@@ -841,6 +836,9 @@ public final class WebAdminRegionControllerService {
             return "unknown";
         }
         String value = safe(action.value());
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
+        } else
         if (action.type() == ActionType.COMMAND) {
             value = "<command redacted length=" + value.length() + ">";
         } else if (value.length() > 96) {
@@ -891,8 +889,13 @@ public final class WebAdminRegionControllerService {
                         + "|requiresOp=" + action.requiresOp()
                         + "|cooldownTicks=" + action.cooldownTicks()
                         + "|notifyOps=" + action.notifyOps()
-                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId()))
+                        + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId())
+                        + stateFingerprintSuffix(action))
                 .toList();
+    }
+
+    private static String stateFingerprintSuffix(ActionConfig action) {
+        return action == null || action.type() != ActionType.STATE_VARIABLE ? "" : "|" + action.stateFingerprint();
     }
 
     private WebAdminWriteResult writeOk(WebAdminWriteTarget target, boolean changed, String message, Map<String, Object> data) {
