@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.54.0-condition-runtime-debugger-doctor-simulation`
-- 当前开发基线：`8.9 Single Action Runtime Gate`；本阶段只补齐 SignalListener、ActionRelay、RegionController enter / exit / stay action list 内的单条 Action 条件判断。未配置 `action.conditionGroupId` 时保持旧执行逻辑；配置后 true 执行当前 action，false 则 skip current action and continue。发布后建议版本为 `v1.55.0-condition-runtime-single-action-gates`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.55.0-condition-runtime-single-action-gates`
+- 当前开发基线：`8.10 Signal Join / Barrier / Aggregator`；本阶段补齐 SignalBridge 多输入汇合能力。Signal Join 作为 passive observer 观察 accepted signal，支持 `ALL` / `ANY_N` / `COUNT`、`GLOBAL` / `PLAYER` scope、`RESET_AFTER_EMIT` / `LATCH_UNTIL_MANUAL_RESET` 和 lazy timeout，并通过 `SignalBridgeServer.emit` 发出 output signal。发布后建议版本为 `v1.56.0-signal-join-barrier-aggregator`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -27,6 +27,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - RegionController editing：创建、删除、enabled/name/regionId/targetFilter/stayInterval 编辑，enter/exit/stay actions 管理。
 - SignalListener / 虚拟监听器 editing：创建、删除、enabled/channel/cooldown 编辑，actions 管理，最近事件、edit lock 和运行时 action 支持。
 - Logic Chain Viewer MVP：只读跨频道逻辑链查看器，把现有 SignalBridge 生产者、频道、消费者、动作和下游频道以可拖动画布的思维导图式树形视图展示；列表按主链 / 子链 / 多级子链组织，只允许保存 WebAdmin-only 视图 metadata，不修改 runtime。
+- 7.15 逻辑链只读查看器不是编辑器；8.10 只把 Signal Join 作为只读节点接入，不提供完整 Logic Chain Editor。
 - WebAdmin 写入基础：权限、CSRF / same-origin、edit lock、expectedFingerprint、`WebAdminWriteResult`、audit、realtime 和 dirty guard。
 
 当前能力入口文档：
@@ -52,10 +53,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ConditionEngine Capability Matrix 8.8](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_8.md)
 - [8.9 Single Action Runtime Gate Current Context](docs/CONDITION_RUNTIME_SINGLE_ACTION_GATES_8_9_CURRENT_CONTEXT.md)
 - [ConditionEngine Capability Matrix 8.9](docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_9.md)
+- [8.10 Signal Join / Barrier / Aggregator Current Context](docs/SIGNAL_JOIN_BARRIER_AGGREGATOR_8_10_CURRENT_CONTEXT.md)
+- [SignalBridge Capability Matrix 8.10](docs/SIGNAL_BRIDGE_CAPABILITY_MATRIX_8_10.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.9；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate；仍不做具体逃走中任务，不接入 SignalReceiver gate、Signal Join / Barrier / Aggregator、failure policy、stop-list policy 或 fallback action。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.9；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate；8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、failure policy、stop-list policy 或 fallback action。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -268,6 +271,35 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不把 action gate 放进 ActionEngine，不改 command / message / sound / signal action 类型语义。
 - 仍不做 SignalReceiver gate、Signal Join / Barrier / Aggregator、GameController / MissionSystem / PhaseController、具体任务 / 关卡、failure policy、stop-list policy、fallback action、raw JSON editor、任意 NBT path、通用脚本表达式、MCP scenario、启动 Minecraft 或截图矩阵。
 
+## 8.10 Signal Join / Barrier / Aggregator
+
+8.10 在 SignalBridge 上补齐多事件汇合能力。Signal Join 是 passive observer：它观察已被 SignalBridge accepted 的 input signal，不阻断原始 signal，不修改原始 payload；满足条件后通过 `SignalBridgeServer.emit` 发出 output signal，因此 output 会自然进入 history、receiver、ActionRelay、SignalListener 和递归保护。
+
+8.10 已实现方向：
+
+- world-scoped store：`<world-save-root>/tzz/webadmin/signal_joins.json`。
+- runtime state 内存态：pending / latched state 不持久化，服务器重启清空。
+- mode：`ALL`、`ANY_N`、`COUNT`。
+- scopeMode：`GLOBAL`、`PLAYER`；PLAYER 缺玩家上下文时 no-op 并记录中文 diagnostic。
+- resetPolicy：`RESET_AFTER_EMIT`、`LATCH_UNTIL_MANUAL_RESET`。
+- timeoutTicks：lazy timeout，不启动 Scheduler，不做后台 tick 扫描。
+- WebAdmin API/UI：`#/signal-joins`、`#/signal-joins/{id}` 和 `/api/webadmin/signal-joins` CRUD/status/reset。
+- Logic Chain Viewer：Join 同时显示为 input channel consumer 和 output channel producer。
+- Doctor：诊断 invalid Join、duplicate input、self-output、threshold invalid、PLAYER scope 风险、timeout 风险和 Join cycle 风险。
+
+8.10 约束：
+
+- 不做 GameController / MissionSystem / PhaseController。
+- 不做具体任务 / 关卡。
+- 不做 Scheduler / Delay / Timer。
+- 不做 Controlled State Actions。
+- 不做完整 Logic Chain Editor / Scratch editor。
+- 不做 SignalReceiver gate。
+- 不做 failure action / failure channel。
+- 不做 per-input condition group。
+- 不做 raw JSON editor。
+- 不改写 8.6 / 8.7 / 8.9 gate 语义。
+
 ## WebAdmin UI 规范
 
 后续类似编辑功能应复用 7.x 已验收交互模式：
@@ -301,7 +333,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Web UI 不直接写业务 JSON，不绕过 store/service/domain 路径。
 - 不提交 `logs/`、`reports/mcp`、screenshots、`node_modules`、token、密码、cookie 或 session 文件。
 - 不提供 raw JSON / NBT path 编辑。
-- ConditionEngine runtime integration 当前已开放 8.6 的 VBD / itemSubmit / container 可选外层 gate、8.7 的 SignalListener / ActionRelay / RegionController 外层 gate，以及 8.9 的 SignalListener / ActionRelay / RegionController 单条 Action gate；仍不接入 SignalReceiver gate、Signal Join / Barrier / Aggregator、failure policy、stop-list policy 或 fallback action。7.15 逻辑链只读查看器不是编辑器。GameController / MissionSystem 尚未实现。
+- ConditionEngine runtime integration 当前已开放 8.6 的 VBD / itemSubmit / container 可选外层 gate、8.7 的 SignalListener / ActionRelay / RegionController 外层 gate，以及 8.9 的 SignalListener / ActionRelay / RegionController 单条 Action gate；8.10 已新增 Signal Join / Barrier / Aggregator 多事件汇合。仍不接入 SignalReceiver gate、failure policy、stop-list policy 或 fallback action。Logic Chain Viewer 仍不是编辑器。GameController / MissionSystem 尚未实现。
 
 ## 主要功能
 

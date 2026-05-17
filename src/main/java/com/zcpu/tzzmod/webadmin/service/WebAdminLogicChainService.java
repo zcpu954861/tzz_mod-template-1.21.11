@@ -11,6 +11,10 @@ import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.signal.join.SignalJoinDefinition;
+import com.zcpu.tzzmod.signal.join.SignalJoinRuntimeService;
+import com.zcpu.tzzmod.signal.join.SignalJoinStatusSnapshot;
+import com.zcpu.tzzmod.signal.join.SignalJoinStore;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -357,6 +361,16 @@ public final class WebAdminLogicChainService {
                 build.edges.add(new WebAdminDtos.LogicChainEdgeDto(actionNode, downstreamNode, "emits_downstream", "下游频道", "dashed"));
             }
         }
+        for (String consumerNode : consumers) {
+            WebAdminDtos.LogicChainNodeDto node = build.nodes.get(consumerNode);
+            Object raw = node == null ? "" : node.metadata().get("downstreamChannel");
+            String downstreamChannel = SignalChannel.normalize(raw instanceof String text ? text : "");
+            if (!downstreamChannel.isBlank()) {
+                String downstreamNode = addDownstreamChannelNode(build, downstreamChannel, depth + 1);
+                downstream.add(downstreamNode);
+                build.edges.add(new WebAdminDtos.LogicChainEdgeDto(consumerNode, downstreamNode, "join_output", "汇合输出", "dashed"));
+            }
+        }
         if (consumers.isEmpty()) {
             build.warnings.add("频道 " + channel + " 当前没有消费者。");
         }
@@ -418,6 +432,19 @@ public final class WebAdminLogicChainService {
             addRegionActionProducers(build, result, channel, region, RegionTriggerType.ENTER, region.enterActions());
             addRegionActionProducers(build, result, channel, region, RegionTriggerType.EXIT, region.exitActions());
             addRegionActionProducers(build, result, channel, region, RegionTriggerType.STAY, region.stayActions());
+        }
+        for (SignalJoinDefinition raw : build.snapshot.joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (!SignalChannel.normalize(join.outputChannel).equals(channel)) {
+                continue;
+            }
+            String id = "producer:signal_join:" + safeNodeId(join.id);
+            boolean enabled = join.enabled;
+            if (!includeNode(build, enabled)) {
+                continue;
+            }
+            result.add(addNode(build, id, "producer", "signal_join", join.id, joinName(join), "Signal Join 输出 · " + join.mode.displayName(), channel, enabled, "#/signal-joins/" + encode(join.id), joinMetadata(build, join, "")));
+            build.edges.add(new WebAdminDtos.LogicChainEdgeDto(id, "channel:" + channel, "emits", "汇合输出", "solid"));
         }
         return List.copyOf(result);
     }
@@ -503,6 +530,19 @@ public final class WebAdminLogicChainService {
                 result.add(addNode(build, id, "consumer", "action_relay", device.id(), WebAdminReadonlySupport.deviceDisplayName(device), actionCount + " 个动作" + (relay == null ? " · 未加载" : ""), channel, device.enabled(), "#/devices/" + encode(device.id()), Map.of("actionCount", actionCount, "loaded", relay != null, "pos", posMap(device))));
                 build.edges.add(new WebAdminDtos.LogicChainEdgeDto("channel:" + channel, id, "consumes", "动作继电器", "solid"));
             }
+        }
+        for (SignalJoinDefinition raw : build.snapshot.joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (!join.inputChannelNames().contains(channel)) {
+                continue;
+            }
+            String id = "consumer:signal_join:" + safeNodeId(join.id) + ":input:" + safeNodeId(channel);
+            boolean enabled = join.enabled;
+            if (!includeNode(build, enabled)) {
+                continue;
+            }
+            result.add(addNode(build, id, "consumer", "signal_join", join.id, joinName(join), join.mode.displayName() + " → " + join.outputChannel, channel, enabled, "#/signal-joins/" + encode(join.id), joinMetadata(build, join, channel)));
+            build.edges.add(new WebAdminDtos.LogicChainEdgeDto("channel:" + channel, id, "consumes", "信号汇合", "solid"));
         }
         return List.copyOf(result);
     }
@@ -621,7 +661,7 @@ public final class WebAdminLogicChainService {
                 build.countByType("producer"),
                 build.countByType("consumer"),
                 build.countByType("action"),
-                build.countEdges("emits_downstream"),
+                build.countEdges("emits_downstream") + build.countEdges("join_output"),
                 build.disabledCount(),
                 build.warnings.isEmpty() ? "OK" : "WARNING",
                 latestTime(rootChannel)
@@ -676,7 +716,8 @@ public final class WebAdminLogicChainService {
                 server,
                 SignalDeviceStore.getSnapshot(server),
                 SignalListenerStore.getSnapshot(server),
-                RegionControllerStore.getSnapshot(server)
+                RegionControllerStore.getSnapshot(server),
+                SignalJoinStore.getSnapshot(server)
         );
     }
 
@@ -703,6 +744,13 @@ public final class WebAdminLogicChainService {
             addActionChannels(channels, region.exitActions());
             addActionChannels(channels, region.stayActions());
         }
+        for (SignalJoinDefinition raw : snapshot.joins) {
+            SignalJoinDefinition join = raw.normalized();
+            addChannel(channels, join.outputChannel);
+            for (String input : join.inputChannelNames()) {
+                addChannel(channels, input);
+            }
+        }
         for (SignalEventRecord record : SignalEventHistory.snapshot()) {
             addChannel(channels, record.channel());
         }
@@ -723,6 +771,12 @@ public final class WebAdminLogicChainService {
             ActionRelayBlockEntity relay = loadedActionRelay(snapshot.server, device);
             if (relay != null) {
                 addActionHierarchy(parents, children, selfCycles, device.channel(), relay.actions(), "action_relay", device.id(), WebAdminReadonlySupport.deviceDisplayName(device), "动作继电器");
+            }
+        }
+        for (SignalJoinDefinition raw : snapshot.joins) {
+            SignalJoinDefinition join = raw.normalized();
+            for (String input : join.inputChannelNames()) {
+                addJoinHierarchy(parents, children, selfCycles, input, join);
             }
         }
         for (String channel : channels) {
@@ -792,6 +846,28 @@ public final class WebAdminLogicChainService {
             parents.computeIfAbsent(child, ignored -> new ArrayList<>()).add(new UpstreamRef(parent, upstreamLabel, upstreamNodeId));
             children.computeIfAbsent(parent, ignored -> new LinkedHashSet<>()).add(child);
         }
+    }
+
+    private void addJoinHierarchy(
+            Map<String, List<UpstreamRef>> parents,
+            Map<String, LinkedHashSet<String>> children,
+            LinkedHashSet<String> selfCycles,
+            String rawInputChannel,
+            SignalJoinDefinition join
+    ) {
+        String parent = SignalChannel.normalize(rawInputChannel);
+        String child = SignalChannel.normalize(join == null ? "" : join.outputChannel);
+        if (parent.isBlank() || child.isBlank()) {
+            return;
+        }
+        if (child.equals(parent)) {
+            selfCycles.add(parent);
+            return;
+        }
+        String upstreamLabel = "信号汇合 " + joinName(join);
+        String upstreamNodeId = "consumer:signal_join:" + safeNodeId(join.id) + ":input:" + safeNodeId(parent);
+        parents.computeIfAbsent(child, ignored -> new ArrayList<>()).add(new UpstreamRef(parent, upstreamLabel, upstreamNodeId));
+        children.computeIfAbsent(parent, ignored -> new LinkedHashSet<>()).add(child);
     }
 
     private void assignHierarchyInfo(
@@ -888,6 +964,14 @@ public final class WebAdminLogicChainService {
         }
         if ("action".equals(type)) {
             return resolveActionRootChannel(snapshot, ref);
+        }
+        if ("signal_join".equals(type)) {
+            for (SignalJoinDefinition raw : snapshot.joins) {
+                SignalJoinDefinition join = raw.normalized();
+                if (join.id.equals(ref) || join.displayName.equals(ref)) {
+                    return SignalChannel.normalize(join.outputChannel);
+                }
+            }
         }
         return "";
     }
@@ -1180,6 +1264,15 @@ public final class WebAdminLogicChainService {
         if ("action".equals(type)) {
             return !resolveActionRootChannel(snapshot, ref).isBlank();
         }
+        if ("signal_join".equals(type)) {
+            for (SignalJoinDefinition raw : snapshot.joins) {
+                SignalJoinDefinition join = raw.normalized();
+                if (join.id.equals(ref) || join.displayName.equals(ref)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return true;
     }
 
@@ -1369,7 +1462,7 @@ public final class WebAdminLogicChainService {
     private static String normalizeRootType(String rootType) {
         String value = safe(rootType).trim().toLowerCase(Locale.ROOT);
         return switch (value) {
-            case "device", "listener", "receiver", "relay", "region", "region_controller", "action" -> value;
+            case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join" -> value;
             default -> "channel";
         };
     }
@@ -1419,6 +1512,42 @@ public final class WebAdminLogicChainService {
         return build.warnings.stream().anyMatch(warning -> warning.contains(channel)) ? "WARNING" : "OK";
     }
 
+    private static String joinName(SignalJoinDefinition join) {
+        if (join == null) {
+            return "Signal Join";
+        }
+        return join.displayName.isBlank() ? join.id : join.displayName;
+    }
+
+    private static Map<String, Object> joinMetadata(GraphBuild build, SignalJoinDefinition join, String inputChannel) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("kind", "signal_join");
+        metadata.put("joinId", join.id);
+        metadata.put("mode", join.mode.name());
+        metadata.put("modeLabel", join.mode.displayName());
+        metadata.put("threshold", join.threshold);
+        metadata.put("scopeMode", join.scopeMode.name());
+        metadata.put("scopeLabel", join.scopeMode.displayName());
+        metadata.put("resetPolicy", join.resetPolicy.name());
+        metadata.put("resetPolicyLabel", join.resetPolicy.displayName());
+        metadata.put("timeoutTicks", join.timeoutTicks);
+        metadata.put("cooldownTicks", join.cooldownTicks);
+        metadata.put("inputChannels", join.inputChannelNames());
+        metadata.put("inputChannel", SignalChannel.normalize(inputChannel));
+        metadata.put("outputChannel", join.outputChannel);
+        metadata.put("downstreamChannel", join.outputChannel);
+        SignalJoinStatusSnapshot status = SignalJoinRuntimeService.status(build.snapshot.server, join, currentGameTime(build.snapshot.server));
+        metadata.put("pendingScopeCount", status.pendingScopeCount());
+        metadata.put("lastResult", status.lastResult());
+        metadata.put("lastFailureReason", status.lastFailureReason());
+        metadata.put("scopes", status.scopes());
+        return metadata;
+    }
+
+    private static long currentGameTime(MinecraftServer server) {
+        return server == null || server.getOverworld() == null ? 0L : server.getOverworld().getTime();
+    }
+
     private static Map<String, Object> posMap(SignalDeviceData device) {
         Map<String, Object> pos = new LinkedHashMap<>();
         pos.put("world", device.dimension());
@@ -1453,7 +1582,8 @@ public final class WebAdminLogicChainService {
             MinecraftServer server,
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
-            List<RegionControllerData> regions
+            List<RegionControllerData> regions,
+            List<SignalJoinDefinition> joins
     ) {
     }
 

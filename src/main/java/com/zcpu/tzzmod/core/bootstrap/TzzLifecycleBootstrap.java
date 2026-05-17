@@ -13,6 +13,7 @@ import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceDispatcher;
+import com.zcpu.tzzmod.signal.join.SignalJoinRuntimeService;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminLifecycle;
 import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateSessions;
@@ -75,6 +76,7 @@ public final class TzzLifecycleBootstrap {
             RegionControllerStore.clearCache(server);
             SignalListenerStore.clearCache(server);
             SignalDeviceStore.clearCache(server);
+            SignalJoinRuntimeService.clearServer(server);
             MapServer.clearServerState();
             RegionControllerServer.clearServerState();
             SignalBridgeServer.clearServerState();

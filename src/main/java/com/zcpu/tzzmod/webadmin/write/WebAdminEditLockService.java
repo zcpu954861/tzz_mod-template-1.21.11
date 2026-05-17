@@ -31,6 +31,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_CONDITION_GROUP = "condition_group";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
+    public static final String TARGET_SIGNAL_JOIN_CONFIG = "signal_join_config";
     public static final String TARGET_REGION_CONTROLLER_CONFIG = "region_controller_config";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
@@ -556,6 +557,9 @@ public final class WebAdminEditLockService {
         if (TARGET_SIGNAL_LISTENER_ACTIONS.equals(safeTargetType)) {
             return "Signal Listener 动作列表";
         }
+        if (TARGET_SIGNAL_JOIN_CONFIG.equals(safeTargetType)) {
+            return "Signal Join 汇合配置";
+        }
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
             return "RegionController 配置";
         }
@@ -623,6 +627,9 @@ public final class WebAdminEditLockService {
         if (TARGET_SIGNAL_LISTENER_ACTIONS.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS;
         }
+        if (TARGET_SIGNAL_JOIN_CONFIG.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_SIGNAL_JOIN;
+        }
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_REGION;
         }
@@ -647,6 +654,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_SIGNAL_LISTENER_ACTIONS.equals(lock.targetType())) {
             return "#/listeners/" + encode(lock.targetId());
+        }
+        if (TARGET_SIGNAL_JOIN_CONFIG.equals(lock.targetType())) {
+            return "#/signal-joins/" + encode(lock.targetId());
         }
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(lock.targetType())) {
             return "#/region-controllers/" + encode(lock.targetId());

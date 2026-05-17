@@ -10,6 +10,12 @@ import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssue;
 import com.zcpu.tzzmod.signal.device.debug.DiagnosticIssueText;
 import com.zcpu.tzzmod.signal.device.debug.DiagnosticSeverity;
 import com.zcpu.tzzmod.signal.device.debug.VirtualBlockDeviceDiagnosticService;
+import com.zcpu.tzzmod.signal.join.SignalJoinDefinition;
+import com.zcpu.tzzmod.signal.join.SignalJoinMode;
+import com.zcpu.tzzmod.signal.join.SignalJoinScopeMode;
+import com.zcpu.tzzmod.signal.join.SignalJoinStore;
+import com.zcpu.tzzmod.signal.join.SignalJoinValidationIssue;
+import com.zcpu.tzzmod.signal.join.SignalJoinValidator;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,6 +26,7 @@ import net.minecraft.util.WorldSavePath;
 
 public final class SignalDoctor {
     private static final int HIGH_COOLDOWN_TICKS = 6_000;
+    private static final String SIGNAL_JOIN_SELF_OUTPUT_CODE = "signal_join_output_equals_input";
 
     private SignalDoctor() {
     }
@@ -30,12 +37,14 @@ public final class SignalDoctor {
         }
 
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
+        List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
         List<SignalChannelSummary> summaries = SignalChannelInspector.getSummaries(server);
         List<SignalEventRecord> history = SignalEventHistory.snapshot();
         List<SignalDoctorIssue> issues = new ArrayList<>();
 
         inspectListeners(listeners, issues);
-        inspectHistoryWithoutListeners(history, listeners, issues);
+        inspectSignalJoins(joins, issues);
+        inspectHistoryWithoutListeners(history, listeners, joins, issues);
         inspectDisabledChannels(summaries, issues);
         inspectRawListenerData(server, issues);
         inspectDevices(server, issues);
@@ -117,6 +126,7 @@ public final class SignalDoctor {
     private static void inspectHistoryWithoutListeners(
             List<SignalEventRecord> history,
             List<SignalListenerData> listeners,
+            List<SignalJoinDefinition> joins,
             List<SignalDoctorIssue> issues
     ) {
         Set<String> listenerChannels = new HashSet<>();
@@ -126,6 +136,12 @@ public final class SignalDoctor {
                 if (!channel.isBlank()) {
                     listenerChannels.add(channel);
                 }
+            }
+        }
+        for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (join.enabled) {
+                listenerChannels.addAll(join.inputChannelNames());
             }
         }
 
@@ -139,6 +155,54 @@ public final class SignalDoctor {
                 continue;
             }
             issues.add(warning("频道 " + channel + " 最近被触发，但没有监听器。"));
+        }
+    }
+
+    private static void inspectSignalJoins(List<SignalJoinDefinition> joins, List<SignalDoctorIssue> issues) {
+        List<SignalJoinDefinition> source = joins == null ? List.of() : joins;
+        for (SignalJoinDefinition raw : source) {
+            SignalJoinDefinition join = raw == null ? null : raw.normalized();
+            if (join == null) {
+                continue;
+            }
+            for (SignalJoinValidationIssue issue : SignalJoinValidator.validate(join, false)) {
+                issues.add(error("Signal Join“" + joinName(join) + "”配置无效（" + issue.code() + "）：" + issue.message()));
+            }
+            if (!join.enabled) {
+                issues.add(info("Signal Join“" + joinName(join) + "”当前已禁用，不会累计输入或输出信号。"));
+            }
+            if (join.scopeMode == SignalJoinScopeMode.PLAYER) {
+                issues.add(warning("Signal Join“" + joinName(join) + "”使用 PLAYER scope；没有玩家上下文的 signal 会被忽略。"));
+            }
+            if (join.mode == SignalJoinMode.COUNT && join.threshold > 1000) {
+                issues.add(info("Signal Join“" + joinName(join) + "”的 COUNT threshold 较高：" + join.threshold + "。"));
+            }
+            if (join.timeoutTicks > 0 && join.timeoutTicks < 20) {
+                issues.add(warning("Signal Join“" + joinName(join) + "”的 timeoutTicks 小于 20 tick，可能导致 pending state 过快清理。"));
+            }
+        }
+        inspectJoinCycles(source, issues);
+    }
+
+    private static void inspectJoinCycles(List<SignalJoinDefinition> joins, List<SignalDoctorIssue> issues) {
+        Set<String> reported = new HashSet<>();
+        for (SignalJoinDefinition leftRaw : joins) {
+            SignalJoinDefinition left = leftRaw == null ? null : leftRaw.normalized();
+            if (left == null || !left.enabled || left.outputChannel.isBlank()) {
+                continue;
+            }
+            for (SignalJoinDefinition rightRaw : joins) {
+                SignalJoinDefinition right = rightRaw == null ? null : rightRaw.normalized();
+                if (right == null || !right.enabled || left.id.equals(right.id)) {
+                    continue;
+                }
+                if (right.inputChannelNames().contains(left.outputChannel) && left.inputChannelNames().contains(right.outputChannel)) {
+                    String key = left.id.compareTo(right.id) < 0 ? left.id + "|" + right.id : right.id + "|" + left.id;
+                    if (reported.add(key)) {
+                        issues.add(warning("Signal Join“" + joinName(left) + "”与“" + joinName(right) + "”存在互相输出 / 输入的循环风险。"));
+                    }
+                }
+            }
         }
     }
 
@@ -229,6 +293,10 @@ public final class SignalDoctor {
     private static String quotedName(SignalListenerData listener) {
         String name = listener == null ? "" : listener.name();
         return "“" + (name == null || name.isBlank() ? "未命名监听器" : name) + "”";
+    }
+
+    private static String joinName(SignalJoinDefinition join) {
+        return join == null || join.displayName.isBlank() ? (join == null ? "unknown" : join.id) : join.displayName;
     }
 
     private static String safeText(String value) {

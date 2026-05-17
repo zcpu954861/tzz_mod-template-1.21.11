@@ -14,6 +14,7 @@ import com.zcpu.tzzmod.condition.runtime.ConditionGateHistoryServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateReplayServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityServiceTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
+import com.zcpu.tzzmod.signal.join.SignalJoinBarrierAggregatorTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.BlockStateConditionMode;
@@ -74,6 +75,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateConfigTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionRuntimeDoctorServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -160,6 +162,8 @@ public final class StabilizationGuardTest {
         WebAdminConditionCatalogTest.run();
         WebAdminConditionGroupServiceTest.run();
         WebAdminConditionRuntimeDoctorServiceTest.run();
+        SignalJoinBarrierAggregatorTest.run();
+        WebAdminSignalJoinServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -170,6 +174,7 @@ public final class StabilizationGuardTest {
         testConditionRuntimeReceiverGates87();
         testConditionRuntimeDebugger88();
         testConditionRuntimeSingleActionGates89();
+        testSignalJoinBarrierAggregator810();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1240,6 +1245,10 @@ public final class StabilizationGuardTest {
                     { id:'recv-1', displayName:'Receiver', type:'SIGNAL_RECEIVER', enabled:true, channel:'test.channel', world:'world', pos:{x:2,y:64,z:3}, doctorStatus:'OK', configSummary:{pulseTicks:20} },
                     { id:'vdev-1', displayName:'Virtual', type:'VIRTUAL_BLOCK_DEVICE', enabled:true, channel:'test.channel', world:'world', pos:{x:3,y:64,z:4}, doctorStatus:'INFO', configSummary:{triggerType:'interact', blockId:'minecraft:lever'} }
                   ];
+                  const signalJoinSmoke = { id:'join.smoke', displayName:'Smoke Join', note:'A+B -> C', enabled:true, inputChannels:[{channel:'a.channel', displayName:'A'}, {channel:'b.channel', displayName:'B'}], inputChannelCount:2, outputChannel:'c.channel', mode:'ALL', threshold:2, scopeMode:'GLOBAL', resetPolicy:'RESET_AFTER_EMIT', timeoutTicks:40, cooldownTicks:0, expectedFingerprint:'join-fp', version:1, updatedAt:'2026-05-16T10:00:00Z', updatedBy:'Owner', lockStatus:{ locked:false }, status:{ pendingScopeCount:1, lastResult:'PENDING', lastFailureReason:'', scopes:[{ scopeKey:'global', matchedChannels:['a.channel'], totalCount:1, lastResult:'PENDING' }] }, validationErrors:[] };
+                  if (url.startsWith('/api/webadmin/signal-joins/') && url.endsWith('/status')) return signalJoinSmoke.status;
+                  if (url.startsWith('/api/webadmin/signal-joins/')) return { ...signalJoinSmoke, id:decodeURIComponent(url.substring('/api/webadmin/signal-joins/'.length).split('/')[0].split('?')[0]) || signalJoinSmoke.id };
+                  if (url.startsWith('/api/webadmin/signal-joins')) return { joins:[signalJoinSmoke], storeDegraded:false };
                   if (url.startsWith('/api/signals/channels/')) { const channel = decodeURIComponent(url.substring('/api/signals/channels/'.length).split('?')[0]); return { channel, type:'CUSTOM', metadata:{effectiveDisplayName:'Test Channel', note:'Test note', updatedAt:'2026-05-09T10:00:00Z', updatedBy:'Owner'}, stats:{listenerCount:1, receiverCount:1, actionRelayCount:0, sourceDeviceCount:1, triggerCountToday:3, totalTriggerCount:9, lastTriggeredAt:'2026-05-09T10:00:00Z'}, listeners:[{id:'test-listener', name:'Test Listener', enabled:true, cooldownTicks:0, actionCount:1, lastTriggeredAt:'2026-05-09T10:00:00Z', actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}]}], receivers:[{id:'recv-1', name:'Receiver'}], actionRelays:[], actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}], sources:[{id:'test-device', name:'Emitter'}], downstreamSignals:[], recentHistory:[{ time:'2026-05-09T10:00:00Z', channel, sourceType:'DEVICE', sourceName:'Emitter', result:'SUCCESS' }], doctorIssues:[], doctorStatus:'OK' }; }
                   if (url.startsWith('/api/signals/channels')) return [{ channel:'test.channel', displayName:'Test Channel', listenerCount:1, receiverCount:1, actionRelayCount:0, consumerCount:2, doctorStatus:'OK' }];
                   if (url.startsWith('/api/webadmin/signal-listener-basic-config/')) return { listenerRef:'test-listener', listenerId:'test-listener', displayName:'Test Listener', enabled:true, channel:'test.channel', cooldownTicks:0, actionCount:1, expectedFingerprint:'listener-fp', lockStatus:{ locked:false } };
@@ -1605,6 +1614,8 @@ public final class StabilizationGuardTest {
                   '#/doctor',
                   '#/diagnostics',
                   '#/signal-doctor',
+                  '#/signal-joins',
+                  '#/signal-joins/join.smoke',
                   '#/signals/test.channel',
                   '#/devices/test-device',
                   '#/devices/vdev-1',
@@ -1624,7 +1635,8 @@ public final class StabilizationGuardTest {
                   '#/actions/test-action',
                   '#/regions/test-region',
                   '#/listeners/test-listener',
-                  '#/signal-listeners/test-listener'
+                  '#/signal-listeners/test-listener',
+                  '#/signal-joins/join.smoke'
                 ]);
                 const settingsRoutes = new Set([
                   '#/settings',
@@ -1646,7 +1658,8 @@ public final class StabilizationGuardTest {
                   '#/actions/test-action':'/api/actions/test-action',
                   '#/regions/test-region':'/api/regions/test-region',
                   '#/listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener',
-                  '#/signal-listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener'
+                  '#/signal-listeners/test-listener':'/api/webadmin/signal-listener-basic-config/test-listener',
+                  '#/signal-joins/join.smoke':'/api/webadmin/signal-joins/join.smoke'
                 };
                 (async () => {
                   const failures = [];
@@ -3073,7 +3086,7 @@ public final class StabilizationGuardTest {
         }
 
         for (String marker : List.of(
-                "knownChannels(server, devices, listeners, regions)",
+                "knownChannels(server, devices, listeners, regions, joins)",
                 "addActionRelayActionChannels",
                 "SignalDeviceStore.getLoadedActionRelay",
                 "countSignalActionsTo(relay.actions(), channel)"
@@ -7818,9 +7831,6 @@ public final class StabilizationGuardTest {
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
         for (String forbidden : List.of(
-                "SignalJoin",
-                "SignalBarrier",
-                "SignalAggregator",
                 "GameController",
                 "MissionSystem",
                 "PhaseController",
@@ -7829,6 +7839,182 @@ public final class StabilizationGuardTest {
                 "StopListPolicy"
         )) {
             requireFalse(allMain.contains(forbidden), "8.9 must not add out-of-scope type: " + forbidden);
+        }
+    }
+
+    private static void testSignalJoinBarrierAggregator810() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/SIGNAL_JOIN_BARRIER_AGGREGATOR_8_10_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/SIGNAL_BRIDGE_CAPABILITY_MATRIX_8_10.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String signalBridge = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalBridgeServer.java"), StandardCharsets.UTF_8);
+        String runtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinRuntimeService.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinStore.java"), StandardCharsets.UTF_8);
+        String validator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinValidator.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
+        String joinService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalJoinService.java"), StandardCharsets.UTF_8);
+        String logicChain = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String doctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalDoctor.java"), StandardCharsets.UTF_8);
+        String test = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/signal/join/SignalJoinBarrierAggregatorTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/SIGNAL_JOIN_BARRIER_AGGREGATOR_8_10_CURRENT_CONTEXT.md",
+                "docs/SIGNAL_BRIDGE_CAPABILITY_MATRIX_8_10.md",
+                "src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinDefinition.java",
+                "src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinRuntimeService.java",
+                "src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinStore.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalJoinService.java",
+                "src/test/java/com/zcpu/tzzmod/signal/join/SignalJoinBarrierAggregatorTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.10 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.10 Signal Join / Barrier / Aggregator",
+                "ALL",
+                "ANY_N",
+                "COUNT",
+                "GLOBAL",
+                "PLAYER",
+                "RESET_AFTER_EMIT",
+                "LATCH_UNTIL_MANUAL_RESET",
+                "lazy timeout",
+                "runtime state 内存态",
+                "tzz/webadmin/signal_joins.json",
+                "不做 GameController",
+                "不做 Scheduler",
+                "不做完整 Logic Chain Editor"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.10 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SignalJoinRuntimeService.observeAcceptedSignal",
+                "recordAcceptedHistory",
+                "ActionSourceType.SIGNAL_JOIN",
+                "CURRENT_DEPTH.set(depth)",
+                "depth + 1"
+        )) {
+            requireContains(signalBridge + "\n" + runtime, marker, "8.10 SignalBridge/runtime marker: " + marker);
+        }
+        requireContains(store, "FILE_NAME = \"signal_joins.json\"", "8.10 world scoped store file marker");
+        requireContains(store, "WebAdminStoragePaths.resolve(server)", "8.10 store uses WebAdmin world scoped path");
+        requireContains(validator, "signal_join_output_equals_input", "8.10 validator rejects self output");
+        requireContains(validator, "signal_join_any_n_threshold_invalid", "8.10 validator rejects invalid ANY_N threshold");
+
+        for (String marker : List.of(
+                "/api/webadmin/signal-joins",
+                "signalJoinService.create",
+                "signalJoinService.update",
+                "signalJoinService.delete",
+                "signalJoinService.reset",
+                "signalJoinService.status",
+                "EDIT_SIGNAL_JOIN",
+                "TARGET_SIGNAL_JOIN_CONFIG",
+                "SIGNAL_JOIN_CHANGED"
+        )) {
+            requireContains(server + "\n" + joinService, marker, "8.10 WebAdmin API/write marker: " + marker);
+        }
+        for (String marker : List.of(
+                "#/signal-joins",
+                "信号汇合",
+                "data-signal-join-input-list-editor",
+                "data-signal-join-mode-selector",
+                "data-signal-join-scope-selector",
+                "data-signal-join-reset-policy-selector",
+                "data-signal-join-timeout-field",
+                "data-signal-join-cooldown-field",
+                "data-signal-join-status-panel",
+                "data-signal-join-modal-preserve-scroll",
+                "data-signal-join-validation-preserves-input",
+                "data-signal-join-threshold-mode-conditional",
+                "data-signal-join-save-payload-typed",
+                "data-signal-join-mode-internal-value",
+                "data-signal-join-scope-mode-internal-value",
+                "data-signal-join-reset-policy-internal-value",
+                "data-signal-join-channel-combo-close-on-toggle",
+                "data-signal-join-channel-combo-outside-click-close",
+                "data-signal-join-channel-combo-escape-close",
+                "data-no-signal-join-raw-json-editor",
+                "signal_join_config"
+        )) {
+            requireContains(shell + "\n" + scripts, marker, "8.10 frontend marker: " + marker);
+        }
+        for (String marker : List.of(
+                "阈值",
+                "作用域",
+                "重置策略",
+                "超时 tick",
+                "输出冷却 tick",
+                "技术字段：scopeMode",
+                "保存值只会使用 ALL / ANY_N / COUNT",
+                "保存值只会使用 GLOBAL / PLAYER",
+                "signal-join-filter-mode",
+                "signal-join-filter-scope"
+        )) {
+            requireContains(scripts, marker, "8.10 Signal Join UI/validation fix marker: " + marker);
+        }
+        requireFalse(scripts.contains("signalJoinFilters.mode=document.getElementById('signal-join-mode')")
+                        || scripts.contains("signalJoinFilters.scope=document.getElementById('signal-join-scope')"),
+                "8.10 Signal Join list filters must not reuse modal mode/scope ids");
+        requireFalse(scripts.contains("<label>Threshold") || scripts.contains("<label>Scope") || scripts.contains("<label>Reset policy")
+                        || scripts.contains("<label>timeoutTicks") || scripts.contains("<label>cooldownTicks"),
+                "8.10 Signal Join form must use Chinese primary labels");
+        requireFalse(scripts.contains("signalJoinRawJson") || scripts.contains("data-signal-join-raw-json-editor=\"true\""),
+                "8.10 Signal Join UI must not expose raw JSON editor");
+
+        for (String marker : List.of(
+                "joinInputEndpoints",
+                "signalJoinCount",
+                "join_output",
+                "\"signal_join\"",
+                "downstreamChannel",
+                "SignalJoinRuntimeService.status"
+        )) {
+            requireContains(signalService + "\n" + logicChain, marker, "8.10 signal/logic-chain marker: " + marker);
+        }
+        for (String marker : List.of(
+                "inspectSignalJoins",
+                "signal_join_output_equals_input",
+                "PLAYER scope",
+                "timeoutTicks",
+                "循环风险"
+        )) {
+            requireContains(doctor, marker, "8.10 Doctor marker: " + marker);
+        }
+        for (String marker : List.of(
+                "testAllModeResetAfterEmit",
+                "testAnyNModeUsesDistinctInputChannels",
+                "testCountModeCountsRepeatedEvents",
+                "testPlayerScopeIsolationAndMissingContextDiagnostic",
+                "testLatchUntilManualReset",
+                "testLazyTimeoutReset",
+                "testStoreRoundTripAndBadFileFallback"
+        )) {
+            requireContains(test, marker, "8.10 runtime/store test marker: " + marker);
+        }
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "ActionFailurePolicy",
+                "FallbackAction",
+                "StopListPolicy",
+                "ScratchEditor",
+                "SignalReceiverGate",
+                "Scheduler",
+                "TickScanner",
+                "FailureChannel",
+                "FailureAction",
+                "PerInputConditionGroup",
+                "raw-json-textarea"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.10 must not add out-of-scope type: " + forbidden);
         }
     }
 

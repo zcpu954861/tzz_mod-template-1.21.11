@@ -120,6 +120,9 @@ final class WebAdminReadonlySupport {
         SignalDeviceData sourceDevice = findDevice(devices, record.sourceId());
         WebAdminDtos.PositionDto pos = sourceDevice == null ? null : pos(sourceDevice);
         String sourceName = sourceDevice == null ? "" : deviceDisplayName(sourceDevice);
+        if (sourceName.isBlank() && "signal_join".equalsIgnoreCase(safe(record.sourceType()))) {
+            sourceName = "Signal Join " + safe(record.sourceId());
+        }
         String result = record.failedCount() > 0 ? "FAILED" : "SUCCESS";
         return new WebAdminDtos.SignalHistoryEntryDto(
                 record.channel() + ":" + record.wallTimeMillis() + ":" + index,

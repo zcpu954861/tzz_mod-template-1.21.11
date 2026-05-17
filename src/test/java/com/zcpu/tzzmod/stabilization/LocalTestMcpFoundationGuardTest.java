@@ -748,6 +748,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("RegionCondition"), "MCP source does not enter region conditions");
         requireFalse(source.contains("SignalCondition"), "MCP source does not enter signal conditions");
         requireFalse(source.contains("LogicChainCondition"), "MCP source does not enter logic chain conditions");
+        requireFalse(source.contains("SignalJoin"), "MCP source does not expose Signal Join tooling");
+        requireFalse(source.contains("signal_join"), "MCP source does not expose signal_join tooling");
+        requireFalse(source.contains("signal-join"), "MCP source does not expose signal-join tooling");
+        requireFalse(source.contains("Signal Join"), "MCP source does not expose Signal Join labels");
+        requireFalse(source.contains("Barrier"), "MCP source does not expose Signal Barrier tooling");
+        requireFalse(source.contains("Aggregator"), "MCP source does not expose Signal Aggregator tooling");
         requireFalse(source.contains("GameController"), "MCP source does not enter GameController");
         requireFalse(source.contains("MissionSystem"), "MCP source does not enter MissionSystem");
         requireFalse(source.contains("PhaseController"), "MCP source does not enter PhaseController");
