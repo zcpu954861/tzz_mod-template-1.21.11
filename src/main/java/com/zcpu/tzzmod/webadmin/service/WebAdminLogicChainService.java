@@ -6,6 +6,10 @@ import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.region.RegionTriggerType;
+import com.zcpu.tzzmod.scheduler.TimerDefinition;
+import com.zcpu.tzzmod.scheduler.TimerRuntimeService;
+import com.zcpu.tzzmod.scheduler.TimerStatusSnapshot;
+import com.zcpu.tzzmod.scheduler.TimerStore;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
@@ -446,6 +450,19 @@ public final class WebAdminLogicChainService {
             result.add(addNode(build, id, "producer", "signal_join", join.id, joinName(join), "Signal Join 输出 · " + join.mode.displayName(), channel, enabled, "#/signal-joins/" + encode(join.id), joinMetadata(build, join, "")));
             build.edges.add(new WebAdminDtos.LogicChainEdgeDto(id, "channel:" + channel, "emits", "汇合输出", "solid"));
         }
+        for (TimerDefinition raw : build.snapshot.timers) {
+            TimerDefinition timer = raw.normalized();
+            if (!SignalChannel.normalize(timer.outputChannel).equals(channel)) {
+                continue;
+            }
+            String id = "producer:timer:" + safeNodeId(timer.id);
+            boolean enabled = timer.enabled;
+            if (!includeNode(build, enabled)) {
+                continue;
+            }
+            result.add(addNode(build, id, "producer", "timer", timer.id, timerName(timer), "Timer 完成输出 · " + timer.mode.displayName(), channel, enabled, "#/timers/" + encode(timer.id), timerMetadata(build, timer)));
+            build.edges.add(new WebAdminDtos.LogicChainEdgeDto(id, "channel:" + channel, "emits", "Timer outputChannel", "solid"));
+        }
         return List.copyOf(result);
     }
 
@@ -717,7 +734,8 @@ public final class WebAdminLogicChainService {
                 SignalDeviceStore.getSnapshot(server),
                 SignalListenerStore.getSnapshot(server),
                 RegionControllerStore.getSnapshot(server),
-                SignalJoinStore.getSnapshot(server)
+                SignalJoinStore.getSnapshot(server),
+                TimerStore.getSnapshot(server)
         );
     }
 
@@ -750,6 +768,9 @@ public final class WebAdminLogicChainService {
             for (String input : join.inputChannelNames()) {
                 addChannel(channels, input);
             }
+        }
+        for (TimerDefinition raw : snapshot.timers) {
+            addChannel(channels, raw.normalized().outputChannel);
         }
         for (SignalEventRecord record : SignalEventHistory.snapshot()) {
             addChannel(channels, record.channel());
@@ -970,6 +991,14 @@ public final class WebAdminLogicChainService {
                 SignalJoinDefinition join = raw.normalized();
                 if (join.id.equals(ref) || join.displayName.equals(ref)) {
                     return SignalChannel.normalize(join.outputChannel);
+                }
+            }
+        }
+        if ("timer".equals(type)) {
+            for (TimerDefinition raw : snapshot.timers) {
+                TimerDefinition timer = raw.normalized();
+                if (timer.id.equals(ref) || timer.displayName.equals(ref)) {
+                    return SignalChannel.normalize(timer.outputChannel);
                 }
             }
         }
@@ -1462,7 +1491,7 @@ public final class WebAdminLogicChainService {
     private static String normalizeRootType(String rootType) {
         String value = safe(rootType).trim().toLowerCase(Locale.ROOT);
         return switch (value) {
-            case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join" -> value;
+            case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join", "timer" -> value;
             default -> "channel";
         };
     }
@@ -1498,6 +1527,8 @@ public final class WebAdminLogicChainService {
             case SOUND -> "音效";
             case SIGNAL -> "发出频道";
             case STATE_VARIABLE -> "状态变量";
+            case TIMER_START -> "启动 Timer";
+            case TIMER_CANCEL -> "取消 Timer";
         };
     }
 
@@ -1518,6 +1549,13 @@ public final class WebAdminLogicChainService {
             return "Signal Join";
         }
         return join.displayName.isBlank() ? join.id : join.displayName;
+    }
+
+    private static String timerName(TimerDefinition timer) {
+        if (timer == null) {
+            return "Timer";
+        }
+        return timer.displayName.isBlank() ? timer.id : timer.displayName;
     }
 
     private static Map<String, Object> joinMetadata(GraphBuild build, SignalJoinDefinition join, String inputChannel) {
@@ -1542,6 +1580,26 @@ public final class WebAdminLogicChainService {
         metadata.put("lastResult", status.lastResult());
         metadata.put("lastFailureReason", status.lastFailureReason());
         metadata.put("scopes", status.scopes());
+        return metadata;
+    }
+
+    private static Map<String, Object> timerMetadata(GraphBuild build, TimerDefinition timer) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("kind", "timer");
+        metadata.put("timerId", timer.id);
+        metadata.put("mode", timer.mode.name());
+        metadata.put("modeLabel", timer.mode.displayName());
+        metadata.put("scopeMode", timer.scopeMode.name());
+        metadata.put("scopeLabel", timer.scopeMode.displayName());
+        metadata.put("durationTicks", timer.durationTicks);
+        metadata.put("intervalTicks", timer.intervalTicks);
+        metadata.put("maxRuns", timer.maxRuns);
+        metadata.put("outputChannel", timer.outputChannel);
+        TimerStatusSnapshot status = TimerRuntimeService.status(build.snapshot.server, timer, currentGameTime(build.snapshot.server));
+        metadata.put("activeInstanceCount", status.activeInstanceCount());
+        metadata.put("lastResult", status.lastResult());
+        metadata.put("lastFailureReason", status.lastFailureReason());
+        metadata.put("runtimeStatePersistent", status.runtimeStatePersistent());
         return metadata;
     }
 
@@ -1584,7 +1642,8 @@ public final class WebAdminLogicChainService {
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
             List<RegionControllerData> regions,
-            List<SignalJoinDefinition> joins
+            List<SignalJoinDefinition> joins,
+            List<TimerDefinition> timers
     ) {
     }
 

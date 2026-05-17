@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.56.0-signal-join-barrier-aggregator`
-- 当前开发基线：`8.11 Controlled State Actions`；本阶段补齐 ActionEngine 的状态变量写入动作。`state_variable` action 通过结构化字段写入 `StateVariableService` 管理的 `GLOBAL` / `PLAYER` StateVariable，支持 `context_player` / `explicit_target`、`createIfMissing` 和 `clear missing` no-op success。WebAdmin 同步补齐只读“状态变量”列表 / 详情入口，用于查看 key、scope、target、type、value、version、fingerprint 和更新时间，确认受控状态动作写入结果。发布后建议版本为 `v1.57.0-controlled-state-actions`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.57.0-controlled-state-actions`
+- 当前开发基线：`8.12 Scheduler / Delay / Timer`；本阶段补齐通用 Scheduler / Timer 时间轴能力。Timer 配置持久化到 world-scoped `tzz/webadmin/timers.json`，active runtime state 内存态；支持 `DELAY` / `COUNTDOWN` / `REPEAT`、`GLOBAL` / `PLAYER` scope、`RESTART` / `IGNORE_IF_RUNNING` / `FAIL_IF_RUNNING` startPolicy、`timer_start` / `timer_cancel` action、`onTickActions` / `onCompleteActions` 和可选 `outputChannel`。发布后建议版本为 `v1.58.0-scheduler-delay-timer`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -57,10 +57,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [SignalBridge Capability Matrix 8.10](docs/SIGNAL_BRIDGE_CAPABILITY_MATRIX_8_10.md)
 - [8.11 Controlled State Actions Current Context](docs/CONTROLLED_STATE_ACTIONS_8_11_CURRENT_CONTEXT.md)
 - [ActionEngine Capability Matrix 8.11](docs/ACTION_ENGINE_CAPABILITY_MATRIX_8_11.md)
+- [8.12 Scheduler / Delay / Timer Current Context](docs/SCHEDULER_DELAY_TIMER_8_12_CURRENT_CONTEXT.md)
+- [Scheduler Capability Matrix 8.12](docs/SCHEDULER_CAPABILITY_MATRIX_8_12.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.11；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action 或 raw JSON editor。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.12；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、完整 Logic Chain Editor 或 raw JSON editor。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -301,6 +303,39 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不做 per-input condition group。
 - 不做 raw JSON editor。
 - 不改写 8.6 / 8.7 / 8.9 gate 语义。
+
+## 8.12 Scheduler / Delay / Timer
+
+8.12 在 Signal / Action / State / Join 系统之上补齐通用时间轴能力。Scheduler / Timer 不是 signal-only 组件；它可以由 ActionEngine 的 `timer_start` action 启动，也可以由 WebAdmin 手动启动 / 取消 / 重置运行态。`outputChannel` 可选，只是兼容 SignalBridge 的输出方式；Timer 自身的直接动作入口是 `onTickActions` 和 `onCompleteActions`。
+
+8.12 已实现方向：
+
+- world-scoped store：`<world-save-root>/tzz/webadmin/timers.json`。
+- runtime state 内存态：active timer instance 不持久化，服务器停止后清空。
+- mode：`DELAY`、`COUNTDOWN`、`REPEAT`。
+- scopeMode：`GLOBAL`、`PLAYER`；PLAYER 缺玩家上下文时 fail closed 并返回中文原因。
+- startPolicy：`RESTART`、`IGNORE_IF_RUNNING`、`FAIL_IF_RUNNING`。
+- ActionEngine action：`timer_start`、`timer_cancel`。
+- Timer action list：`onStartActions`、`onTickActions`、`onCompleteActions`、`onCancelActions`，并保留 single action gate。
+- WebAdmin API/UI：`#/timers`、`#/timers/{id}` 和 `/api/webadmin/timers` CRUD/status/start/cancel/reset。
+- Doctor：诊断 invalid Timer、无输出/动作、REPEAT 高频、无限重复缺取消路径、缺 timerId、引用不存在/停用 Timer、PLAYER context 缺失。
+- Logic Chain Viewer：只做最小只读接入，有 outputChannel 的 Timer 显示为 producer/source。
+
+8.12 约束：
+
+- 不做 GameController / MissionSystem / PhaseController。
+- 不做具体任务 / 关卡。
+- 不做完整 Logic Chain Editor / Scratch editor。
+- 不做 StateVariable 新 scope。
+- 不做 Scheduler 持久恢复。
+- 不做 cron / calendar。
+- 不做多服务器调度。
+- 不做 version rollback。
+- 不做 raw JSON editor。
+- 不做任意 NBT path 或脚本表达式。
+- 不跑 MCP scenario。
+- 不启动 Minecraft。
+- 不生成截图矩阵。
 
 ## WebAdmin UI 规范
 

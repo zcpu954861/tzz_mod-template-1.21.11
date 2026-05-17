@@ -28,5 +28,11 @@ public final class WebAdminActionRelayActionsUpdateRequest {
         public Object stateDelta = 0;
         public Object stateCreateIfMissing = Boolean.FALSE;
         public String stateInitialValue = "";
+        public String timerId = "";
+        public String timerTargetMode = "";
+        public String timerTargetId = "";
+        public String timerStartPolicyOverride = "";
+        public Object timerDurationOverrideTicks = 0;
+        public String timerMissingBehavior = "";
     }
 }

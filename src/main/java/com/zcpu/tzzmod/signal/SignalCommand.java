@@ -914,6 +914,10 @@ public final class SignalCommand {
             return Text.literal("状态变量 ").formatted(Formatting.LIGHT_PURPLE)
                     .append(Text.literal(action.stateActionSummary()).formatted(Formatting.WHITE));
         }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return Text.literal("Timer ").formatted(Formatting.LIGHT_PURPLE)
+                    .append(Text.literal(action.timerActionSummary()).formatted(Formatting.WHITE));
+        }
         return Text.literal(actionTypeLabel(action.type()) + " ").formatted(Formatting.GOLD)
                 .append(Text.literal(value).formatted(Formatting.WHITE));
     }
@@ -924,6 +928,8 @@ public final class SignalCommand {
             case SOUND -> "音效";
             case SIGNAL -> "信号";
             case STATE_VARIABLE -> "状态变量";
+            case TIMER_START -> "启动 Timer";
+            case TIMER_CANCEL -> "取消 Timer";
             case COMMAND -> "命令";
         };
     }

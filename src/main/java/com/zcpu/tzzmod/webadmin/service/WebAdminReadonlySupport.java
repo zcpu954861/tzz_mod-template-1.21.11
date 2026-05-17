@@ -81,6 +81,8 @@ final class WebAdminReadonlySupport {
             case SOUND -> "SOUND";
             case SIGNAL -> "SIGNAL";
             case STATE_VARIABLE -> "STATE_VARIABLE";
+            case TIMER_START -> "TIMER_START";
+            case TIMER_CANCEL -> "TIMER_CANCEL";
         };
     }
 
@@ -94,6 +96,9 @@ final class WebAdminReadonlySupport {
         }
         if (action.type() == ActionType.STATE_VARIABLE) {
             return "state_variable: " + action.stateActionSummary();
+        }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return action.type().id() + ": " + action.timerActionSummary();
         }
         return actionType(action).toLowerCase(Locale.ROOT) + (value.isBlank() ? "" : ": " + value);
     }

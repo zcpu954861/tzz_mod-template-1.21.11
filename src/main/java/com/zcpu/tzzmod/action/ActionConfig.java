@@ -7,6 +7,9 @@ import com.zcpu.tzzmod.condition.state.StateVariableScope;
 import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
 import com.zcpu.tzzmod.condition.state.StateVariableType;
 import com.zcpu.tzzmod.condition.state.StateVariableValidation;
+import com.zcpu.tzzmod.scheduler.TimerStartPolicy;
+import com.zcpu.tzzmod.scheduler.TimerStore;
+import com.zcpu.tzzmod.scheduler.TimerTargetMode;
 import com.zcpu.tzzmod.signal.SignalChannel;
 
 public record ActionConfig(
@@ -26,7 +29,13 @@ public record ActionConfig(
         String stateValue,
         long stateDelta,
         boolean stateCreateIfMissing,
-        String stateInitialValue
+        String stateInitialValue,
+        String timerId,
+        String timerTargetMode,
+        String timerTargetId,
+        String timerStartPolicyOverride,
+        long timerDurationOverrideTicks,
+        String timerMissingBehavior
 ) {
     public ActionConfig(
             ActionType type,
@@ -65,6 +74,58 @@ public record ActionConfig(
                 "",
                 0L,
                 false,
+                "",
+                "",
+                "",
+                "",
+                "",
+                0L,
+                ""
+        );
+    }
+
+    public ActionConfig(
+            ActionType type,
+            String value,
+            boolean enabled,
+            boolean requiresOp,
+            int cooldownTicks,
+            boolean notifyOps,
+            String conditionGroupId,
+            String stateOperation,
+            String stateScope,
+            String stateTargetMode,
+            String stateTargetId,
+            String stateKey,
+            String stateValueType,
+            String stateValue,
+            long stateDelta,
+            boolean stateCreateIfMissing,
+            String stateInitialValue
+    ) {
+        this(
+                type,
+                value,
+                enabled,
+                requiresOp,
+                cooldownTicks,
+                notifyOps,
+                conditionGroupId,
+                stateOperation,
+                stateScope,
+                stateTargetMode,
+                stateTargetId,
+                stateKey,
+                stateValueType,
+                stateValue,
+                stateDelta,
+                stateCreateIfMissing,
+                stateInitialValue,
+                "",
+                "",
+                "",
+                "",
+                0L,
                 ""
         );
     }
@@ -77,6 +138,8 @@ public record ActionConfig(
         } else if (type == ActionType.SIGNAL) {
             value = SignalChannel.normalize(value);
         } else if (type == ActionType.STATE_VARIABLE) {
+            value = "";
+        } else if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
             value = "";
         }
         conditionGroupId = ConditionGroupIds.normalize(conditionGroupId);
@@ -103,6 +166,23 @@ public record ActionConfig(
             stateDelta = 0L;
             stateCreateIfMissing = false;
             stateInitialValue = "";
+        }
+        if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
+            timerId = TimerStore.normalizeId(timerId);
+            timerTargetMode = normalizeTimerTargetMode(timerTargetMode);
+            timerTargetId = timerTargetId == null ? "" : timerTargetId.trim();
+            timerStartPolicyOverride = type == ActionType.TIMER_START ? normalizeTimerStartPolicy(timerStartPolicyOverride) : "";
+            timerDurationOverrideTicks = type == ActionType.TIMER_START ? Math.max(0L, timerDurationOverrideTicks) : 0L;
+            timerMissingBehavior = normalizeTimerMissingBehavior(timerMissingBehavior);
+            requiresOp = false;
+            notifyOps = false;
+        } else {
+            timerId = "";
+            timerTargetMode = "";
+            timerTargetId = "";
+            timerStartPolicyOverride = "";
+            timerDurationOverrideTicks = 0L;
+            timerMissingBehavior = "";
         }
     }
 
@@ -164,6 +244,73 @@ public record ActionConfig(
         );
     }
 
+    public static ActionConfig timerStart(
+            String timerId,
+            TimerTargetMode targetMode,
+            String targetId,
+            TimerStartPolicy startPolicyOverride,
+            String conditionGroupId
+    ) {
+        return new ActionConfig(
+                ActionType.TIMER_START,
+                "",
+                true,
+                false,
+                0,
+                false,
+                conditionGroupId,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                0L,
+                false,
+                "",
+                timerId,
+                targetMode == null ? "" : targetMode.id(),
+                targetId,
+                startPolicyOverride == null ? "" : startPolicyOverride.id(),
+                0L,
+                "noop_success"
+        );
+    }
+
+    public static ActionConfig timerCancel(
+            String timerId,
+            TimerTargetMode targetMode,
+            String targetId,
+            String conditionGroupId
+    ) {
+        return new ActionConfig(
+                ActionType.TIMER_CANCEL,
+                "",
+                true,
+                false,
+                0,
+                false,
+                conditionGroupId,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                0L,
+                false,
+                "",
+                timerId,
+                targetMode == null ? "" : targetMode.id(),
+                targetId,
+                "",
+                0L,
+                "noop_success"
+        );
+    }
+
     public boolean isUsable() {
         if (!enabled) {
             return false;
@@ -171,11 +318,18 @@ public record ActionConfig(
         if (type == ActionType.STATE_VARIABLE) {
             return true;
         }
+        if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
+            return timerId != null && !timerId.trim().isEmpty();
+        }
         return value != null && !value.trim().isEmpty();
     }
 
     public boolean isStateVariableAction() {
         return type == ActionType.STATE_VARIABLE;
+    }
+
+    public boolean isTimerAction() {
+        return type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL;
     }
 
     public StateVariableMutationRequest stateMutationRequest(String contextPlayerId) {
@@ -247,6 +401,42 @@ public record ActionConfig(
         );
     }
 
+    public String timerActionSummary() {
+        if (!isTimerAction()) {
+            return "";
+        }
+        TimerTargetMode parsedTarget = TimerTargetMode.parse(timerTargetMode);
+        TimerStartPolicy parsedPolicy = TimerStartPolicy.parse(timerStartPolicyOverride);
+        String target = parsedTarget == null
+                ? (timerTargetMode == null || timerTargetMode.isBlank() ? "默认作用域目标" : timerTargetMode)
+                : parsedTarget.displayName();
+        String policy = parsedPolicy == null
+                ? (timerStartPolicyOverride == null || timerStartPolicyOverride.isBlank() ? "使用 Timer 定义策略" : timerStartPolicyOverride)
+                : parsedPolicy.displayName();
+        return (type == ActionType.TIMER_START ? "启动 Timer" : "取消 Timer")
+                + " · " + safe(timerId)
+                + " · " + target
+                + (type == ActionType.TIMER_START ? " · " + policy : "");
+    }
+
+    public String timerFingerprint() {
+        if (!isTimerAction()) {
+            return "";
+        }
+        return String.join("|",
+                "timerId=" + safe(timerId),
+                "timerTargetMode=" + safe(timerTargetMode),
+                "timerTargetId=" + safe(timerTargetId),
+                "timerStartPolicyOverride=" + safe(timerStartPolicyOverride),
+                "timerDurationOverrideTicks=" + timerDurationOverrideTicks,
+                "timerMissingBehavior=" + safe(timerMissingBehavior)
+        );
+    }
+
+    public String timerAuditFingerprint() {
+        return timerFingerprint();
+    }
+
     public ActionConfig normalized() {
         return new ActionConfig(
                 type,
@@ -265,7 +455,13 @@ public record ActionConfig(
                 stateValue,
                 stateDelta,
                 stateCreateIfMissing,
-                stateInitialValue
+                stateInitialValue,
+                timerId,
+                timerTargetMode,
+                timerTargetId,
+                timerStartPolicyOverride,
+                timerDurationOverrideTicks,
+                timerMissingBehavior
         );
     }
 
@@ -303,6 +499,23 @@ public record ActionConfig(
         return StateVariableType.parse(value)
                 .map(StateVariableType::name)
                 .orElse(value);
+    }
+
+    private static String normalizeTimerTargetMode(String raw) {
+        String value = safe(raw);
+        TimerTargetMode targetMode = TimerTargetMode.parse(value);
+        return targetMode == null ? value : targetMode.id();
+    }
+
+    private static String normalizeTimerStartPolicy(String raw) {
+        String value = safe(raw);
+        TimerStartPolicy startPolicy = TimerStartPolicy.parse(value);
+        return startPolicy == null ? value : startPolicy.id();
+    }
+
+    private static String normalizeTimerMissingBehavior(String raw) {
+        String value = safe(raw).toLowerCase(java.util.Locale.ROOT);
+        return value.isBlank() ? "noop_success" : value;
     }
 
     private static String safe(String value) {

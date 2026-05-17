@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.map.MapServer;
 import com.zcpu.tzzmod.note.NoteDataStore;
 import com.zcpu.tzzmod.phone.PhoneAppsConfig;
 import com.zcpu.tzzmod.region.RegionControllerServer;
+import com.zcpu.tzzmod.scheduler.TimerRuntimeService;
 import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
@@ -77,6 +78,7 @@ public final class TzzLifecycleBootstrap {
             SignalListenerStore.clearCache(server);
             SignalDeviceStore.clearCache(server);
             SignalJoinRuntimeService.clearServer(server);
+            TimerRuntimeService.clearServer(server);
             MapServer.clearServerState();
             RegionControllerServer.clearServerState();
             SignalBridgeServer.clearServerState();

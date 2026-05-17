@@ -544,7 +544,7 @@ public final class WebAdminRegionControllerService {
         data.put("orphanRegion", planner == null);
         data.put("expectedFingerprint", fingerprintFor(controller));
         data.put("lockStatus", editLockService == null ? null : editLockService.status(WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controller.id(), user, session));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable", "timer_start", "timer_cancel"));
         data.put("minStayIntervalTicks", RegionControllerData.MIN_STAY_INTERVAL_TICKS);
         data.put("defaultStayIntervalTicks", RegionControllerData.DEFAULT_STAY_INTERVAL_TICKS);
         data.put("noRawJson", true);
@@ -770,6 +770,7 @@ public final class WebAdminRegionControllerService {
             entry.put("notifyOps", action.notifyOps());
             entry.put("conditionGroupId", action.conditionGroupId());
             WebAdminActionRelayActionsService.putStateActionFields(entry, action);
+            WebAdminActionRelayActionsService.putTimerActionFields(entry, action);
             entry.put("actionConditionGateTargetType", actionTargetType.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(actionTargetType, actionTargetId));
@@ -828,6 +829,9 @@ public final class WebAdminRegionControllerService {
         if (action.type() == ActionType.STATE_VARIABLE) {
             return prefix + action.type().id() + ": " + action.stateActionSummary();
         }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return prefix + action.type().id() + ": " + action.timerActionSummary();
+        }
         return prefix + action.type().id() + ": " + safe(action.value());
     }
 
@@ -838,6 +842,8 @@ public final class WebAdminRegionControllerService {
         String value = safe(action.value());
         if (action.type() == ActionType.STATE_VARIABLE) {
             value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
+        } else if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            value = action.timerActionSummary() + " " + action.timerAuditFingerprint();
         } else
         if (action.type() == ActionType.COMMAND) {
             value = "<command redacted length=" + value.length() + ">";

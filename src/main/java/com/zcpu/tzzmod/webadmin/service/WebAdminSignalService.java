@@ -6,6 +6,8 @@ import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionControllerStore;
 import com.zcpu.tzzmod.region.RegionTriggerType;
+import com.zcpu.tzzmod.scheduler.TimerDefinition;
+import com.zcpu.tzzmod.scheduler.TimerStore;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalChannelInspector;
 import com.zcpu.tzzmod.signal.SignalEventHistory;
@@ -34,15 +36,17 @@ public final class WebAdminSignalService {
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
+        List<TimerDefinition> timers = TimerStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions, joins);
+        // 8.12 extends former knownChannels(server, devices, listeners, regions, joins) with Timer output channels.
+        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions, joins, timers);
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<WebAdminDtos.SignalChannelListEntryDto> result = new ArrayList<>();
         for (String channel : channels) {
             if (result.size() >= limit) {
                 break;
             }
-            ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins);
+            ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins, timers);
             SignalEventRecord latest = latest(channel);
             String fallbackIcon = counts.doctorStatus().equals("OK") ? "signal" : "warning";
             WebAdminChannelMetadataStore.MetadataEntry metadata = metadataFile.channels.get(channel);
@@ -77,8 +81,9 @@ public final class WebAdminSignalService {
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
+        List<TimerDefinition> timers = TimerStore.getSnapshot(server);
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
-        ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins);
+        ChannelCounts counts = counts(server, channel, devices, listeners, regions, joins, timers);
         SignalEventRecord latest = latest(channel);
         WebAdminDtos.SignalChannelStatsDto stats = new WebAdminDtos.SignalChannelStatsDto(
                 latest == null ? "" : WebAdminReadonlySupport.isoTime(latest.wallTimeMillis()),
@@ -90,7 +95,7 @@ public final class WebAdminSignalService {
                 counts.signalJoinCount(),
                 counts.downstreamSignalCount()
         );
-        List<WebAdminDtos.SignalChannelEndpointDto> sources = sourceEndpoints(channel, devices, joins);
+        List<WebAdminDtos.SignalChannelEndpointDto> sources = sourceEndpoints(channel, devices, joins, timers);
         List<WebAdminDtos.SignalChannelEndpointDto> listenerEndpoints = listenerEndpoints(channel, listeners);
         List<WebAdminDtos.SignalChannelEndpointDto> receivers = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_SIGNAL_RECEIVER);
         List<WebAdminDtos.SignalChannelEndpointDto> relays = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_ACTION_RELAY);
@@ -147,7 +152,8 @@ public final class WebAdminSignalService {
         List<SignalListenerData> listeners = SignalListenerStore.getSnapshot(server);
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
-        return knownChannels(server, devices, listeners, regions, joins).contains(channel);
+        List<TimerDefinition> timers = TimerStore.getSnapshot(server);
+        return knownChannels(server, devices, listeners, regions, joins, timers).contains(channel);
     }
 
     public List<WebAdminDtos.SignalHistoryEntryDto> history(MinecraftServer server, String channel, int requestedLimit) {
@@ -163,7 +169,8 @@ public final class WebAdminSignalService {
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
             List<RegionControllerData> regions,
-            List<SignalJoinDefinition> joins
+            List<SignalJoinDefinition> joins,
+            List<TimerDefinition> timers
     ) {
         LinkedHashSet<String> channels = new LinkedHashSet<>();
         for (SignalDeviceData device : devices) {
@@ -187,6 +194,9 @@ public final class WebAdminSignalService {
             for (String input : normalized.inputChannelNames()) {
                 add(channels, input);
             }
+        }
+        for (TimerDefinition timer : timers == null ? List.<TimerDefinition>of() : timers) {
+            add(channels, timer.normalized().outputChannel);
         }
         for (SignalEventRecord record : SignalEventHistory.snapshot()) {
             add(channels, record.channel());
@@ -216,9 +226,10 @@ public final class WebAdminSignalService {
             List<SignalDeviceData> devices,
             List<SignalListenerData> listeners,
             List<RegionControllerData> regions,
-            List<SignalJoinDefinition> joins
+            List<SignalJoinDefinition> joins,
+            List<TimerDefinition> timers
     ) {
-        int sources = sourceEndpoints(channel, devices, joins).size();
+        int sources = sourceEndpoints(channel, devices, joins, timers).size();
         int listenerCount = 0;
         int receiverCount = 0;
         int relayCount = 0;
@@ -265,7 +276,7 @@ public final class WebAdminSignalService {
         return new ChannelCounts(sources, listenerCount, receiverCount, relayCount, joinCount, downstreamCount, status);
     }
 
-    private List<WebAdminDtos.SignalChannelEndpointDto> sourceEndpoints(String channel, List<SignalDeviceData> devices, List<SignalJoinDefinition> joins) {
+    private List<WebAdminDtos.SignalChannelEndpointDto> sourceEndpoints(String channel, List<SignalDeviceData> devices, List<SignalJoinDefinition> joins, List<TimerDefinition> timers) {
         List<WebAdminDtos.SignalChannelEndpointDto> endpoints = new ArrayList<>();
         for (SignalDeviceData raw : devices) {
             SignalDeviceData device = raw.normalized();
@@ -280,6 +291,12 @@ public final class WebAdminSignalService {
             SignalJoinDefinition join = raw.normalized();
             if (SignalChannel.normalize(join.outputChannel).equals(channel)) {
                 endpoints.add(joinEndpoint(join, "SIGNAL_JOIN", "signal_join", join.outputChannel));
+            }
+        }
+        for (TimerDefinition raw : timers == null ? List.<TimerDefinition>of() : timers) {
+            TimerDefinition timer = raw.normalized();
+            if (SignalChannel.normalize(timer.outputChannel).equals(channel)) {
+                endpoints.add(timerEndpoint(timer, channel));
             }
         }
         return List.copyOf(endpoints);
@@ -346,6 +363,22 @@ public final class WebAdminSignalService {
                 0,
                 join.inputChannelNames().size(),
                 "signal_join:" + join.id
+        );
+    }
+
+    private WebAdminDtos.SignalChannelEndpointDto timerEndpoint(TimerDefinition timer, String channel) {
+        return new WebAdminDtos.SignalChannelEndpointDto(
+                timer.id,
+                timer.displayName.isBlank() ? timer.id : timer.displayName,
+                "TIMER",
+                "scheduler_timer",
+                "",
+                null,
+                timer.enabled,
+                channel,
+                0,
+                timer.onCompleteActions.size(),
+                "timer:" + timer.id
         );
     }
 

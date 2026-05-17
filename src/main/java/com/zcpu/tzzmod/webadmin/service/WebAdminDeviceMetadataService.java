@@ -50,7 +50,17 @@ public final class WebAdminDeviceMetadataService {
             "chest",
             "door",
             "signal",
-            "custom_1"
+            "custom_1",
+            "condition_group",
+            "condition_debugger",
+            "runtime_gate",
+            "signal_join",
+            "signal_barrier",
+            "signal_aggregator",
+            "timer",
+            "scheduler",
+            "state_variable",
+            "logic_chain"
     );
 
     private final WebAdminPermissionService permissionService;

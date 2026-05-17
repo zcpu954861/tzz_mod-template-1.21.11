@@ -2,8 +2,13 @@ package com.zcpu.tzzmod.action;
 
 import com.mojang.brigadier.ParseResults;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
+import com.zcpu.tzzmod.scheduler.TimerStartPolicy;
+import com.zcpu.tzzmod.scheduler.TimerStore;
+import com.zcpu.tzzmod.scheduler.TimerTargetMode;
+import com.zcpu.tzzmod.scheduler.TimerValidator;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.command.permission.PermissionPredicate;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -34,6 +39,13 @@ public final class ActionValidator {
             }
         }
 
+        if (config.type() == ActionType.TIMER_START || config.type() == ActionType.TIMER_CANCEL) {
+            Text error = validateTimerAction(config);
+            if (error != null) {
+                return error;
+            }
+        }
+
         return null;
     }
 
@@ -53,6 +65,9 @@ public final class ActionValidator {
         if (config.type() == ActionType.STATE_VARIABLE) {
             String contextPlayerId = context.player() == null ? "" : context.player().getUuidAsString();
             return validateStateAction(config, contextPlayerId);
+        }
+        if (config.type() == ActionType.TIMER_START || config.type() == ActionType.TIMER_CANCEL) {
+            return validateTimerAction(config);
         }
         return null;
     }
@@ -106,5 +121,39 @@ public final class ActionValidator {
             return Text.literal(message);
         }
         return null;
+    }
+
+    private static Text validateTimerAction(ActionConfig config) {
+        if (config == null || TimerStore.normalizeId(config.timerId()).isBlank()) {
+            return Text.literal("Timer 动作缺少 timerId。");
+        }
+        String targetMode = safe(config.timerTargetMode());
+        TimerTargetMode parsedTarget = TimerTargetMode.parse(targetMode);
+        if (!targetMode.isBlank() && parsedTarget == null) {
+            return Text.literal("Timer 目标模式无效。");
+        }
+        if (parsedTarget == TimerTargetMode.EXPLICIT_TARGET && safe(config.timerTargetId()).isBlank()) {
+            return Text.literal("Timer 指定玩家目标不能为空。");
+        }
+        String policy = safe(config.timerStartPolicyOverride());
+        if (config.type() == ActionType.TIMER_START && !policy.isBlank() && TimerStartPolicy.parse(policy) == null) {
+            return Text.literal("Timer 启动策略覆盖无效。");
+        }
+        if (config.type() == ActionType.TIMER_START && (config.timerDurationOverrideTicks() < 0 || config.timerDurationOverrideTicks() > TimerValidator.MAX_DURATION_TICKS)) {
+            return Text.literal("Timer 时长覆盖超出允许范围。");
+        }
+        String missingBehavior = safe(config.timerMissingBehavior()).toLowerCase(Locale.ROOT);
+        if (config.type() == ActionType.TIMER_CANCEL
+                && !missingBehavior.isBlank()
+                && !"noop_success".equals(missingBehavior)
+                && !"fail".equals(missingBehavior)
+                && !"fail_if_missing".equals(missingBehavior)) {
+            return Text.literal("Timer 缺失处理策略无效。");
+        }
+        return null;
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 }

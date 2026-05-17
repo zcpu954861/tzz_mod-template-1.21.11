@@ -15,6 +15,7 @@ import net.minecraft.server.MinecraftServer;
 
 public final class WebAdminDoctorService {
     private final WebAdminConditionRuntimeDoctorService conditionRuntimeDoctorService = new WebAdminConditionRuntimeDoctorService();
+    private final WebAdminTimerDoctorService timerDoctorService = new WebAdminTimerDoctorService();
 
     public WebAdminDtos.DoctorReportDto report(MinecraftServer server) {
         SignalDoctorReport report = SignalDoctor.inspect(server);
@@ -42,6 +43,18 @@ public final class WebAdminDoctorService {
         }
 
         for (WebAdminDtos.DoctorIssueDto issue : conditionRuntimeDoctorService.inspect(server)) {
+            if (issue == null) {
+                continue;
+            }
+            switch (issue.severity()) {
+                case "ERROR" -> errorCount++;
+                case "WARNING" -> warningCount++;
+                default -> infoCount++;
+            }
+            issues.add(issue);
+        }
+
+        for (WebAdminDtos.DoctorIssueDto issue : timerDoctorService.inspect(server)) {
             if (issue == null) {
                 continue;
             }

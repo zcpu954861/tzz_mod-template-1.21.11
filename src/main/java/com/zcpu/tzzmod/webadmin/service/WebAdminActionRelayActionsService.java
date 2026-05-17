@@ -8,6 +8,10 @@ import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
+import com.zcpu.tzzmod.scheduler.TimerStartPolicy;
+import com.zcpu.tzzmod.scheduler.TimerStore;
+import com.zcpu.tzzmod.scheduler.TimerTargetMode;
+import com.zcpu.tzzmod.scheduler.TimerValidator;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -328,7 +332,7 @@ public final class WebAdminActionRelayActionsService {
         data.put("actionCount", relay == null ? device.actionCount() : actions.size());
         data.put("snapshotActionCount", device.actionCount());
         data.put("actions", actionDtos(actions, device.id()));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable", "timer_start", "timer_cancel"));
         data.put("conditionGroupId", relay == null ? "" : relay.conditionGroupId());
         data.put("conditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY.id());
         data.put("conditionGateTargetId", device.id());
@@ -370,6 +374,7 @@ public final class WebAdminActionRelayActionsService {
             entry.put("notifyOps", action.notifyOps());
             entry.put("conditionGroupId", action.conditionGroupId());
             putStateActionFields(entry, action);
+            putTimerActionFields(entry, action);
             entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.ACTION_RELAY_ACTION.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
@@ -416,7 +421,7 @@ public final class WebAdminActionRelayActionsService {
             }
             ActionType type = parseType(entry.type);
             if (type == null) {
-                errors.add(new WebAdminValidationError(prefix + ".type", "invalid_type", "Action 类型必须是 command、signal、message、sound 或 state_variable。", safe(entry.type)));
+                errors.add(new WebAdminValidationError(prefix + ".type", "invalid_type", "Action 类型必须是 command、signal、message、sound、state_variable、timer_start 或 timer_cancel。", safe(entry.type)));
                 continue;
             }
             Boolean enabled = parseBoolean(entry.enabled);
@@ -468,6 +473,10 @@ public final class WebAdminActionRelayActionsService {
             validateStateAction(errors, field.substring(0, Math.max(0, field.length() - ".value".length())), entry);
             return;
         }
+        if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
+            validateTimerAction(errors, field.substring(0, Math.max(0, field.length() - ".value".length())), entry, type);
+            return;
+        }
         if (value.isBlank()) {
             errors.add(new WebAdminValidationError(field, "empty", "Action 内容不能为空。", value));
             return;
@@ -504,6 +513,8 @@ public final class WebAdminActionRelayActionsService {
                 }
             }
             case STATE_VARIABLE -> {
+            }
+            case TIMER_START, TIMER_CANCEL -> {
             }
         }
     }
@@ -613,6 +624,9 @@ public final class WebAdminActionRelayActionsService {
         if (type == ActionType.STATE_VARIABLE) {
             return "";
         }
+        if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
+            return "";
+        }
         return value;
     }
 
@@ -644,6 +658,36 @@ public final class WebAdminActionRelayActionsService {
             boolean notifyOps,
             String conditionGroupId
     ) {
+        if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry safeEntry = entry == null
+                    ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry()
+                    : entry;
+            return new ActionConfig(
+                    type,
+                    "",
+                    enabled,
+                    false,
+                    cooldownTicks,
+                    false,
+                    conditionGroupId,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    0L,
+                    false,
+                    "",
+                    safe(safeEntry.timerId),
+                    safe(safeEntry.timerTargetMode),
+                    safe(safeEntry.timerTargetId),
+                    safe(safeEntry.timerStartPolicyOverride),
+                    parseLong(safeEntry.timerDurationOverrideTicks, 0L),
+                    safe(safeEntry.timerMissingBehavior)
+            );
+        }
         if (type != ActionType.STATE_VARIABLE) {
             return new ActionConfig(type, value, enabled, requiresOp, cooldownTicks, notifyOps, conditionGroupId);
         }
@@ -697,6 +741,42 @@ public final class WebAdminActionRelayActionsService {
         }
     }
 
+    public static void validateTimerAction(
+            List<WebAdminValidationError> errors,
+            String prefix,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry entry,
+            ActionType type
+    ) {
+        String timerId = TimerStore.normalizeId(entry == null ? "" : entry.timerId);
+        if (timerId.isBlank()) {
+            errors.add(new WebAdminValidationError(prefix + ".timerId", "timer_id_required", "Timer 动作必须选择 timerId。", entry == null ? "" : entry.timerId));
+        }
+        String targetMode = safe(entry == null ? "" : entry.timerTargetMode);
+        TimerTargetMode parsedTargetMode = TimerTargetMode.parse(targetMode);
+        if (!targetMode.isBlank() && parsedTargetMode == null) {
+            errors.add(new WebAdminValidationError(prefix + ".timerTargetMode", "timer_target_mode_invalid", "Timer 目标模式必须是 global、context_player 或 explicit_target。", targetMode));
+        }
+        if (parsedTargetMode == TimerTargetMode.EXPLICIT_TARGET && safe(entry == null ? "" : entry.timerTargetId).isBlank()) {
+            errors.add(new WebAdminValidationError(prefix + ".timerTargetId", "timer_target_id_required", "Timer 指定玩家目标不能为空。", ""));
+        }
+        String policy = safe(entry == null ? "" : entry.timerStartPolicyOverride);
+        if (type == ActionType.TIMER_START && !policy.isBlank() && TimerStartPolicy.parse(policy) == null) {
+            errors.add(new WebAdminValidationError(prefix + ".timerStartPolicyOverride", "timer_start_policy_invalid", "Timer 启动策略覆盖必须是 RESTART、IGNORE_IF_RUNNING 或 FAIL_IF_RUNNING。", policy));
+        }
+        Long durationOverride = parseLongObject(entry == null ? 0 : entry.timerDurationOverrideTicks);
+        if (durationOverride == null || durationOverride < 0 || durationOverride > TimerValidator.MAX_DURATION_TICKS) {
+            errors.add(new WebAdminValidationError(prefix + ".timerDurationOverrideTicks", "timer_duration_override_invalid", "Timer 时长覆盖必须是 0 到 1728000 的整数。", String.valueOf(entry == null ? "" : entry.timerDurationOverrideTicks)));
+        }
+        String missingBehavior = safe(entry == null ? "" : entry.timerMissingBehavior).toLowerCase(java.util.Locale.ROOT);
+        if (type == ActionType.TIMER_CANCEL
+                && !missingBehavior.isBlank()
+                && !"noop_success".equals(missingBehavior)
+                && !"fail".equals(missingBehavior)
+                && !"fail_if_missing".equals(missingBehavior)) {
+            errors.add(new WebAdminValidationError(prefix + ".timerMissingBehavior", "timer_missing_behavior_invalid", "Timer 缺失处理策略必须是 noop_success 或 fail。", missingBehavior));
+        }
+    }
+
     public static void putStateActionFields(Map<String, Object> entry, ActionConfig action) {
         if (entry == null || action == null) {
             return;
@@ -712,6 +792,19 @@ public final class WebAdminActionRelayActionsService {
         entry.put("stateCreateIfMissing", action.stateCreateIfMissing());
         entry.put("stateInitialValue", action.stateInitialValue());
         entry.put("stateActionSummary", action.stateActionSummary());
+    }
+
+    public static void putTimerActionFields(Map<String, Object> entry, ActionConfig action) {
+        if (entry == null || action == null) {
+            return;
+        }
+        entry.put("timerId", action.timerId());
+        entry.put("timerTargetMode", action.timerTargetMode());
+        entry.put("timerTargetId", action.timerTargetId());
+        entry.put("timerStartPolicyOverride", action.timerStartPolicyOverride());
+        entry.put("timerDurationOverrideTicks", action.timerDurationOverrideTicks());
+        entry.put("timerMissingBehavior", action.timerMissingBehavior());
+        entry.put("timerActionSummary", action.timerActionSummary());
     }
 
     public static String stateActionSummary(ActionConfig action) {
@@ -1005,12 +1098,17 @@ public final class WebAdminActionRelayActionsService {
                         + "|cooldownTicks=" + action.cooldownTicks()
                         + "|notifyOps=" + action.notifyOps()
                         + "|conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId())
-                        + stateFingerprintSuffix(action))
+                        + stateFingerprintSuffix(action)
+                        + timerFingerprintSuffix(action))
                 .toList();
     }
 
     private static String stateFingerprintSuffix(ActionConfig action) {
         return action == null || action.type() != ActionType.STATE_VARIABLE ? "" : "|" + action.stateFingerprint();
+    }
+
+    private static String timerFingerprintSuffix(ActionConfig action) {
+        return action == null || (action.type() != ActionType.TIMER_START && action.type() != ActionType.TIMER_CANCEL) ? "" : "|" + action.timerFingerprint();
     }
 
     private static List<String> auditActionSummaryList(List<ActionConfig> actions) {
@@ -1025,6 +1123,9 @@ public final class WebAdminActionRelayActionsService {
         if (action.type() == ActionType.STATE_VARIABLE) {
             return prefix + action.type().id() + ": " + action.stateActionSummary();
         }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return prefix + action.type().id() + ": " + action.timerActionSummary();
+        }
         return prefix + action.type().id() + ": " + safe(action.value());
     }
 
@@ -1037,6 +1138,12 @@ public final class WebAdminActionRelayActionsService {
             return prefix + action.type().id()
                     + ": " + action.stateActionSummary()
                     + " " + action.stateAuditFingerprint()
+                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return prefix + action.type().id()
+                    + ": " + action.timerActionSummary()
+                    + " " + action.timerAuditFingerprint()
                     + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
         }
         String value = safe(action.value());
@@ -1087,6 +1194,11 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static long parseLong(Object value, long fallback) {
+        Long parsed = parseLongObject(value);
+        return parsed == null ? fallback : parsed;
+    }
+
+    private static Long parseLongObject(Object value) {
         if (value instanceof Number number) {
             double doubleValue = number.doubleValue();
             if (Double.isFinite(doubleValue) && Math.floor(doubleValue) == doubleValue
@@ -1098,10 +1210,10 @@ public final class WebAdminActionRelayActionsService {
             try {
                 return Long.parseLong(string.trim());
             } catch (NumberFormatException ignored) {
-                return fallback;
+                return null;
             }
         }
-        return fallback;
+        return null;
     }
 
     private static boolean containsControl(String value) {

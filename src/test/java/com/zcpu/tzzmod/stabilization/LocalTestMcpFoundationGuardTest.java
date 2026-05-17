@@ -754,6 +754,12 @@ public final class LocalTestMcpFoundationGuardTest {
         requireFalse(source.contains("Signal Join"), "MCP source does not expose Signal Join labels");
         requireFalse(source.contains("Barrier"), "MCP source does not expose Signal Barrier tooling");
         requireFalse(source.contains("Aggregator"), "MCP source does not expose Signal Aggregator tooling");
+        requireFalse(source.contains("TimerStore"), "MCP source does not expose Timer store tooling");
+        requireFalse(source.contains("TimerRuntimeService"), "MCP source does not expose Timer runtime tooling");
+        requireFalse(source.contains("timer_start"), "MCP source does not expose timer_start tooling");
+        requireFalse(source.contains("timer_cancel"), "MCP source does not expose timer_cancel tooling");
+        requireFalse(source.contains("scheduler_timer"), "MCP source does not expose scheduler timer tooling");
+        requireFalse(source.contains("scheduler-delay"), "MCP source does not expose scheduler delay tooling");
         requireFalse(source.contains("GameController"), "MCP source does not enter GameController");
         requireFalse(source.contains("MissionSystem"), "MCP source does not enter MissionSystem");
         requireFalse(source.contains("PhaseController"), "MCP source does not enter PhaseController");

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ControlledStateActionServiceTest;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.TimerActionExecutionTest;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
@@ -15,6 +16,8 @@ import com.zcpu.tzzmod.condition.runtime.ConditionGateHistoryServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateReplayServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityServiceTest;
 import com.zcpu.tzzmod.resources.ResourceIntegrityTest;
+import com.zcpu.tzzmod.scheduler.TimerRuntimeServiceTest;
+import com.zcpu.tzzmod.scheduler.TimerStoreTest;
 import com.zcpu.tzzmod.signal.join.SignalJoinBarrierAggregatorTest;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
@@ -79,6 +82,8 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminConditionRuntimeDoctorServiceTes
 import com.zcpu.tzzmod.webadmin.service.WebAdminControlledStateActionServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
+import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceExtendedConfigService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
@@ -112,10 +117,14 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.minecraft.server.network.ServerPlayerEntity;
 
 public final class StabilizationGuardTest {
@@ -170,6 +179,11 @@ public final class StabilizationGuardTest {
         WebAdminConditionRuntimeDoctorServiceTest.run();
         SignalJoinBarrierAggregatorTest.run();
         WebAdminSignalJoinServiceTest.run();
+        TimerStoreTest.run();
+        TimerRuntimeServiceTest.run();
+        TimerActionExecutionTest.run();
+        WebAdminTimerServiceTest.run();
+        TimerDoctorTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -182,6 +196,7 @@ public final class StabilizationGuardTest {
         testConditionRuntimeSingleActionGates89();
         testSignalJoinBarrierAggregator810();
         testControlledStateActions811();
+        testSchedulerDelayTimer812();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1091,7 +1106,157 @@ public final class StabilizationGuardTest {
         requireFalse(js.contains("history.go(0)"), "frontend does not use browser history reload as refresh fallback");
         requireFalse(js.contains("location.href=location.href") || js.contains("location.href = location.href"),
                 "frontend does not self-assign location.href as a reload fallback");
+        assertWebAdminIconRegistryCoverage(loginHtml, appHtml, css, js);
         runWebAdminRenderRouteSmoke(js);
+    }
+
+    private static void assertWebAdminIconRegistryCoverage(String loginHtml, String appHtml, String css, String js) throws Exception {
+        List<String> iconKeysList = extractJsStringListBetween(
+                js,
+                "const FLAT_ICON_KEYS=[",
+                "];const FLAT_ICON_ASSETS"
+        );
+        Set<String> iconKeys = new LinkedHashSet<>(iconKeysList);
+        requireEquals(iconKeysList.size(), iconKeys.size(), "WebAdmin flat icon keys contain no duplicates");
+        requireTrue(iconKeys.contains("doctor-ok"), "WebAdmin icon fallback key remains registered");
+
+        Set<String> geometryKeys = extractJsObjectKeysBetween(js, "const ICON_GEOMETRY={", "};");
+        for (String key : iconKeys) {
+            requireTrue(geometryKeys.contains(key), "WebAdmin icon key has SVG geometry: " + key);
+        }
+        for (String key : geometryKeys) {
+            requireTrue(iconKeys.contains(key), "WebAdmin SVG geometry is registered: " + key);
+        }
+
+        Map<String, String> aliases = extractFrontendIconAliases(js);
+        Set<String> referenced = new LinkedHashSet<>();
+        collectMatches(referenced, Pattern.compile("data-icon=\\\"([^\\\"]+)\\\""), loginHtml + "\n" + appHtml);
+        collectMatches(referenced, Pattern.compile("icon\\(\\s*['\\\"]([^'\\\"]+)['\\\"]\\s*\\)"), js);
+        collectMatches(referenced, Pattern.compile("(?:icon|iconName)\\s*:\\s*['\\\"]([^'\\\"]+)['\\\"]"), js);
+        for (String ref : referenced) {
+            String resolved = resolveFrontendIconKey(ref, iconKeys, aliases);
+            requireTrue(iconKeys.contains(resolved), "WebAdmin referenced icon resolves: " + ref + " -> " + resolved);
+        }
+
+        for (String marker : List.of(
+                "data-route=\"#/signal-joins\"><span class=\"nav-icon\" data-icon=\"signal-join\"",
+                "data-route=\"#/logic-chains\"><span class=\"nav-icon\" data-icon=\"logic-chain\"",
+                "data-route=\"#/condition-groups\"><span class=\"nav-icon\" data-icon=\"condition-group\"",
+                "data-route=\"#/condition-debugger\"><span class=\"nav-icon\" data-icon=\"condition-debugger\"",
+                "data-route=\"#/state-variables\"><span class=\"nav-icon\" data-icon=\"state-variable\"",
+                "data-route=\"#/timers\"><span class=\"nav-icon\" data-icon=\"timer\""
+        )) {
+            requireContains(appHtml, marker, "WebAdmin sidebar uses semantic module icon marker: " + marker);
+        }
+        for (String marker : List.of(
+                "icon:'condition-debugger'",
+                "icon:'state-variable-global'",
+                "icon:'signal-join'",
+                "icon:'timer'",
+                "conditionGroupDisplayIconKey",
+                "iconName:timerModeIcon",
+                "TIMER_START:'timer-start'",
+                "TIMER_CANCEL:'timer-cancel'",
+                "icon('chevron-down')"
+        )) {
+            requireContains(js, marker, "WebAdmin icon marker present: " + marker);
+        }
+        for (String marker : List.of(
+                ".icon-asset-condition-group",
+                ".icon-asset-condition-debugger",
+                ".icon-asset-signal-join",
+                ".icon-asset-timer",
+                ".icon-asset-state-variable-global",
+                ".icon-bubble-condition-group",
+                ".icon-bubble-timer"
+        )) {
+            requireContains(css, marker, "WebAdmin icon color/style marker present: " + marker);
+        }
+        Path repoRoot = Path.of("").toAbsolutePath().normalize();
+        requireContains(Files.readString(repoRoot.resolve("docs/WEBADMIN_ICON_SEMANTICS.md"), StandardCharsets.UTF_8),
+                "Icon color semantics:", "WebAdmin icon color semantics doc is present");
+
+        String frontendAssets = loginHtml + "\n" + appHtml + "\n" + css + "\n" + js;
+        for (String forbidden : List.of(
+                "data:image",
+                "<img",
+                ".png",
+                ".webp",
+                "@font-face",
+                ".woff",
+                "fontawesome",
+                "image2",
+                "atlas",
+                "/assets/icons",
+                "background-image:url"
+        )) {
+            requireFalse(frontendAssets.toLowerCase().contains(forbidden.toLowerCase()),
+                    "WebAdmin custom icons stay inline SVG and avoid forbidden asset marker: " + forbidden);
+        }
+        requireFalse(js.contains("?'▾':'▸'"), "WebAdmin icon buttons do not use pure character chevrons");
+        requireFalse(js.contains(">⌄</button>"), "WebAdmin combo toggles use registry chevron icons instead of pure characters");
+    }
+
+    private static List<String> extractJsStringListBetween(String source, String start, String end) {
+        String body = extractBetween(source, start, end);
+        List<String> values = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\"([^\"]+)\"").matcher(body);
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+        return values;
+    }
+
+    private static Set<String> extractJsObjectKeysBetween(String source, String start, String end) {
+        String body = extractBetween(source, start, end);
+        Set<String> values = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("\"([^\"]+)\"\\s*:").matcher(body);
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+        return values;
+    }
+
+    private static Map<String, String> extractFrontendIconAliases(String js) {
+        String body = extractBetween(js, "const aliases={", "};");
+        Map<String, String> aliases = new LinkedHashMap<>();
+        Matcher matcher = Pattern.compile("(?:'([^']+)'|([a-zA-Z0-9_-]+))\\s*:\\s*'([^']+)'").matcher(body);
+        while (matcher.find()) {
+            String key = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
+            aliases.put(key, matcher.group(3));
+        }
+        return aliases;
+    }
+
+    private static String extractBetween(String source, String start, String end) {
+        int startIndex = source.indexOf(start);
+        requireTrue(startIndex >= 0, "Expected JS marker exists: " + start);
+        int bodyStart = startIndex + start.length();
+        int endIndex = source.indexOf(end, bodyStart);
+        requireTrue(endIndex >= 0, "Expected JS marker exists: " + end);
+        return source.substring(bodyStart, endIndex);
+    }
+
+    private static void collectMatches(Set<String> values, Pattern pattern, String source) {
+        Matcher matcher = pattern.matcher(source);
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+    }
+
+    private static String resolveFrontendIconKey(String name, Set<String> iconKeys, Map<String, String> aliases) {
+        String raw = String.valueOf(name == null ? "" : name).trim().toLowerCase().replace('_', '-');
+        String compact = raw.replaceAll("[^a-z0-9]", "");
+        if (iconKeys.contains(raw)) {
+            return raw;
+        }
+        if (aliases.containsKey(raw)) {
+            return aliases.get(raw);
+        }
+        if (aliases.containsKey(compact)) {
+            return aliases.get(compact);
+        }
+        return raw.isBlank() ? "doctor-ok" : raw;
     }
 
     private static void runWebAdminRenderRouteSmoke(String js) throws Exception {
@@ -8014,7 +8179,6 @@ public final class StabilizationGuardTest {
                 "StopListPolicy",
                 "ScratchEditor",
                 "SignalReceiverGate",
-                "Scheduler",
                 "TickScanner",
                 "FailureChannel",
                 "FailureAction",
@@ -8287,9 +8451,6 @@ public final class StabilizationGuardTest {
                 "GameController",
                 "MissionSystem",
                 "PhaseController",
-                "SchedulerAction",
-                "DelayAction",
-                "TimerAction",
                 "SignalReceiverGate",
                 "ActionFailurePolicy",
                 "FallbackAction",
@@ -8304,6 +8465,337 @@ public final class StabilizationGuardTest {
                 "rawJsonEditor"
         )) {
             requireFalse(controlledStateMain.contains(forbidden), "8.11 controlled state action code must not add forbidden capability: " + forbidden);
+        }
+    }
+
+    private static void testSchedulerDelayTimer812() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/SCHEDULER_DELAY_TIMER_8_12_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/SCHEDULER_CAPABILITY_MATRIX_8_12.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String scheduler = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod/scheduler"));
+        String bootstrap = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/core/bootstrap/TzzServerBootstrap.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+        String actionConfig = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionConfig.java"), StandardCharsets.UTF_8);
+        String actionEngine = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionEngine.java"), StandardCharsets.UTF_8);
+        String actionResult = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionExecutionResult.java"), StandardCharsets.UTF_8);
+        String actionValidator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionValidator.java"), StandardCharsets.UTF_8);
+        String timerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerService.java"), StandardCharsets.UTF_8);
+        String timerDoctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerDoctorService.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String logicChain = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
+        String listenerActionsService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerActionsService.java"), StandardCharsets.UTF_8);
+        String regionControllerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String signalDoctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/SignalDoctor.java"), StandardCharsets.UTF_8);
+        String runtimeTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/scheduler/TimerRuntimeServiceTest.java"), StandardCharsets.UTF_8);
+        String storeTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/scheduler/TimerStoreTest.java"), StandardCharsets.UTF_8);
+        String actionTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/action/TimerActionExecutionTest.java"), StandardCharsets.UTF_8);
+        String webadminTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerServiceTest.java"), StandardCharsets.UTF_8);
+        String doctorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/TimerDoctorTest.java"), StandardCharsets.UTF_8);
+        String compatibilityTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/SCHEDULER_DELAY_TIMER_8_12_CURRENT_CONTEXT.md",
+                "docs/SCHEDULER_CAPABILITY_MATRIX_8_12.md",
+                "src/main/java/com/zcpu/tzzmod/scheduler/TimerDefinition.java",
+                "src/main/java/com/zcpu/tzzmod/scheduler/TimerRuntimeService.java",
+                "src/main/java/com/zcpu/tzzmod/scheduler/TimerStore.java",
+                "src/main/java/com/zcpu/tzzmod/scheduler/TimerActionExecutor.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerDoctorService.java",
+                "src/test/java/com/zcpu/tzzmod/scheduler/TimerStoreTest.java",
+                "src/test/java/com/zcpu/tzzmod/scheduler/TimerRuntimeServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/action/TimerActionExecutionTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerServiceTest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/TimerDoctorTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.12 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.12 Scheduler / Delay / Timer",
+                "DELAY",
+                "COUNTDOWN",
+                "REPEAT",
+                "GLOBAL",
+                "PLAYER",
+                "RESTART",
+                "IGNORE_IF_RUNNING",
+                "FAIL_IF_RUNNING",
+                "timer_start",
+                "timer_cancel",
+                "onTickActions",
+                "onCompleteActions",
+                "outputChannel 可选",
+                "runtime state 内存态",
+                "tzz/webadmin/timers.json",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做完整 Logic Chain Editor",
+                "不做 cron / calendar",
+                "不做 StateVariable 新 scope"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.12 docs/README marker: " + marker);
+        }
+
+        requireContains(bootstrap, "TimerServer.register", "8.12 bootstrap registers timer server");
+        for (String marker : List.of(
+                "ServerTickEvents.END_SERVER_TICK",
+                "TimerRuntimeService::tick",
+                "MAX_ACTIVE_TIMERS_PER_SERVER",
+                "MAX_DUE_EXECUTIONS_PER_TICK",
+                "RuntimeStore",
+                "runtimeStatePersistent",
+                "SignalBridgeServer.emit",
+                "ActionSourceType.SCHEDULER_TIMER"
+        )) {
+            requireContains(scheduler + "\n" + actionType, marker, "8.12 runtime marker: " + marker);
+        }
+        requireFalse(scheduler.contains("Thread.sleep"), "8.12 scheduler runtime must not use Thread.sleep");
+        requireFalse(scheduler.contains("Files.walk") || scheduler.contains("BlockPos.iterate") || scheduler.contains("getBlockEntity("),
+                "8.12 scheduler runtime must not scan world blocks or filesystem during tick");
+        requireContains(scheduler, "FILE_NAME = \"timers.json\"", "8.12 timer store file marker");
+        requireContains(scheduler, "WebAdminStoragePaths.resolve(server)", "8.12 timer store uses WebAdmin world-scoped path");
+        requireContains(scheduler, "Timer 配置文件读取失败", "8.12 bad file fallback Chinese marker");
+
+        for (String marker : List.of(
+                "TIMER_START(\"timer_start\")",
+                "TIMER_CANCEL(\"timer_cancel\")",
+                "case TIMER_START -> TimerRuntimeService.startFromAction",
+                "case TIMER_CANCEL -> TimerRuntimeService.cancelFromAction",
+                "timerOperation",
+                "timerActionSummary",
+                "timerFingerprint",
+                "Timer 动作缺少 timerId"
+        )) {
+            requireContains(actionType + "\n" + actionConfig + "\n" + actionEngine + "\n" + actionResult + "\n" + actionValidator, marker, "8.12 timer action marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/timers",
+                "timerService.create",
+                "timerService.update",
+                "timerService.delete",
+                "timerService.start",
+                "timerService.cancel",
+                "timerService.reset",
+                "EDIT_TIMER",
+                "TARGET_TIMER_CONFIG",
+                "TIMER_CHANGED",
+                "TIMER_RUNTIME_CHANGED",
+                "permission",
+                "CSRF",
+                "sameOrigin",
+                "expectedFingerprint",
+                "audit"
+        )) {
+            requireContains(server + "\n" + timerService, marker, "8.12 WebAdmin write/API marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "#/timers",
+                "调度器 / 计时器",
+                "data-timer-page",
+                "data-timer-list",
+                "data-timer-unified-layout",
+                "data-timer-stats-cards",
+                "data-timer-secondary-storage-info",
+                "data-timer-compact-filter-toolbar",
+                "data-timer-filter-responsive-wrap",
+                "data-timer-no-giant-full-width-stacked-filters",
+                "data-timer-mature-empty-state",
+                "data-timer-empty-create-action",
+                "data-timer-empty-filter-reset",
+                "data-timer-modern-table",
+                "data-timer-list-row-card",
+                "data-timer-row-click-detail",
+                "data-timer-detail",
+                "data-timer-editor",
+                "data-timer-action-summary-cards",
+                "data-timer-actions-managed-in-modal",
+                "data-timer-mode-selector",
+                "data-timer-scope-selector",
+                "data-timer-duration-ticks",
+                "data-timer-interval-ticks",
+                "data-timer-max-runs",
+                "data-timer-start-policy",
+                "data-timer-output-channel-combobox",
+                "data-timer-on-tick-actions",
+                "data-timer-on-complete-actions",
+                "data-timer-on-start-actions",
+                "data-timer-on-cancel-actions",
+                "data-timer-status-panel",
+                "data-timer-manual-form",
+                "data-timer-manual-op",
+                "data-timer-manual-submit",
+                "data-timer-manual-start",
+                "data-timer-manual-cancel",
+                "data-timer-manual-reset",
+                "data-timer-action-submit",
+                "data-timer-no-raw-json",
+                "data-timer-validation-preserves-input",
+                "data-timer-silent-refresh-preserves-draft",
+                "data-timer-refresh-preserves-filters",
+                "data-timer-unified-animated-modal",
+                "data-timer-modal-uses-webadmin-modal",
+                "submitTimerManualForm",
+                "timerDetailActionCard",
+                "Tick 动作",
+                "timer_changed','timer_runtime_changed",
+                "timer_config"
+        )) {
+            requireContains(shell + "\n" + scripts, marker, "8.12 timer frontend marker: " + marker);
+        }
+        for (String marker : List.of(
+                ".wa-filter-bar",
+                "flex-wrap:wrap",
+                ".wa-filter-bar .search-control",
+                ".wa-card-grid",
+                "repeat(auto-fit,minmax",
+                ".wa-table-card",
+                ".wa-table-scroll",
+                ".wa-clickable-row",
+                ":focus-visible",
+                ".timer-empty-state",
+                ".timer-storage-note",
+                "waModalBackdropIn",
+                "waModalIn"
+        )) {
+            requireContains(styles, marker, "8.12 Timer UI shared CSS marker: " + marker);
+        }
+        requireContains(scripts, "setView(`<section class=\"wa-page timer-page\"", "8.12 Timer list must use unified wa-page layout");
+        requireContains(scripts, "renderTimersPage({silent:true})", "8.12 Timer refresh preserves filters via silent refresh");
+        requireContains(scripts, "setView(`<section class=\"wa-page wa-detail-shell timer-detail-page\"", "8.12 Timer detail must use unified detail shell");
+        requireContains(scripts, "openTimerActionBucketModal", "8.12 Timer action lists must use summary card plus modal");
+        requireContains(scripts, "data-timer-mode-repeat-hides-duration", "8.12 Timer REPEAT form hides duration field");
+        requireContains(scripts, "data-timer-mode-delay-hides-on-tick", "8.12 Timer DELAY form hides onTick actions");
+        requireContains(scripts, "disabled=(!draft.lockId&&draft.mode!=='create')||draft.saving", "8.12 Timer create action gate picker remains selectable before save lock");
+        requireContains(scripts, "data-timer-interval-ticks=\"true\" type=\"number\" min=\"1\"", "8.12 visible Timer interval field starts at one tick");
+        requireContains(scripts, "data-timer-action-timer-id-combobox", "8.12 timerId action fields use Timer combobox");
+        requireContains(scripts, "data-timer-scroll-preserved", "8.12 Timer action bucket return preserves parent scroll");
+        requireContains(scripts, "timerActionBucketTargetType", "8.12 Timer single action gate uses bucket-specific target type");
+        requireContains(scripts, "if(k==='timer_config')", "8.12 Timer edit modal must use a typed dirty-check snapshot");
+        requireFalse(scripts.contains("class=\"filter-bar\" data-timer-list=\"true\"") || scripts.contains("function timerTable(items){return `<div class=\"table-wrap\""),
+                "8.12 Timer UI must not regress to legacy full-width filter/data-table layout");
+        requireContains(scripts, "WebAdmin 手动操作没有 ActionEngine 触发玩家上下文",
+                "8.12 WebAdmin manual Timer operation explains context_player is unavailable");
+        requireContains(scripts, "PLAYER scope 需要填写玩家 UUID 或名称",
+                "8.12 WebAdmin manual Timer player scope requires explicit target");
+        requireContains(scripts, "该 Timer 为 GLOBAL 作用域，手动操作会作用于全局运行实例",
+                "8.12 WebAdmin manual Timer global scope stays global-only");
+        String timerManualModal = extractBetween(scripts, "function showTimerManualModal(op){", "function syncTimerManualDraft()");
+        String timerActionBucketModal = extractBetween(scripts, "function showTimerActionBucketModal(bucket){", "function rerenderTimerEditor()");
+        requireContains(timerManualModal, "data-timer-manual-form=\"true\"", "8.12 Timer manual modal uses data marker form");
+        requireContains(timerManualModal, "onsubmit=\"event.preventDefault();submitTimerManualForm(this)\"", "8.12 Timer manual modal submit path is safe");
+        requireContains(timerManualModal, "timerManualModalFooter(op,d.saving)", "8.12 Timer manual modal uses Timer-specific footer");
+        requireContains(scripts, "target.closest('[data-timer-manual-submit]')", "8.12 Timer manual submit uses delegated click handler");
+        requireContains(scripts, "target.closest('[data-timer-action-submit]')", "8.12 Timer action save uses delegated click handler");
+        requireFalse(timerManualModal.contains("runTimerManual(${jsString(op)})") || timerManualModal.contains("requestSubmit()"),
+                "8.12 Timer manual modal must not use unsafe inline runTimerManual/requestSubmit");
+        requireFalse(timerActionBucketModal.contains("requestSubmit()"),
+                "8.12 Timer action bucket modal must not use inline requestSubmit");
+        requireFalse(scripts.contains("detailCard('启动动作',timerActionSummaryList(detail.onStartActions||[]),'data-timer-on-start-actions"),
+                "8.12 Timer detail marker must not be passed as visible card action text");
+        requireContains(scripts, "timerDetailActionCard('启动动作','data-timer-on-start-actions',detail.onStartActions||[])",
+                "8.12 Timer detail renders onStartActions in the start section");
+        requireContains(scripts, "timerDetailActionCard('Tick 动作','data-timer-on-tick-actions',detail.onTickActions||[])",
+                "8.12 Timer detail renders onTickActions in the tick section");
+        requireContains(scripts, "timerDetailActionCard('完成动作','data-timer-on-complete-actions',detail.onCompleteActions||[])",
+                "8.12 Timer detail renders onCompleteActions in the complete section");
+        requireContains(scripts, "timerDetailActionCard('取消动作','data-timer-on-cancel-actions',detail.onCancelActions||[])",
+                "8.12 Timer detail renders onCancelActions in the cancel section");
+        requireFalse(scripts.contains("timerRawJson") || scripts.contains("data-timer-raw-json-editor=\"true\""),
+                "8.12 Timer UI must not expose raw JSON editor");
+
+        for (String marker : List.of(
+                "timer-store-degraded",
+                "timer-no-output",
+                "timer-repeat-small-interval",
+                "timer-infinite-repeat-no-cancel-note",
+                "timer-action-missing-id",
+                "timer-action-missing-target",
+                "timer-action-disabled-target",
+                "timer-action-player-context-missing",
+                "PLAYER Timer 缺少触发玩家上下文"
+        )) {
+            requireContains(timerDoctor, marker, "8.12 Timer Doctor marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "TimerStore.getSnapshot",
+                "producer:timer",
+                "Timer 完成输出",
+                "scheduler_timer",
+                "timerMetadata",
+                "logicChainTimerMetadataRows"
+        )) {
+            requireContains(logicChain + "\n" + signalService + "\n" + scripts, marker, "8.12 minimal Logic Chain/Signal marker: " + marker);
+        }
+        requireContains(listenerActionsService, "putTimerActionFields(entry, normalized)", "8.12 SignalListener action DTO roundtrips timer fields");
+        requireContains(listenerActionsService, "action.timerActionSummary()", "8.12 SignalListener timer action summaries use structured timer fields");
+        requireContains(scripts, "...timerActionPayload({...action,type:String(action.type||'signal').toLowerCase()})", "8.12 SignalListener edit draft preserves timer action fields");
+        requireContains(regionControllerService, "putTimerActionFields(entry, action)", "8.12 RegionController action DTO roundtrips timer fields");
+        requireContains(regionControllerService, "action.timerActionSummary()", "8.12 RegionController timer action summaries use structured timer fields");
+        requireContains(scripts, "...timerActionPayload({...action,type:String(action.type||'signal').toLowerCase()})", "8.12 RegionController edit draft preserves timer action fields");
+        requireContains(timerService, "WebAdminConditionGateBindingValidator", "8.12 Timer action condition group backend reject is wired");
+        requireContains(timerService, "ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION", "8.12 Timer action condition gate uses Timer action target types");
+        requireContains(timerService, "applyModeSemantics(timer)", "8.12 Timer service sanitizes hidden mode fields before save");
+        requireContains(signalDoctor, "timer_start 缺少 timerId", "8.12 Signal Doctor reports timer_start missing timerId precisely");
+        requireContains(signalDoctor, "timer_cancel 缺少 timerId", "8.12 Signal Doctor reports timer_cancel missing timerId precisely");
+        requireContains(signalDoctor, "state action 缺少 key", "8.12 Signal Doctor recognizes structured state action content");
+
+        for (String marker : List.of(
+                "testDelayCountdownAndRepeatRuntime",
+                "testCancelBeforeCompleteAndInfiniteRepeatUntilCancel",
+                "testStartPolicies",
+                "testScopeIsolationAndReset",
+                "testPlayerScopeRequiresContextAndRepeatStatus",
+                "testDelayCompleteActionsOnlyRunAtCompletionOnce",
+                "testActionFailureStatusAndDueBudget",
+                "testStartAndCancelBucketHarnessCoverage",
+                "testActiveLimitStillAllowsExistingScopePolicies",
+                "testStoreRoundTripAndBadFileFallback",
+                "testValidationRejectsUnsafeDefinitions",
+                "testTimerActionValidationFailures",
+                "testWebAdminTimerActionEntryRoundTrip",
+                "testActionEngineDispatchAndSourceDtoMarkers",
+                "testCreateDetailAndNoChangeUpdate",
+                "testActionBucketRoundTripDoesNotMixBuckets",
+                "testModeSpecificHiddenFieldsAreIgnoredAndSanitized",
+                "testRejectsInvalidTimerActionFields",
+                "testWriteSecurityFingerprintDeleteStatusAndRuntimeApis",
+                "testEditLockRequiredAndConflict",
+                "testAuditAndRealtimeEventsForWrites",
+                "testRuntimeResetRequiresFingerprintAndConfirmation",
+                "testTimerActionReferenceDiagnostics",
+                "testTimerRuntimeGateProfiles"
+        )) {
+            requireContains(runtimeTest + "\n" + storeTest + "\n" + actionTest + "\n" + webadminTest + "\n" + doctorTest + "\n" + compatibilityTest, marker, "8.12 test marker: " + marker);
+        }
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "ScratchEditor",
+                "CronScheduler",
+                "CalendarScheduler",
+                "PersistentTimerRuntimeState",
+                "VersionRollback",
+                "ENTITY_STATE_VARIABLE_WRITE",
+                "BLOCK_STATE_VARIABLE_WRITE",
+                "DEVICE_STATE_VARIABLE_WRITE",
+                "REGION_STATE_VARIABLE_WRITE",
+                "TEAM_STATE_VARIABLE_WRITE",
+                "GAME_STATE_VARIABLE_WRITE",
+                "ScriptExpression"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.12 must not add out-of-scope marker: " + forbidden);
         }
     }
 

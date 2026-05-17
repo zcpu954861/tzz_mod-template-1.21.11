@@ -27,6 +27,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminTimerRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest;
@@ -53,6 +54,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminTimerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
@@ -107,6 +109,7 @@ public final class WebAdminServer {
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminTimerService timerService = new WebAdminTimerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
@@ -317,6 +320,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/signal-joins") || path.startsWith("/api/webadmin/signal-joins/")) {
                 runOnServerThread(() -> handleSignalJoins(exchange, auth, path, method));
+                return;
+            }
+            if (path.equals("/api/webadmin/timers") || path.startsWith("/api/webadmin/timers/")) {
+                runOnServerThread(() -> handleTimers(exchange, auth, path, method));
                 return;
             }
             if (path.startsWith("/api/webadmin/selection/")) {
@@ -1163,6 +1170,207 @@ public final class WebAdminServer {
         }
 
         WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Join 接口不存在。");
+    }
+
+    private void handleTimers(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/timers";
+        if (path.equals(root)) {
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, timerService.list(minecraftServer, auth.user, auth.session));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+                if (request == null) {
+                    request = new WebAdminTimerRequest();
+                }
+                WebAdminWriteResult result = timerService.create(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / POST。");
+            return;
+        }
+
+        String prefix = root + "/";
+        String tail = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Timer ID 不能为空。");
+            return;
+        }
+        String[] parts = tail.split("/");
+        String timerId = decodePathSegment(parts[0]);
+        if (timerId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Timer ID 不能为空。");
+            return;
+        }
+
+        if (parts.length == 1) {
+            if (method.equalsIgnoreCase("GET")) {
+                Map<String, Object> detail = timerService.detail(minecraftServer, auth.user, auth.session, timerId);
+                if (Boolean.TRUE.equals(detail.get("notFound"))) {
+                    WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", String.valueOf(detail.getOrDefault("message", "Timer 不存在。")));
+                    return;
+                }
+                WebAdminJsonResponse.ok(exchange, detail);
+                return;
+            }
+            if (method.equalsIgnoreCase("PATCH")) {
+                WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+                if (request == null) {
+                    request = new WebAdminTimerRequest();
+                }
+                request.id = timerId;
+                WebAdminWriteResult result = timerService.update(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        timerId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            if (method.equalsIgnoreCase("DELETE")) {
+                WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+                if (request == null) {
+                    request = new WebAdminTimerRequest();
+                }
+                request.id = timerId;
+                WebAdminWriteResult result = timerService.delete(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        timerId,
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET / PATCH / DELETE。");
+            return;
+        }
+
+        if (parts.length == 2 && "status".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, timerService.status(minecraftServer, auth.user, timerId));
+            return;
+        }
+
+        if (parts.length == 2 && "start".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+            if (request == null) {
+                request = new WebAdminTimerRequest();
+            }
+            request.id = timerId;
+            WebAdminWriteResult result = timerService.start(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    timerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 2 && "cancel".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+            if (request == null) {
+                request = new WebAdminTimerRequest();
+            }
+            request.id = timerId;
+            WebAdminWriteResult result = timerService.cancel(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    timerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 2 && "reset".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+            if (request == null) {
+                request = new WebAdminTimerRequest();
+            }
+            request.id = timerId;
+            WebAdminWriteResult result = timerService.reset(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    timerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        if (parts.length == 2 && "delete".equals(parts[1])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminTimerRequest request = readJson(exchange, WebAdminTimerRequest.class);
+            if (request == null) {
+                request = new WebAdminTimerRequest();
+            }
+            request.id = timerId;
+            WebAdminWriteResult result = timerService.delete(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    timerId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Timer 接口不存在。");
     }
 
     private void handleConditionTypes(HttpExchange exchange, AuthContext auth, String method) throws IOException {

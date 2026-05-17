@@ -17,6 +17,8 @@ public enum WebAdminRealtimeEventType {
     SIGNAL_LISTENER_ENABLED_CHANGED("signal_listener_enabled_changed", "Signal Listener 启用状态已变化"),
     SIGNAL_LISTENER_ACTION_CHANGED("signal_listener_action_changed", "Signal Listener 动作已变化"),
     SIGNAL_JOIN_CHANGED("signal_join_changed", "Signal Join 已变化"),
+    TIMER_CHANGED("timer_changed", "Timer 配置已变化"),
+    TIMER_RUNTIME_CHANGED("timer_runtime_changed", "Timer 运行态已变化"),
     ACTION_CHANGED("action_changed", "动作已变化"),
     ACTION_HISTORY_APPENDED("action_history_appended", "动作历史已追加"),
     ACTION_EXECUTION_APPENDED("action_execution_appended", "动作执行已追加"),

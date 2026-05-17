@@ -8,7 +8,11 @@ public enum ActionType {
     SOUND("sound"),
     SIGNAL("signal"),
     @SerializedName(value = "state_variable", alternate = {"STATE_VARIABLE"})
-    STATE_VARIABLE("state_variable");
+    STATE_VARIABLE("state_variable"),
+    @SerializedName(value = "timer_start", alternate = {"TIMER_START"})
+    TIMER_START("timer_start"),
+    @SerializedName(value = "timer_cancel", alternate = {"TIMER_CANCEL"})
+    TIMER_CANCEL("timer_cancel");
 
     private final String id;
 

@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.action;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationResult;
 import com.zcpu.tzzmod.condition.state.StateVariableStore;
+import com.zcpu.tzzmod.scheduler.TimerRuntimeService;
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalEvent;
@@ -46,6 +47,8 @@ public final class ActionEngine {
                 case SOUND -> executeSound(context, config);
                 case SIGNAL -> executeSignal(context, config);
                 case STATE_VARIABLE -> executeStateVariable(context, config);
+                case TIMER_START -> TimerRuntimeService.startFromAction(context, config);
+                case TIMER_CANCEL -> TimerRuntimeService.cancelFromAction(context, config);
             };
 
             ActionAuditLogger.log(context, config, result);
