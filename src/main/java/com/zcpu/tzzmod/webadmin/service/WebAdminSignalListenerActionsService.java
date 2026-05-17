@@ -306,7 +306,7 @@ public final class WebAdminSignalListenerActionsService {
         data.put("cooldownTicks", listener.cooldownTicks());
         data.put("actionCount", listener.actions().size());
         data.put("actions", actionDtos(listener.actions(), listener.id()));
-        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable"));
+        data.put("allowedActionTypes", List.of("command", "signal", "message", "sound", "state_variable", "timer_start", "timer_cancel"));
         data.put("expectedFingerprint", WebAdminSignalListenerBasicConfigService.fingerprintFor(listener));
         WebAdminEditLockStatusDto lockStatus = editLockService == null ? null : editLockService.status(
                 WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS,
@@ -416,6 +416,7 @@ public final class WebAdminSignalListenerActionsService {
             entry.put("notifyOps", normalized.notifyOps());
             entry.put("conditionGroupId", normalized.conditionGroupId());
             WebAdminActionRelayActionsService.putStateActionFields(entry, normalized);
+            WebAdminActionRelayActionsService.putTimerActionFields(entry, normalized);
             entry.put("actionConditionGateTargetType", ConditionRuntimeTargetType.SIGNAL_LISTENER_ACTION.id());
             entry.put("actionConditionGateTargetId", actionTargetId);
             entry.put("recentActionConditionGate", WebAdminConditionGateHistoryService.recentStatus(
@@ -441,6 +442,9 @@ public final class WebAdminSignalListenerActionsService {
         if (action.type() == ActionType.STATE_VARIABLE) {
             return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + action.stateActionSummary();
         }
+        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + action.timerActionSummary();
+        }
         return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + safe(action.value());
     }
 
@@ -451,6 +455,8 @@ public final class WebAdminSignalListenerActionsService {
         String value = safe(action.value());
         if (action.type() == ActionType.STATE_VARIABLE) {
             value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
+        } else if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
+            value = action.timerActionSummary() + " " + action.timerAuditFingerprint();
         } else
         if (action.type() == ActionType.COMMAND) {
             value = "<command redacted length=" + value.length() + ">";

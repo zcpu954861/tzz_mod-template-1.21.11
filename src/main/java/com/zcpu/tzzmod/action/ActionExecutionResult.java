@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.action;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationResult;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
+import com.zcpu.tzzmod.scheduler.TimerOperationResult;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +84,25 @@ public record ActionExecutionResult(
                 result.code(),
                 details,
                 result.durationNanos()
+        );
+    }
+
+    public static ActionExecutionResult timerOperation(TimerOperationResult result) {
+        if (result == null) {
+            return new ActionExecutionResult(
+                    false,
+                    Text.literal("Timer 动作执行失败：结果为空。"),
+                    "timer_result_missing",
+                    Map.of("actionType", "timer"),
+                    0L
+            );
+        }
+        return new ActionExecutionResult(
+                result.success(),
+                Text.literal(result.message()),
+                result.code(),
+                result.actionDetails(),
+                0L
         );
     }
 

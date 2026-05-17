@@ -24,6 +24,7 @@ public enum WebAdminOperationType {
     EDIT_SIGNAL_LISTENER_BASIC_CONFIG("EDIT_SIGNAL_LISTENER_BASIC_CONFIG", "编辑 Signal Listener 基础配置"),
     EDIT_SIGNAL_LISTENER_ACTIONS("EDIT_SIGNAL_LISTENER_ACTIONS", "编辑 Signal Listener 动作列表"),
     EDIT_SIGNAL_JOIN("EDIT_SIGNAL_JOIN", "编辑 Signal Join / Barrier / Aggregator"),
+    EDIT_TIMER("EDIT_TIMER", "编辑 Scheduler Timer"),
     START_OBJECT_SELECTION("START_OBJECT_SELECTION", "发起 WebAdmin 对象选择"),
     DELETE_VIRTUAL_BLOCK_DEVICE("DELETE_VIRTUAL_BLOCK_DEVICE", "删除 / 解绑虚拟方块设备"),
     CREATE_SIGNAL_LISTENER("CREATE_SIGNAL_LISTENER", "创建 Signal Listener"),

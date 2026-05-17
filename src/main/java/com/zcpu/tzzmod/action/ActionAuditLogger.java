@@ -92,6 +92,9 @@ public final class ActionAuditLogger {
         if (config.type() == ActionType.STATE_VARIABLE) {
             return config.stateActionSummary();
         }
+        if (config.type() == ActionType.TIMER_START || config.type() == ActionType.TIMER_CANCEL) {
+            return config.timerActionSummary();
+        }
         return config.value() == null ? "" : config.value();
     }
 

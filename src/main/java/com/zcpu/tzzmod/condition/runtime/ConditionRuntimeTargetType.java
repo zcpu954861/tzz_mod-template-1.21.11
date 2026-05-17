@@ -20,7 +20,15 @@ public enum ConditionRuntimeTargetType {
     ACTION_RELAY_ACTION("ACTION_RELAY_ACTION", "Action Relay 单条 Action"),
     REGION_ENTER_ACTION("REGION_ENTER_ACTION", "RegionController enter 单条 Action"),
     REGION_EXIT_ACTION("REGION_EXIT_ACTION", "RegionController exit 单条 Action"),
-    REGION_STAY_ACTION("REGION_STAY_ACTION", "RegionController stay 单条 Action");
+    REGION_STAY_ACTION("REGION_STAY_ACTION", "RegionController stay 单条 Action"),
+    TIMER_ON_START("TIMER_ON_START", "Timer 启动动作列表"),
+    TIMER_ON_START_ACTION("TIMER_ON_START_ACTION", "Timer 启动单条 Action"),
+    TIMER_ON_TICK("TIMER_ON_TICK", "Timer 间隔动作列表"),
+    TIMER_ON_TICK_ACTION("TIMER_ON_TICK_ACTION", "Timer 间隔单条 Action"),
+    TIMER_ON_COMPLETE("TIMER_ON_COMPLETE", "Timer 完成动作列表"),
+    TIMER_ON_COMPLETE_ACTION("TIMER_ON_COMPLETE_ACTION", "Timer 完成单条 Action"),
+    TIMER_ON_CANCEL("TIMER_ON_CANCEL", "Timer 取消动作列表"),
+    TIMER_ON_CANCEL_ACTION("TIMER_ON_CANCEL_ACTION", "Timer 取消单条 Action");
 
     private final String id;
     private final String displayName;

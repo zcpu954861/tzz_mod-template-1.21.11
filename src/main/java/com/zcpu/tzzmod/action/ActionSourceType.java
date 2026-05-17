@@ -7,6 +7,7 @@ public enum ActionSourceType {
     REGION_CONTROLLER("region_controller"),
     SIGNAL_BRIDGE("signal_bridge"),
     SIGNAL_JOIN("signal_join"),
+    SCHEDULER_TIMER("scheduler_timer"),
     SIGNAL_DEVICE("signal_device"),
     ACTION_RELAY("action_relay"),
     VIRTUAL_BLOCK_DEVICE("virtual_block_device"),

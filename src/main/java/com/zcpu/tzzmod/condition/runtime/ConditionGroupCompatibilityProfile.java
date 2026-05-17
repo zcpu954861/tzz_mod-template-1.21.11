@@ -317,6 +317,66 @@ public record ConditionGroupCompatibilityProfile(
                     Set.of(),
                     Set.of()
             );
+            case TIMER_ON_START, TIMER_ON_TICK, TIMER_ON_COMPLETE, TIMER_ON_CANCEL -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "timerId",
+                            "timerMode",
+                            "timerScopeMode",
+                            "timerScopeKey",
+                            "timerRunCount",
+                            "timerRemainingTicks"
+                    ),
+                    set("trigger", "detail", "timerId", "timerMode", "timerScopeMode", "timerScopeKey", "timerRunCount", "timerRemainingTicks"),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
+            case TIMER_ON_START_ACTION, TIMER_ON_TICK_ACTION, TIMER_ON_COMPLETE_ACTION, TIMER_ON_CANCEL_ACTION -> new ConditionGroupCompatibilityProfile(
+                    type,
+                    type.displayName(),
+                    false,
+                    true,
+                    true,
+                    withAction(set(
+                            "sourceType",
+                            "sourceId",
+                            "worldId",
+                            "world",
+                            "triggerType",
+                            "detail",
+                            "gameTime",
+                            "timerId",
+                            "timerMode",
+                            "timerScopeMode",
+                            "timerScopeKey",
+                            "timerRunCount",
+                            "timerRemainingTicks"
+                    )),
+                    withActionMetadata(set("trigger", "detail", "timerId", "timerMode", "timerScopeMode", "timerScopeKey", "timerRunCount", "timerRemainingTicks")),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of(),
+                    Set.of()
+            );
         };
     }
 

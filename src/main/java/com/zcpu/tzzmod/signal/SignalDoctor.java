@@ -103,13 +103,14 @@ public final class SignalDoctor {
                 issues.add(warning("监听器" + listenerName + "的第 " + actionNumber + " 个动作未启用。"));
             }
 
-            String value = action.value() == null ? "" : action.value().trim();
-            if (value.isEmpty()) {
-                issues.add(error("监听器" + listenerName + "的第 " + actionNumber + " 个动作内容为空。"));
+            String emptyMessage = actionContentIssue(action);
+            if (!emptyMessage.isBlank()) {
+                issues.add(error("监听器" + listenerName + "的第 " + actionNumber + " 个" + emptyMessage));
                 continue;
             }
 
             if (action.type() == ActionType.SIGNAL) {
+                String value = action.value() == null ? "" : action.value().trim();
                 String actionChannel = SignalChannel.normalize(value);
                 if (!SignalChannel.isValid(actionChannel)) {
                     issues.add(error("监听器" + listenerName + "的第 " + actionNumber
@@ -121,6 +122,38 @@ public final class SignalDoctor {
                 }
             }
         }
+    }
+
+    private static String actionContentIssue(ActionConfig action) {
+        if (action == null || action.type() == null) {
+            return "";
+        }
+        if (action.type() == ActionType.TIMER_START) {
+            return action.timerId() == null || action.timerId().trim().isEmpty() ? " timer_start 缺少 timerId。" : "";
+        }
+        if (action.type() == ActionType.TIMER_CANCEL) {
+            return action.timerId() == null || action.timerId().trim().isEmpty() ? " timer_cancel 缺少 timerId。" : "";
+        }
+        if (action.type() == ActionType.STATE_VARIABLE) {
+            return action.stateKey() == null || action.stateKey().trim().isEmpty() ? " state action 缺少 key。" : "";
+        }
+        String value = action.value() == null ? "" : action.value().trim();
+        if (!value.isEmpty()) {
+            return "";
+        }
+        if (action.type() == ActionType.COMMAND) {
+            return " command action 缺少 command。";
+        }
+        if (action.type() == ActionType.MESSAGE) {
+            return " message action 缺少 message。";
+        }
+        if (action.type() == ActionType.SOUND) {
+            return " sound action 缺少 sound。";
+        }
+        if (action.type() == ActionType.SIGNAL) {
+            return " signal action 缺少 channel。";
+        }
+        return "动作内容为空。";
     }
 
     private static void inspectHistoryWithoutListeners(

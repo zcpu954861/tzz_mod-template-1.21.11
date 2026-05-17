@@ -439,7 +439,11 @@ public final class WebAdminConditionRuntimeDoctorService {
     private static boolean providesPlayerContext(ConditionRuntimeTargetType targetType) {
         return targetType == ConditionRuntimeTargetType.REGION_ENTER_ACTION
                 || targetType == ConditionRuntimeTargetType.REGION_EXIT_ACTION
-                || targetType == ConditionRuntimeTargetType.REGION_STAY_ACTION;
+                || targetType == ConditionRuntimeTargetType.REGION_STAY_ACTION
+                || targetType == ConditionRuntimeTargetType.TIMER_ON_START_ACTION
+                || targetType == ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION
+                || targetType == ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION
+                || targetType == ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION;
     }
 
     private static boolean containsAlwaysFalse(ConditionNode node) {

@@ -12,6 +12,7 @@ import com.zcpu.tzzmod.phone.chat.PhoneChatServer;
 import com.zcpu.tzzmod.region.RegionControllerServer;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceContainerHandler;
 import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceInteractionHandler;
+import com.zcpu.tzzmod.scheduler.TimerServer;
 import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateServer;
 import com.zcpu.tzzmod.webadmin.itemsubmit.WebAdminSingleItemSubmitTemplateServer;
 import com.zcpu.tzzmod.task.TaskServer;
@@ -23,6 +24,7 @@ public final class TzzServerBootstrap {
     }
 
     public static void register() {
+        TimerServer.register();
         DeathSyncServer.register();
         PhoneChatServer.register();
         MapServer.register();

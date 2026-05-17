@@ -24,6 +24,7 @@ public final class ConditionGroupCompatibilityServiceTest {
         testChineseIncompatibilityReasons();
         testReceiverSideRuntimeGateProfiles();
         testSingleActionRuntimeGateProfiles();
+        testTimerRuntimeGateProfiles();
     }
 
     private static void testAlwaysTrueCompatibleWithAllProfiles() {
@@ -230,6 +231,47 @@ public final class ConditionGroupCompatibilityServiceTest {
             requireCompatible(contextPlayerState, regionActionTarget, regionActionTarget.id() + " accepts context_player state");
             requireCompatible(region, regionActionTarget, regionActionTarget.id() + " exposes region snapshot");
             requireCompatible(currentRegion, regionActionTarget, regionActionTarget.id() + " exposes current_region snapshot");
+        }
+    }
+
+    private static void testTimerRuntimeGateProfiles() {
+        ConditionGroupDefinition playerTag = definition("timer_player_tag", leaf(ConditionNodeType.PLAYER_HAS_TAG, config("tag", "runner")));
+        ConditionGroupDefinition contextPlayerState = definition("timer_context_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "context_player", "expected", "true")));
+        ConditionGroupDefinition explicitPlayerState = definition("timer_explicit_player_state", leaf(ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                config("scope", "PLAYER", "key", "ready", "targetMode", "explicit_target", "targetId", "player-1", "expected", "true")));
+        ConditionGroupDefinition timerId = definition("timer_id_context", leaf(ConditionNodeType.CONTEXT_EQUALS,
+                config("field", "timerId", "expected", "timer.demo")));
+        ConditionGroupDefinition timerEventDetail = definition("timer_detail_event", leaf(ConditionNodeType.EVENT_METADATA_EXISTS,
+                config("key", "detail")));
+        ConditionGroupDefinition actionType = definition("timer_action_type", leaf(ConditionNodeType.CONTEXT_EQUALS,
+                config("field", "actionType", "expected", "signal")));
+
+        for (ConditionRuntimeTargetType targetType : List.of(
+                ConditionRuntimeTargetType.TIMER_ON_START,
+                ConditionRuntimeTargetType.TIMER_ON_TICK,
+                ConditionRuntimeTargetType.TIMER_ON_COMPLETE,
+                ConditionRuntimeTargetType.TIMER_ON_CANCEL
+        )) {
+            requireCompatible(timerId, targetType, targetType.id() + " exposes timerId context");
+            requireCompatible(timerEventDetail, targetType, targetType.id() + " exposes timer detail metadata");
+            requireCompatible(explicitPlayerState, targetType, targetType.id() + " accepts explicit PLAYER state variable");
+            requireIncompatible(playerTag, targetType, "触发玩家", targetType.id() + " conservatively rejects player context");
+            requireIncompatible(contextPlayerState, targetType, "context_player", targetType.id() + " conservatively rejects context_player state");
+        }
+
+        for (ConditionRuntimeTargetType targetType : List.of(
+                ConditionRuntimeTargetType.TIMER_ON_START_ACTION,
+                ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION,
+                ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION,
+                ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION
+        )) {
+            requireCompatible(timerId, targetType, targetType.id() + " exposes timerId context");
+            requireCompatible(timerEventDetail, targetType, targetType.id() + " exposes timer detail metadata");
+            requireCompatible(actionType, targetType, targetType.id() + " exposes action metadata");
+            requireCompatible(explicitPlayerState, targetType, targetType.id() + " accepts explicit PLAYER state variable");
+            requireIncompatible(playerTag, targetType, "触发玩家", targetType.id() + " conservatively rejects player context");
+            requireIncompatible(contextPlayerState, targetType, "context_player", targetType.id() + " conservatively rejects context_player state");
         }
     }
 

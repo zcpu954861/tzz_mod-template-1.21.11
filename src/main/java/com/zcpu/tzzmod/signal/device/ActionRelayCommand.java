@@ -336,6 +336,8 @@ public final class ActionRelayCommand {
                     .append(channelText(value));
             case STATE_VARIABLE -> Text.literal("状态变量 ").formatted(Formatting.LIGHT_PURPLE)
                     .append(Text.literal(action.stateActionSummary()).formatted(Formatting.WHITE));
+            case TIMER_START, TIMER_CANCEL -> Text.literal("Timer ").formatted(Formatting.LIGHT_PURPLE)
+                    .append(Text.literal(action.timerActionSummary()).formatted(Formatting.WHITE));
         };
     }
 }
