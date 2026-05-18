@@ -8,6 +8,7 @@ import com.zcpu.tzzmod.action.TimerActionExecutionTest;
 import com.zcpu.tzzmod.condition.ConditionBasicPlayerContextTest;
 import com.zcpu.tzzmod.condition.ConditionEngineCoreTest;
 import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
+import com.zcpu.tzzmod.condition.ConditionNodeType;
 import com.zcpu.tzzmod.condition.ConditionRegionSignalLogicChainTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateServiceTest;
@@ -82,6 +83,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminConditionRuntimeDoctorServiceTes
 import com.zcpu.tzzmod.webadmin.service.WebAdminControlledStateActionServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
 import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -114,6 +116,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -184,6 +187,7 @@ public final class StabilizationGuardTest {
         TimerActionExecutionTest.run();
         WebAdminTimerServiceTest.run();
         TimerDoctorTest.run();
+        WebAdminLogicChainServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -197,6 +201,7 @@ public final class StabilizationGuardTest {
         testSignalJoinBarrierAggregator810();
         testControlledStateActions811();
         testSchedulerDelayTimer812();
+        testLogicChainViewerEnhancement813();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -8797,6 +8802,440 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(allMain.contains(forbidden), "8.12 must not add out-of-scope marker: " + forbidden);
         }
+    }
+
+    private static void testLogicChainViewerEnhancement813() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/LOGIC_CHAIN_VIEWER_ENHANCEMENT_8_13_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/LOGIC_CHAIN_CAPABILITY_MATRIX_8_13.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String logicChain = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String logicChainTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainServiceTest.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/LOGIC_CHAIN_VIEWER_ENHANCEMENT_8_13_CURRENT_CONTEXT.md",
+                "docs/LOGIC_CHAIN_CAPABILITY_MATRIX_8_13.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.13 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.13 Logic Chain Viewer",
+                "只读 runtime graph",
+                "signal_join",
+                "timer",
+                "state_action",
+                "timer_action",
+                "condition_gate",
+                "action_gate",
+                "state_variable",
+                "join_input",
+                "join_output",
+                "timer_outputs_channel",
+                "state_writes",
+                "gate_guards",
+                "GraphModel V2",
+                "真实节点 vs 引用卡",
+                "节点去重",
+                "下游合并",
+                "上游在左侧",
+                "Join 专用布局",
+                "Join 其他上游虚线",
+                "颜色分组",
+                "no cross-channel long line mixing",
+                "if / else / else-if",
+                "direct typed game-program calls",
+                "Signal/channel 不是长期唯一入口",
+                "不做完整 Logic Chain Editor",
+                "不做 if / else / else-if runtime",
+                "不新增 Action type",
+                "不新增 Condition type"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.13 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "MAX_GRAPH_NODES",
+                "MAX_GRAPH_EDGES",
+                "MAX_COMPONENT_CHANNELS",
+                "MAX_JOIN_INPUT_PORTS",
+                "MAX_COMPONENT_METADATA_ROWS",
+                "enhancementStage",
+                "noCrossChannelLongLineMixing",
+                "component-aware-connected-subgraph",
+                "buildComponent",
+                "componentRelatedChannels",
+                "rootChannelRole",
+                "focusChannel",
+                "componentSummary",
+                "associationStrength",
+                "\"signal_join\"",
+                "\"timer\"",
+                "\"state_action\"",
+                "\"timer_action\"",
+                "\"condition_gate\"",
+                "\"action_gate\"",
+                "\"state_variable\"",
+                "\"join_input\"",
+                "\"join_output\"",
+                "\"timer_outputs_channel\"",
+                "\"action_starts_timer\"",
+                "\"action_cancels_timer\"",
+                "\"state_writes\"",
+                "\"gate_guards\"",
+                "nodeKind",
+                "primaryNodeId",
+                "referenceReason",
+                "pathGroupId",
+                "visualStyle",
+                "referenceEdge",
+                "edgeKeys",
+                "edgeDedupeEnabled",
+                "v2-join-layout",
+                "joinTraversalPolicy",
+                "primaryInput",
+                "relatedInputs",
+                "inputPorts",
+                "join-related-dashed",
+                "listGateNodeId",
+                "actionGateNodeId",
+                "shortNodeHash",
+                "SignalJoinRuntimeService.statusReadOnly",
+                "TimerRuntimeService.status",
+                "StateVariableStore.getSnapshotWithStatus",
+                "recentConditionGate",
+                "stateVariableReference",
+                "timerActionBucketSummaries",
+                "graphForSnapshotForTest"
+        )) {
+            requireContains(logicChain, marker, "8.13 logic chain graph marker: " + marker);
+        }
+        requireFalse(logicChain.contains("getLoadedActionRelay") || logicChain.contains("loadedActionRelay") || logicChain.contains("ActionRelayBlockEntity"),
+                "8.13 Logic Chain graph builder must not read live ActionRelay block entities");
+        requireFalse(logicChain.contains("SignalJoinRuntimeService.status(build.snapshot.server"),
+                "8.13 Logic Chain graph must use read-only SignalJoin status and not trigger lazy timeout mutation");
+
+        for (String marker : List.of(
+                "requireComponentAwareJoinTraversalFromAnyRoot",
+                "requireLargeComponentTruncation",
+                "requireComponentStats",
+                "component-aware-connected-subgraph",
+                "componentTruncated"
+        )) {
+            requireContains(logicChainTest, marker, "8.13 logic chain component traversal test marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-logic-chain-enhanced-runtime-graph",
+                "data-logic-chain-view-mode-filter",
+                "data-logic-chain-node-type-filter",
+                "data-logic-chain-node-detail-panel",
+                "data-logic-chain-join-input-summary",
+                "data-logic-chain-upstream-expand-card",
+                "data-logic-chain-timer-node",
+                "data-logic-chain-state-action-node",
+                "data-logic-chain-condition-gate-node",
+                "data-logic-chain-action-gate-node",
+                "data-logic-chain-debugger-link",
+                "data-logic-chain-doctor-link",
+                "data-no-cross-channel-long-line-mixing",
+                "data-logic-chain-reference-card",
+                "data-logic-chain-primary-node",
+                "data-logic-chain-path-color-legend",
+                "data-logic-chain-layout-v2-join-lanes",
+                "data-logic-chain-crossing-reduction",
+                "data-logic-chain-source-to-target-ordering",
+                "data-logic-chain-consumer-to-action-ordering",
+                "data-logic-chain-display-name-preferred",
+                "data-logic-chain-technical-id-secondary",
+                "data-logic-chain-smooth-bezier-default",
+                "data-logic-chain-old-arrow-style",
+                "data-logic-chain-no-polyline-default",
+                "data-logic-chain-no-shared-trunk-default",
+                "data-logic-chain-straight-only-dy-le-1",
+                "data-logic-chain-different-height-smooth-curve",
+                "data-logic-chain-no-diagonal-straight",
+                "data-logic-chain-same-row-straight-edge",
+                "data-logic-chain-complex-curve-edge",
+                "data-logic-chain-reference-curve-edge",
+                "data-logic-chain-join-related-curve-edge",
+                "data-logic-chain-empty-lane-compaction",
+                "data-logic-chain-no-downstream-foldback",
+                "data-logic-chain-single-chain-compact-horizontal",
+                "data-logic-chain-dynamic-lane-depth",
+                "data-logic-chain-action-index-layout-ordering",
+                "data-logic-chain-edge-port-offset",
+                "data-logic-chain-source-right-output-port",
+                "data-logic-chain-target-left-input-port",
+                "data-logic-chain-join-input-port-indexed",
+                "data-logic-chain-join-output-port",
+                "data-logic-chain-multi-edge-port-offset",
+                "data-logic-chain-single-source-anchor",
+                "data-logic-chain-single-target-anchor",
+                "data-logic-chain-target-arrow-once",
+                "data-logic-chain-no-endpoint-port-split",
+                "data-logic-chain-control-point-fanout",
+                "data-logic-chain-target-arrow-owner",
+                "data-logic-chain-join-layout-v2",
+                "data-logic-chain-default-edge-opacity",
+                "data-logic-chain-join-primary-input-edge",
+                "data-logic-chain-join-related-input-edge",
+                "data-logic-chain-reference-edge",
+                "data-logic-chain-join-input-port",
+                "data-logic-chain-graph-truncation-marker",
+                "data-logic-chain-component-aware-mode",
+                "data-logic-chain-focus-channel",
+                "data-logic-chain-focus-node",
+                "data-logic-chain-highlight-clear",
+                "data-logic-chain-hover-clear-on-leave",
+                "data-logic-chain-selection-highlight-clear",
+                "data-logic-chain-escape-clears-highlight",
+                "data-logic-chain-timer-action-node",
+                "data-logic-chain-timer-card-no-overflow",
+                "data-logic-chain-timer-action-card-wrap",
+                "data-logic-chain-timer-bucket-wrap",
+                "data-logic-chain-timer-instance-wrap",
+                "data-logic-chain-timer-start-no-overflow",
+                "data-logic-chain-timer-cancel-no-overflow",
+                "data-logic-chain-timer-no-overflow",
+                "data-logic-chain-state-action-no-overflow",
+                "data-logic-chain-action-no-overflow",
+                "data-logic-chain-no-duplicate-action-index",
+                "data-logic-chain-fixed-card-layout",
+                "data-logic-chain-card-title-row-fixed",
+                "data-logic-chain-card-subtitle-row-fixed",
+                "data-logic-chain-card-meta-row-fixed",
+                "data-logic-chain-text-clamp",
+                "data-logic-chain-component-summary",
+                "data-logic-chain-collapsed-related-marker",
+                "data-logic-chain-expand-related",
+                "data-logic-chain-join-all-input-channels-visible",
+                "data-logic-chain-dag-like-overlay",
+                "data-logic-chain-node-id",
+                "data-logic-chain-reference-jump-primary",
+                "focusLogicChainPrimaryNode",
+                "highlightRelatedEdges",
+                "selectionPinned",
+                "logicChainLayoutGraphV2",
+                "logicChainCrossingReducedLaneSort",
+                "logicChainPreventDownstreamFoldback",
+                "logicChainCompactLanePositions",
+                "logicChainBundleEdges",
+                "logicChainEdgePathShape",
+                "logicChainApplyFixedNodeHeights",
+                "logicChainFixedNodeHeight",
+                "clearLogicChainHighlight",
+                "clearLogicChainHighlightByEscape",
+                "logicChainVisualEdgeRelated",
+                "logicChainAnnotateEdgePorts",
+                "logicChainAnnotateTargetArrowOwners",
+                "logicChainEdgeAnchorKey",
+                "logicChainEdgeIsReference",
+                "logicChainPortOffset",
+                "joinInputTargetId",
+                "joinInputPortIndex",
+                "closeLogicChainDetailPanel",
+                "detailOpen",
+                "logicChainViewModeLabel",
+                "logicChainComponentFocusCard",
+                "logicChainNodeTypeFilterLabel",
+                "logicChainChildNodesForMode",
+                "logicChainIsReferenceNode",
+                "logicChainNodeVisibleByFilter",
+                "logicChainJoinInputSummaryCard",
+                "logicChainTimerRuntimeCard",
+                "logicChainStateActionCard",
+                "logicChainGateCard",
+                "setLogicChainViewMode",
+                "setLogicChainNodeTypeFilter",
+                "logicChainRuntimeStatusLabel",
+                "data-no-condition-engine-editing",
+                "condition_gate_history_appended",
+                "TZZ_WEBADMIN_ASSET_VERSION='8.13-logic-chain-runtime-graph'"
+        )) {
+            requireContains(scripts, marker, "8.13 frontend marker: " + marker);
+        }
+        for (String functionName : List.of(
+                "logicChainCanvas",
+                "logicChainLayoutGraphV2",
+                "logicChainMindMap",
+                "logicChainEdgePath",
+                "logicChainEdgePathShape",
+                "highlightRelatedEdges"
+        )) {
+            requireTrue(countOccurrences(scripts, "function " + functionName + "(") == 1,
+                    "8.13 frontend helper must be unique: " + functionName);
+        }
+        requireContains(scripts, "sameRow=centerDy<=1&&dy<=1&&!reference&&!joinRelated",
+                "8.13 smooth edge routing must keep strict straight threshold at dy <= 1px and keep reference/join-related edges curved");
+        requireContains(scripts, "logicChainIsReferenceNode(edge?.from?.node)||logicChainIsReferenceNode(edge?.to?.node)",
+                "8.13 reference-card alias edges must be treated as reference edges for routing and arrows");
+        requireContains(scripts, "logicChainAnnotateTargetArrowOwners(logicChainBundleEdges",
+                "8.13 unified endpoint routing must annotate one target arrow owner after visual edge collection");
+        requireContains(scripts, "if(kind==='from')return {x:item.x+item.w,y:item.y+item.h/2};return {x:item.x,y:item.y+item.h/2}",
+                "8.13 unified endpoint routing must keep source-right and target-left anchors aligned with SVG markers");
+        requireContains(scripts, "edge.targetArrowOwner===false",
+                "8.13 target arrow de-duplication must suppress marker-end for non-owner edges");
+        requireContains(scripts, "targetArrowOwner=edge===owner",
+                "8.13 target arrow de-duplication must pick a single owner per target anchor");
+        requireFalse(scripts.contains("sameRow=dy<=12") || scripts.contains("dy<=8") || scripts.contains("dy<=32")
+                        || scripts.contains("shape:'elbow'") || scripts.contains("data-logic-chain-slight-offset-elbow-edge"),
+                "8.13 smooth edge routing must not use wide straight thresholds or elbow/polyline routes");
+        requireFalse(scripts.contains("item.y+item.h/2+logicChainPortOffset"),
+                "8.13 unified endpoint routing must not split final source/target anchors by port offset");
+        requireFalse(scripts.contains("data-logic-chain-shared-trunk=\"true\"")
+                        || scripts.contains("data-logic-chain-bundled-target-arrow=\"true\"")
+                        || scripts.contains("data-logic-chain-edge-bundle-branch=\"true\"")
+                        || scripts.contains("data-logic-chain-merge-point-near-target=\"true\"")
+                        || scripts.contains("data-logic-chain-single-target-arrow=\"true\"")
+                        || scripts.contains("data-logic-chain-common-trunk-enters-target-once=\"true\""),
+                "8.13 smooth edge routing must not enable shared trunk / bundled edge rendering by default");
+        requireFalse(scripts.contains("logicChainApplyDynamicNodeHeights") || scripts.contains("logicChainNodeVisualHeight")
+                        || scripts.contains("data-logic-chain-node-dynamic-height"),
+                "8.13 card layout must use fixed graph card height instead of dynamic text-driven height");
+
+        for (String marker : List.of(
+                ".logic-chain-node-card.signal_join",
+                ".logic-chain-node-card.timer",
+                ".logic-chain-node-card.state_action",
+                ".logic-chain-node-card.timer_action",
+                ".logic-chain-node-card .logic-chain-node-text",
+                ".logic-chain-node-card .logic-chain-node-title-row",
+                ".logic-chain-node-card .logic-chain-node-subtitle-row",
+                ".logic-chain-node-card .logic-chain-node-meta-row",
+                ".logic-chain-node-card.condition_gate",
+                ".logic-chain-node-card.action_gate",
+                ".logic-chain-node-card.state_variable",
+                ".logic-chain-node-card.reference",
+                ".logic-chain-node-card.focus-channel",
+                ".logic-chain-edge.group-join",
+                ".logic-chain-edge.group-reference",
+                ".logic-chain-edge.edge-dashed",
+                ".logic-chain-edge.join-primary-input",
+                ".logic-chain-edge.join-related-input",
+                "#logic-chain-arrow-join path",
+                "#logic-chain-arrow-timer path",
+                "#logic-chain-arrow-state path",
+                ".logic-chain-edge.related",
+                ".logic-chain-edge.dimmed",
+                ".logic-chain-summary-card",
+                ".logic-chain-component-focus",
+                ".logic-chain-input-summary",
+                ".logic-chain-upstream-card",
+                ".logic-chain-runtime-grid",
+                ".logic-chain-bucket-list span",
+                "height:118px",
+                "width:268px;min-height:118px",
+                "grid-template-rows:22px 40px 18px",
+                "white-space:nowrap",
+                "text-overflow:ellipsis",
+                "-webkit-line-clamp",
+                "overflow-wrap:anywhere"
+        )) {
+            requireContains(styles, marker, "8.13 Logic Chain CSS marker: " + marker);
+        }
+
+        String viewerSection = extractBetween(scripts, "function renderLogicChainViewer", "function showLogicChainMetadataModal");
+        for (String forbidden : List.of(
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "LogicChainRuntimeEditor",
+                "RawJsonEditor",
+                "rawJsonEditor",
+                "McpScenario",
+                "MinecraftStartup"
+        )) {
+            requireFalse(viewerSection.contains(forbidden), "8.13 viewer must not add out-of-scope frontend marker: " + forbidden);
+            requireFalse(logicChain.contains(forbidden), "8.13 graph service must not add out-of-scope marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "LOGIC_CHAIN_BRANCH",
+                "IF_ELSE",
+                "SCRATCH_BLOCK",
+                "GAME_PROGRAM_CALL"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.13 must not add action type: " + forbidden);
+        }
+        requireFalse(viewerSection.contains("data-logic-chain-editor=\"true\"") || viewerSection.contains("drag edit") || viewerSection.contains("raw JSON"),
+                "8.13 Logic Chain viewer must remain read-only and not expose editor/raw JSON UI");
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void requireConditionNodeTypeSetUnchangedFor813() {
+        Set<String> actual = new LinkedHashSet<>();
+        for (var field : ConditionNodeType.class.getDeclaredFields()) {
+            int modifiers = field.getModifiers();
+            if (Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers) && field.getType() == String.class) {
+                try {
+                    actual.add(String.valueOf(field.get(null)));
+                } catch (IllegalAccessException exception) {
+                    throw new AssertionError("Unable to inspect ConditionNodeType field " + field.getName(), exception);
+                }
+            }
+        }
+        Set<String> expected = new LinkedHashSet<>(List.of(
+                "group",
+                "always_true",
+                "always_false",
+                "context_exists",
+                "context_field_exists",
+                "context_equals",
+                "player_exists",
+                "player_online",
+                "player_is_op",
+                "player_has_tag",
+                "player_lacks_tag",
+                "player_team_equals",
+                "player_gamemode_equals",
+                "player_alive",
+                "player_dead",
+                "source_type_equals",
+                "source_id_equals",
+                "channel_equals",
+                "world_equals",
+                "device_id_equals",
+                "listener_id_equals",
+                "region_id_equals",
+                "action_id_equals",
+                "game_time_compare",
+                "event_metadata_exists",
+                "event_metadata_equals",
+                "state_variable_exists",
+                "state_variable_bool_equals",
+                "state_variable_int_compare",
+                "state_variable_string_equals",
+                "state_variable_string_contains",
+                "item_stack_exists",
+                "item_stack_matches",
+                "inventory_contains_item",
+                "inventory_item_count_compare",
+                "container_slot_empty",
+                "container_slot_item_matches",
+                "container_item_count_compare",
+                "region_exists",
+                "region_enabled",
+                "player_in_region",
+                "region_player_count_compare",
+                "signal_channel_exists",
+                "signal_channel_consumer_count_compare",
+                "signal_event_count_compare",
+                "logic_chain_contains_node",
+                "logic_chain_contains_channel",
+                "logic_chain_has_cycle",
+                "logic_chain_node_count_compare"
+        ));
+        requireEquals(expected, actual, "8.13 must not add condition types");
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {

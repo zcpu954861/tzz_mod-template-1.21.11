@@ -539,7 +539,11 @@ public final class WebAdminDtos {
             String to,
             String type,
             String label,
-            String style
+            String style,
+            String pathGroupId,
+            String visualStyle,
+            boolean referenceEdge,
+            Map<String, Object> metadata
     ) {
     }
 }
