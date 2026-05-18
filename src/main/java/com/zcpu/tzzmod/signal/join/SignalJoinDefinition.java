@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.signal.join;
 
 import com.zcpu.tzzmod.signal.SignalChannel;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -69,9 +70,9 @@ public final class SignalJoinDefinition {
     }
 
     public List<String> inputChannelNames() {
-        List<String> result = new ArrayList<>();
+        LinkedHashSet<String> result = new LinkedHashSet<>();
         for (SignalJoinInputDefinition input : normalized().inputChannels) {
-            if (!input.channel.isBlank() && !result.contains(input.channel)) {
+            if (!input.channel.isBlank()) {
                 result.add(input.channel);
             }
         }

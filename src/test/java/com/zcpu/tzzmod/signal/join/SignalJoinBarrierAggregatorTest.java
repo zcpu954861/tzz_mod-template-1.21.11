@@ -16,6 +16,7 @@ public final class SignalJoinBarrierAggregatorTest {
         testPlayerScopeIsolationAndMissingContextDiagnostic();
         testLatchUntilManualReset();
         testLazyTimeoutReset();
+        testReadOnlyStatusDoesNotApplyLazyTimeout();
         testLatchIsNotClearedByLazyTimeout();
         testValidationRejectsUnsafeDefinitions();
     }
@@ -102,6 +103,18 @@ public final class SignalJoinBarrierAggregatorTest {
         requireEquals(0, expired.pendingScopeCount(), "status query lazily resets expired pending state");
         requireTrue(String.valueOf(expired.scopes().get(0).get("lastFailureReason")).contains("超时"), "lazy timeout records Chinese diagnostic");
         requireTrue(runtime.observe(List.of(join), "in.b", "", 67L).isEmpty(), "post-timeout next input starts a fresh window");
+    }
+
+    private static void testReadOnlyStatusDoesNotApplyLazyTimeout() {
+        SignalJoinRuntimeService.TestRuntime runtime = SignalJoinRuntimeService.testRuntime();
+        SignalJoinDefinition join = join("join.timeout.readonly", SignalJoinMode.ALL, "out.timeout.readonly", "in.a", "in.b");
+        join.timeoutTicks = 5L;
+        runtime.observe(List.of(join), "in.a", "", 80L);
+        SignalJoinStatusSnapshot readOnly = runtime.statusReadOnly(join, 90L);
+        requireEquals(1, readOnly.pendingScopeCount(), "read-only status keeps expired pending state for viewer refresh");
+        SignalJoinStatusSnapshot mutating = runtime.status(join, 90L);
+        requireEquals(0, mutating.pendingScopeCount(), "normal status still applies lazy timeout cleanup");
+        requireTrue(String.valueOf(mutating.scopes().get(0).get("lastFailureReason")).contains("超时"), "normal status records timeout diagnostic after read-only query");
     }
 
     private static void testLatchIsNotClearedByLazyTimeout() {

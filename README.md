@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.57.0-controlled-state-actions`
-- 当前开发基线：`8.12 Scheduler / Delay / Timer`；本阶段补齐通用 Scheduler / Timer 时间轴能力。Timer 配置持久化到 world-scoped `tzz/webadmin/timers.json`，active runtime state 内存态；支持 `DELAY` / `COUNTDOWN` / `REPEAT`、`GLOBAL` / `PLAYER` scope、`RESTART` / `IGNORE_IF_RUNNING` / `FAIL_IF_RUNNING` startPolicy、`timer_start` / `timer_cancel` action、`onTickActions` / `onCompleteActions` 和可选 `outputChannel`。发布后建议版本为 `v1.58.0-scheduler-delay-timer`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.58.0-scheduler-delay-timer`
+- 当前开发基线：`8.13 Logic Chain Viewer 增强`；本阶段把 WebAdmin Logic Chain Viewer 扩展为只读 runtime graph，显示 Signal Join、Timer、StateAction、StateVariable、Condition gate、single Action gate、上游/下游视图、节点类型筛选、recent status、Debugger / Doctor 跳转。发布后建议版本为 `v1.59.0-logic-chain-viewer-runtime-graph-enhancements`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -59,10 +59,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [ActionEngine Capability Matrix 8.11](docs/ACTION_ENGINE_CAPABILITY_MATRIX_8_11.md)
 - [8.12 Scheduler / Delay / Timer Current Context](docs/SCHEDULER_DELAY_TIMER_8_12_CURRENT_CONTEXT.md)
 - [Scheduler Capability Matrix 8.12](docs/SCHEDULER_CAPABILITY_MATRIX_8_12.md)
+- [8.13 Logic Chain Viewer Enhancement Current Context](docs/LOGIC_CHAIN_VIEWER_ENHANCEMENT_8_13_CURRENT_CONTEXT.md)
+- [Logic Chain Capability Matrix 8.13](docs/LOGIC_CHAIN_CAPABILITY_MATRIX_8_13.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.12；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、完整 Logic Chain Editor 或 raw JSON editor。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.13；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、完整 Logic Chain Editor 或 raw JSON editor。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -336,6 +338,52 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不跑 MCP scenario。
 - 不启动 Minecraft。
 - 不生成截图矩阵。
+
+## 8.13 Logic Chain Viewer 增强
+
+8.13 增强 WebAdmin Logic Chain Viewer 的只读 runtime graph，不新增 runtime 行为。Viewer 现在能从 channel/root 出发显示更多真实运行结构：Signal Join、Timer、StateAction、StateVariable、Condition gate、single Action gate，以及上游 / 下游 / 双向 / 相关节点浏览。8.13 返修后，Logic Chain 不再等于单个 channel；root channel 只是当前焦点，真实图谱按 Signal / Join / Timer / Action / State / Gate 关系组成的 logical component 展开。
+
+8.13 已实现方向：
+
+- graph model：新增 `signal_join`、`timer`、`state_action`、`timer_action`、`condition_gate`、`action_gate`、`state_variable` 节点。
+- edge model：新增 `join_input`、`join_output`、`timer_outputs_channel`、`action_starts_timer`、`action_cancels_timer`、`state_writes`、`gate_guards` 等关键关系。
+- GraphModel V2：新增真实节点 vs 引用卡模型，用 `nodeKind`、`primaryNodeId`、`referenceReason` 区分 primary node 和 reference card，支持节点去重、边合并、下游合并，并使用 Join 专用 lane 布局。
+- component-aware traversal：`rootChannel` 不再裁剪图谱；从同一 component 内任意 Join input 或 output 进入都应看到同一组核心频道、Join、Timer、Action 和消费者，只改变焦点高亮。
+- component safety：强关联纳入同一逻辑组件，弱关联默认折叠；`maxComponentChannels`、`maxGraphNodes`、`maxGraphEdges` 和 `maxDepth` 共同保护大图，并用中文提示截断原因。
+- path model：edge 增加 `pathGroupId`、`visualStyle`、`referenceEdge`，用颜色分组、Join 主输入实线、其他输入虚线和灰色引用虚线提升可读性。
+- crossing reduction：V2 lane 内按 connected target/source、parent 和 actionIndex 做稳定局部排序，并用 source 右侧 / target 左侧端口与多边 offset 减少非必要交叉。
+- display / routing polish：节点标题优先使用 WebAdmin 设备 / 频道 displayName，技术 ID 作为副文本；edge 默认恢复旧版平滑 Bezier 曲线和统一箭头样式，直线只在 source / target centerY 差值 `<= 1px` 时使用，不同高度、reference 和 Join related 边都走平滑曲线；同 source 多线共享一个出口锚点，同 target 多线共享一个入口锚点并只渲染一个 target 箭头，多线分离只放在 Bezier control point；shared trunk / merge point 默认禁用，空 lane 压缩且长链继续向右展开不折回。
+- Join：从 input channel 可见 Join consumer；从 output channel 可见 Join source；全部 input channel 在 Join 左侧可见，output channel 和 downstream 在右侧，详情显示 inputPorts、primaryInput、relatedInputs、pending / last result。
+- Timer：有 outputChannel 的 Timer 显示为 channel source；timer_start / timer_cancel action 显示为 Timer 引用；详情显示 mode、scope、duration、interval、maxRuns、active count 和 action bucket summary。
+- StateAction：`state_variable` action 显示为状态写入节点，能看到 operation、scope、targetMode、key 和静态可解析 StateVariable 链接。
+- Gate：list-level condition gate 与 single action gate 分别显示，包含 conditionGroupId、targetType / targetId、recent status、Condition Debugger 和 Doctor 入口。
+- UI：增加视图模式筛选、节点类型筛选、增强图例、可关闭节点详情面板、Join 输入摘要、上游展开卡片、引用卡跳转主节点、一阶关联高亮和 no cross-channel long-line mixing 标记；再次点击已选中节点可取消 pinned 高亮，graph card 使用固定高度和固定 title / subtitle / meta 行，长文本省略或 clamp，完整内容在详情面板展示。
+- ActionRelay：Logic Chain Viewer 不直接读取 live world / block entity；当前显示 snapshot actionCount 摘要和设备详情入口，后续若要展开 ActionRelay gate 需先进入安全快照。
+
+8.13 语义说明：
+
+- Logic Chain Viewer 不保证全局唯一拓扑排序。
+- 同一 channel 下多个 consumers 是并列消费者，不代表严格顺序。
+- action list 内部顺序只在同一 owner 内有效。
+- Join inputs 无先后顺序。
+- Condition gate 只是允许 / 阻断 / 跳过；未来 if / else / else-if / nested branching 是真实控制流，需作为后续能力独立实现。
+- 9.x 以后 Timer、StateAction、Message、Title、Sound、Condition、Join 等能力应能作为游戏程序 typed block 直接调用；Signal/channel 不是长期唯一入口。
+
+8.13 约束：
+
+- 不做完整 Logic Chain Editor / Scratch-like editor。
+- 不做拖拽编辑。
+- 不做 if / else / else-if runtime。
+- 不做 GameController / MissionSystem / PhaseController。
+- 不做具体任务 / 关卡。
+- 不新增 Action type。
+- 不新增 Condition type。
+- 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction runtime 语义。
+- 不做 raw JSON editor。
+- 不跑 MCP scenario。
+- 不启动 Minecraft。
+- 不生成截图矩阵。
+- 本返修不 checkpoint，不 commit / push / merge / tag。
 
 ## WebAdmin UI 规范
 

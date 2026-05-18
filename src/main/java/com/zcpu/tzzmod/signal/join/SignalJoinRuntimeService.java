@@ -42,10 +42,20 @@ public final class SignalJoinRuntimeService {
     }
 
     public static SignalJoinStatusSnapshot status(MinecraftServer server, SignalJoinDefinition join, long gameTime) {
+        return status(server, join, gameTime, true);
+    }
+
+    public static SignalJoinStatusSnapshot statusReadOnly(MinecraftServer server, SignalJoinDefinition join, long gameTime) {
+        return status(server, join, gameTime, false);
+    }
+
+    private static SignalJoinStatusSnapshot status(MinecraftServer server, SignalJoinDefinition join, long gameTime, boolean applyLazyTimeout) {
         SignalJoinDefinition normalized = join == null ? new SignalJoinDefinition() : join.normalized();
         RuntimeStore store = runtimeStore(server);
         synchronized (store) {
-            store.applyLazyTimeout(normalized, gameTime);
+            if (applyLazyTimeout) {
+                store.applyLazyTimeout(normalized, gameTime);
+            }
             Map<String, SignalJoinRuntimeState> states = store.statesFor(normalized.id);
             List<Map<String, Object>> scopes = new ArrayList<>();
             String lastResult = "";
@@ -337,6 +347,21 @@ public final class SignalJoinRuntimeService {
         public SignalJoinStatusSnapshot status(SignalJoinDefinition join, long gameTime) {
             synchronized (store) {
                 store.applyLazyTimeout(join.normalized(), gameTime);
+                Map<String, SignalJoinRuntimeState> states = new LinkedHashMap<>(store.statesFor(join.normalized().id));
+                List<Map<String, Object>> scopes = new ArrayList<>();
+                int pendingScopeCount = 0;
+                for (SignalJoinRuntimeState state : states.values()) {
+                    scopes.add(state.toMap(join.normalized()));
+                    if (!state.channelHits.isEmpty() || state.latched) {
+                        pendingScopeCount++;
+                    }
+                }
+                return new SignalJoinStatusSnapshot(join.normalized().id, join.enabled, join.mode.name(), join.scopeMode.name(), join.resetPolicy.name(), pendingScopeCount, gameTime, "", store.diagnostic(join.normalized().id), List.copyOf(scopes));
+            }
+        }
+
+        public SignalJoinStatusSnapshot statusReadOnly(SignalJoinDefinition join, long gameTime) {
+            synchronized (store) {
                 Map<String, SignalJoinRuntimeState> states = new LinkedHashMap<>(store.statesFor(join.normalized().id));
                 List<Map<String, Object>> scopes = new ArrayList<>();
                 int pendingScopeCount = 0;
