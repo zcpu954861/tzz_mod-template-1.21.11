@@ -28,6 +28,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_INTERACTION_ITEM_MATCHER = "interaction_item_matcher";
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_LOGIC_CHAIN_METADATA = "logic_chain_metadata";
+    public static final String TARGET_LOGIC_CHAIN_EDITOR = "logic_chain_editor";
     public static final String TARGET_CONDITION_GROUP = "condition_group";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
@@ -549,6 +550,9 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
             return "逻辑链显示信息";
         }
+        if (TARGET_LOGIC_CHAIN_EDITOR.equals(safeTargetType)) {
+            return "逻辑链编辑器";
+        }
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return "条件组";
         }
@@ -622,6 +626,9 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_METADATA.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA;
         }
+        if (TARGET_LOGIC_CHAIN_EDITOR.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_LOGIC_CHAIN;
+        }
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CONDITION_GROUP;
         }
@@ -652,6 +659,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_LOGIC_CHAIN_METADATA.equals(lock.targetType())) {
             return "#/logic-chains/" + encode(lock.targetId());
+        }
+        if (TARGET_LOGIC_CHAIN_EDITOR.equals(lock.targetType())) {
+            return "#/logic-chains";
         }
         if (TARGET_CONDITION_GROUP.equals(lock.targetType())) {
             return "#/condition-groups/" + encode(lock.targetId());

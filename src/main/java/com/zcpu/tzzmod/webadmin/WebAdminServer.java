@@ -15,6 +15,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminConditionGroupPreviewRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminConditionGroupRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainEditorRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainMetadataRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionCancelRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminContainerTemplateSessionStartRequest;
@@ -45,6 +46,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateHistoryService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService;
@@ -110,8 +112,9 @@ public final class WebAdminServer {
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
     private final WebAdminTimerService timerService = new WebAdminTimerService(permissionService, writeSecurityService, editLockService);
-    private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
+    private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
@@ -312,6 +315,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/state-variables") || path.startsWith("/api/webadmin/state-variables/")) {
                 runOnServerThread(() -> handleStateVariables(exchange, auth, path, method));
+                return;
+            }
+            if (path.equals("/api/webadmin/logic-chain-editor") || path.startsWith("/api/webadmin/logic-chain-editor/")) {
+                runOnServerThread(() -> handleLogicChainEditor(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
@@ -908,6 +915,75 @@ public final class WebAdminServer {
                 header(exchange, "X-TZZ-WebAdmin-CSRF"),
                 isWriteSameOrigin(exchange)
         );
+        WebAdminJsonResponse.ok(exchange, result);
+    }
+
+    private void handleLogicChainEditor(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/logic-chain-editor";
+        if (path.equals(root + "/capabilities")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, logicChainEditorService.capabilities(auth.user));
+            return;
+        }
+        String tail = path.startsWith(root + "/") ? path.substring((root + "/").length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Logic Chain 编辑器接口不存在。");
+            return;
+        }
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        WebAdminLogicChainEditorRequest request = readJson(exchange, WebAdminLogicChainEditorRequest.class);
+        if (request == null) {
+            request = new WebAdminLogicChainEditorRequest();
+        }
+        WebAdminWriteResult result;
+        if ("enter".equals(tail)) {
+            result = logicChainEditorService.enter(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+        } else if ("validate-draft".equals(tail)) {
+            result = logicChainEditorService.validateDraft(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+        } else if ("save-draft".equals(tail)) {
+            result = logicChainEditorService.saveDraft(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+        } else if ("cancel".equals(tail)) {
+            result = logicChainEditorService.cancel(
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+        } else {
+            WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Logic Chain 编辑器接口不存在。");
+            return;
+        }
         WebAdminJsonResponse.ok(exchange, result);
     }
 

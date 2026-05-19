@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.58.0-scheduler-delay-timer`
-- 当前开发基线：`8.13 Logic Chain Viewer 增强`；本阶段把 WebAdmin Logic Chain Viewer 扩展为只读 runtime graph，显示 Signal Join、Timer、StateAction、StateVariable、Condition gate、single Action gate、上游/下游视图、节点类型筛选、recent status、Debugger / Doctor 跳转。发布后建议版本为 `v1.59.0-logic-chain-viewer-runtime-graph-enhancements`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.59.0-logic-chain-viewer-runtime-graph-enhancements`
+- 当前开发基线：`8.14 Logic Chain Editor MVP`；本阶段在当前 WebAdmin Logic Chain Viewer 画布中加入受控编辑模式，支持新增 Signal Join / Timer、放置到合法 slot、绿色加号连线、必要时的频道 reference card、频道端点 combobox、新建独立链 metadata，以及对已有 action 容器追加一条 ActionConfig，保存落地到现有 typed 配置。发布后建议版本为 `v1.60.0-logic-chain-editor-mvp-new-node-placement`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -61,10 +61,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [Scheduler Capability Matrix 8.12](docs/SCHEDULER_CAPABILITY_MATRIX_8_12.md)
 - [8.13 Logic Chain Viewer Enhancement Current Context](docs/LOGIC_CHAIN_VIEWER_ENHANCEMENT_8_13_CURRENT_CONTEXT.md)
 - [Logic Chain Capability Matrix 8.13](docs/LOGIC_CHAIN_CAPABILITY_MATRIX_8_13.md)
+- [8.14 Logic Chain Editor MVP Current Context](docs/LOGIC_CHAIN_EDITOR_MVP_8_14_CURRENT_CONTEXT.md)
+- [Logic Chain Editor Capability Matrix 8.14](docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_14.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.13；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、完整 Logic Chain Editor 或 raw JSON editor。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.14；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -384,6 +386,47 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不启动 Minecraft。
 - 不生成截图矩阵。
 - 本返修不 checkpoint，不 commit / push / merge / tag。
+
+## 8.14 Logic Chain Editor MVP
+
+8.14 在当前 Viewer 画布中加入受控编辑模式。它不是新页面，不是 full Logic Chain Editor，也不是 Scratch editor；本阶段只做新增节点、新增节点放置、合法连线和保存落地。
+
+8.14 已实现方向：
+
+- 编辑模式入口：当前 Logic Chain Viewer 页面显示“进入编辑模式”，获取 `logic_chain_editor` edit lock 后显示新增节点 / 保存 / 退出编辑工具栏；enter 返回的 canonical lock target 会贯穿 heartbeat / save / cancel，避免刷新后保存时报“编辑锁不存在”。保存 validation 失败、底层 typed 配置锁失败或 typed validation 失败都会保留主 Logic Chain 编辑锁和草稿；新增 Signal Join / Timer 保存时，临时 typed 配置锁使用和底层 typed service 一致的 normalized ID，避免带空格 / 大写的用户输入 ID 被 raw lock target 拦下；只有明确标记为主编辑锁失效的结果才会要求重新进入编辑。
+- 支持节点：新增 Signal Join 和 Timer；另支持对已有 SignalListener / ActionRelay / Region enter、exit、stay / Timer onTick、onComplete action list 追加一条新 ActionConfig。Signal Join 可放在上游频道卡的右侧下游列，Timer 只作为 C0 来源节点创建；C5 Timer 引用 / 目标位仍 deferred。虚拟监听器 / SignalListener 是纯配置对象、不需要世界实体，但画布新增路径暂未接入安全 listener-create edit lock，本轮在 UI 中明确禁用，需先在虚拟监听器页面创建。
+- 新节点配置：使用 modal 做节点类型选择和必要配置引导；Signal Join 只收集 mode、scope、resetPolicy 等自身配置，ALL 隐藏 threshold，ANY_N / COUNT 才显示 threshold，输入频道 / 输出频道由连线阶段推导；Timer 只收集中文化 mode、mode-specific timing、scope、startPolicy 等自身配置，完成后的输出由下游连线推导，或由已有 onCompleteActions 承担。
+- 拖动 / slot / snap：新草稿卡片初始未放置，使用 pointer drag 作为主流程，按住后跟随鼠标移动；靠近合法 slot 时白色虚线发光轮廓和 drop preview 才生效，松开后吸附到 canonical column / slot。Join slot 由当前画布上的频道卡推导：频道卡所在视觉列的右侧下游列可放 Join；目标列为空时只显示一个基于左侧频道 y 范围的中位 slot；目标列已有 listener / action / consumer 等内容时，每个已有卡间隔只显示一个中间插入位，并显示最下方追加位。Join 不再固定在 C2 / C3，也不再为了 Join 草稿把后续列整体右移制造空白 processing column。已放置草稿卡片保存前可重新拿起调整位置，slot 覆盖层不再挡住卡片；旧节点仍不可移动、删除或重排。
+- 连接阶段：草稿卡片显示绿色加号，支持上游 / 下游连接模式；再次点击当前激活的同侧加号会退出连接模式，切换另一侧加号会切换模式，Escape 或点击空白画布也会退出；候选连接通过 `data-*` event delegation 创建，新增连线保持高亮直到保存或取消，再次点击同一已连接候选会取消该 draft edge。
+- 新频道 / 新逻辑链：连接模式可添加 draft channel endpoint；Signal Join 和 Timer 共享“选择已有频道 / 创建新下游频道端点”的输出能力。频道字段使用 dark combobox，显示已有 channel 的 displayName + channel id，也允许输入新 channel id。保存时只使用真实 channel id；新 channel display metadata / root channel metadata 写入 WebAdmin metadata，不保存假图节点；端点连接失败、取消或替换会清理不再被连线引用的 metadata，后端也会拒绝 unreferenced metadata，并且只在 typed 写入成功后尝试保存频道 metadata。Action append payload 不允许携带 draft edges，Signal action append 的频道 metadata 只能引用 action value，避免伪造边保存孤立频道。Logic Chain 列表提供“新建逻辑链”，让独立链出现在列表中，不强制挂到当前 root。
+- 引用卡方向：新增 Join / Timer 连接已有频道时，优先复用同侧可用的 primary / reference channel card；只有同侧没有可复用卡片时，才在当前草稿节点附近的对应侧创建 draft-only channel reference card。保存 payload 仍使用 canonical channel id。
+- Join 语义：Join 左侧 / 上游端口选择输入频道并保存为 `inputChannels`；右侧 / 下游端口选择输出频道并保存为 `outputChannel`。视觉上处于上游 / 下游只影响布局，不等于当前 Join 的 input/output 语义；视觉上游但未选为 input 的频道可以作为 output，并显示为右侧 output reference，例如 `inputChannels=b,d`、`outputChannel=a` 在没有真实 `a -> b/d` 回路时允许保存。 同一个 Join 的输入频道和输出频道必须互斥，前端候选会过滤，后端保存也会拒绝；保存前还会做有上限的循环风险检查，避免 output 回到当前 input 或无限遍历，并在拒绝时显示实际循环路径。
+- Graph 渲染：`timer_start` / `timer_cancel` 以及 Timer 自身 onStart / onTick / onComplete / onCancel bucket 中的动作会显示为 action / timer action 节点，并连到目标 Timer 或下游频道。Signal action 输出不再在最左侧生成 listener producer duplicate；它显示为 action 右侧的 output channel，若有消费者则继续连接到 consumer，若无消费者则保留 terminal output channel。
+- Action append：已有 action list 可追加一个新 ActionConfig，并可携带 action conditionGroupId；保存需要同时持有 Logic Chain editor lock 和目标 action 容器 edit lock，子锁丢失时保留草稿但禁用保存；追加草稿使用唯一 draft id、保存后同款右侧 action lane resolver 和独立空 slot 展示，避免 SignalListener 新 action 在编辑态落到同列或覆盖已有 action 卡；不允许移动、删除、重排或复杂编辑旧 action。
+- 保存 validation：后端校验节点类型、列、slot、自身必要配置、由 draft edges 推导出的必要连线、重复边、edit lock、`baseGraphFingerprint` 和频道 metadata 是否被当前 draft edge / Signal action append 引用；Signal Join 至少 2 个上游且 1 个下游，Timer 需要 1 个下游输出，除非已有有效 onCompleteActions；Action append 需要 owner、bucket、expectedFingerprint 和对应 action 容器 edit lock。校验失败返回结构化中文错误，尽量带 code、相关节点、相关频道、相关连线、severity 和 fixHint；画布显示详细错误列表，toast 显示第一个具体原因摘要。失败后保留主编辑锁、草稿、滚动和焦点，用户修正后可用同一锁再次保存。
+- 保存落地到现有配置：Signal Join 草稿调用 `WebAdminSignalJoinService.create` 写入 `SignalJoinDefinition`；Timer 草稿调用 `WebAdminTimerService.create` 写入 `TimerDefinition`；Action append 调用现有 SignalListener / ActionRelay / Region / Timer action service；频道 metadata 草稿在 typed 写入成功后作为附属 metadata 保存。
+- 错误 toast：所有编辑器报错使用顶部居中自定义 toast，自动消失，不使用浏览器 `alert` / `confirm` / `prompt`。
+- dirty exit：退出编辑模式只退出编辑，不离开页面；有草稿时使用自定义确认 dialog，确认后丢弃草稿并释放锁；切到列表、其它 Logic Chain 或不同 resolve route 时也必须先确认，当前路由 silent refresh 保持非扰动。
+
+8.14 约束：
+
+- 旧节点移动 deferred。
+- 旧节点删除 deferred。
+- 旧节点重排 deferred。
+- 旧 action 移动 / 删除 / 重排 / 复杂编辑 deferred。
+- 世界实体必须先存在；VBD、SignalReceiver、ActionRelay block、Region 等不能由画布凭空创建。虚拟监听器虽然不是世界实体，但画布新增仍因 listener create 锁链路未完成而 deferred。未来可独立设计“游戏内草稿创建 + 取消回滚”和安全的纯配置 listener create，8.14 只记录 deferred 方向并在 UI 中说明。
+- 不做 full Logic Chain Editor。
+- 不做 Scratch editor。
+- 不做 if / else runtime。
+- 不做 GameController / MissionSystem / PhaseController。
+- 不新增 Action type。
+- 不新增 Condition type。
+- 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction / Condition runtime 语义。
+- 不做 raw JSON editor。
+- 不跑 MCP scenario。
+- 不启动 Minecraft。
+- 不生成截图矩阵。
+- 本阶段不 commit / push / merge / tag。
 
 ## WebAdmin UI 规范
 
