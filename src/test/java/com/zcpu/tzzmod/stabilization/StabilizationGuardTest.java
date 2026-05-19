@@ -84,6 +84,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminControlledStateActionServiceTest
 import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
 import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -188,6 +189,7 @@ public final class StabilizationGuardTest {
         WebAdminTimerServiceTest.run();
         TimerDoctorTest.run();
         WebAdminLogicChainServiceTest.run();
+        WebAdminLogicChainEditorServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -202,6 +204,7 @@ public final class StabilizationGuardTest {
         testControlledStateActions811();
         testSchedulerDelayTimer812();
         testLogicChainViewerEnhancement813();
+        testLogicChainEditorMvp814();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -4685,6 +4688,8 @@ public final class StabilizationGuardTest {
                 "extended channel combobox uses independent per-field query");
         requireContains(js, "filteredChannelOptions(draft.channelOptions||appState.channelOptions||[],channelComboQuery(draft,index))",
                 "action relay signal action channel combobox uses independent per-action query");
+        requireContains(js, "[c.channel,c.displayName,c.effectiveDisplayName,c.note]",
+                "channel combobox searches existing channels by channel id, displayName, effectiveDisplayName and note");
         requireFalse(js.contains("<datalist"), "basic config channel picker does not use native datalist menu");
         requireContains(js, "该频道当前未在系统中发现", "basic config channel input warns about unseen channels");
         requireContains(js, "不会自动创建监听器", "basic config channel input explains manual channel behavior");
@@ -9058,7 +9063,7 @@ public final class StabilizationGuardTest {
                 "logicChainRuntimeStatusLabel",
                 "data-no-condition-engine-editing",
                 "condition_gate_history_appended",
-                "TZZ_WEBADMIN_ASSET_VERSION='8.13-logic-chain-runtime-graph'"
+                "TZZ_WEBADMIN_ASSET_VERSION='8.14-logic-chain-editor-mvp'"
         )) {
             requireContains(scripts, marker, "8.13 frontend marker: " + marker);
         }
@@ -9169,6 +9174,690 @@ public final class StabilizationGuardTest {
         }
         requireFalse(viewerSection.contains("data-logic-chain-editor=\"true\"") || viewerSection.contains("drag edit") || viewerSection.contains("raw JSON"),
                 "8.13 Logic Chain viewer must remain read-only and not expose editor/raw JSON UI");
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void testLogicChainEditorMvp814() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/LOGIC_CHAIN_EDITOR_MVP_8_14_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_14.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String request = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java"), StandardCharsets.UTF_8);
+        String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String logicService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String validationError = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminValidationError.java"), StandardCharsets.UTF_8);
+        String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String rolePolicy = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminRolePolicy.java"), StandardCharsets.UTF_8);
+        String editorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/LOGIC_CHAIN_EDITOR_MVP_8_14_CURRENT_CONTEXT.md",
+                "docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_14.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminValidationError.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.14 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.14 Logic Chain Editor MVP",
+                "新增节点",
+                "当前 Viewer 画布",
+                "edit lock",
+                "dirty exit",
+                "Signal Join",
+                "Timer",
+                "C2",
+                "C0",
+                "C5 Timer 引用",
+                "slot",
+                "snap",
+                "绿色加号",
+                "ALL 隐藏 threshold",
+                "ANY_N / COUNT",
+                "draft edge",
+                "新建逻辑链",
+                "root channel metadata",
+                "reference card",
+                "Action append",
+                "追加一条 ActionConfig",
+                "append-only",
+                "SignalListener / ActionRelay / Region / Timer",
+                "频道端点 combobox",
+                "dark combobox",
+                "Join input / output mutual exclusion",
+                "inputChannels",
+                "outputChannel",
+                "structured validation",
+                "fixHint",
+                "necessary",
+                "placed draft card re-drag",
+                "游戏内草稿创建 + 取消回滚",
+                "保存落地到现有配置",
+                "SignalJoinDefinition",
+                "TimerDefinition",
+                "old action move / delete / reorder",
+                "世界实体必须先存在",
+                "旧节点移动 deferred",
+                "旧节点删除 deferred",
+                "旧节点重排 deferred",
+                "不做 full Logic Chain Editor",
+                "不做 Scratch editor",
+                "不做 if / else runtime",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做 PhaseController"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.14 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminLogicChainEditorRequest",
+                "DraftNode",
+                "DraftEdge",
+                "SUPPORTED_NODE_TYPES",
+                "MAX_DRAFT_NODES_PER_SAVE",
+                "MAX_DRAFT_EDGES_PER_SAVE",
+                "signal_join",
+                "timer",
+                "logic_chain_editor",
+                "baseGraphFingerprint",
+                "lockTargetType",
+                "lockTargetId",
+                "logic_chain_editor_lock_target_mismatch",
+                "logicChainEditorLockFailure",
+                "logicChainSaveFailurePreservingEditorLock",
+                "logicChainEnrichTypedFailureErrors",
+                "editorLockLost",
+                "draftPreserved",
+                "validateDraftRequest",
+                "validateSignalJoinDraft",
+                "validateDraftJoinCycleGuard",
+                "draftJoinCycleGuardDiagnostics",
+                "logicChainCyclePathSummary",
+                "MAX_JOIN_CYCLE_GUARD_NODES",
+                "MAX_JOIN_CYCLE_GUARD_EDGES",
+                "logic_chain_join_cycle_risk",
+                "logic_chain_join_cycle_guard_truncated",
+                "nodeId",
+                "edgeId",
+                "channelId",
+                "fixHint",
+                "severity",
+                "logic_chain_join_any_n_threshold_required",
+                "logic_chain_join_any_n_threshold_exceeds_inputs",
+                "logic_chain_join_count_threshold_required",
+                "validateTimerDraft",
+                "deriveSignalJoinRequestFromEdges",
+                "deriveTimerRequestFromEdges",
+                "channelRefsFromEdges",
+                "logic_chain_edge_type_not_allowed_for_node",
+                "logic_chain_edge_not_incident_to_draft",
+                "logic_chain_edge_endpoint_not_channel",
+                "logic_chain_join_input_edge_required",
+                "logic_chain_join_output_edge_required",
+                "logic_chain_timer_output_edge_required",
+                "logic_chain_timer_output_edge_single_required",
+                "logic_chain_timer_column_deferred",
+                "WebAdminAuditWriter",
+                "saveSignalJoin",
+                "saveTimer",
+                "saveActionAppend",
+                "saveChannelMetadataDrafts",
+                "channel_metadata_draft_failed_after_typed_write",
+                "SignalJoinStore.normalizeId(request.id)",
+                "TimerStore.normalizeId(request.id)",
+                "validateActionAppendDraft",
+                "validateChannelMetadataDrafts",
+                "logic_chain_draft_single_write_only",
+                "logic_chain_action_append_owner_id_required",
+                "logic_chain_channel_metadata_drafts_too_many",
+                "signalJoinService.create",
+                "timerService.create",
+                "signalListenerActionsService.addAction",
+                "actionRelayActionsService.addAction",
+                "regionControllerService.addAction",
+                "timerService.addActionToBucket",
+                "TARGET_LOGIC_CHAIN_EDITOR",
+                "EDIT_LOGIC_CHAIN",
+                "join_input",
+                "join_output",
+                "timer_outputs_channel"
+        )) {
+            requireContains(request + "\n" + editorService + "\n" + validationError + "\n" + editLockService + "\n" + operationType + "\n" + rolePolicy, marker, "8.14 backend marker: " + marker);
+        }
+        for (String legacyFourFieldError : List.of(
+                "error(\"nodes[0].column\", \"logic_chain_join_column_invalid\", \"Signal Join 只能放在上游频道卡的下游合法列。\", column)",
+                "error(\"nodes[0].column\", \"logic_chain_timer_column_deferred\", \"Timer 只能放在 C0 来源列；C5 Timer 引用 / 目标位需要 action-list 映射，已 deferred。\", column)",
+                "error(\"signalJoin.id\", \"signal_join_id_required\", \"Signal Join ID 不能为空。\", \"\")",
+                "error(\"timer.id\", \"timer_id_required\", \"Timer ID 不能为空。\", \"\")",
+                "error(\"actionAppend.ownerId\", \"logic_chain_action_append_owner_id_required\", \"追加 Action 需要已有 action 容器 ID。\", \"\")",
+                "error(\"channelMetadataDrafts[\" + index + \"].channel\", \"duplicate_channel\", \"频道端点 metadata 不能重复提交同一个 channel。\", channel)"
+        )) {
+            requireFalse(editorService.contains(legacyFourFieldError), "8.14 structured validation must not use legacy four-field error: " + legacyFourFieldError);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/logic-chain-editor",
+                "/capabilities",
+                "enter",
+                "validate-draft",
+                "save-draft",
+                "cancel",
+                "handleLogicChainEditor",
+                "logicChainEditorService"
+        )) {
+            requireContains(server, marker, "8.14 WebAdmin API marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-logic-chain-editor-mvp",
+                "data-logic-chain-edit-mode-toggle",
+                "data-logic-chain-edit-lock-status",
+                "data-logic-chain-lock-target-stable",
+                "data-logic-chain-save-failure-preserves-lock",
+                "data-logic-chain-save-failure-keeps-edit-session",
+                "data-logic-chain-save-failure-keeps-lock",
+                "data-logic-chain-second-save-after-validation-fail",
+                "data-logic-chain-validation-focus-preserved",
+                "data-logic-chain-action-append-lock-required",
+                "data-logic-chain-edit-locked-disabled",
+                "data-logic-chain-draft-preserved",
+                "data-logic-chain-dirty-confirm",
+                "data-logic-chain-dirty-modal",
+                "data-logic-chain-drag-slot-palette",
+                "data-logic-chain-drag-slot-canvas",
+                "data-logic-chain-pointer-drag",
+                "data-logic-chain-pointer-drag-canvas",
+                "data-logic-chain-new-node-placement",
+                "data-logic-chain-connection-mode",
+                "data-logic-chain-save-validation",
+                "data-logic-chain-validation-list",
+                "data-logic-chain-validation-detail-list",
+                "data-logic-chain-structured-validation-errors",
+                "data-logic-chain-validation-channel-id",
+                "data-logic-chain-validation-severity",
+                "data-logic-chain-validation-fix-hint",
+                "data-logic-chain-save-error-reason-visible",
+                "data-logic-chain-no-browser-dialogs",
+                "data-logic-chain-no-runtime-mutation",
+                "data-logic-chain-save-writes-underlying-config",
+                "data-logic-chain-topology-from-edges",
+                "data-logic-chain-no-manual-topology-inputs",
+                "data-logic-chain-join-topology-derived-from-edges",
+                "data-logic-chain-timer-output-derived-from-edges",
+                "data-logic-chain-node-type-panel",
+                "data-logic-chain-guided-config",
+                "data-logic-chain-world-entity-requires-existing",
+                "data-logic-chain-pure-config-node",
+                "data-logic-chain-incomplete-draft",
+                "data-logic-chain-valid-slot-outline",
+                "data-logic-chain-nearest-slot-only",
+                "data-logic-chain-far-empty-slot-hidden",
+                "data-logic-chain-slot-context-derived",
+                "data-logic-chain-slot-context-anchor",
+                "data-logic-chain-all-draft-types-nearest-slot-policy",
+                "data-logic-chain-join-visual-downstream-column",
+                "data-logic-chain-join-visual-downstream-slot",
+                "data-logic-chain-join-semantic-lane-preserved",
+                "data-logic-chain-drop-preview",
+                "data-logic-chain-snap-to-canonical-slot",
+                "data-logic-chain-slot-occupancy-column",
+                "data-logic-chain-slot-cannot-overlap-existing-node",
+                "data-logic-chain-same-column-make-room",
+                "data-logic-chain-new-node-drag-only",
+                "data-logic-chain-old-node-drag-disabled",
+                "data-logic-chain-green-plus-handle",
+                "data-logic-chain-large-hit-target",
+                "data-logic-chain-event-delegation",
+                "data-logic-chain-connect-candidate",
+                "data-logic-chain-connect-handle",
+                "data-logic-chain-upstream-connect-mode",
+                "data-logic-chain-downstream-connect-mode",
+                "data-logic-chain-candidate-plus",
+                "data-logic-chain-invalid-candidate-hidden",
+                "data-logic-chain-new-edge-highlighted",
+                "data-logic-chain-new-edge-remains-highlighted",
+                "data-logic-chain-timer-mode-labels-chinese",
+                "data-logic-chain-timer-start-policy-labels-chinese",
+                "data-logic-chain-timer-delay-hides-interval",
+                "data-logic-chain-timer-delay-hides-max-runs",
+                "data-logic-chain-timer-countdown-hides-max-runs",
+                "data-logic-chain-timer-repeat-hides-duration",
+                "data-logic-chain-join-all-hides-threshold",
+                "data-logic-chain-join-any-n-shows-threshold",
+                "data-logic-chain-join-count-shows-threshold",
+                "data-logic-chain-draft-starts-unplaced",
+                "data-logic-chain-slot-proximity",
+                "data-logic-chain-snap-animation",
+                "data-logic-chain-drag-primary-path",
+                "data-logic-chain-click-placement-fallback",
+                "pointercancel",
+                "lostpointercapture",
+                "logicChainDraftPointerMatches",
+                "cleanupLogicChainDraftPointerDrag",
+                "data-logic-chain-draft-edge-toggle",
+                "data-logic-chain-connected-candidate",
+                "data-logic-chain-action-append",
+                "data-logic-chain-action-append-only",
+                "data-logic-chain-action-append-unique-draft-id",
+                "data-logic-chain-action-append-action-index-in-draft-id",
+                "data-logic-chain-action-append-no-overlap",
+                "data-logic-chain-action-append-close-keeps-draft",
+                "data-logic-chain-action-append-slot-after-existing",
+                "data-logic-chain-action-append-order-preserved",
+                "data-logic-chain-no-old-action-move-delete-reorder",
+                "data-logic-chain-join-slot-expanded-columns",
+                "data-logic-chain-join-slot-no-illegal-columns",
+                "data-logic-chain-join-slot-no-overlap",
+                "data-logic-chain-join-slot-input-channel-adjacent",
+                "data-logic-chain-join-slot-hidden-without-input-context",
+                "data-logic-chain-join-slot-shared-input-band",
+                "data-logic-chain-join-slot-left-channel-column",
+                "data-logic-chain-join-slot-upstream-channel-column",
+                "data-logic-chain-join-slot-downstream-of-channel",
+                "data-logic-chain-join-slot-target-column-may-contain-listener",
+                "data-logic-chain-join-slot-no-forced-empty-processing-column",
+                "data-logic-chain-join-slot-dynamic-columns",
+                "data-logic-chain-join-slot-empty-column-single-middle",
+                "data-logic-chain-join-slot-occupied-column-insert-anywhere",
+                "data-logic-chain-join-slot-bottom-append",
+                "data-logic-chain-join-slot-multi-gap",
+                "data-logic-chain-join-slot-not-median-only",
+                "data-logic-chain-action-append-saved-layout-parity",
+                "data-logic-chain-action-append-listener-right-lane",
+                "data-logic-chain-legal-columns-from-visible-channel",
+                "data-logic-chain-join-input-output-mutual-exclusive",
+                "logic_chain_join_input_output_channel_conflict",
+                "logicChainResolveDraftVisualEndpoint",
+                "logicChainFindReusableChannelEndpoint",
+                "logicChainValidationToastSummary",
+                "logicChainValidationErrorsHtml",
+                "logicChainApplyEditorLockFailure",
+                "logicChainEditorResultLosesCurrentLock",
+                "logicChainEditorLockFailureCode",
+                "rerenderLogicChainEditorPreservingUi",
+                "data-logic-chain-reference-card-necessary-only",
+                "data-logic-chain-reference-card-near-draft",
+                "data-logic-chain-output-reference-right-side",
+                "data-logic-chain-input-reference-left-side",
+                "data-logic-chain-reference-slot-no-overlap",
+                "data-logic-chain-visual-upstream-non-input-output-reference",
+                "data-logic-chain-same-side-primary-no-reference",
+                "data-logic-chain-same-side-reference-no-duplicate",
+                "data-logic-chain-connection-mode-same-side-exits",
+                "data-logic-chain-connection-mode-canvas-exits",
+                "data-logic-chain-escape-exits-connection-mode",
+                "data-logic-chain-channel-endpoint-picker",
+                "data-logic-chain-channel-picker-existing-channel",
+                "data-logic-chain-channel-picker-new-channel",
+                "data-logic-chain-channel-metadata-drafts",
+                "data-logic-chain-channel-endpoint-no-orphan-metadata",
+                "data-logic-chain-output-capable-node",
+                "data-logic-chain-timer-output-endpoint",
+                "data-logic-chain-create-output-channel-endpoint",
+                "data-logic-chain-output-endpoint-right-side",
+                "data-logic-chain-shared-output-endpoint-flow",
+                "data-logic-chain-placed-draft-redrag",
+                "logicChainActionAppendSavePayload",
+                "actionAppendLockOk",
+                "logicChainChannelMetadataDraftSavePayload",
+                "logicChainDraftReferencedChannels",
+                "logicChainPruneDraftChannels",
+                "data-logic-chain-draft-channel-node",
+                "data-logic-chain-create-draft-channel-node",
+                "data-logic-chain-new-entry",
+                "data-logic-chain-create-root-channel",
+                "data-logic-chain-root-field-payload",
+                "data-logic-chain-root-field-dto-roundtrip",
+                "data-logic-chain-new-root-channel-validation",
+                "data-logic-chain-new-chain-root-ref-normalized",
+                "data-logic-chain-disconnected-draft-new-chain",
+                "data-logic-chain-save-channel-metadata",
+                "data-logic-chain-no-fake-graph-save",
+                "data-logic-chain-save-uses-real-channel-id",
+                "data-logic-chain-world-entity-not-directly-creatable",
+                "data-logic-chain-world-entity-future-game-draft-deferred",
+                "data-logic-chain-virtual-listener-disabled-reason",
+                "data-logic-chain-signal-listener-pure-config",
+                "data-logic-chain-no-world-entity-required",
+                "data-logic-chain-timer-action-detail-card",
+                "logicChainTimerActionCard",
+                "data-logic-chain-node-card-delegated-actions",
+                "logicChainLayoutWithDraft",
+                "logicChainDraftSlotOverlay",
+                "startLogicChainEditMode",
+                "showLogicChainNewNodeModal",
+                "makeLogicChainEditorDraft",
+                "logicChainSupportedNewNodeType",
+                "logicChainAllowedDraftColumns",
+                "logicChainLegalSlotsForColumn",
+                "logicChainJoinInputAdjacentLegalSlots",
+                "logicChainJoinInputAnchorItems",
+                "logicChainJoinSlotColumnFromInput",
+                "logicChainJoinSlotsForEmptyColumn",
+                "logicChainJoinSlotsForOccupiedColumn",
+                "logicChainJoinBottomAppendSlot",
+                "logicChainJoinMultiGapLegalSlots",
+                "logicChainJoinTargetColumns",
+                "logicChainDraftPlacementColumns",
+                "virtualJoinInputAnchor",
+                "logicChainActionAppendCanonicalLane",
+                "logicChainNearestFreeSlotForColumn",
+                "logicChainColumnItems",
+                "logicChainSlotRect",
+                "logicChainSlotOverlapsColumn",
+                "logicChainMakeRoomForDraft",
+                "logicChainNearestDraftSlot",
+                "startLogicChainDraftPointerDrag",
+                "logicChainDraftPointerMove",
+                "logicChainDraftPointerUp",
+                "handleLogicChainEditorDelegatedClick",
+                "logicChainEditorRouteMatches",
+                "startLogicChainConnectionMode",
+                "connectLogicChainDraftCandidate",
+                "logicChainDraftCandidateConnected",
+                "logicChainEditorDraftEdgeForCandidate",
+                "showLogicChainDraftChannelModal",
+                "startNewLogicChainMetadataCreate",
+                "ensureLogicChainMetadataDraftLock",
+                "closeLogicChainActionAppendModal",
+                "logic_chain_metadata_changed",
+                "logic_chain_metadata",
+                "logicChainCandidateConnectionHandle",
+                "saveLogicChainEditorDraft",
+                "logicChainEditorSaveBody",
+                "lockTargetId:data.targetId",
+                "targetId:e.lockTargetId",
+                "maybeReleaseLogicChainEditorForRoute",
+                "logicChainTopCenterToast",
+                "logicChainToastAutoDismiss"
+        )) {
+            requireContains(scripts, marker, "8.14 frontend marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                ".logic-chain-editor-toolbar",
+                ".logic-chain-tree-node",
+                ".logic-chain-tree-node{overflow:visible;z-index:2}",
+                ".logic-chain-node-card.draft",
+                ".logic-chain-draft-slot",
+                ".logic-chain-draft-slot:hover",
+                ".logic-chain-connect-plus",
+                ".logic-chain-connect-plus.active",
+                ".logic-chain-connect-plus.connected",
+                ".logic-chain-validation-panel",
+                ".logic-chain-validation-kv",
+                ".logic-chain-draft-dragging .logic-chain-node-card.draft",
+                ".logic-chain-edge.group-draft",
+                ".logic-chain-edge.draft-highlight",
+                ".logic-chain-new-node-form",
+                ".toast[data-logic-chain-top-center-toast=true]"
+        )) {
+            requireContains(styles, marker, "8.14 CSS marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "testEnterRequiresPermissionCsrfAndEditorLock",
+                "testLockConflictBlocksEditMode",
+                "testSaveDraftWithStableLockTargetSucceedsAndReleasesLock",
+                "testMissingMismatchAndValidationFailurePreserveDraftLockState",
+                "testValidationFailureRetryUsesSameLockAndStructuredErrors",
+                "testTypedLockFailurePreservesEditorLockAndDraft",
+                "requireStructuredError",
+                "testValidateDraftRejectsIncompleteAndOutOfScopeNodes",
+                "testStaleBaseGraphFingerprintBlocksSave",
+                "testSaveRejectsSignalJoinMissingRequiredConfigAndEdges",
+                "testSaveRejectsTimerMissingRequiredConfigAndEdges",
+                "testSaveRejectsIdsThatNormalizeToBlankBeforeTypedLock",
+                "testSaveRejectsInvalidDuplicateAndIncompleteEdges",
+                "testSaveRejectsJoinInputOutputChannelConflict",
+                "testSaveAllowsVisualUpstreamOutputWhenNoRealCycle",
+                "testJoinCycleGuardRejectsReachableInputAndTruncates",
+                "testSaveRejectsDirectNonChannelVisualEndpoints",
+                "testChannelMetadataDraftValidation",
+                "testSaveRejectsModeSpecificJoinThresholdErrors",
+                "testSaveRejectsInvalidPlacementAndUnplacedDraft",
+                "testActionAppendRejectsInvalidShapeAndMixedDraft",
+                "testActionAppendValidationCoversSupportedOwnersBucketsAndConditionGroup",
+                "testSaveRejectsWrongLockAndSameOriginFailure",
+                "testSaveSignalJoinDraftWritesUnderlyingConfig",
+                "testSaveTimerDraftWritesUnderlyingConfig",
+                "testTimerDraftCanCreateAndSelectDownstreamChannelEndpoint",
+                "testSaveDraftNormalizesTypedLockTargetsBeforeSaving",
+                "testSaveTimerDraftAllowsOnCompleteOnlyOutput",
+                "testTimerActionAppendThroughLogicChainEditor",
+                "logic_chain_draft_node_required",
+                "logic_chain_node_type_deferred",
+                "virtual SignalListener canvas creation is deferred",
+                "logic_chain_join_column_invalid",
+                "logic_chain_timer_column_deferred",
+                "logic_chain_join_input_edge_required",
+                "edit_lock_expired",
+                "edit_lock_required",
+                "logic_chain_join_input_output_channel_conflict",
+                "logic_chain_editor_lock_target_mismatch",
+                "logic_chain_join_cycle_risk",
+                "logic_chain_join_cycle_guard_truncated",
+                "nodeId",
+                "edgeId",
+                "channelId",
+                "fixHint",
+                "logic_chain_timer_output_edge_required",
+                "logic_chain_timer_output_edge_single_required",
+                "logic_chain_action_append_owner_id_required",
+                "logic_chain_timer_action_bucket_invalid",
+                "logic_chain_draft_single_write_only",
+                "logic_chain_edge_endpoint_not_channel",
+                "duplicate_channel",
+                "logic_chain_channel_metadata_unreferenced",
+                "logic_chain_action_append_edges_not_allowed",
+                "editor_action_gate",
+                "logic_chain_join_any_n_threshold_exceeds_inputs",
+                "logic_chain_join_count_threshold_required",
+                "Timer draft can create a downstream channel endpoint",
+                "Timer draft can select an existing downstream channel endpoint",
+                "conflict_detected"
+        )) {
+            requireContains(editorTest, marker, "8.14 service test marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "timerActionVisible",
+                "addTimerActionBucketNodes",
+                "action_cancels_timer",
+                "signalActionOutputChannel",
+                "signalActionHasConsumer",
+                "addSignalActionOutputChannelNode",
+                "hasConsumersForChannel",
+                "outputChannelPlacement",
+                "right_of_action",
+                "if (\"listener\".equals(safe(refType).toLowerCase(Locale.ROOT)) && !SignalChannel.normalize(ownerChannel).isBlank())",
+                "expandedTimerActionBuckets"
+        )) {
+            requireContains(logicService, marker, "8.14 logic chain graph marker: " + marker);
+        }
+
+        requireFalse(editorService.contains("List.of(\"C0\", \"C5\")"), "8.14 Timer capability must not advertise C5 as saveable");
+        requireFalse(editorService.contains("\"C0\".equalsIgnoreCase(column) || \"C5\".equalsIgnoreCase(column)"), "8.14 backend must not allow Timer C5 placement");
+        requireContains(editorService, "dynamic_downstream_channel_column", "8.14 Signal Join capability advertises dynamic downstream-of-channel placement");
+        requireContains(editorService, "isSignalJoinPlacementColumn(column)", "8.14 Signal Join placement validation uses semantic column helper");
+        requireFalse(editorService.contains("&& !\"C2\".equalsIgnoreCase(column)"), "8.14 backend must not keep Signal Join C2-only validation");
+        requireContains(scripts, "function logicChainDraftPlacementColumns", "8.14 frontend derives Signal Join placement columns from visible upstream channel cards");
+        requireContains(scripts, "function logicChainJoinTargetColumns", "8.14 frontend exposes dynamic downstream-of-channel Join columns");
+        requireFalse(scripts.contains("logicChainAllowedDraftColumns(draftType).forEach"), "8.14 frontend legal slot cache must not be built from fixed Signal Join columns");
+        requireFalse(scripts.contains("cols=logicChainAllowedDraftColumns(type)"), "8.14 slot overlay must not render fixed Signal Join columns");
+        requireFalse(scripts.contains("cols=logicChainAllowedDraftColumns(node.type)"), "8.14 drag snapping must not scan fixed Signal Join columns");
+        requireFalse(scripts.contains("if(t==='signal_join')return [2,3]"), "8.14 frontend must not keep fixed Signal Join C2/C3 legal columns");
+        requireFalse(scripts.contains("if(t==='signal_join')return [2]"), "8.14 frontend must not keep a fixed Signal Join C2 fallback");
+        requireFalse(scripts.contains("==='timer'?[0]:[2]"), "8.14 frontend must not keep Signal Join C2-only legal slots");
+        requireContains(scripts, "logicChainJoinProcessingDraftActive", "8.14 frontend still marks Join draft mode without forcing an empty processing column");
+        requireFalse(scripts.contains("keys.forEach(lane=>{map[lane]=lane>=3?lane+1:lane;});return map;"), "8.14 Join draft layout must not reserve a forced empty processing column");
+        requireFalse(editorService.contains("String joinId = safe(request.id);"), "8.14 Signal Join typed lock target must use the normalized service id");
+        requireFalse(editorService.contains("String timerId = safe(request.id);"), "8.14 Timer typed lock target must use the normalized service id");
+        requireFalse(scripts.contains("type==='timer'?[0,5]"), "8.14 frontend must not render Timer C5 as legal slot");
+        String legalSlotFunction = extractBetween(scripts, "function logicChainLegalSlotsForColumn", "function logicChainResolveDraftSlot");
+        String joinSlotFunction = extractBetween(scripts, "function logicChainJoinInputAdjacentLegalSlots", "function logicChainDraftAnchorSlot");
+        requireContains(scripts, "function logicChainJoinInputAdjacentLegalSlots", "8.14 Join legal slots are resolved from input-channel-adjacent anchors");
+        requireContains(scripts, "function logicChainJoinInputAnchorItems", "8.14 Join slot anchors are channel cards, not arbitrary selected/root nodes");
+        requireContains(scripts, "function logicChainJoinSlotColumnFromInput", "8.14 Join slots are placed immediately right of the input channel column");
+        requireFalse(scripts.contains("[2,3].includes(target)"), "8.14 Join target columns must not be filtered back to fixed C2/C3");
+        requireContains(scripts, "virtualJoinInputAnchor:true", "8.14 Join slot anchors must include draft-only input channel endpoints before reference cards are rendered");
+        requireContains(scripts, "function logicChainJoinSlotsForEmptyColumn", "8.14 Join empty target column uses a single context-middle slot");
+        requireContains(scripts, "Math.max(0,Math.round(mid))", "8.14 Join empty-column middle slot must resolve to an integer canonical slot");
+        requireContains(scripts, "function logicChainJoinSlotsForOccupiedColumn", "8.14 Join occupied target column exposes insertable gaps");
+        requireFalse(scripts.contains("for(let slot=0;slot<=maxSlot;slot++)"), "8.14 Join occupied target columns must not expose top-of-column blank space before the first existing card");
+        requireFalse(scripts.contains("for(let slot=occupied[i]+1;slot<occupied[i+1];slot++)"), "8.14 Join occupied target columns should expose one insert slot per existing-card gap, not every canonical slot in a large gap");
+        requireContains(scripts, "function logicChainJoinBottomAppendSlot", "8.14 Join occupied target column exposes bottom append");
+        requireContains(scripts, "function logicChainJoinMultiGapLegalSlots", "8.14 Join slot resolver uses left-channel-column multi-gap policy");
+        requireContains(joinSlotFunction, "logicChainJoinMultiGapLegalSlots", "8.14 Join slots must expose multi-gap candidates for occupied input-adjacent columns");
+        requireContains(joinSlotFunction, "return logicChainJoinMultiGapLegalSlots(layout,col,anchors)", "8.14 Join legal slot resolver returns the multi-gap policy result");
+        requireContains(scripts, "joinSlotTargetColumnMayContainListener", "8.14 Join target columns may already contain listener/action cards");
+        requireContains(scripts, "joinSlotNoForcedEmptyProcessingColumn", "8.14 Join placement must avoid the forced blank processing column");
+        requireContains(scripts, "joinSlotDynamicColumns", "8.14 Join placement uses dynamic visual columns");
+        requireFalse(joinSlotFunction.contains("return [logicChainNearestFreeSlotForColumn(layout,col,mid)]"), "8.14 Join input-adjacent slots must not collapse multiple anchors to a median-only single slot");
+        requireContains(legalSlotFunction, "logicChainNearestFreeSlotForColumn", "8.14 legal slot overlay uses nearest slot policy");
+        requireContains(legalSlotFunction, "logicChainJoinInputAdjacentLegalSlots", "8.14 Signal Join legal slots must use the input-channel-adjacent resolver");
+        requireContains(scripts, "Object.keys(legal).map", "8.14 drag snapping must iterate actual dynamic legal slot columns");
+        requireFalse(legalSlotFunction.contains("Array.from({length:maxSlot+1}"), "8.14 legal slot overlay must not render an entire far-empty column");
+        requireFalse(scripts.contains("function logicChainLegalSlotsForColumn(layout,col,type){const anchor=logicChainDraftAnchorSlot"), "8.14 Signal Join legal slots must not fall back to generic selected/root anchor only");
+        requireFalse(scripts.contains("||[0,1,2]"), "8.14 drag snapping must not fall back to far empty slot list when legalSlots are missing");
+        requireContains(scripts, "option value=\"signal_listener\" disabled", "8.14 virtual SignalListener canvas creation must remain disabled until safe editor create path exists");
+        requireContains(scripts, "if(!logicChainSupportedNewNodeType(type))", "8.14 frontend must reject tampered unsupported canvas draft node types");
+        requireContains(editorService, "SUPPORTED_NODE_TYPES = Set.of(\"signal_join\", \"timer\")", "8.14 backend must not accept signal_listener canvas create before safe edit-lock path exists");
+        requireFalse(editorService.contains("WebAdminSignalListenerLifecycleService"), "8.14 Logic Chain canvas editor must not wire SignalListener lifecycle create service");
+        requireFalse(editorService.contains("WebAdminSignalListenerCreateRequest"), "8.14 Logic Chain canvas editor must not wire SignalListener create request");
+        requireContains(editorService, "channelMetadataDraftReferencedChannels", "8.14 backend validates channel metadata drafts against connected draft endpoints");
+        requireContains(editorService, "if (actionAppend && !edges.isEmpty())", "8.14 action append payload must reject draft edges");
+        String metadataRefFunction = extractBetween(editorService, "private static Set<String> channelMetadataDraftReferencedChannels", "private static RegionTriggerType parseRegionTrigger");
+        requireContains(metadataRefFunction, "if (hasActionAppend(request))", "8.14 action append metadata refs must use actionAppend.action instead of draft edges");
+        requireContains(editorService, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
+        requireContains(scripts, "connectLogicChainDraftCandidate(channelRef,{toggle:false})", "8.14 draft channel endpoint add path does not toggle off an existing connection");
+        String actionAppendLayout = extractBetween(scripts, "if(editor.actionAppend)", "const draftEdges=[]");
+        requireContains(actionAppendLayout, "draft:action_append:${append.ownerType||'owner'}:${append.ownerId||''}:${append.bucket||'default'}:${actionIndex}", "8.14 action append draft id includes actionIndex");
+        requireContains(actionAppendLayout, "logicChainActionAppendCanonicalLane", "8.14 action append layout uses the canonical saved-layout lane resolver");
+        requireContains(actionAppendLayout, "savedLayoutParity:true", "8.14 action append draft marks saved-layout parity");
+        requireContains(actionAppendLayout, "listenerRightLane:true", "8.14 SignalListener append action stays in the right-side action lane");
+        requireFalse(actionAppendLayout.contains("Math.min(5"), "8.14 action append layout must not clamp listener/action lane to C5");
+        requireContains(actionAppendLayout, "logicChainNearestFreeSlotForColumn(layout,col", "8.14 action append layout avoids occupied slots");
+        requireContains(actionAppendLayout, "logicChainColumnX(metrics,col)", "8.14 action append draft x uses its free slot column");
+        requireContains(actionAppendLayout, "logicChainSlotY(metrics,slot)", "8.14 action append draft y uses its free slot");
+        requireFalse(scripts.contains("draft:action_append:${append.ownerType||'owner'}:${append.ownerId||''}:${append.bucket||'default'}`"), "8.14 action append draft id must not be owner/bucket only");
+        requireContains(scripts, "logic_chain_metadata')return JSON.stringify", "8.14 logic chain metadata modal has a stable dirty snapshot");
+        requireContains(scripts, "if(d?.mode==='create'||d?.newRootChannel===true)return computed", "8.14 new logic chain target id recomputes from current rootRef");
+        requireContains(scripts, "if(d.lockId&&d.lockTargetId===targetId)return true", "8.14 new logic chain metadata lock reuses only the matching current root target");
+        requireContains(scripts, "targetId:d.lockTargetId||d.chainId", "8.14 metadata heartbeat/release uses the held lock target");
+        requireContains(scripts, "d.lockTargetId=targetId", "8.14 metadata lock acquisition records the real target id");
+        requireContains(scripts, "if(d?.confirmed){syncLogicChainActionAppendDraft();return true;}", "8.14 closing a confirmed action append modal keeps the draft");
+        requireContains(scripts, "document.querySelector('#wa-modal-root [data-logic-chain-action-append]')", "8.14 action append heartbeat only rerenders its own modal");
+        requireContains(scripts, "缺少 root channel，请填写 Root 引用。", "8.14 new logic chain empty root error names the actual field");
+        String newNodeModal = extractBetween(scripts, "function showLogicChainNewNodeModal", "function syncLogicChainEditorDraft");
+        requireContains(newNodeModal, "FAIL_IF_RUNNING", "8.14 Logic Chain Timer modal exposes supported FAIL_IF_RUNNING start policy");
+        requireContains(newNodeModal, "labelTimerMode(v)", "8.14 Logic Chain Timer modal uses Chinese mode labels");
+        requireContains(newNodeModal, "labelTimerStartPolicy(v)", "8.14 Logic Chain Timer modal uses Chinese start policy labels");
+        requireContains(newNodeModal, "输入 / 输出将在连线阶段确定", "8.14 Logic Chain Join topology is explained as connection-derived");
+        requireContains(newNodeModal, "完成后的输出将在连线阶段确定", "8.14 Logic Chain Timer output is explained as connection-derived");
+        requireFalse(newNodeModal.contains("logic-chain-new-node-output"), "8.14 Logic Chain modal must not expose manual output channel input");
+        requireFalse(newNodeModal.contains("logic-chain-new-node-inputs"), "8.14 Logic Chain modal must not expose manual Join input channel input");
+        requireFalse(newNodeModal.contains("option value=\"STACK\""), "8.14 Logic Chain Timer modal must not expose unsupported STACK start policy");
+        requireFalse(scripts.contains("layout.flat.length%5"), "8.14 draft endpoint layout must not use layout.flat.length%5");
+        requireFalse(scripts.contains("if(byId[id])return byId[id];if(!isChannelNodeId(id))return null;"), "8.14 draft channel endpoints must not reuse primary channel card when a side-specific reference card is needed");
+        requireFalse(scripts.contains("function logicChainFindPrimaryChannelItem"), "8.14 reference direct-connect must scan same-side primary/reference endpoints instead of a single primary");
+        requireTrue(scripts.indexOf("logicChainFindReusableChannelEndpoint") < scripts.indexOf("return channelReferenceItem(id,edgeType,side,preferredCol,anchorSlot)"),
+                "8.14 resolver must search same-side reusable endpoint before creating a reference card");
+        requireContains(scripts, "placed:false", "8.14 new draft node starts unplaced until pointer drop");
+        requireContains(scripts, "e.previewColumn='';e.previewSlot=-1", "8.14 new draft node does not show an initial slot preview");
+        requireContains(scripts, "proximityThreshold", "8.14 slot snapping requires proximity detection");
+        requireFalse(scripts.contains("durationTicks:Number(d.durationTicks||100)")
+                        || scripts.contains("intervalTicks:Number(d.intervalTicks||20)")
+                        || scripts.contains("maxRuns:Number(d.maxRuns||1)")
+                        || scripts.contains("threshold:Math.max(1,Number(d.threshold||1))"),
+                "8.14 draft payload must preserve legal or invalid zero values for mode-specific backend validation");
+        requireContains(scripts, "target==='logic_chain_metadata'", "8.14 realtime config_changed marks logic chain metadata routes dirty");
+        requireContains(scripts, "isAny('logic_chain_metadata_changed')", "8.14 realtime logic_chain_metadata_changed marks logic chain list dirty");
+        requireContains(scripts, "不创建 SignalBridge channel", "8.14 new logic chain create modal states it does not create runtime channels");
+        requireContains(scripts, "不创建消费者", "8.14 new logic chain create modal states it does not create consumers");
+        requireFalse(scripts.contains("connectLogicChainDraftCandidate(${jsString"), "8.14 candidate connect must not inline complex JS arguments");
+        requireFalse(scripts.contains("onclick=\"event.stopPropagation();connectLogicChainDraftCandidate"), "8.14 candidate connect must use event delegation");
+        requireFalse(scripts.contains("moveLogicChainAction") || scripts.contains("deleteLogicChainAction") || scripts.contains("reorderLogicChainAction"),
+                "8.14 action append must not expose old action move/delete/reorder");
+        requireFalse(scripts.contains("draggable=\"true\"") || scripts.contains("ondragover=\"logicChainHandleDraftDragOver"), "8.14 draft placement must use pointer drag as primary path");
+        requireFalse(scripts.contains("<button type=\"button\" class=\"logic-chain-node-card"), "8.14 node card must not nest connection buttons inside a button card");
+        String nodeCard = extractBetween(scripts, "function logicChainNodeCard", "function logicChainMinimap");
+        requireContains(nodeCard, "data-logic-chain-node-action", "8.14 node card uses delegated action data attribute");
+        requireContains(nodeCard, "data-logic-chain-node-id", "8.14 node card exposes safe node id dataset");
+        requireContains(nodeCard, "data-logic-chain-primary-node-id", "8.14 reference card exposes safe primary id dataset");
+        requireFalse(nodeCard.contains("onclick=") || nodeCard.contains("onkeydown=") || nodeCard.contains("onmouseenter=") || nodeCard.contains("onmouseleave=") || nodeCard.contains("onpointerdown="),
+                "8.14 node card must not contain unsafe inline handlers");
+        requireContains(scripts, "document.addEventListener('pointerdown',event=>{if(handleLogicChainEditorDelegatedPointerDown(event))return;},true)", "8.14 draft drag pointerdown uses event delegation");
+        requireContains(scripts, "document.addEventListener('click',event=>{if(handleLogicChainEditorDelegatedClick(event))return;},true)", "8.14 connection handles must be captured before card click handlers");
+        String editorRouteGuard = extractBetween(scripts, "function maybeReleaseLogicChainEditorForRoute", "function logicChainRootChannel");
+        requireContains(editorRouteGuard, "logicChainEditorRouteMatches(e,h)", "8.14 route guard only bypasses the original editor route");
+        requireFalse(editorRouteGuard.contains("h==='#/logic-chains'||h.startsWith('#/logic-chains/')||isLogicChainResolveRoute(h)"), "8.14 route guard must not broadly bypass Logic Chain route changes");
+        requireFalse(scripts.contains("targetType:'logic_chain_editor',targetId:`${e.rootType||'channel'}:${e.rootRef||''}`"), "8.14 editor heartbeat must use the canonical lock target returned by enter");
+        requireContains(scripts, "e.lockLost=true", "8.14 save / heartbeat lock loss keeps draft state and disables save");
+        requireContains(editorService, "data.put(\"editorLockLost\", true)", "8.14 main editor lock failure must explicitly tag editorLockLost");
+        requireContains(editorService, "data.put(\"editorLockLost\", false)", "8.14 typed save failure must explicitly preserve main editor lock");
+        requireContains(editorService, "logicChainCyclePathSummary(result.path(), outputChannel)", "8.14 Join cycle diagnostic must expose the concrete path");
+        String editorLockFailure = extractBetween(scripts, "function logicChainEditorResultLosesCurrentLock", "function logicChainApplyEditorLockFailure");
+        requireContains(editorLockFailure, "data.editorLockLost===true", "8.14 frontend only clears main editor lock on explicit editorLockLost");
+        requireContains(editorLockFailure, "String(result?.targetType||'')==='EDIT_LOCK'", "8.14 frontend lock loss fallback must check edit lock target type");
+        requireContains(editorLockFailure, "String(result?.targetId||'')===expectedTargetId", "8.14 frontend lock loss fallback must match canonical editor lock target");
+        String applyEditorLockFailure = extractBetween(scripts, "function logicChainApplyEditorLockFailure", "function logicChainEditorUiState");
+        requireContains(applyEditorLockFailure, "logicChainEditorResultLosesCurrentLock(result)", "8.14 frontend must not clear editor lock based only on result code");
+        requireFalse(applyEditorLockFailure.contains("logicChainEditorLockFailureCode(result?.code))return false;e.lockLost=true"),
+                "8.14 frontend must not treat every edit_lock_* code as lost Logic Chain editor lock");
+
+        String editorSection = extractBetween(scripts, "function logicChainEditorAction", "function logicChainMetadataAction");
+        for (String forbidden : List.of(
+                "alert(",
+                "confirm(",
+                "prompt(",
+                "window.alert",
+                "window.confirm",
+                "window.prompt",
+                "moveExistingLogicChainNode",
+                "deleteLogicChainNode",
+                "reorderLogicChainNode",
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "RawJsonEditor",
+                "raw JSON"
+        )) {
+            requireFalse(editorSection.contains(forbidden), "8.14 editor section must not contain forbidden marker: " + forbidden);
+        }
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "LogicChainRuntimeEditor",
+                "class RawJsonEditor",
+                "McpScenario",
+                "MinecraftStartup"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.14 must not add out-of-scope runtime/source marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "LOGIC_CHAIN_BRANCH",
+                "IF_ELSE",
+                "SCRATCH_BLOCK",
+                "GAME_PROGRAM_CALL"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.14 must not add action type: " + forbidden);
+        }
         requireConditionNodeTypeSetUnchangedFor813();
     }
 

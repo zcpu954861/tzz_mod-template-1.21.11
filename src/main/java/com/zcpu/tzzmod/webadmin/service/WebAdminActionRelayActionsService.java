@@ -118,6 +118,203 @@ public final class WebAdminActionRelayActionsService {
         return data;
     }
 
+    public WebAdminWriteResult addAction(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String deviceId,
+            WebAdminActionRelayActionsUpdateRequest request,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        String safeDeviceId = safe(deviceId);
+        WebAdminWriteTarget target = target(safeDeviceId, safeDeviceId);
+        WebAdminWriteContext writeContext = WebAdminWriteContext.of(
+                user,
+                session,
+                remoteAddress,
+                WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS,
+                target
+        );
+
+        ActionRelayTarget relayTarget = resolveRelay(server, safeDeviceId);
+        if (relayTarget.device() == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.TARGET_NOT_FOUND,
+                    target,
+                    "目标设备不存在或已被删除。"
+            );
+            audit(writeContext, result, Map.of(), Map.of("attempt", "append_action_missing"));
+            return result;
+        }
+        target = target(relayTarget.device().id(), WebAdminReadonlySupport.deviceDisplayName(relayTarget.device()));
+        writeContext = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, target);
+        if (request != null) {
+            request.deviceId = relayTarget.device().id();
+        }
+
+        if (!SignalDeviceData.TYPE_ACTION_RELAY.equals(relayTarget.device().type())) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "device",
+                    "invalid_type",
+                    "只有 action_relay 支持追加 Action。",
+                    relayTarget.device().type()
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_invalid_type"));
+            return result;
+        }
+
+        WebAdminPermissionDecision permission = permissionService.decide(user, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS);
+        if (!permission.allowed()) {
+            WebAdminWriteResult result = permission.asWriteResult(target);
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_permission_denied"));
+            return result;
+        }
+
+        WebAdminWriteResult csrf = securityService.requireValidCsrf(session, csrfToken);
+        if (!csrf.success()) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(resultCode(csrf.code()), target, csrf.message());
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_csrf_failed"));
+            return result;
+        }
+        if (!sameOrigin) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.CSRF_INVALID,
+                    target,
+                    "写请求来源校验失败，请刷新页面后重试。"
+            );
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_origin_failed"));
+            return result;
+        }
+
+        if (relayTarget.relay() == null || relayTarget.world() == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "device",
+                    "unsupported_state",
+                    "设备当前不可安全编辑：" + relayTarget.unsupportedReason(),
+                    relayTarget.device().type()
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_unloaded"));
+            return result;
+        }
+
+        if (editLockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS,
+                    relayTarget.device().id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session
+            );
+            if (!lockValidation.success()) {
+                WebAdminWriteResult result = lockValidation.result();
+                audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_edit_lock_failed"));
+                return result;
+            }
+        }
+
+        List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> requestedActions = request == null || request.actions == null
+                ? List.of()
+                : request.actions;
+        if (requestedActions.size() != 1) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "action",
+                    "logic_chain_action_append_single_action_required",
+                    "逻辑链编辑器一次只能追加 1 条 Action。",
+                    String.valueOf(requestedActions.size())
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_count_invalid"));
+            return result;
+        }
+
+        if (request == null || isBlank(request.expectedFingerprint)) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "expectedFingerprint",
+                    "required",
+                    "保存需要 expectedFingerprint，用于防止覆盖其他操作的修改。",
+                    ""
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_expected_fingerprint_missing"));
+            return result;
+        }
+        if (!fingerprintMatches(relayTarget.device(), relayTarget.relay().actions(), relayTarget.relay().conditionGroupId(), request.expectedFingerprint)) {
+            WebAdminWriteResult result = conflictDetected(target, relayTarget.device(), relayTarget.relay().actions(), relayTarget.relay().conditionGroupId(), request.expectedFingerprint);
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_fingerprint_conflict"));
+            return result;
+        }
+
+        if (relayTarget.relay().actions().size() >= MAX_ACTIONS) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "actions",
+                    "too_many",
+                    "Action 列表最多支持 " + MAX_ACTIONS + " 条。",
+                    String.valueOf(relayTarget.relay().actions().size())
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_too_many"));
+            return result;
+        }
+
+        WebAdminActionRelayActionsUpdateRequest appendRequest = new WebAdminActionRelayActionsUpdateRequest();
+        appendRequest.deviceId = relayTarget.device().id();
+        appendRequest.conditionGroupId = relayTarget.relay().conditionGroupId();
+        appendRequest.actions = requestedActions;
+        Validation validation = validateRequest(server, appendRequest, gateBindingValidator);
+        if (!validation.errors().isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, validation.errors());
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), requestSummary(validation.actions(), relayTarget.relay().conditionGroupId()));
+            return result;
+        }
+        if (validation.actions().isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "action",
+                    "required",
+                    "Action 配置不能为空。",
+                    ""
+            )));
+            audit(writeContext, result, currentSummary(relayTarget.device(), relayTarget.relay()), Map.of("attempt", "append_action_empty_validation"));
+            return result;
+        }
+
+        List<ActionConfig> beforeActions = normalizeActions(relayTarget.relay().actions());
+        String conditionGroupId = relayTarget.relay().conditionGroupId();
+        List<ActionConfig> afterActions = new ArrayList<>(beforeActions);
+        afterActions.add(validation.actions().getFirst());
+        relayTarget.relay().setConditionGroupId(conditionGroupId);
+        relayTarget.relay().replaceActions(afterActions);
+        SignalDeviceData updated = SignalDeviceStore.updateActions(relayTarget.world(), relayTarget.pos(), relayTarget.relay());
+        SignalDeviceStore.forceFlushDirty(server);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("actionList", baseData(updated == null ? relayTarget.device() : updated, relayTarget.relay(), user, session));
+        data.put("changedFields", List.of("actions"));
+        data.put("actionCountBefore", beforeActions.size());
+        data.put("actionCountAfter", afterActions.size());
+        WebAdminWriteResult result = new WebAdminWriteResult(
+                true,
+                WebAdminWriteResultCode.OK.id(),
+                "Action Relay 动作已追加。",
+                target.targetType(),
+                target.targetId(),
+                true,
+                List.of(),
+                "",
+                "",
+                false,
+                Map.of(),
+                data
+        );
+        WebAdminAuditEvent auditEvent = audit(
+                writeContext,
+                result,
+                currentSummary(relayTarget.device(), beforeActions, conditionGroupId),
+                currentSummary(updated == null ? relayTarget.device() : updated, afterActions, conditionGroupId)
+        );
+        publishRealtime(updated == null ? relayTarget.device() : updated, auditEvent, user, beforeActions, afterActions, conditionGroupId);
+        releaseLockAfterWrite(request, user, session, remoteAddress);
+        return result;
+    }
+
     public WebAdminWriteResult update(
             MinecraftServer server,
             WebAdminUser user,

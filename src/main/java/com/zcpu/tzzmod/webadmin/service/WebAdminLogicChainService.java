@@ -609,6 +609,13 @@ public final class WebAdminLogicChainService {
             }
             collectActionRelatedChannels(build, related, channel, listener.channel(), listener.actions());
         }
+        for (TimerDefinition raw : build.snapshot.timers) {
+            TimerDefinition timer = raw.normalized();
+            if (!includeNode(build, timer.enabled)) {
+                continue;
+            }
+            collectTimerActionRelatedChannels(build, related, channel, timer);
+        }
         for (RegionControllerData raw : build.snapshot.regions) {
             RegionControllerData region = raw.normalized();
             if (!includeNode(build, region.enabled())) {
@@ -668,7 +675,7 @@ public final class WebAdminLogicChainService {
             }
             if (action.type() == ActionType.SIGNAL) {
                 String output = SignalChannel.normalize(action.value());
-                if (ownerChannel.equals(focusChannel) && !output.isBlank()) {
+                if (ownerChannel.equals(focusChannel) && !output.isBlank() && hasConsumersForChannel(build, output)) {
                     related.add(output);
                 }
                 if (output.equals(focusChannel) && !ownerChannel.isBlank()) {
@@ -684,6 +691,34 @@ public final class WebAdminLogicChainService {
                 if (output.equals(focusChannel) && !ownerChannel.isBlank()) {
                     related.add(ownerChannel);
                 }
+            }
+        }
+    }
+
+    private void collectTimerActionRelatedChannels(GraphBuild build, LinkedHashSet<String> related, String focusChannel, TimerDefinition timer) {
+        TimerDefinition safeTimer = timer == null ? new TimerDefinition().normalized() : timer.normalized();
+        collectTimerBucketActionRelatedChannels(build, related, focusChannel, safeTimer, safeTimer.onStartActions);
+        collectTimerBucketActionRelatedChannels(build, related, focusChannel, safeTimer, safeTimer.onTickActions);
+        collectTimerBucketActionRelatedChannels(build, related, focusChannel, safeTimer, safeTimer.onCompleteActions);
+        collectTimerBucketActionRelatedChannels(build, related, focusChannel, safeTimer, safeTimer.onCancelActions);
+    }
+
+    private void collectTimerBucketActionRelatedChannels(GraphBuild build, LinkedHashSet<String> related, String focusChannel, TimerDefinition timer, List<ActionConfig> actions) {
+        String timerOutput = SignalChannel.normalize(timer == null ? "" : timer.outputChannel);
+        for (ActionConfig raw : actions == null ? List.<ActionConfig>of() : actions) {
+            ActionConfig action = raw == null ? null : raw.normalized();
+            if (action == null || !includeNode(build, action.enabled() && action.isUsable()) || action.type() != ActionType.SIGNAL) {
+                continue;
+            }
+            String output = SignalChannel.normalize(action.value());
+            if (output.isBlank()) {
+                continue;
+            }
+            if (timerOutput.equals(focusChannel) && !output.isBlank() && hasConsumersForChannel(build, output)) {
+                related.add(output);
+            }
+            if (output.equals(focusChannel) && !timerOutput.isBlank()) {
+                related.add(timerOutput);
             }
         }
     }
@@ -787,6 +822,7 @@ public final class WebAdminLogicChainService {
             return;
         }
         LinkedHashSet<String> downstream = new LinkedHashSet<>();
+        LinkedHashSet<String> expandableDownstream = new LinkedHashSet<>();
         for (String actionNode : actions) {
             if (build.isTruncated()) {
                 break;
@@ -795,9 +831,18 @@ public final class WebAdminLogicChainService {
             Object raw = action == null ? "" : action.metadata().get("downstreamChannel");
             String downstreamChannel = SignalChannel.normalize(raw instanceof String text ? text : "");
             if (!downstreamChannel.isBlank()) {
-                String downstreamNode = addDownstreamChannelNode(build, downstreamChannel, depth + 1);
+                boolean hasConsumers = hasConsumersForChannel(build, downstreamChannel);
+                String downstreamNode = addSignalActionOutputChannelNode(build, downstreamChannel, depth + 1, hasConsumers);
                 downstream.add(downstreamNode);
-                addEdge(build, actionNode, downstreamNode, "emits_downstream", "下游频道", "dashed");
+                if (hasConsumers) {
+                    expandableDownstream.add(downstreamNode);
+                }
+                addEdge(build, actionNode, downstreamNode, "emits_downstream", "下游频道", "dashed", Map.of(
+                        "signalActionOutputChannel", true,
+                        "signalActionHasConsumer", hasConsumers,
+                        "signalActionTerminalOutput", !hasConsumers,
+                        "outputChannelPlacement", "right_of_action"
+                ));
             }
         }
         for (String consumerNode : consumers) {
@@ -810,6 +855,7 @@ public final class WebAdminLogicChainService {
                 if (!downstreamChannel.isBlank()) {
                     String downstreamNode = addChannelNode(build, downstreamChannel);
                     downstream.add(downstreamNode);
+                    expandableDownstream.add(downstreamNode);
                     addEdge(build, consumerNode, downstreamNode, "join_output", "汇合输出", "solid", Map.of(
                             "joinOutputRole", "primary",
                             "downstreamPrimaryNode", downstreamNode,
@@ -823,6 +869,7 @@ public final class WebAdminLogicChainService {
             if (!downstreamChannel.isBlank()) {
                 String downstreamNode = addDownstreamChannelNode(build, downstreamChannel, depth + 1);
                 downstream.add(downstreamNode);
+                expandableDownstream.add(downstreamNode);
                 addEdge(build, consumerNode, downstreamNode, "join_output", "汇合输出", "dashed");
             }
         }
@@ -857,7 +904,7 @@ public final class WebAdminLogicChainService {
                 List.copyOf(downstream),
                 consumers.isEmpty() ? List.of("当前频道暂无消费者。") : List.of()
         ));
-        for (String downstreamNode : downstream) {
+        for (String downstreamNode : expandableDownstream) {
             WebAdminDtos.LogicChainNodeDto node = build.nodes.get(downstreamNode);
             if (node != null && depth + 1 <= build.maxDepth) {
                 buildSegment(build, node.channel(), depth + 1, visiting);
@@ -1068,6 +1115,9 @@ public final class WebAdminLogicChainService {
         for (int i = 0; i < source.size(); i++) {
             ActionConfig action = source.get(i);
             if (action == null || action.type() != ActionType.SIGNAL || !SignalChannel.normalize(action.value()).equals(channel)) {
+                continue;
+            }
+            if ("listener".equals(safe(refType).toLowerCase(Locale.ROOT)) && !SignalChannel.normalize(ownerChannel).isBlank()) {
                 continue;
             }
             String id = "producer:" + refType + ":" + safeNodeId(refId) + ":" + i;
@@ -1305,6 +1355,36 @@ public final class WebAdminLogicChainService {
         return List.copyOf(result);
     }
 
+    private boolean hasConsumersForChannel(GraphBuild build, String channel) {
+        String normalized = SignalChannel.normalize(channel);
+        if (build == null || normalized.isBlank()) {
+            return false;
+        }
+        for (SignalListenerData raw : build.snapshot.listeners) {
+            SignalListenerData listener = raw.normalized();
+            if (SignalChannel.normalize(listener.channel()).equals(normalized) && includeNode(build, listener.enabled())) {
+                return true;
+            }
+        }
+        for (SignalDeviceData raw : build.snapshot.devices) {
+            SignalDeviceData device = raw.normalized();
+            if (!SignalChannel.normalize(device.channel()).equals(normalized)) {
+                continue;
+            }
+            if ((SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(device.type()) || SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type()))
+                    && includeNode(build, device.enabled())) {
+                return true;
+            }
+        }
+        for (SignalJoinDefinition raw : build.snapshot.joins) {
+            SignalJoinDefinition join = raw.normalized();
+            if (joinReferencesInput(join, normalized) && includeNode(build, join.enabled)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<String> actionsFor(GraphBuild build, String channel, List<String> consumers) {
         List<String> result = new ArrayList<>();
         for (SignalListenerData raw : build.snapshot.listeners) {
@@ -1401,6 +1481,109 @@ public final class WebAdminLogicChainService {
             }
             if (action != null && action.isTimerAction()) {
                 addTimerActionReference(build, id, action);
+            }
+        }
+    }
+
+    private void addTimerActionBucketNodes(GraphBuild build, String timerNode, TimerDefinition timer) {
+        if (build == null || safe(timerNode).isBlank() || timer == null) {
+            return;
+        }
+        TimerDefinition safeTimer = timer.normalized();
+        String key = "timer_actions:" + safeTimer.id;
+        if (!build.expandedTimerActionBuckets.add(key)) {
+            return;
+        }
+        addTimerBucketActionNodes(build, timerNode, safeTimer, "start", "启动动作", safeTimer.onStartActions);
+        addTimerBucketActionNodes(build, timerNode, safeTimer, "tick", "Tick 动作", safeTimer.onTickActions);
+        addTimerBucketActionNodes(build, timerNode, safeTimer, "complete", "完成动作", safeTimer.onCompleteActions);
+        addTimerBucketActionNodes(build, timerNode, safeTimer, "cancel", "取消动作", safeTimer.onCancelActions);
+    }
+
+    private void addTimerBucketActionNodes(
+            GraphBuild build,
+            String timerNode,
+            TimerDefinition timer,
+            String bucket,
+            String bucketLabel,
+            List<ActionConfig> actions
+    ) {
+        List<ActionConfig> source = actions == null ? List.of() : actions;
+        for (int i = 0; i < source.size(); i++) {
+            ActionConfig action = source.get(i);
+            String downstream = action != null && action.type() == ActionType.SIGNAL ? SignalChannel.normalize(action.value()) : "";
+            String id = "action:timer:" + safeNodeId(timer.id) + ":" + safeNodeId(bucket) + ":" + i;
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("actionIndex", i);
+            metadata.put("actionDisplayIndex", i + 1);
+            metadata.put("ownerType", "timer");
+            metadata.put("ownerId", timer.id);
+            metadata.put("ownerName", safe(timer.displayName));
+            metadata.put("ownerChannel", SignalChannel.normalize(timer.outputChannel));
+            metadata.put("timerBucket", bucket);
+            metadata.put("timerBucketLabel", bucketLabel);
+            metadata.put("actionType", WebAdminReadonlySupport.actionType(action));
+            metadata.put("summary", WebAdminReadonlySupport.actionSummary(action));
+            metadata.put("downstreamChannel", downstream);
+            metadata.put("readOnly", true);
+            metadata.put("timerActionVisible", true);
+            metadata.put("timerActionSurvivesReload", true);
+            if (action != null && action.isStateVariableAction()) {
+                metadata.putAll(stateActionMetadata(build, action));
+            }
+            if (action != null && action.isTimerAction()) {
+                metadata.putAll(timerActionMetadata(build, action));
+            }
+            boolean enabled = timer.enabled && action != null && action.enabled() && action.isUsable();
+            if (!includeNode(build, enabled)) {
+                continue;
+            }
+            String conditionGroupId = WebAdminConditionGroupStore.normalizeId(action == null ? "" : action.conditionGroupId());
+            String gateId = conditionGroupId.isBlank() ? "" : actionGateNodeId("timer", timer.id, bucket, i);
+            metadata.put("conditionGroupId", conditionGroupId);
+            metadata.put("conditionGateNodeId", gateId);
+            String nodeType = actionNodeType(action);
+            String refType = actionRefType(action);
+            String detailRoute = "#/timers/" + encode(timer.id);
+            addNode(build, id, nodeType, refType, "timer:" + timer.id + ":" + bucket + ":" + i, bucketLabel + " #" + (i + 1) + " " + labelAction(action), WebAdminReadonlySupport.actionSummary(action), SignalChannel.normalize(timer.outputChannel), enabled, detailRoute, metadata);
+            if (!conditionGroupId.isBlank()) {
+                String targetId = ConditionActionGateService.actionTargetId("timer_" + safe(bucket), timer.id, i);
+                String gateNode = addGateNode(
+                        build,
+                        gateId,
+                        "action_gate",
+                        bucketLabel + " gate",
+                        conditionGroupId,
+                        timerActionTargetType(bucket),
+                        targetId,
+                        "ACTION",
+                        timerParentTargetType(bucket),
+                        timer.id,
+                        i,
+                        action == null || action.type() == null ? "" : action.type().id(),
+                        SignalChannel.normalize(timer.outputChannel),
+                        detailRoute
+                );
+                addEdge(build, timerNode, gateNode, "gate_guards", bucketLabel + " #" + (i + 1) + " 条件", "solid");
+                addEdge(build, gateNode, id, "executes", "通过后执行 " + bucketLabel + " #" + (i + 1), "solid");
+            } else {
+                addEdge(build, timerNode, id, "executes", bucketLabel + " #" + (i + 1), "solid");
+            }
+            if (action != null && action.isStateVariableAction()) {
+                addStateVariableReference(build, id, action);
+            }
+            if (action != null && action.isTimerAction()) {
+                addTimerActionReference(build, id, action);
+            }
+            if (!downstream.isBlank()) {
+                boolean hasConsumers = hasConsumersForChannel(build, downstream);
+                String downstreamNode = addSignalActionOutputChannelNode(build, downstream, 1, hasConsumers);
+                addEdge(build, id, downstreamNode, "emits_downstream", "下游频道", "dashed", Map.of(
+                        "signalActionOutputChannel", true,
+                        "signalActionHasConsumer", hasConsumers,
+                        "signalActionTerminalOutput", !hasConsumers,
+                        "outputChannelPlacement", "right_of_action"
+                ));
             }
         }
     }
@@ -1530,6 +1713,14 @@ public final class WebAdminLogicChainService {
         return addNode(build, id, "downstream_channel", "channel", channel, display.title(), display.subtitle(), channel, true, "#/logic-chains/resolve?rootType=channel&rootRef=" + encode(channel), metadata);
     }
 
+    private String addSignalActionOutputChannelNode(GraphBuild build, String channel, int depth, boolean hasConsumers) {
+        String normalized = SignalChannel.normalize(channel);
+        if (hasConsumers) {
+            return addChannelNode(build, normalized);
+        }
+        return addDownstreamChannelNode(build, normalized, depth);
+    }
+
     private String addTimerNode(GraphBuild build, TimerDefinition timer, String channel, String graphRole) {
         TimerDefinition safeTimer = timer == null ? new TimerDefinition() : timer.normalized();
         String id = "timer:" + safeNodeId(safeTimer.id);
@@ -1537,7 +1728,7 @@ public final class WebAdminLogicChainService {
         String subtitle = "producer".equals(graphRole)
                 ? "Timer 完成输出 · " + safeTimer.mode.displayName()
                 : "Timer 引用 · " + safeTimer.mode.displayName();
-        return addNode(
+        String nodeId = addNode(
                 build,
                 id,
                 "timer",
@@ -1550,6 +1741,8 @@ public final class WebAdminLogicChainService {
                 "#/timers/" + encode(safeTimer.id),
                 timerMetadata(build, safeTimer, graphRole)
         );
+        addTimerActionBucketNodes(build, nodeId, safeTimer);
+        return nodeId;
     }
 
     private String addMissingTimerNode(GraphBuild build, String timerId) {
@@ -2242,7 +2435,12 @@ public final class WebAdminLogicChainService {
             }
         }
         for (TimerDefinition raw : snapshot.timers) {
-            if (!addKnownChannel(channels, raw.normalized().outputChannel)) {
+            TimerDefinition timer = raw.normalized();
+            if (!addKnownChannel(channels, timer.outputChannel)
+                    || !addKnownActionChannels(channels, timer.onStartActions)
+                    || !addKnownActionChannels(channels, timer.onTickActions)
+                    || !addKnownActionChannels(channels, timer.onCompleteActions)
+                    || !addKnownActionChannels(channels, timer.onCancelActions)) {
                 return channels;
             }
         }
@@ -3604,6 +3802,7 @@ public final class WebAdminLogicChainService {
         private final Map<String, WebAdminDtos.LogicChainNodeDto> nodes = new LinkedHashMap<>();
         private final List<WebAdminDtos.LogicChainEdgeDto> edges = new ArrayList<>();
         private final Set<String> edgeKeys = new LinkedHashSet<>();
+        private final Set<String> expandedTimerActionBuckets = new LinkedHashSet<>();
         private final List<WebAdminDtos.LogicChainSegmentDto> segments = new ArrayList<>();
         private final List<String> warnings = new ArrayList<>();
         private final Set<String> visitedChannels = new LinkedHashSet<>();

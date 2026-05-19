@@ -17,7 +17,13 @@ import com.zcpu.tzzmod.signal.join.SignalJoinDefinition;
 import com.zcpu.tzzmod.signal.join.SignalJoinInputDefinition;
 import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminDeviceMetadataStore;
+import com.zcpu.tzzmod.webadmin.WebAdminLogicChainMetadataStore;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainMetadataRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
+import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +57,7 @@ public final class WebAdminLogicChainServiceTest {
         requireEdgeType(inputGraph, "gate_guards", "gate guard edge visible");
         requireEdgeType(inputGraph, "state_writes", "state write edge visible");
         requireEdgeType(inputGraph, "action_starts_timer", "timer action edge visible");
+        requireEdgeType(inputGraph, "action_cancels_timer", "timer cancel action edge visible");
         requireEdgeType(inputGraph, "join_input", "join input edge visible");
         requireJoinInputEdge(inputGraph, "channel:in.a", "signal_join:join.alpha", "primary", "solid", "join-primary", false);
         requireJoinInputEdge(inputGraph, "channel:in.b", "signal_join:join.alpha", "related", "dashed", "join-related-dashed", false);
@@ -95,6 +102,18 @@ public final class WebAdminLogicChainServiceTest {
         WebAdminDtos.LogicChainNodeDto timerNode = requireNodeType(timerGraph, "timer", "timer output source visible");
         requireEquals("timer", timerNode.metadata().get("graphRole"), "timer node metadata is shared and role-neutral");
         requireEdgeType(timerGraph, "timer_outputs_channel", "timer output edge visible");
+        requireNodeId(timerGraph, "action:timer:timer.alpha:complete:0", "timer complete signal action visible as a real graph node");
+        requireEdge(timerGraph, "timer:timer.alpha", "action_gate:timer:timer.alpha:complete:0", "gate_guards", "timer bucket action gate is connected from the Timer");
+        requireEdge(timerGraph, "action_gate:timer:timer.alpha:complete:0", "action:timer:timer.alpha:complete:0", "executes", "timer action bucket expands into graph nodes");
+        requireEdge(timerGraph, "action:timer:timer.alpha:complete:0", "reference:channel:timer.after", "emits_downstream", "timer signal action output appears to the right of the action");
+        WebAdminDtos.LogicChainNodeDto startBucketAction = requireNodeId(timerGraph, "action:timer:timer.alpha:start:0", "timer bucket timer_start action visible");
+        requireEquals("timer_start", startBucketAction.metadata().get("timerOperation"), "timer_start bucket action exposes timer action metadata");
+        requireEquals("timer.alpha", startBucketAction.metadata().get("timerId"), "timer_start bucket action points to target timer");
+        requireEquals(Boolean.TRUE, startBucketAction.metadata().get("targetExists"), "timer_start bucket action resolves target timer");
+        requireEdge(timerGraph, "action:timer:timer.alpha:start:0", "timer:timer.alpha", "action_starts_timer", "timer_start bucket action links to Timer");
+        WebAdminDtos.LogicChainNodeDto cancelBucketAction = requireNodeId(timerGraph, "action:timer:timer.alpha:cancel:0", "timer bucket timer_cancel action visible");
+        requireEquals("timer_cancel", cancelBucketAction.metadata().get("timerOperation"), "timer_cancel bucket action exposes timer action metadata");
+        requireEdge(timerGraph, "action:timer:timer.alpha:cancel:0", "timer:timer.alpha", "action_cancels_timer", "timer_cancel bucket action links to Timer");
         requireTimerGateSummary(timerNode);
 
         WebAdminDtos.LogicChainGraphDto missingTimerGraph = WebAdminLogicChainService.graphForSnapshotForTest(
@@ -113,9 +132,67 @@ public final class WebAdminLogicChainServiceTest {
         requireEquals(0, missingTimerGraph.stats().get("timerCount"), "missing timer reference is not counted as a real timer");
         requireEquals(0, missingTimerGraph.stats().get("disabledNodeCount"), "missing timer reference is not counted as a disabled real node");
         requireDisplayNameResolverUsesWebAdminMetadata();
+        requireLogicChainMetadataRootChannelRoundtripContract();
         requireComponentAwareJoinTraversalFromAnyRoot();
+        requireSignalActionOutputPlacement();
         requireLargeComponentTruncation();
         requireGraphModelV2Dedupe();
+    }
+
+    private static void requireLogicChainMetadataRootChannelRoundtripContract() {
+        try {
+            WebAdminLogicChainService service = new WebAdminLogicChainService(new WebAdminPermissionService(), new WebAdminWriteSecurityService(), null);
+            WebAdminLogicChainMetadataRequest request = new WebAdminLogicChainMetadataRequest();
+            request.chainId = "";
+            request.displayName = "Round Start";
+            request.rootType = "channel";
+            request.rootRef = "Game.Round.Start";
+            request.includeDisabled = true;
+            request.maxDepth = 3;
+            request.layoutPreference = "auto";
+
+            Method generatedId = WebAdminLogicChainService.class.getDeclaredMethod("generatedId", WebAdminLogicChainMetadataRequest.class);
+            generatedId.setAccessible(true);
+            String id = (String) generatedId.invoke(null, request);
+            requireEquals("channel:game.round.start", id, "new logic chain generated id uses normalized root channel");
+
+            Method normalizedEntry = WebAdminLogicChainService.class.getDeclaredMethod(
+                    "normalizedEntry",
+                    WebAdminLogicChainMetadataRequest.class,
+                    String.class,
+                    long.class,
+                    com.zcpu.tzzmod.webadmin.WebAdminUser.class
+            );
+            normalizedEntry.setAccessible(true);
+            WebAdminLogicChainMetadataStore.MetadataEntry entry = (WebAdminLogicChainMetadataStore.MetadataEntry) normalizedEntry.invoke(service, request, id, 0L, null);
+            requireEquals("channel:game.round.start", entry.id, "new logic chain metadata id roundtrips");
+            requireEquals("channel", entry.rootType, "new logic chain rootType roundtrips");
+            requireEquals("game.round.start", entry.rootRef, "new logic chain rootRef normalizes and roundtrips");
+
+            Class<?> snapshotClass = null;
+            for (Class<?> declared : WebAdminLogicChainService.class.getDeclaredClasses()) {
+                if ("Snapshot".equals(declared.getSimpleName())) {
+                    snapshotClass = declared;
+                    break;
+                }
+            }
+            requireTrue(snapshotClass != null, "logic chain service snapshot class is available for validation reflection");
+            Method validate = WebAdminLogicChainService.class.getDeclaredMethod("validateMetadataRequest", snapshotClass, WebAdminLogicChainMetadataRequest.class, String.class);
+            validate.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<WebAdminValidationError> validErrors = (List<WebAdminValidationError>) validate.invoke(service, null, request, id);
+            requireEquals(0, validErrors.size(), "rootType=channel with filled rootRef passes metadata validation");
+
+            WebAdminLogicChainMetadataRequest blank = new WebAdminLogicChainMetadataRequest();
+            blank.rootType = "channel";
+            blank.rootRef = "";
+            @SuppressWarnings("unchecked")
+            List<WebAdminValidationError> blankErrors = (List<WebAdminValidationError>) validate.invoke(service, null, blank, "");
+            requireTrue(blankErrors.stream().anyMatch(error -> "rootRef".equals(error.field()) && "required".equals(error.code())),
+                    "empty root channel fails metadata validation with rootRef required");
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("logic chain metadata root channel reflection test failed", exception);
+        }
     }
 
     private static void requireDisplayNameResolverUsesWebAdminMetadata() {
@@ -211,7 +288,13 @@ public final class WebAdminLogicChainServiceTest {
                 TimerStartPolicy.RESTART,
                 "group.timer.start"
         );
-        return new SignalListenerData("listener.alpha", "监听器 Alpha", "in.a", true, 0, "group.list", List.of(state, timerStart)).normalized();
+        ActionConfig timerCancel = ActionConfig.timerCancel(
+                "timer.alpha",
+                TimerTargetMode.GLOBAL,
+                "",
+                ""
+        );
+        return new SignalListenerData("listener.alpha", "监听器 Alpha", "in.a", true, 0, "group.list", List.of(state, timerStart, timerCancel)).normalized();
     }
 
     private static SignalJoinDefinition join() {
@@ -232,7 +315,9 @@ public final class WebAdminLogicChainServiceTest {
         timer.displayName = "计时器 Alpha";
         timer.outputChannel = "timer.done";
         timer.durationTicks = 40;
+        timer.onStartActions = List.of(ActionConfig.timerStart("timer.alpha", TimerTargetMode.GLOBAL, "", TimerStartPolicy.RESTART, ""));
         timer.onCompleteActions = List.of(new ActionConfig(ActionType.SIGNAL, "timer.after", true, false, 0, false, "group.timer.complete"));
+        timer.onCancelActions = List.of(ActionConfig.timerCancel("timer.alpha", TimerTargetMode.GLOBAL, "", ""));
         return timer.normalized();
     }
 
@@ -307,8 +392,10 @@ public final class WebAdminLogicChainServiceTest {
             requireNodeId(graph, "channel:in.b", "component contains Join input B from root " + root);
             requireNodeId(graph, "channel:out.c", "component contains Join output C from root " + root);
             requireNodeId(graph, "signal_join:join.alpha", "component contains Join node from root " + root);
-            requireNodeId(graph, "producer:listener:producer-a:0", "component contains input A upstream signal producer alias from root " + root);
-            requireNodeId(graph, "producer:listener:producer-b:0", "component contains input B upstream signal producer alias from root " + root);
+            requireNodeId(graph, "action:listener:producer-a:0", "component contains input A upstream signal action from root " + root);
+            requireNodeId(graph, "action:listener:producer-b:0", "component contains input B upstream signal action from root " + root);
+            requireEquals(0, countNodeIdsContaining(graph, "producer:listener:producer-a"), "listener signal action producer alias is not duplicated from root " + root);
+            requireEquals(0, countNodeIdsContaining(graph, "producer:listener:producer-b"), "listener signal action producer alias is not duplicated from root " + root);
             requireNodeId(graph, "consumer:listener:producer-a", "component expands input A producer owner channel from root " + root);
             requireNodeId(graph, "consumer:listener:producer-b", "component expands input B producer owner channel from root " + root);
             requireNodeId(graph, "consumer:listener:listener.out", "component expands shared output downstream once from root " + root);
@@ -368,6 +455,44 @@ public final class WebAdminLogicChainServiceTest {
         requireEquals(Boolean.TRUE, focusedJoin.metadata().get("currentRootIsInput"), "large join recognizes focus input beyond cap");
         requireJoinInputEdge(focusedInputGraph, "channel:large.in.109", "signal_join:join.large", "primary", "solid", "join-primary", false);
         requireTrue(focusedInputGraph.nodes().size() <= 70, "large join focused input graph node materialization stays bounded");
+    }
+
+    private static void requireSignalActionOutputPlacement() {
+        SignalListenerData producer = upstreamSignalProducer("producer-terminal", "seed.terminal", "terminal.out");
+        WebAdminDtos.LogicChainGraphDto terminalGraph = WebAdminLogicChainService.graphForSnapshotForTest(
+                "seed.terminal",
+                List.of(),
+                List.of(producer),
+                List.of(),
+                List.of(),
+                List.of(),
+                new StateVariableLoadResult(StateVariableSnapshot.empty(), false, "", false),
+                true,
+                3
+        );
+        requireNodeId(terminalGraph, "action:listener:producer-terminal:0", "terminal signal action is visible");
+        requireNodeId(terminalGraph, "reference:channel:terminal.out", "terminal output channel is visible as a downstream endpoint");
+        requireEdge(terminalGraph, "action:listener:producer-terminal:0", "reference:channel:terminal.out", "emits_downstream", "terminal signal output is linked from the action");
+        requireEquals(0, countNodes(terminalGraph, "channel", "channel:terminal.out", "primary"), "terminal signal output does not also create a disconnected primary channel");
+        requireEquals(0, countNodeIdsContaining(terminalGraph, "producer:listener:producer-terminal"), "terminal signal action does not create far-left listener producer alias");
+
+        SignalListenerData consumer = new SignalListenerData("listener.consumer", "终点监听器", "terminal.out", true, 0, "", List.of()).normalized();
+        WebAdminDtos.LogicChainGraphDto consumerGraph = WebAdminLogicChainService.graphForSnapshotForTest(
+                "seed.terminal",
+                List.of(),
+                List.of(producer, consumer),
+                List.of(),
+                List.of(),
+                List.of(),
+                new StateVariableLoadResult(StateVariableSnapshot.empty(), false, "", false),
+                true,
+                3
+        );
+        requireEdge(consumerGraph, "action:listener:producer-terminal:0", "channel:terminal.out", "emits_downstream", "signal action output links to primary output channel before consumers");
+        requireNodeId(consumerGraph, "channel:terminal.out", "primary output channel is present for downstream consumer");
+        requireNodeId(consumerGraph, "consumer:listener:listener.consumer", "downstream consumer remains linked to the output channel");
+        requireEdge(consumerGraph, "channel:terminal.out", "consumer:listener:listener.consumer", "consumes", "output channel links to consumer");
+        requireEquals(0, countNodeIdsContaining(consumerGraph, "producer:listener:producer-terminal"), "signal action with consumers does not create far-left listener producer alias");
     }
 
     private static SignalListenerData downstreamListener() {

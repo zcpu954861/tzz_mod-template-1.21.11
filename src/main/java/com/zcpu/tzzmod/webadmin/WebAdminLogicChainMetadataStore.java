@@ -118,7 +118,7 @@ public final class WebAdminLogicChainMetadataStore {
     private static String normalizeRootType(String rootType) {
         String value = safe(rootType).trim().toLowerCase(java.util.Locale.ROOT);
         return switch (value) {
-            case "device", "listener", "receiver", "relay", "region", "region_controller", "action" -> value;
+            case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join", "timer" -> value;
             default -> "channel";
         };
     }

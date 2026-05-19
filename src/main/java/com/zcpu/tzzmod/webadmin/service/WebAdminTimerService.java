@@ -255,6 +255,125 @@ public final class WebAdminTimerService {
         return result;
     }
 
+    public WebAdminWriteResult addActionToBucket(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String id,
+            String bucket,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry action,
+            String expectedFingerprint,
+            String lockId,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        String safeId = TimerStore.normalizeId(id);
+        String safeBucket = safe(bucket).toLowerCase(java.util.Locale.ROOT);
+        WebAdminWriteTarget target = target(safeId);
+        WebAdminWriteContext context = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_TIMER, target);
+        WebAdminWriteResult preflight = writePreflight(user, session, csrfToken, sameOrigin, target, safe(lockId), safeId);
+        if (!preflight.success()) {
+            audit(context, preflight, Map.of(), Map.of("attempt", "append_action_preflight_failed", "bucket", safeBucket));
+            return preflight;
+        }
+        if (!"tick".equals(safeBucket) && !"complete".equals(safeBucket)) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
+                    "bucket",
+                    "logic_chain_timer_action_bucket_invalid",
+                    "逻辑链编辑器当前只允许追加 Timer onTick / onComplete Action。",
+                    safeBucket
+            )));
+            audit(context, result, Map.of(), Map.of("attempt", "append_action_invalid_bucket", "bucket", safeBucket));
+            return result;
+        }
+        TimerStore.TimerLoadResult loaded = loadResult(server);
+        if (loaded.degraded()) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, loaded.message());
+            audit(context, result, Map.of(), Map.of("attempt", "append_action_store_degraded", "bucket", safeBucket));
+            return result;
+        }
+        TimerDefinition before = loaded.file().timers.get(safeId);
+        if (before == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Timer 不存在或已删除。");
+            audit(context, result, Map.of(), Map.of("attempt", "append_action_missing", "bucket", safeBucket));
+            return result;
+        }
+        TimerDefinition normalizedBefore = before.normalized();
+        if ("tick".equals(safeBucket) && normalizedBefore.mode == TimerMode.DELAY) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
+                    "bucket",
+                    "logic_chain_timer_delay_tick_action_not_supported",
+                    "DELAY 模式没有 onTick 阶段，不能追加 Tick 动作。",
+                    safeBucket
+            )));
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", "append_action_delay_tick"));
+            return result;
+        }
+        String expected = safe(expectedFingerprint);
+        String actual = TimerStore.fingerprintFor(before);
+        if (expected.isBlank() || !actual.equals(expected)) {
+            WebAdminWriteResult result = fingerprintConflict(target, before, expected);
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", "append_action_fingerprint_conflict", "bucket", safeBucket));
+            return result;
+        }
+
+        List<ActionConfig> current = "tick".equals(safeBucket)
+                ? normalizedBefore.onTickActions
+                : normalizedBefore.onCompleteActions;
+        if (current.size() >= MAX_ACTIONS_PER_LIST) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
+                    safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions",
+                    "timer_too_many_actions",
+                    "每个 Timer action list 最多支持 64 条动作。",
+                    String.valueOf(current.size())
+            )));
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", "append_action_too_many", "bucket", safeBucket));
+            return result;
+        }
+        List<WebAdminValidationError> errors = new ArrayList<>();
+        validateActionEntries(
+                server,
+                safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions",
+                List.of(action == null ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry() : action),
+                safeBucket.equals("tick") ? ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION : ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION,
+                errors
+        );
+        if (!errors.isEmpty()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", "append_action_validation_failed", "bucket", safeBucket));
+            return result;
+        }
+
+        TimerDefinition afterDraft = normalizedBefore.normalized();
+        List<ActionConfig> appended = new ArrayList<>(current);
+        appended.add(WebAdminActionRelayActionsService.actionFromEntry(action).normalized());
+        if ("tick".equals(safeBucket)) {
+            afterDraft.onTickActions = List.copyOf(appended);
+        } else {
+            afterDraft.onCompleteActions = List.copyOf(appended);
+        }
+        TimerDefinition after = afterDraft.withWriteMetadata(username(user), before.version + 1L, false);
+        loaded.file().timers.put(after.id, after);
+        if (!save(server, loaded.file())) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "Timer Action 追加失败，请查看服务端日志。");
+            audit(context, result, TimerStore.summary(before), TimerStore.summary(after));
+            return result;
+        }
+        TimerRuntimeService.clearTimer(server, after.id);
+        WebAdminWriteResult result = okWithData(target, ("tick".equals(safeBucket) ? "Timer Tick Action" : "Timer 完成 Action") + " 已追加。", Map.of(
+                "timer", detailMap(server, after, user, session, true, currentGameTime(server)),
+                "routeTarget", routeTarget(after.id),
+                "changedFields", List.of(safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions"),
+                "actionCountBefore", current.size(),
+                "actionCountAfter", appended.size()
+        ));
+        WebAdminAuditEvent auditEvent = audit(context, result, TimerStore.summary(before), TimerStore.summary(after));
+        publishConfigRealtime(after, auditEvent, user, "Timer Action 已追加。");
+        releaseLockAfterWrite(lockId, user, session, remoteAddress, after.id);
+        return result;
+    }
+
     public WebAdminWriteResult delete(
             MinecraftServer server,
             WebAdminUser user,

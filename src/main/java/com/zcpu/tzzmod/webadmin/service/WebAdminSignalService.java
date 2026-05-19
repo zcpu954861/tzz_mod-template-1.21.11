@@ -40,6 +40,7 @@ public final class WebAdminSignalService {
         WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
         // 8.12 extends former knownChannels(server, devices, listeners, regions, joins) with Timer output channels.
         LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions, joins, timers);
+        channels.addAll(metadataFile.channels.keySet());
         int limit = WebAdminReadonlySupport.limit(requestedLimit, WebAdminReadonlySupport.MAX_LIST_LIMIT);
         List<WebAdminDtos.SignalChannelListEntryDto> result = new ArrayList<>();
         for (String channel : channels) {
@@ -153,7 +154,10 @@ public final class WebAdminSignalService {
         List<RegionControllerData> regions = RegionControllerStore.getSnapshot(server);
         List<SignalJoinDefinition> joins = SignalJoinStore.getSnapshot(server);
         List<TimerDefinition> timers = TimerStore.getSnapshot(server);
-        return knownChannels(server, devices, listeners, regions, joins, timers).contains(channel);
+        WebAdminChannelMetadataStore.MetadataFile metadataFile = WebAdminChannelMetadataStore.load(server);
+        LinkedHashSet<String> channels = knownChannels(server, devices, listeners, regions, joins, timers);
+        channels.addAll(metadataFile.channels.keySet());
+        return channels.contains(channel);
     }
 
     public List<WebAdminDtos.SignalHistoryEntryDto> history(MinecraftServer server, String channel, int requestedLimit) {
