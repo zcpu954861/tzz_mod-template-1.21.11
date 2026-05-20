@@ -29,6 +29,8 @@ public final class WebAdminEditLockService {
     public static final String TARGET_CHANNEL_METADATA = "channel_metadata";
     public static final String TARGET_LOGIC_CHAIN_METADATA = "logic_chain_metadata";
     public static final String TARGET_LOGIC_CHAIN_EDITOR = "logic_chain_editor";
+    public static final String TARGET_TEMPLATE_STORE = "template_store";
+    public static final String TARGET_TEMPLATE_APPLY = "template_apply";
     public static final String TARGET_CONDITION_GROUP = "condition_group";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
@@ -553,6 +555,12 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_EDITOR.equals(safeTargetType)) {
             return "逻辑链编辑器";
         }
+        if (TARGET_TEMPLATE_STORE.equals(safeTargetType)) {
+            return "模板库";
+        }
+        if (TARGET_TEMPLATE_APPLY.equals(safeTargetType)) {
+            return "模板应用";
+        }
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return "条件组";
         }
@@ -629,6 +637,12 @@ public final class WebAdminEditLockService {
         if (TARGET_LOGIC_CHAIN_EDITOR.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_LOGIC_CHAIN;
         }
+        if (TARGET_TEMPLATE_STORE.equals(safeTargetType)) {
+            return WebAdminOperationType.IMPORT_TEMPLATE;
+        }
+        if (TARGET_TEMPLATE_APPLY.equals(safeTargetType)) {
+            return WebAdminOperationType.APPLY_TEMPLATE;
+        }
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CONDITION_GROUP;
         }
@@ -662,6 +676,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_LOGIC_CHAIN_EDITOR.equals(lock.targetType())) {
             return "#/logic-chains";
+        }
+        if (TARGET_TEMPLATE_STORE.equals(lock.targetType()) || TARGET_TEMPLATE_APPLY.equals(lock.targetType())) {
+            return "#/templates";
         }
         if (TARGET_CONDITION_GROUP.equals(lock.targetType())) {
             return "#/condition-groups/" + encode(lock.targetId());

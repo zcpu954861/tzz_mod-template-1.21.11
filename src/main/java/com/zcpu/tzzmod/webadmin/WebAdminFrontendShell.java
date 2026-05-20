@@ -106,6 +106,10 @@ public final class WebAdminFrontendShell {
                           <button class="nav-item" data-route="#/action-templates"><span class="nav-icon" data-icon="action-template"></span>动作模板</button>
                         </div>
                         <div class="nav-section">
+                          <div class="nav-section-title">模板与复用</div>
+                          <button class="nav-item" data-route="#/templates" data-template-center-nav="true"><span class="nav-icon" data-icon="template-package"></span>模板中心</button>
+                        </div>
+                        <div class="nav-section">
                           <div class="nav-section-title">系统管理</div>
                           <button class="nav-item" data-route="#/users"><span class="nav-icon" data-icon="user"></span>用户与权限</button>
                           <button class="nav-item" data-route="#/config"><span class="nav-icon" data-icon="settings"></span>配置管理</button>
