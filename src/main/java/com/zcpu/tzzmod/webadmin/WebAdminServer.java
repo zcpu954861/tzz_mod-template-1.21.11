@@ -28,6 +28,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminTemplateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminTimerRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
@@ -56,6 +57,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerBasicConfigService
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalListenerLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminTemplateService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
@@ -112,6 +114,7 @@ public final class WebAdminServer {
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
     private final WebAdminTimerService timerService = new WebAdminTimerService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminTemplateService templateService = new WebAdminTemplateService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
     private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
@@ -323,6 +326,10 @@ public final class WebAdminServer {
             }
             if (path.equals("/api/webadmin/logic-chains") || path.startsWith("/api/webadmin/logic-chains/")) {
                 runOnServerThread(() -> handleLogicChains(exchange, auth, path, method));
+                return;
+            }
+            if (path.equals("/api/webadmin/templates") || path.startsWith("/api/webadmin/templates/")) {
+                runOnServerThread(() -> handleTemplates(exchange, auth, path, method));
                 return;
             }
             if (path.equals("/api/webadmin/signal-joins") || path.startsWith("/api/webadmin/signal-joins/")) {
@@ -1045,7 +1052,14 @@ public final class WebAdminServer {
         }
         if (parts.length == 1) {
             if (method.equalsIgnoreCase("GET")) {
-                WebAdminJsonResponse.ok(exchange, logicChainService.graphForChain(minecraftServer, auth.user, auth.session, chainId));
+                Map<String, String> query = queryParams(exchange);
+                WebAdminJsonResponse.ok(exchange, logicChainService.graphForChain(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        chainId,
+                        query.getOrDefault("focusChannel", query.getOrDefault("focus", ""))
+                ));
                 return;
             }
             if (method.equalsIgnoreCase("PATCH")) {
@@ -1246,6 +1260,100 @@ public final class WebAdminServer {
         }
 
         WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "Signal Join 接口不存在。");
+    }
+
+    private void handleTemplates(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/templates";
+        if (path.equals(root)) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, templateService.list(minecraftServer, auth.user, auth.session));
+            return;
+        }
+        String tail = path.startsWith(root + "/") ? path.substring((root + "/").length()) : "";
+        if (tail.equals("detail")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, templateService.detail(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    query.getOrDefault("source", ""),
+                    query.getOrDefault("id", "")
+            ));
+            return;
+        }
+        if (tail.equals("export")) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            Map<String, String> query = queryParams(exchange);
+            WebAdminJsonResponse.ok(exchange, templateService.exportTemplate(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    query.getOrDefault("source", ""),
+                    query.getOrDefault("id", "")
+            ));
+            return;
+        }
+        if (!method.equalsIgnoreCase("POST")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+            return;
+        }
+        WebAdminTemplateRequest request = readJson(exchange, WebAdminTemplateRequest.class);
+        if (request == null) {
+            request = new WebAdminTemplateRequest();
+        }
+        if (tail.equals("import-preview")) {
+            WebAdminJsonResponse.ok(exchange, templateService.previewImport(minecraftServer, auth.user, auth.session, request));
+            return;
+        }
+        if (tail.equals("import")) {
+            WebAdminWriteResult result = templateService.importUserTemplate(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if (tail.equals("apply-preview")) {
+            WebAdminWriteResult result = templateService.dryRunApply(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if (tail.equals("apply")) {
+            WebAdminWriteResult result = templateService.apply(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "模板中心接口不存在。");
     }
 
     private void handleTimers(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {

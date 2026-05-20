@@ -137,6 +137,76 @@ public final class WebAdminLogicChainServiceTest {
         requireSignalActionOutputPlacement();
         requireLargeComponentTruncation();
         requireGraphModelV2Dedupe();
+        requireComponentListEntryGrouping();
+    }
+
+    private static void requireComponentListEntryGrouping() {
+        List<WebAdminDtos.LogicChainSummaryDto> autoRows = WebAdminLogicChainService.listChainsForSnapshotForTest(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(join()),
+                List.of(),
+                List.of(),
+                true,
+                3
+        );
+        requireEquals(1, autoRows.size(), "Join input/output channels are grouped into one auto component list entry");
+        WebAdminDtos.LogicChainSummaryDto auto = autoRows.get(0);
+        requireEquals("auto_component", auto.source(), "auto-only component row exposes auto component source");
+        requireTrue(auto.componentId().startsWith("component:"), "auto component row exposes stable componentId");
+        requireEquals(auto.defaultFocusChannel(), auto.rootChannel(), "auto component default focus is the row root channel");
+        requireContainsChannel(auto.includedChannels(), "in.a", "auto component includes Join input A");
+        requireContainsChannel(auto.includedChannels(), "in.b", "auto component includes Join input B");
+        requireContainsChannel(auto.includedChannels(), "out.c", "auto component includes Join output C");
+        requireEquals(auto.includedChannels().size(), auto.channelCount(), "component channel count is derived from includedChannels");
+        requireEquals(1, auto.signalJoinCount(), "component summary counts Join once");
+
+        WebAdminLogicChainMetadataStore.MetadataEntry saved = metadataEntry("chain.saved", "保存的整链", "in.a");
+        List<WebAdminDtos.LogicChainSummaryDto> savedRows = WebAdminLogicChainService.listChainsForSnapshotForTest(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(join()),
+                List.of(),
+                List.of(saved),
+                true,
+                3
+        );
+        requireEquals(1, savedRows.size(), "metadata root and auto-discovered channels in same component merge into one row");
+        WebAdminDtos.LogicChainSummaryDto savedRow = savedRows.get(0);
+        requireEquals("chain.saved", savedRow.id(), "saved metadata entry remains the route id");
+        requireEquals("saved_metadata", savedRow.source(), "merged component prefers saved metadata source");
+        requireEquals("保存的整链", savedRow.displayName(), "merged component prefers saved metadata display name");
+        requireContainsChannel(savedRow.includedChannels(), "out.c", "saved metadata component absorbs auto output channel");
+
+        ActionConfig sharedState = ActionConfig.stateVariable(
+                StateVariableMutationOperation.SET_VARIABLE,
+                StateVariableScope.GLOBAL,
+                StateVariableTargetMode.CONTEXT_PLAYER,
+                "",
+                "shared.flag",
+                StateVariableType.BOOLEAN,
+                "true",
+                0,
+                true,
+                "false",
+                "shared.condition"
+        );
+        List<WebAdminDtos.LogicChainSummaryDto> weakRows = WebAdminLogicChainService.listChainsForSnapshotForTest(
+                List.of(),
+                List.of(
+                        new SignalListenerData("weak.a", "弱关联 A", "weak.a", true, 0, "shared.condition", List.of(sharedState)).normalized(),
+                        new SignalListenerData("weak.b", "弱关联 B", "weak.b", true, 0, "shared.condition", List.of(sharedState)).normalized()
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                true,
+                3
+        );
+        requireEquals(2, weakRows.size(), "shared ConditionGroup/StateVariable references do not merge unrelated components");
     }
 
     private static void requireLogicChainMetadataRootChannelRoundtripContract() {
@@ -319,6 +389,17 @@ public final class WebAdminLogicChainServiceTest {
         timer.onCompleteActions = List.of(new ActionConfig(ActionType.SIGNAL, "timer.after", true, false, 0, false, "group.timer.complete"));
         timer.onCancelActions = List.of(ActionConfig.timerCancel("timer.alpha", TimerTargetMode.GLOBAL, "", ""));
         return timer.normalized();
+    }
+
+    private static WebAdminLogicChainMetadataStore.MetadataEntry metadataEntry(String id, String displayName, String rootChannel) {
+        WebAdminLogicChainMetadataStore.MetadataEntry entry = new WebAdminLogicChainMetadataStore.MetadataEntry();
+        entry.id = id;
+        entry.displayName = displayName;
+        entry.rootType = "channel";
+        entry.rootRef = rootChannel;
+        entry.includeDisabled = true;
+        entry.maxDepth = 3;
+        return entry;
     }
 
     private static void requireGraphModelV2Dedupe() {
@@ -544,6 +625,13 @@ public final class WebAdminLogicChainServiceTest {
             }
         }
         throw new AssertionError(message + " missing edge=" + type);
+    }
+
+    private static void requireContainsChannel(List<String> channels, String expected, String message) {
+        if (channels != null && channels.contains(expected)) {
+            return;
+        }
+        throw new AssertionError(message + " missing channel=" + expected + " actual=" + channels);
     }
 
     private static void requireTimerGateSummary(WebAdminDtos.LogicChainNodeDto timerNode) {

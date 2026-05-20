@@ -110,33 +110,81 @@ public final class WebAdminLogicChainService {
     ) {
         Snapshot snapshot = snapshot(server);
         WebAdminLogicChainMetadataStore.MetadataFile file = WebAdminLogicChainMetadataStore.load(server);
-        List<WebAdminDtos.LogicChainSummaryDto> result = new ArrayList<>();
-        Set<String> seenChannels = new LinkedHashSet<>();
+        return listChainsFromSnapshot(snapshot, file, user, session, requestedLimit);
+    }
+
+    private List<WebAdminDtos.LogicChainSummaryDto> listChainsFromSnapshot(
+            Snapshot snapshot,
+            WebAdminLogicChainMetadataStore.MetadataFile file,
+            WebAdminUser user,
+            WebAdminSession session,
+            int requestedLimit
+    ) {
+        WebAdminLogicChainMetadataStore.MetadataFile safeFile = file == null ? new WebAdminLogicChainMetadataStore.MetadataFile() : file;
+        Map<String, WebAdminDtos.LogicChainSummaryDto> componentEntries = new LinkedHashMap<>();
+        Set<String> assignedComponentChannels = new LinkedHashSet<>();
         ChannelHierarchy hierarchy = channelHierarchy(snapshot);
         int limit = WebAdminReadonlySupport.limit(requestedLimit, AUTO_CHAIN_LIMIT);
-        for (WebAdminLogicChainMetadataStore.MetadataEntry entry : file.chains.values()) {
+        for (WebAdminLogicChainMetadataStore.MetadataEntry entry : safeFile.chains.values()) {
             String rootChannel = resolveRootChannel(snapshot, entry.rootType, entry.rootRef);
+            ComponentIndex component = componentIndex(snapshot, rootChannel, entry.includeDisabled, entry.maxDepth);
+            String componentId = rootChannel.isBlank() ? "component:metadata:" + safeNodeId(entry.id) : component.componentId();
             WebAdminDtos.LogicChainMetadataDto metadata = metadataDto(entry, rootChannel, user, session);
-            GraphStats stats = summarize(snapshot, rootChannel, entry.includeDisabled, entry.maxDepth);
-            result.add(summary(entry.id, metadata.effectiveDisplayName(), entry.rootType, entry.rootRef, rootChannel, true, metadata, stats, hierarchy));
-            if (!rootChannel.isBlank()) {
-                seenChannels.add(rootChannel);
+            WebAdminDtos.LogicChainSummaryDto row = summary(
+                    entry.id,
+                    componentId,
+                    metadata.effectiveDisplayName(),
+                    entry.rootType,
+                    entry.rootRef,
+                    rootChannel,
+                    rootChannel,
+                    component.includedChannels(),
+                    logicChainSummarySource(entry),
+                    true,
+                    metadata,
+                    component.stats(),
+                    hierarchy
+            );
+            WebAdminDtos.LogicChainSummaryDto existing = componentEntries.get(componentId);
+            if (existing == null || !existing.saved()) {
+                componentEntries.put(componentId, row);
             }
-        }
-        for (String channel : knownChannels(snapshot)) {
-            if (result.size() >= limit) {
+            assignedComponentChannels.addAll(component.includedChannels());
+            if (componentEntries.size() >= limit) {
                 break;
             }
-            if (seenChannels.contains(channel)) {
+        }
+        // 8.15 component entry fix marker: list uses whole connected component entries, not one row per channel.
+        for (String channel : knownChannels(snapshot)) {
+            if (componentEntries.size() >= limit) {
+                break;
+            }
+            ComponentIndex component = componentIndex(snapshot, channel, true, DEFAULT_MAX_DEPTH);
+            if (assignedComponentChannels.contains(channel) || componentEntries.containsKey(component.componentId())) {
                 continue;
             }
-            GraphStats stats = summarize(snapshot, channel, true, DEFAULT_MAX_DEPTH);
-            String id = autoChainId(channel);
-            WebAdminLogicChainMetadataStore.MetadataEntry entry = defaultEntry(id, "channel", channel);
-            WebAdminDtos.LogicChainMetadataDto metadata = metadataDto(entry, channel, user, session);
-            result.add(summary(id, metadata.effectiveDisplayName(), "channel", channel, channel, false, metadata, stats, hierarchy));
+            String defaultFocusChannel = component.defaultFocusChannel().isBlank() ? channel : component.defaultFocusChannel();
+            String id = autoChainId(defaultFocusChannel);
+            WebAdminLogicChainMetadataStore.MetadataEntry entry = defaultEntry(id, "channel", defaultFocusChannel);
+            WebAdminDtos.LogicChainMetadataDto metadata = metadataDto(entry, defaultFocusChannel, user, session);
+            componentEntries.put(component.componentId(), summary(
+                    id,
+                    component.componentId(),
+                    metadata.effectiveDisplayName(),
+                    "channel",
+                    defaultFocusChannel,
+                    defaultFocusChannel,
+                    defaultFocusChannel,
+                    component.includedChannels(),
+                    "auto_component",
+                    false,
+                    metadata,
+                    component.stats(),
+                    hierarchy
+            ));
+            assignedComponentChannels.addAll(component.includedChannels());
         }
-        return List.copyOf(result);
+        return List.copyOf(componentEntries.values());
     }
 
     public WebAdminDtos.LogicChainGraphDto graphForChain(
@@ -145,6 +193,16 @@ public final class WebAdminLogicChainService {
             WebAdminSession session,
             String chainId
     ) {
+        return graphForChain(server, user, session, chainId, "");
+    }
+
+    public WebAdminDtos.LogicChainGraphDto graphForChain(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String chainId,
+            String focusChannel
+    ) {
         String safeId = normalizeChainId(chainId);
         WebAdminLogicChainMetadataStore.MetadataFile file = WebAdminLogicChainMetadataStore.load(server);
         WebAdminLogicChainMetadataStore.MetadataEntry entry = file.chains.get(safeId);
@@ -152,10 +210,33 @@ public final class WebAdminLogicChainService {
             String channel = safeId.substring("auto:channel:".length());
             entry = defaultEntry(safeId, "channel", channel);
         }
+        // 8.15 template UI / Logic Chain entry fix marker: direct old channel route resolves to owning component with that channel as focus.
+        Snapshot snapshot = entry == null ? snapshot(server) : null;
         if (entry == null) {
-            entry = defaultEntry(safeId, "channel", "");
+            String directChannel = SignalChannel.normalize(safeId);
+            if (!directChannel.isBlank()) {
+                for (WebAdminLogicChainMetadataStore.MetadataEntry candidate : file.chains.values()) {
+                    String candidateRoot = resolveRootChannel(snapshot, candidate.rootType, candidate.rootRef);
+                    if (directChannel.equals(candidateRoot)
+                            || componentChannelSet(snapshot, candidateRoot, candidate.includeDisabled, candidate.maxDepth).contains(directChannel)) {
+                        entry = candidate;
+                        focusChannel = directChannel;
+                        break;
+                    }
+                }
+            }
         }
-        return graphForRoot(server, user, session, entry.rootType, entry.rootRef, entry.includeDisabled, entry.maxDepth, entry);
+        if (entry == null) {
+            entry = defaultEntry(autoChainId(safeId), "channel", safeId);
+        }
+        String focus = SignalChannel.normalize(focusChannel);
+        if (focus.isBlank()) {
+            return graphForRoot(server, user, session, entry.rootType, entry.rootRef, entry.includeDisabled, entry.maxDepth, entry);
+        }
+        WebAdminLogicChainMetadataStore.MetadataEntry focusedEntry = WebAdminLogicChainMetadataStore.MetadataEntry.normalized(entry.id, entry);
+        focusedEntry.rootType = "channel";
+        focusedEntry.rootRef = focus;
+        return graphForRoot(server, user, session, "channel", focus, entry.includeDisabled, entry.maxDepth, focusedEntry);
     }
 
     public WebAdminDtos.LogicChainGraphDto graphForRoot(
@@ -265,6 +346,39 @@ public final class WebAdminLogicChainService {
                 channelMetadata == null ? new WebAdminChannelMetadataStore.MetadataFile() : channelMetadata.normalized()
         );
         return graphForSnapshotForTest(snapshot, rootChannel, includeDisabled, maxDepth);
+    }
+
+    static List<WebAdminDtos.LogicChainSummaryDto> listChainsForSnapshotForTest(
+            List<SignalDeviceData> devices,
+            List<SignalListenerData> listeners,
+            List<RegionControllerData> regions,
+            List<SignalJoinDefinition> joins,
+            List<TimerDefinition> timers,
+            List<WebAdminLogicChainMetadataStore.MetadataEntry> metadataEntries,
+            boolean includeDisabled,
+            int maxDepth
+    ) {
+        Snapshot snapshot = new Snapshot(
+                null,
+                devices == null ? List.of() : List.copyOf(devices),
+                listeners == null ? List.of() : List.copyOf(listeners),
+                regions == null ? List.of() : List.copyOf(regions),
+                joins == null ? List.of() : List.copyOf(joins),
+                timers == null ? List.of() : List.copyOf(timers),
+                new StateVariableLoadResult(StateVariableSnapshot.empty(), false, "", false),
+                new WebAdminDeviceMetadataStore.MetadataFile(),
+                new WebAdminChannelMetadataStore.MetadataFile()
+        );
+        WebAdminLogicChainMetadataStore.MetadataFile file = new WebAdminLogicChainMetadataStore.MetadataFile();
+        for (WebAdminLogicChainMetadataStore.MetadataEntry raw : metadataEntries == null ? List.<WebAdminLogicChainMetadataStore.MetadataEntry>of() : metadataEntries) {
+            WebAdminLogicChainMetadataStore.MetadataEntry entry = WebAdminLogicChainMetadataStore.MetadataEntry.normalized(raw == null ? "" : raw.id, raw);
+            if (!entry.id.isBlank()) {
+                entry.includeDisabled = includeDisabled;
+                entry.maxDepth = maxDepth;
+                file.chains.put(entry.id, entry);
+            }
+        }
+        return new WebAdminLogicChainService(null, null, null).listChainsFromSnapshot(snapshot, file, null, null, AUTO_CHAIN_LIMIT);
     }
 
     private static WebAdminDtos.LogicChainGraphDto graphForSnapshotForTest(
@@ -462,12 +576,17 @@ public final class WebAdminLogicChainService {
         Map<String, Object> stats = new LinkedHashMap<>();
         String safeFocus = SignalChannel.normalize(focusChannel);
         boolean componentTruncated = build.componentChannelsTruncated || build.nodesTruncated || build.edgesTruncated;
+        List<String> includedChannels = componentChannelsFromBuild(build).stream().sorted().toList();
+        String componentId = componentIdForChannels(includedChannels);
         Map<String, Object> componentSummary = new LinkedHashMap<>();
         componentSummary.put("focusChannel", safeFocus);
         componentSummary.put("focusComponentId", build.focusComponentId());
+        componentSummary.put("componentId", componentId);
+        componentSummary.put("includedChannels", includedChannels);
         componentSummary.put("channelCount", build.channelCount());
         componentSummary.put("producerCount", build.producerCount());
         componentSummary.put("consumerCount", build.consumerCount());
+        componentSummary.put("listenerCount", build.listenerCount());
         componentSummary.put("actionCount", build.actionCount());
         componentSummary.put("signalJoinCount", build.countByType("signal_join"));
         componentSummary.put("timerCount", build.countByType("timer"));
@@ -483,6 +602,7 @@ public final class WebAdminLogicChainService {
         stats.put("channelCount", build.channelCount());
         stats.put("producerCount", build.producerCount());
         stats.put("consumerCount", build.consumerCount());
+        stats.put("listenerCount", build.listenerCount());
         stats.put("actionCount", build.actionCount());
         stats.put("downstreamChannelCount", build.countEdges("emits_downstream"));
         stats.put("signalJoinCount", build.countByType("signal_join"));
@@ -512,6 +632,8 @@ public final class WebAdminLogicChainService {
         stats.put("rootChannelRole", "focus");
         stats.put("focusChannel", safeFocus);
         stats.put("focusComponentId", build.focusComponentId());
+        stats.put("componentId", componentId);
+        stats.put("includedChannels", includedChannels);
         stats.put("componentView", true);
         stats.put("componentCount", safeFocus.isBlank() ? 0 : 1);
         stats.put("componentChannelCount", build.channelCount());
@@ -2318,7 +2440,7 @@ public final class WebAdminLogicChainService {
 
     private GraphStats summarize(Snapshot snapshot, String rootChannel, boolean includeDisabled, int maxDepth) {
         if (rootChannel == null || rootChannel.isBlank()) {
-            return new GraphStats(0, 0, 0, 0, 0, 0, "WARNING", "");
+            return new GraphStats(0, 0, 0, 0, 0, 0, 0, 0, 0, "WARNING", "");
         }
         GraphBuild build = new GraphBuild(snapshot, includeDisabled, Math.max(1, Math.min(HARD_MAX_DEPTH, maxDepth <= 0 ? DEFAULT_MAX_DEPTH : maxDepth)));
         buildComponent(build, rootChannel);
@@ -2326,40 +2448,145 @@ public final class WebAdminLogicChainService {
                 build.channelCount(),
                 build.producerCount(),
                 build.consumerCount(),
+                build.listenerCount(),
                 build.actionCount(),
                 build.countEdges("emits_downstream") + build.countEdges("join_output"),
+                build.countByType("signal_join"),
+                build.countByType("timer"),
                 build.disabledCount(),
                 build.warnings.isEmpty() ? "OK" : "WARNING",
                 latestTime(rootChannel)
         );
     }
 
+    private ComponentIndex componentIndex(Snapshot snapshot, String rootChannel, boolean includeDisabled, int maxDepth) {
+        String safeRoot = SignalChannel.normalize(rootChannel);
+        if (safeRoot.isBlank()) {
+            return new ComponentIndex("component:unresolved:" + shortNodeHash(rootChannel), "", List.of(), new GraphStats(0, 0, 0, 0, 0, 0, 0, 0, 0, "WARNING", ""));
+        }
+        int safeDepth = Math.max(1, Math.min(HARD_MAX_DEPTH, maxDepth <= 0 ? DEFAULT_MAX_DEPTH : maxDepth));
+        GraphBuild build = new GraphBuild(snapshot, includeDisabled, safeDepth);
+        buildComponent(build, safeRoot);
+        LinkedHashSet<String> channels = componentChannelsFromBuild(build);
+        if (channels.isEmpty()) {
+            channels.add(safeRoot);
+        }
+        List<String> sortedChannels = channels.stream().sorted().toList();
+        String defaultFocus = sortedChannels.contains(safeRoot) ? safeRoot : sortedChannels.get(0);
+        String componentId = componentIdForChannels(sortedChannels);
+        GraphStats stats = new GraphStats(
+                sortedChannels.size(),
+                build.producerCount(),
+                build.consumerCount(),
+                build.listenerCount(),
+                build.actionCount(),
+                build.countEdges("emits_downstream") + build.countEdges("join_output"),
+                build.countByType("signal_join"),
+                build.countByType("timer"),
+                build.disabledCount(),
+                build.warnings.isEmpty() ? "OK" : "WARNING",
+                latestTime(defaultFocus)
+        );
+        return new ComponentIndex(componentId, defaultFocus, sortedChannels, stats);
+    }
+
+    private static LinkedHashSet<String> componentChannelsFromBuild(GraphBuild build) {
+        LinkedHashSet<String> channels = new LinkedHashSet<>();
+        if (build == null) {
+            return channels;
+        }
+        for (WebAdminDtos.LogicChainNodeDto node : build.nodes.values()) {
+            if ("channel".equalsIgnoreCase(node.type()) || "downstream_channel".equalsIgnoreCase(node.type())) {
+                String channel = SignalChannel.normalize(node.channel());
+                if (!channel.isBlank()) {
+                    channels.add(channel);
+                }
+            }
+        }
+        channels.addAll(build.visitedChannels);
+        return channels;
+    }
+
+    private static String componentIdForChannels(List<String> channels) {
+        List<String> safeChannels = channels == null ? List.of() : channels.stream()
+                .map(SignalChannel::normalize)
+                .filter(channel -> !channel.isBlank())
+                .sorted()
+                .toList();
+        if (safeChannels.isEmpty()) {
+            return "component:empty";
+        }
+        String canonical = safeChannels.get(0);
+        return "component:" + safeNodeId(canonical) + ":" + shortNodeHash(String.join("\n", safeChannels));
+    }
+
+    private static String logicChainSummarySource(WebAdminLogicChainMetadataStore.MetadataEntry entry) {
+        WebAdminLogicChainMetadataStore.MetadataEntry safeEntry = WebAdminLogicChainMetadataStore.MetadataEntry.normalized(entry == null ? "" : entry.id, entry);
+        if ("template-package".equals(safeEntry.iconKey) || safeEntry.note.contains("模板中心应用") || safeEntry.tags.stream().anyMatch(tag -> "template".equalsIgnoreCase(tag))) {
+            return "template_apply";
+        }
+        return "saved_metadata";
+    }
+
+    private LinkedHashSet<String> componentChannelSet(Snapshot snapshot, String rootChannel, boolean includeDisabled, int maxDepth) {
+        LinkedHashSet<String> channels = new LinkedHashSet<>();
+        String safeRoot = SignalChannel.normalize(rootChannel);
+        if (safeRoot.isBlank()) {
+            return channels;
+        }
+        GraphBuild build = new GraphBuild(snapshot, includeDisabled, Math.max(1, Math.min(HARD_MAX_DEPTH, maxDepth <= 0 ? DEFAULT_MAX_DEPTH : maxDepth)));
+        buildComponent(build, safeRoot);
+        channels.addAll(componentChannelsFromBuild(build));
+        return channels;
+    }
+
     private WebAdminDtos.LogicChainSummaryDto summary(
             String id,
+            String componentId,
             String displayName,
             String rootType,
             String rootRef,
             String rootChannel,
+            String defaultFocusChannel,
+            List<String> includedChannels,
+            String source,
             boolean saved,
             WebAdminDtos.LogicChainMetadataDto metadata,
             GraphStats stats,
             ChannelHierarchy hierarchy
     ) {
         ChannelHierarchyInfo info = hierarchy.info(rootChannel);
+        List<String> safeIncludedChannels = includedChannels == null ? List.of() : includedChannels.stream()
+                .map(SignalChannel::normalize)
+                .filter(channel -> !channel.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+        String safeDefaultFocus = SignalChannel.normalize(defaultFocusChannel);
+        if (safeDefaultFocus.isBlank() && !safeIncludedChannels.isEmpty()) {
+            safeDefaultFocus = safeIncludedChannels.get(0);
+        }
         return new WebAdminDtos.LogicChainSummaryDto(
                 id,
+                componentId,
                 displayName,
                 rootType,
                 rootRef,
                 rootChannel,
-                stats.channelCount(),
+                safeDefaultFocus,
+                safeIncludedChannels,
+                safeIncludedChannels.isEmpty() ? stats.channelCount() : safeIncludedChannels.size(),
                 stats.producerCount(),
                 stats.consumerCount(),
+                stats.listenerCount(),
                 stats.actionCount(),
                 stats.downstreamChannelCount(),
+                stats.signalJoinCount(),
+                stats.timerCount(),
                 stats.disabledNodeCount(),
                 stats.doctorStatus(),
                 stats.lastTriggeredAt(),
+                source,
                 saved,
                 info.level(),
                 info.parentChannel().isBlank() ? "" : autoChainId(info.parentChannel()),
@@ -3767,11 +3994,22 @@ public final class WebAdminLogicChainService {
             int channelCount,
             int producerCount,
             int consumerCount,
+            int listenerCount,
             int actionCount,
             int downstreamChannelCount,
+            int signalJoinCount,
+            int timerCount,
             int disabledNodeCount,
             String doctorStatus,
             String lastTriggeredAt
+    ) {
+    }
+
+    private record ComponentIndex(
+            String componentId,
+            String defaultFocusChannel,
+            List<String> includedChannels,
+            GraphStats stats
     ) {
     }
 
@@ -3859,6 +4097,16 @@ public final class WebAdminLogicChainService {
             int count = 0;
             for (WebAdminDtos.LogicChainNodeDto node : nodes.values()) {
                 if (!isReferenceNode(node) && ("consumer".equals(node.type()) || "consumer".equals(String.valueOf(node.metadata().get("graphRole"))))) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private int listenerCount() {
+            int count = 0;
+            for (WebAdminDtos.LogicChainNodeDto node : nodes.values()) {
+                if (!isReferenceNode(node) && "consumer".equals(node.type()) && "listener".equals(node.refType())) {
                     count++;
                 }
             }

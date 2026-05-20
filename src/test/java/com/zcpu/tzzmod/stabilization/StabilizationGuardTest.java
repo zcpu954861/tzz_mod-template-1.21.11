@@ -85,6 +85,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminStateVariableServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminTemplateServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
 import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -190,6 +191,7 @@ public final class StabilizationGuardTest {
         TimerDoctorTest.run();
         WebAdminLogicChainServiceTest.run();
         WebAdminLogicChainEditorServiceTest.run();
+        WebAdminTemplateServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -205,6 +207,7 @@ public final class StabilizationGuardTest {
         testSchedulerDelayTimer812();
         testLogicChainViewerEnhancement813();
         testLogicChainEditorMvp814();
+        testTemplatesPrefabImportExport815();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -9857,6 +9860,314 @@ public final class StabilizationGuardTest {
                 "GAME_PROGRAM_CALL"
         )) {
             requireFalse(actionType.contains(forbidden), "8.14 must not add action type: " + forbidden);
+        }
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void testTemplatesPrefabImportExport815() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/TEMPLATES_PREFAB_IMPORT_EXPORT_8_15_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/TEMPLATES_PREFAB_CAPABILITY_MATRIX_8_15.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String templatePackage = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/template/WebAdminTemplatePackage.java"), StandardCharsets.UTF_8);
+        String builtIns = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/template/WebAdminBuiltInTemplates.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminTemplateStore.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTemplateService.java"), StandardCharsets.UTF_8);
+        String request = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminTemplateRequest.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String logicChainService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String rolePolicy = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminRolePolicy.java"), StandardCharsets.UTF_8);
+        String writeFoundation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminWriteFoundationService.java"), StandardCharsets.UTF_8);
+        String realtimeType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+        String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String serviceTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminTemplateServiceTest.java"), StandardCharsets.UTF_8);
+        String logicChainServiceTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainServiceTest.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/TEMPLATES_PREFAB_IMPORT_EXPORT_8_15_CURRENT_CONTEXT.md",
+                "docs/TEMPLATES_PREFAB_CAPABILITY_MATRIX_8_15.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/template/WebAdminTemplatePackage.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/template/WebAdminBuiltInTemplates.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminTemplateStore.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTemplateService.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminTemplateRequest.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminTemplateServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.15 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.15 Templates / Prefab / Import-Export",
+                "模板中心",
+                "tzz_template_v1",
+                "built-in starter templates",
+                "user template store",
+                "templates.json",
+                "Import JSON",
+                "Export JSON",
+                "dry-run",
+                "safe apply",
+                "prefix",
+                "conflict policy",
+                "placeholder policy",
+                "placeholder binding apply deferred",
+                "external reference fail closed",
+                "Logic Chain metadata conflict policy",
+                "Expected fingerprint policy",
+                "world entity limitations",
+                "真实配置",
+                "SignalJoinDefinition",
+                "TimerDefinition",
+                "SignalListener",
+                "ActionConfig",
+                "StateVariable definition apply deferred",
+                "ConditionGroup apply deferred",
+                "component export deferred",
+                "不恢复旧 full Logic Chain Editor",
+                "不做 GameController",
+                "不做 MissionSystem",
+                "不做 PhaseController"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.15 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminTemplatePackage",
+                "SCHEMA = \"tzz_template_v1\"",
+                "Resources",
+                "Placeholder",
+                "Metadata",
+                "WebAdminBuiltInTemplates",
+                "join_all_two_inputs",
+                "timer_delay_with_start_listener",
+                "listener_message_action",
+                "SignalJoinDefinition",
+                "TimerDefinition",
+                "SignalListenerData",
+                "ActionConfig.timerStart",
+                "ActionType.MESSAGE",
+                "WebAdminTemplateStore",
+                "FILE_NAME = \"templates.json\"",
+                "loadWithStatus",
+                "模板文件读取失败，已停止写入",
+                "fingerprintFor",
+                "TemplateFile",
+                "WebAdminTemplateService",
+                "previewImport",
+                "importUserTemplate",
+                "dryRunApply",
+                "apply(",
+                "writePlan",
+                "buildApplyPlan",
+                "StateVariable definition apply 本阶段 deferred",
+                "ConditionGroup apply 本阶段 deferred",
+                "Placeholder binding apply 本阶段 deferred",
+                "template_channel_reference_external",
+                "template_timer_reference_external",
+                "template_condition_group_reference_deferred",
+                "template_state_action_deferred",
+                "template_command_action_deferred",
+                "template_apply_confirmation_required",
+                "importDoesNotApply",
+                "componentExportSupported",
+                "componentExportDeferredReason",
+                "rootMappedChannels",
+                "createLogicChains",
+                "TEMPLATE_STORE_CHANGED",
+                "TEMPLATE_APPLIED",
+                "IMPORT_TEMPLATE",
+                "APPLY_TEMPLATE",
+                "TARGET_TEMPLATE_STORE",
+                "TARGET_TEMPLATE_APPLY"
+        )) {
+            requireContains(templatePackage + "\n" + builtIns + "\n" + store + "\n" + service + "\n" + request
+                    + "\n" + operationType + "\n" + rolePolicy + "\n" + writeFoundation + "\n" + realtimeType + "\n" + editLockService,
+                    marker,
+                    "8.15 backend marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "/api/webadmin/templates",
+                "handleTemplates",
+                "import-preview",
+                "apply-preview",
+                "templateService.exportTemplate",
+                "templateService.importUserTemplate",
+                "templateService.apply",
+                "query.getOrDefault(\"source\", \"\")"
+        )) {
+            requireContains(server, marker, "8.15 WebAdmin API marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-template-center-nav",
+                "#/templates",
+                "#/action-templates",
+                "模板与复用",
+                "template-package",
+                "renderTemplatesPage",
+                "renderTemplateDetailPage",
+                "data-template-list-route",
+                "data-template-detail-route",
+                "data-template-built-in-detail-route",
+                "data-template-detail-source-built-in",
+                "data-template-detail-export-apply-visible",
+                "data-template-apply-wizard",
+                "data-template-dry-run-preview",
+                "data-template-import-json-modal",
+                "data-template-export-json-action",
+                "data-template-no-browser-dialogs",
+                "data-template-placeholder-mapping",
+                "data-template-detail-right-json-preview",
+                "data-template-json-copy-in-right-panel",
+                "data-template-json-download-in-right-panel",
+                "data-template-detail-two-column-stretch",
+                "data-template-detail-responsive-stack",
+                "template-json-right-card",
+                "templateResourceTypeLabel",
+                "频道",
+                "信号汇合",
+                "计时器",
+                "信号监听器",
+                "状态变量",
+                "条件组",
+                "用户模板",
+                "导入模板",
+                "导出组件",
+                "预览",
+                "应用",
+                "data-logic-chain-list-metadata-first",
+                "data-logic-chain-one-entry-per-component",
+                "data-logic-chain-list-no-duplicate-component-channels",
+                "data-logic-chain-component-entry-list",
+                "data-logic-chain-component-entry",
+                "data-logic-chain-included-channel-count",
+                "data-logic-chain-source-metadata",
+                "data-logic-chain-source-auto-component",
+                "data-logic-chain-detail-focus-channel-selector",
+                "data-logic-chain-focus-switch-updates-route-state",
+                "data-logic-chain-old-channel-route-compatible",
+                "renderLogicChainLegacyChannelRoute",
+                "switchLogicChainFocusChannel",
+                "logicChainFocusChannelOptions",
+                "focusChannel",
+                "template_import",
+                "template_apply",
+                "openTemplateImportJsonModal",
+                "openTemplateApplyWizard",
+                "requestTemplateDryRun",
+                "applyTemplateDryRun",
+                "template_store_changed",
+                "template_applied",
+                "top-center",
+                "templateDetailErrorMessage",
+                "templateRouteParts(arg){const text=String(arg||''), index=text.indexOf('?')"
+        )) {
+            requireContains(shell + "\n" + scripts + "\n" + styles, marker, "8.15 frontend marker: " + marker);
+        }
+
+        String templateUiSection = extractBetween(scripts, "async function renderTemplatesPage", "async function renderActionTemplatesPage");
+        for (String forbidden : List.of(
+                "alert(",
+                "confirm(",
+                "prompt(",
+                "window.alert",
+                "window.confirm",
+                "window.prompt",
+                "raw JSON 作为主界面"
+        )) {
+            requireFalse(templateUiSection.contains(forbidden), "8.15 template UI must not use browser dialog/raw-main marker: " + forbidden);
+        }
+
+        for (String marker : List.of(
+                "testBuiltInListDetailAndJsonExport",
+                "testTemplateDetailLookupSourcesAndErrors",
+                "testImportPreviewSaveAndDoesNotApply",
+                "testInvalidUnknownJsonAndBadStoreFallback",
+                "testDryRunAndApplyJoinTemplateWritesRealStores",
+                "testTimerAndListenerTemplatesWriteRealStores",
+                "testPlaceholderAndDeferredResourcesBlockApply",
+                "testExternalReferencesAndConditionGroupsBlockApply",
+                "testExistingRootChannelAndLogicMetadataConflict",
+                "testStaleFingerprintAndImportSecurity",
+                "template_channel_reference_external",
+                "template_timer_reference_external",
+                "template_condition_group_reference_deferred",
+                "template_state_action_deferred",
+                "template_command_action_deferred",
+                "testSecurityLockConfirmationAndRealtime",
+                "template_apply_confirmation_required",
+                "template_store_changed",
+                "template_applied"
+        )) {
+            requireContains(serviceTest, marker, "8.15 service test marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "normalizeSourceForLookup",
+                "template_not_found",
+                "template_permission_denied",
+                "template_source_invalid",
+                "template_schema_invalid",
+                "WebAdminBuiltInTemplates.find(safeId)"
+        )) {
+            requireContains(service, marker, "8.15 built-in template detail lookup marker: " + marker);
+        }
+
+        requireFalse(scripts.contains("模板不存在或当前账号无权查看"), "8.15 template detail must not collapse not-found and permission errors");
+        for (String marker : List.of(
+                "componentEntries",
+                "assignedComponentChannels",
+                "ComponentIndex",
+                "componentIdForChannels",
+                "defaultFocusChannel",
+                "includedChannels",
+                "saved_metadata",
+                "auto_component",
+                "listChainsForSnapshotForTest",
+                "requireComponentListEntryGrouping",
+                "shared ConditionGroup/StateVariable references do not merge unrelated components",
+                "componentChannelSet",
+                "list uses whole connected component entries",
+                "direct old channel route resolves to owning component",
+                "graphForChain(",
+                "focusChannel"
+        )) {
+            requireContains(logicChainService + "\n" + server + "\n" + scripts + "\n" + logicChainServiceTest, marker, "8.15 logic chain entry/focus marker: " + marker);
+        }
+        requireFalse(logicChainService.contains("metadataComponentChannels"), "8.15 logic chain list must not fall back to metadata-only channel suppression");
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "class GameController",
+                "class MissionSystem",
+                "class PhaseController",
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "VersionRollback",
+                "TemplateMarketplace",
+                "McpScenario",
+                "MinecraftStartup",
+                "CREATE_TEMPLATE_ACTION",
+                "TEMPLATE_ACTION_TYPE"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.15 must not add out-of-scope source marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "TEMPLATE",
+                "PREFAB",
+                "GAME_CONTROLLER",
+                "MISSION_SYSTEM",
+                "IF_ELSE",
+                "SCRATCH_BLOCK"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.15 must not add ActionType marker: " + forbidden);
         }
         requireConditionNodeTypeSetUnchangedFor813();
     }

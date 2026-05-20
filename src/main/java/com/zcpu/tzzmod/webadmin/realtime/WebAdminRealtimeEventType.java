@@ -46,6 +46,8 @@ public enum WebAdminRealtimeEventType {
     SIGNAL_CONFIG_CHANGED("signal_config_changed", "Signal 配置已变化"),
     CHANNEL_METADATA_CHANGED("channel_metadata_changed", "频道显示信息已变化"),
     LOGIC_CHAIN_METADATA_CHANGED("logic_chain_metadata_changed", "逻辑链显示信息已变化"),
+    TEMPLATE_STORE_CHANGED("template_store_changed", "模板库已变化"),
+    TEMPLATE_APPLIED("template_applied", "模板已应用"),
     CONDITION_GROUP_CHANGED("condition_group_changed", "条件组已变化"),
     CONDITION_GATE_HISTORY_APPENDED("condition_gate_history_appended", "条件 gate 历史已追加"),
     SIGNAL_LISTENER_CONFIG_CHANGED("signal_listener_config_changed", "Signal Listener 配置已变化"),

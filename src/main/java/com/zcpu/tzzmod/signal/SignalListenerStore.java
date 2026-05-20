@@ -1,9 +1,15 @@
 package com.zcpu.tzzmod.signal;
 
 import com.zcpu.tzzmod.action.ActionConfig;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +21,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.WorldSavePath;
 
 public final class SignalListenerStore {
+    public static final String FILE_NAME = "signal_listeners.json";
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Map<MinecraftServer, State> CACHE = new WeakHashMap<>();
 
     private SignalListenerStore() {
@@ -69,6 +77,27 @@ public final class SignalListenerStore {
                 "Signal Listener 已创建：" + displayName(listener)
         );
         return listener;
+    }
+
+    public static synchronized boolean addListenerExactForWebAdmin(MinecraftServer server, SignalListenerData listener) {
+        SignalListenerData normalized = listener == null ? null : listener.normalized();
+        if (normalized == null || normalized.id().isBlank() || !SignalChannel.isValid(normalized.channel())) {
+            return false;
+        }
+        State state = getState(server);
+        for (SignalListenerData existing : state.listeners) {
+            if (existing.id().equals(normalized.id())) {
+                return false;
+            }
+        }
+        state.listeners.add(normalized);
+        state.markDirty();
+        WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                normalized,
+                "Signal Listener 已创建：" + displayName(normalized)
+        );
+        return true;
     }
 
     public static synchronized boolean deleteListener(MinecraftServer server, String listenerRef) {
@@ -330,9 +359,7 @@ public final class SignalListenerStore {
     }
 
     private static State load(MinecraftServer server) {
-        Path path = server.getSavePath(WorldSavePath.ROOT)
-                .resolve("tzz_mod")
-                .resolve("signal_listeners.json");
+        Path path = path(server, false);
         State state = new State(path);
         DataFile dataFile = JsonStoreSupport.readOrDefault(path, DataFile.class, DataFile::new, "signal listeners");
         if (dataFile.listeners != null) {
@@ -347,6 +374,63 @@ public final class SignalListenerStore {
             }
         }
         return state;
+    }
+
+    public static Path path(MinecraftServer server) {
+        return path(server, true);
+    }
+
+    public static Path path(MinecraftServer server, boolean ensureDirectory) {
+        Path directory = server.getSavePath(WorldSavePath.ROOT).resolve("tzz_mod");
+        if (ensureDirectory) {
+            try {
+                Files.createDirectories(directory);
+            } catch (Exception exception) {
+                throw new IllegalStateException("Failed to create signal listener directory: " + directory, exception);
+            }
+        }
+        return directory.resolve(FILE_NAME);
+    }
+
+    public static synchronized SignalListenerLoadResult loadWithStatus(Path path) {
+        try {
+            if (path == null || !Files.exists(path)) {
+                return new SignalListenerLoadResult(new DataFile(), false, "");
+            }
+            try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+                DataFile raw = GSON.fromJson(reader, DataFile.class);
+                DataFile normalized = normalizeFile(raw == null ? new DataFile() : raw);
+                return new SignalListenerLoadResult(normalized, false, "");
+            }
+        } catch (Exception exception) {
+            Tzz_mod.LOGGER.warn("Failed to load signal listeners: {}", exception.getMessage());
+            return new SignalListenerLoadResult(
+                    new DataFile(),
+                    true,
+                    "Signal Listener 配置文件读取失败，已停止写入以避免覆盖损坏文件：" + exception.getMessage()
+            );
+        }
+    }
+
+    public static synchronized boolean save(Path path, DataFile file) {
+        return JsonStoreSupport.write(path, normalizeFile(file == null ? new DataFile() : file), "signal listeners");
+    }
+
+    private static DataFile normalizeFile(DataFile raw) {
+        DataFile copy = new DataFile();
+        copy.version = 1;
+        if (raw != null && raw.listeners != null) {
+            for (SignalListenerData listener : raw.listeners) {
+                if (listener == null) {
+                    continue;
+                }
+                SignalListenerData normalized = listener.normalized();
+                if (!normalized.id().isBlank() && SignalChannel.isValid(normalized.channel())) {
+                    copy.listeners.add(normalized);
+                }
+            }
+        }
+        return copy;
     }
 
     public static String shortId(String id) {
@@ -378,6 +462,13 @@ public final class SignalListenerStore {
     public static final class DataFile {
         public int version = 1;
         public List<SignalListenerData> listeners = new ArrayList<>();
+    }
+
+    public record SignalListenerLoadResult(DataFile file, boolean degraded, String message) {
+        public SignalListenerLoadResult {
+            file = file == null ? new DataFile() : normalizeFile(file);
+            message = message == null ? "" : message;
+        }
     }
 
     public record ResolveResult(
