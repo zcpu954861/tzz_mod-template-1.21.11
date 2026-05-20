@@ -32,6 +32,7 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,16 +46,34 @@ public final class WebAdminSignalListenerActionsService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
-    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
+    private final WebAdminConditionGateBindingValidator gateBindingValidator;
+    private final Path testStorePath;
 
     public WebAdminSignalListenerActionsService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService,
             WebAdminEditLockService editLockService
     ) {
+        this(permissionService, securityService, editLockService, null);
+    }
+
+    WebAdminSignalListenerActionsService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path testStorePath
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
+        this.testStorePath = testStorePath;
+        this.gateBindingValidator = new WebAdminConditionGateBindingValidator(conditionGroupTestPath(testStorePath));
+    }
+
+    private static Path conditionGroupTestPath(Path signalListenerTestStorePath) {
+        return signalListenerTestStorePath == null || signalListenerTestStorePath.getParent() == null
+                ? null
+                : signalListenerTestStorePath.getParent().resolve(WebAdminConditionGroupStore.FILE_NAME);
     }
 
     public Map<String, Object> actionsFor(MinecraftServer server, WebAdminUser user, WebAdminSession session, String listenerRef) {
@@ -97,8 +116,10 @@ public final class WebAdminSignalListenerActionsService {
             audit(context, result, auditSummary(before), Map.of("attempt", "action_too_many"));
             return result;
         }
-        boolean added = SignalListenerStore.addAction(server, before.id(), validation.action());
-        SignalListenerStore.flushDirty(server);
+        boolean added = addAction(server, before.id(), validation.action());
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         SignalListenerData after = findListener(server, before.id());
         if (!added || after == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
@@ -152,8 +173,10 @@ public final class WebAdminSignalListenerActionsService {
             releaseLockAfterWrite(before.id(), request.lockId, user, session, remoteAddress);
             return result;
         }
-        boolean cleared = SignalListenerStore.clearActions(server, before.id());
-        SignalListenerStore.flushDirty(server);
+        boolean cleared = clearActions(server, before.id());
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         SignalListenerData after = findListener(server, before.id());
         if (!cleared || after == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
@@ -209,8 +232,10 @@ public final class WebAdminSignalListenerActionsService {
             return result;
         }
         actions.remove(index);
-        SignalListenerData after = SignalListenerStore.replaceActionsForWebAdmin(server, before.id(), actions);
-        SignalListenerStore.flushDirty(server);
+        SignalListenerData after = replaceActions(server, before.id(), actions);
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         if (after == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
             audit(context, result, auditSummary(before), Map.of("attempt", "action_delete_removed"));
@@ -273,8 +298,10 @@ public final class WebAdminSignalListenerActionsService {
             releaseLockAfterWrite(before.id(), request == null ? "" : request.lockId, user, session, remoteAddress);
             return result;
         }
-        SignalListenerData after = SignalListenerStore.replaceActionsForWebAdmin(server, before.id(), actions);
-        SignalListenerStore.flushDirty(server);
+        SignalListenerData after = replaceActions(server, before.id(), actions);
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         if (after == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
             audit(context, result, auditSummary(before), Map.of("attempt", "action_update_removed"));
@@ -540,11 +567,31 @@ public final class WebAdminSignalListenerActionsService {
     }
 
     private SignalListenerData findListener(MinecraftServer server, String listenerRef) {
-        if (server == null || isBlank(listenerRef)) {
+        if ((server == null && testStorePath == null) || isBlank(listenerRef)) {
             return null;
         }
-        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(server, listenerRef);
+        SignalListenerStore.ResolveResult resolved = testStorePath == null
+                ? SignalListenerStore.resolveListener(server, listenerRef)
+                : SignalListenerStore.resolveListener(testStorePath, listenerRef);
         return resolved.foundUnique() ? resolved.listener().normalized() : null;
+    }
+
+    private boolean addAction(MinecraftServer server, String listenerId, ActionConfig action) {
+        return testStorePath == null
+                ? SignalListenerStore.addAction(server, listenerId, action)
+                : SignalListenerStore.addAction(testStorePath, listenerId, action);
+    }
+
+    private boolean clearActions(MinecraftServer server, String listenerId) {
+        return testStorePath == null
+                ? SignalListenerStore.clearActions(server, listenerId)
+                : SignalListenerStore.clearActions(testStorePath, listenerId);
+    }
+
+    private SignalListenerData replaceActions(MinecraftServer server, String listenerId, List<ActionConfig> actions) {
+        return testStorePath == null
+                ? SignalListenerStore.replaceActionsForWebAdmin(server, listenerId, actions)
+                : SignalListenerStore.replaceActionsForWebAdmin(testStorePath, listenerId, actions);
     }
 
     private static WebAdminWriteResult writeOk(WebAdminWriteTarget target, boolean changed, String message, Map<String, Object> data) {

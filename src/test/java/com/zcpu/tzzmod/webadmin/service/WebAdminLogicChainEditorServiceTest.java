@@ -1,8 +1,13 @@
 package com.zcpu.tzzmod.webadmin.service;
 
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.scheduler.TimerStore;
+import com.zcpu.tzzmod.signal.SignalListenerData;
+import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.join.SignalJoinInputDefinition;
 import com.zcpu.tzzmod.signal.join.SignalJoinStore;
+import com.zcpu.tzzmod.webadmin.WebAdminChannelMetadataStore;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
@@ -11,6 +16,10 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainEditorRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminTimerRequest;
 import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
@@ -47,7 +56,7 @@ public final class WebAdminLogicChainEditorServiceTest {
         testChannelMetadataDraftValidation();
         testSaveRejectsModeSpecificJoinThresholdErrors();
         testSaveRejectsInvalidPlacementAndUnplacedDraft();
-        testActionAppendRejectsInvalidShapeAndMixedDraft();
+        testActionAppendRejectsInvalidShapeAndAllowsMixedDraft();
         testActionAppendValidationCoversSupportedOwnersBucketsAndConditionGroup();
         testSaveRejectsWrongLockAndSameOriginFailure();
         testSaveSignalJoinDraftWritesUnderlyingConfig();
@@ -56,6 +65,23 @@ public final class WebAdminLogicChainEditorServiceTest {
         testSaveDraftNormalizesTypedLockTargetsBeforeSaving();
         testSaveTimerDraftAllowsOnCompleteOnlyOutput();
         testTimerActionAppendThroughLogicChainEditor();
+        testExistingChannelMetadataEditValidatesTypedPayload();
+        testExistingChannelMetadataEditSavesUnderlyingMetadata();
+        testExistingTimerNodeEditWritesUnderlyingConfig();
+        testExistingSignalListenerBasicEditWritesUnderlyingConfig();
+        testExistingSignalJoinEditRejectsInputOutputOverlap();
+        testExistingNodeEditRejectsTargetOutsideCurrentGraph();
+        testExistingNodeEditAllowsReferencedChannelMetadataDrafts();
+        testExistingTypedEditsRejectDraftEdgesAndAllowMultipleTargets();
+        testMultiDraftSessionSavesNewNodeExistingEditAndMetadata();
+        testMultiActionEditsSaveAcrossOwners();
+        testTimerExistingNodeEditCannotMutateActionList();
+        testTimerSameIndexActionEditReplacesWithoutReorder();
+        testSignalListenerSameIndexActionEditReplacesWithoutReorder();
+        testExistingActionEditStructuredPayloadConversion();
+        testExistingActionEditStructuredSaveRoundtrip();
+        testActionDisableCoercedServerSide();
+        testActionEditRejectsDeleteAndReorderOperations();
     }
 
     private static void testEnterRequiresPermissionCsrfAndEditorLock() throws Exception {
@@ -650,7 +676,7 @@ public final class WebAdminLogicChainEditorServiceTest {
 
     }
 
-    private static void testActionAppendRejectsInvalidShapeAndMixedDraft() throws Exception {
+    private static void testActionAppendRejectsInvalidShapeAndAllowsMixedDraft() throws Exception {
         Fixture fixture = fixture();
         WebAdminWriteResult entered = enter(fixture, "editor.action.append.invalid");
         WebAdminLogicChainEditorRequest append = rootRequest("editor.action.append.invalid");
@@ -673,8 +699,8 @@ public final class WebAdminLogicChainEditorServiceTest {
 
         append.nodes = signalJoinDraftRequest("editor.action.append.invalid", lockId(entered), fingerprint(entered), "editor.action.append.mixed").nodes;
         WebAdminWriteResult mixed = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", append, fixture.csrf, true);
-        requireFalse(mixed.success(), "action append cannot be mixed with a new node draft");
-        requireValidationCode(mixed, "logic_chain_draft_single_write_only");
+        requireFalse(mixed.success(), "invalid action append remains rejected even when mixed with a new node draft");
+        requireValidationCode(mixed, "logic_chain_action_append_owner_id_required");
     }
 
     private static void testActionAppendValidationCoversSupportedOwnersBucketsAndConditionGroup() throws Exception {
@@ -837,9 +863,652 @@ public final class WebAdminLogicChainEditorServiceTest {
         requireEquals(0, fixture.editLockService.activeLockCount(), "editor and timer locks are released after append");
     }
 
+    private static void testExistingTimerNodeEditWritesUnderlyingConfig() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult createdEditor = enter(fixture, "editor.existing.timer.create");
+        WebAdminLogicChainEditorRequest create = timerDraftRequest("editor.existing.timer.create", lockId(createdEditor), fingerprint(createdEditor), "editor.existing.timer.saved");
+        create.nodes.getFirst().timer.onCompleteActions = List.of(messageAction("timer unchanged action"));
+        WebAdminWriteResult created = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture Timer exists before existing-node edit");
+
+        Map<?, ?> before = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.existing.timer.saved");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_TIMER_CONFIG, "editor.existing.timer.saved");
+        WebAdminWriteResult entered = enter(fixture, "timer", "editor.existing.timer.saved");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.existing.timer.saved");
+        edit.rootType = "timer";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "timer";
+        draft.targetId = "editor.existing.timer.saved";
+        WebAdminTimerRequest timer = new WebAdminTimerRequest();
+        timer.id = "editor.existing.timer.saved";
+        timer.displayName = "Edited Existing Timer";
+        timer.note = "8.16 existing node edit";
+        timer.enabled = true;
+        timer.mode = "DELAY";
+        timer.scopeMode = "GLOBAL";
+        timer.durationTicks = 80L;
+        timer.intervalTicks = 0L;
+        timer.maxRuns = 1;
+        timer.startPolicy = "RESTART";
+        timer.outputChannel = "editor.existing.timer.out";
+        timer.onCompleteActions = List.of(messageAction("malicious node edit replacement"), messageAction("malicious node edit extra"));
+        timer.expectedFingerprint = string(before.get("expectedFingerprint"));
+        timer.lockId = typedLockId;
+        draft.timer = timer;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult validation = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+        requireTrue(validation.success(), "existing Timer node edit validates with typed lock and fingerprint");
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+        requireTrue(saved.success(), "existing Timer node edit writes through Timer service");
+        Map<?, ?> after = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.existing.timer.saved");
+        requireEquals("Edited Existing Timer", string(after.get("displayName")), "Timer displayName updated by existing-node edit");
+        requireEquals("editor.existing.timer.out", string(after.get("outputChannel")), "Timer outputChannel local reconnect is saved as typed field");
+        List<?> actions = (List<?>) after.get("onCompleteActions");
+        requireEquals(1, actions.size(), "existing Timer edit preserves action list length");
+        requireEquals("timer unchanged action", string(((Map<?, ?>) actions.getFirst()).get("value")), "existing Timer edit does not reorder or delete action");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "editor and timer typed locks released after existing Timer edit");
+    }
+
+    private static void testExistingChannelMetadataEditValidatesTypedPayload() throws Exception {
+        Fixture fixture = fixture();
+        String channel = "editor.existing.channel";
+        WebAdminWriteResult entered = enter(fixture, "channel", channel);
+        WebAdminLogicChainEditorRequest edit = rootRequest(channel);
+        edit.rootType = "channel";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "channel_metadata";
+        draft.targetId = channel;
+        WebAdminChannelMetadataUpdateRequest metadata = new WebAdminChannelMetadataUpdateRequest();
+        metadata.channel = channel;
+        metadata.displayName = "Edited Channel";
+        metadata.note = "8.16 channel metadata edit";
+        metadata.iconKey = "auto";
+        metadata.expectedFingerprint = "typed-fingerprint";
+        metadata.lockId = "typed-lock";
+        draft.channelMetadata = metadata;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult validation = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+
+        requireTrue(validation.success(), "existing Channel metadata edit validates as a typed payload on the current graph errors=" + validation.validationErrors());
+    }
+
+    private static void testExistingChannelMetadataEditSavesUnderlyingMetadata() throws Exception {
+        Fixture fixture = fixture();
+        String channel = "editor.existing.channel.save";
+        WebAdminDtos.ChannelMetadataDto before = fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, channel, "signal");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_CHANNEL_METADATA, channel);
+        WebAdminWriteResult entered = enter(fixture, "channel", channel);
+        WebAdminLogicChainEditorRequest edit = rootRequest(channel);
+        edit.rootType = "channel";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "channel_metadata";
+        draft.targetId = channel;
+        WebAdminChannelMetadataUpdateRequest metadata = new WebAdminChannelMetadataUpdateRequest();
+        metadata.channel = channel;
+        metadata.displayName = "Edited Channel Save";
+        metadata.note = "8.16 channel metadata save roundtrip";
+        metadata.iconKey = "timer";
+        metadata.expectedFingerprint = before.expectedFingerprint();
+        metadata.lockId = typedLockId;
+        draft.channelMetadata = metadata;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(saved.success(), "existing Channel metadata edit saves through metadata service errors=" + saved.validationErrors());
+        WebAdminDtos.ChannelMetadataDto after = fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, channel, "signal");
+        requireEquals("Edited Channel Save", after.displayName(), "Channel metadata displayName persists");
+        requireEquals("8.16 channel metadata save roundtrip", after.note(), "Channel metadata note persists");
+        requireEquals("timer", after.iconKey(), "Channel metadata icon persists");
+        requireEquals(1L, after.version(), "Channel metadata version increments on save");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "editor and channel metadata typed locks released after save");
+    }
+
+    private static void testExistingSignalListenerBasicEditWritesUnderlyingConfig() throws Exception {
+        Fixture fixture = fixture();
+        saveAlwaysConditionGroup(fixture);
+        SignalListenerData listener = saveSignalListenerFixture(
+                fixture,
+                "listener.existing.basic",
+                "listener.existing.in",
+                List.of(WebAdminActionRelayActionsService.actionFromEntry(messageAction("listener action unchanged")))
+        );
+        WebAdminDtos.SignalListenerBasicConfigDto before = fixture.signalListenerBasicConfigService.configFor(null, fixture.editor, fixture.session, listener.id());
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG, listener.id());
+        WebAdminWriteResult entered = enter(fixture, "listener", listener.id());
+        WebAdminLogicChainEditorRequest edit = rootRequest(listener.id());
+        edit.rootType = "listener";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "signal_listener";
+        draft.targetId = listener.id();
+        WebAdminSignalListenerBasicConfigUpdateRequest basic = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        basic.listenerRef = listener.id();
+        basic.enabled = Boolean.FALSE;
+        basic.channel = "listener.existing.edited";
+        basic.cooldownTicks = 35;
+        basic.conditionGroupId = "always";
+        basic.expectedFingerprint = before.expectedFingerprint();
+        basic.lockId = typedLockId;
+        draft.signalListenerBasic = basic;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(saved.success(), "existing SignalListener basic edit saves through listener service errors=" + saved.validationErrors());
+        SignalListenerData after = requireSignalListener(fixture, listener.id());
+        requireEquals(Boolean.FALSE, after.enabled(), "SignalListener enabled field persists");
+        requireEquals("listener.existing.edited", after.channel(), "SignalListener channel local reconnect persists");
+        requireEquals(35, after.cooldownTicks(), "SignalListener cooldown persists");
+        requireEquals("always", after.conditionGroupId(), "SignalListener conditionGroupId persists");
+        requireEquals(1, after.actions().size(), "SignalListener basic edit preserves action list");
+        requireEquals("listener action unchanged", after.actions().getFirst().value(), "SignalListener basic edit does not replace action content");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "editor and listener basic typed locks released after save");
+    }
+
+    private static void testExistingSignalJoinEditRejectsInputOutputOverlap() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult entered = enter(fixture, "signal_join", "editor.existing.join.validation");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.existing.join.validation");
+        edit.rootType = "signal_join";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "signal_join";
+        draft.targetId = "editor.existing.join.validation";
+        WebAdminSignalJoinRequest join = new WebAdminSignalJoinRequest();
+        join.id = "editor.existing.join.validation";
+        join.displayName = "Existing Join";
+        join.mode = "ALL";
+        join.threshold = 2;
+        join.inputChannels = List.of(
+                new SignalJoinInputDefinition("editor.existing.join.shared", "", "", 1),
+                new SignalJoinInputDefinition("editor.existing.join.second", "", "", 1)
+        );
+        join.outputChannel = "editor.existing.join.shared";
+        join.expectedFingerprint = "typed-fingerprint";
+        join.lockId = "typed-lock";
+        draft.signalJoin = join;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult result = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+        requireFalse(result.success(), "existing Signal Join edit rejects input/output overlap");
+        requireValidationCode(result, "logic_chain_join_input_output_channel_conflict");
+    }
+
+    private static void testExistingNodeEditRejectsTargetOutsideCurrentGraph() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult entered = enter(fixture, "editor.existing.graph.scope");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.existing.graph.scope");
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "timer";
+        draft.targetId = "editor.existing.graph.outside";
+        WebAdminTimerRequest timer = new WebAdminTimerRequest();
+        timer.id = "editor.existing.graph.outside";
+        timer.displayName = "Outside Timer";
+        timer.mode = "DELAY";
+        timer.scopeMode = "GLOBAL";
+        timer.durationTicks = 40L;
+        timer.intervalTicks = 0L;
+        timer.maxRuns = 1;
+        timer.startPolicy = "RESTART";
+        timer.outputChannel = "editor.existing.graph.out";
+        timer.expectedFingerprint = "typed-fingerprint";
+        timer.lockId = "typed-lock";
+        draft.timer = timer;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult result = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+
+        requireFalse(result.success(), "existing node edit rejects target outside current graph");
+        requireValidationCode(result, "logic_chain_existing_node_not_in_graph");
+    }
+
+    private static void testExistingNodeEditAllowsReferencedChannelMetadataDrafts() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult createdEditor = enter(fixture, "editor.existing.metadata.create");
+        WebAdminLogicChainEditorRequest create = timerDraftRequest("editor.existing.metadata.create", lockId(createdEditor), fingerprint(createdEditor), "editor.existing.metadata.timer");
+        create.nodes.getFirst().timer.onCompleteActions = List.of(messageAction("metadata timer action"));
+        WebAdminWriteResult created = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture Timer exists before metadata draft mixed typed edit");
+
+        Map<?, ?> before = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.existing.metadata.timer");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_TIMER_CONFIG, "editor.existing.metadata.timer");
+        WebAdminWriteResult entered = enter(fixture, "timer", "editor.existing.metadata.timer");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.existing.metadata.timer");
+        edit.rootType = "timer";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        edit.channelMetadataDrafts = List.of(channelMetadataDraft("editor.existing.metadata.out", "Existing Timer Output", "由已有 Timer 重连引用"));
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "timer";
+        draft.targetId = "editor.existing.metadata.timer";
+        WebAdminTimerRequest timer = new WebAdminTimerRequest();
+        timer.id = "editor.existing.metadata.timer";
+        timer.displayName = "Metadata Piggyback Timer";
+        timer.mode = "DELAY";
+        timer.scopeMode = "GLOBAL";
+        timer.durationTicks = 40L;
+        timer.intervalTicks = 0L;
+        timer.maxRuns = 1;
+        timer.startPolicy = "RESTART";
+        timer.outputChannel = "editor.existing.metadata.out";
+        timer.expectedFingerprint = string(before.get("expectedFingerprint"));
+        timer.lockId = typedLockId;
+        draft.timer = timer;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult validation = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+        requireTrue(validation.success(), "existing typed edit may carry channel metadata when that channel is referenced by typed reconnect");
+        WebAdminWriteResult result = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(result.success(), "existing typed edit saves with referenced channel metadata draft");
+        WebAdminDtos.ChannelMetadataDto metadata = fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, "editor.existing.metadata.out", "signal");
+        requireEquals("Existing Timer Output", metadata.displayName(), "referenced channel metadata draft is saved after existing typed edit");
+    }
+
+    private static void testExistingTypedEditsRejectDraftEdgesAndAllowMultipleTargets() throws Exception {
+        Fixture edgeFixture = fixture();
+        WebAdminWriteResult edgeEntered = enter(edgeFixture, "timer", "editor.existing.edge.timer");
+        WebAdminLogicChainEditorRequest edgeEdit = rootRequest("editor.existing.edge.timer");
+        edgeEdit.rootType = "timer";
+        edgeEdit.lockId = lockId(edgeEntered);
+        edgeEdit.baseGraphFingerprint = fingerprint(edgeEntered);
+        edgeEdit.nodes = List.of();
+        edgeEdit.edges = List.of(edge("forged-edge", "timer:editor.existing.edge.timer", "channel:forged", "timer_outputs_channel"));
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existing = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        existing.nodeType = "timer";
+        existing.targetId = "editor.existing.edge.timer";
+        WebAdminTimerRequest timer = new WebAdminTimerRequest();
+        timer.id = "editor.existing.edge.timer";
+        timer.displayName = "Forged Edge Timer";
+        timer.mode = "DELAY";
+        timer.scopeMode = "GLOBAL";
+        timer.durationTicks = 40L;
+        timer.intervalTicks = 0L;
+        timer.maxRuns = 1;
+        timer.startPolicy = "RESTART";
+        timer.outputChannel = "editor.existing.edge.out";
+        timer.expectedFingerprint = "typed-fingerprint";
+        timer.lockId = "typed-lock";
+        existing.timer = timer;
+        edgeEdit.existingNodeEdits = List.of(existing);
+
+        WebAdminWriteResult edgeResult = edgeFixture.service.validateDraft(null, edgeFixture.editor, edgeFixture.session, edgeEdit, edgeFixture.csrf, true);
+        requireFalse(edgeResult.success(), "existing typed edit rejects draft edges");
+        requireValidationCode(edgeResult, "logic_chain_existing_edit_edges_not_allowed");
+
+        Fixture multipleFixture = fixture();
+        WebAdminWriteResult multipleEntered = enter(multipleFixture, "editor.existing.multiple");
+        WebAdminLogicChainEditorRequest multipleExisting = rootRequest("editor.existing.multiple");
+        multipleExisting.lockId = lockId(multipleEntered);
+        multipleExisting.baseGraphFingerprint = fingerprint(multipleEntered);
+        multipleExisting.nodes = List.of();
+        multipleExisting.edges = List.of();
+        multipleExisting.existingNodeEdits = List.of(existing, existing);
+        WebAdminWriteResult multipleExistingResult = multipleFixture.service.validateDraft(null, multipleFixture.editor, multipleFixture.session, multipleExisting, multipleFixture.csrf, true);
+        requireFalse(multipleExistingResult.success(), "duplicate existing-node edits for the same target are rejected");
+        requireValidationCode(multipleExistingResult, "logic_chain_existing_node_duplicate_edit");
+
+        Fixture multipleActionFixture = fixture();
+        WebAdminWriteResult actionEntered = enter(multipleActionFixture, "editor.action.multiple");
+        WebAdminLogicChainEditorRequest actionEdit = actionEditDraftRequest(
+                "editor.action.multiple",
+                lockId(actionEntered),
+                fingerprint(actionEntered),
+                "listener",
+                "listener.action.multiple",
+                "",
+                0,
+                messageAction("blocked")
+        );
+        actionEdit.actionEdits = List.of(actionEdit.actionEdits.getFirst(), actionEdit.actionEdits.getFirst());
+        WebAdminWriteResult multipleActionResult = multipleActionFixture.service.validateDraft(null, multipleActionFixture.editor, multipleActionFixture.session, actionEdit, multipleActionFixture.csrf, true);
+        requireFalse(multipleActionResult.success(), "duplicate action edits for the same target/index are rejected");
+        requireValidationCode(multipleActionResult, "logic_chain_action_duplicate_edit");
+
+        Fixture multiSaveFixture = fixture();
+        WebAdminWriteResult createEntered = enter(multiSaveFixture, "editor.join.in.a");
+        WebAdminLogicChainEditorRequest create = signalJoinDraftRequest("editor.join.in.a", lockId(createEntered), fingerprint(createEntered), "editor.multiple.existing.join");
+        WebAdminWriteResult created = multiSaveFixture.service.saveDraft(null, multiSaveFixture.editor, multiSaveFixture.session, "127.0.0.1", create, multiSaveFixture.csrf, true);
+        requireTrue(created.success(), "fixture Join exists before multiple existing-node edits");
+
+        WebAdminWriteResult multiEntered = enter(multiSaveFixture, "editor.join.in.a");
+        WebAdminLogicChainEditorRequest multiEdit = rootRequest("editor.join.in.a");
+        multiEdit.lockId = lockId(multiEntered);
+        multiEdit.baseGraphFingerprint = fingerprint(multiEntered);
+        multiEdit.nodes = List.of();
+        multiEdit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft inChannel = channelMetadataExistingEdit(
+                multiSaveFixture,
+                "editor.join.in.a",
+                "Multiple Input Channel"
+        );
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft outChannel = channelMetadataExistingEdit(
+                multiSaveFixture,
+                "editor.join.out",
+                "Multiple Output Channel"
+        );
+        multiEdit.existingNodeEdits = List.of(inChannel, outChannel);
+        WebAdminWriteResult multiSaved = multiSaveFixture.service.saveDraft(null, multiSaveFixture.editor, multiSaveFixture.session, "127.0.0.1", multiEdit, multiSaveFixture.csrf, true);
+        requireTrue(multiSaved.success(), "multiple existing-node edits for different targets save together");
+        requireEquals("Multiple Input Channel", multiSaveFixture.channelMetadataService.metadataFor(null, multiSaveFixture.editor, multiSaveFixture.session, "editor.join.in.a", "signal").displayName(), "first existing channel metadata edit saved");
+        requireEquals("Multiple Output Channel", multiSaveFixture.channelMetadataService.metadataFor(null, multiSaveFixture.editor, multiSaveFixture.session, "editor.join.out", "signal").displayName(), "second existing channel metadata edit saved");
+    }
+
+    private static void testMultiDraftSessionSavesNewNodeExistingEditAndMetadata() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult entered = enter(fixture, "editor.join.in.a");
+        WebAdminLogicChainEditorRequest request = signalJoinDraftRequest("editor.join.in.a", lockId(entered), fingerprint(entered), "editor.multi.session.join");
+        request.channelMetadataDrafts = List.of(channelMetadataDraft("editor.join.out", "Multi Session Output", "由新增 Join 输出引用"));
+        request.existingNodeEdits = List.of(channelMetadataExistingEdit(fixture, "editor.join.in.a", "Multi Session Input"));
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", request, fixture.csrf, true);
+
+        requireTrue(saved.success(), "multi draft session saves new node, existing edit, and referenced channel metadata together");
+        Map<?, ?> joinDetail = fixture.signalJoinService.detail(null, fixture.editor, fixture.session, "editor.multi.session.join");
+        requireEquals("editor.join.out", string(joinDetail.get("outputChannel")), "new Join from mixed draft session is saved");
+        requireEquals("Multi Session Input", fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, "editor.join.in.a", "signal").displayName(), "existing channel edit from mixed draft session is saved");
+        requireEquals("Multi Session Output", fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, "editor.join.out", "signal").displayName(), "referenced channel endpoint metadata from mixed draft session is saved");
+    }
+
+    private static void testMultiActionEditsSaveAcrossOwners() throws Exception {
+        Fixture fixture = fixture();
+        SignalListenerData first = saveSignalListenerFixture(
+                fixture,
+                "listener.multi.action.first",
+                "editor.multi.action.channel",
+                List.of(WebAdminActionRelayActionsService.actionFromEntry(messageAction("first old action")))
+        );
+        SignalListenerData second = saveSignalListenerFixture(
+                fixture,
+                "listener.multi.action.second",
+                "editor.multi.action.channel",
+                List.of(WebAdminActionRelayActionsService.actionFromEntry(messageAction("second old action")))
+        );
+        Map<String, Object> firstBefore = fixture.signalListenerActionsService.actionsFor(null, fixture.editor, fixture.session, first.id());
+        Map<String, Object> secondBefore = fixture.signalListenerActionsService.actionsFor(null, fixture.editor, fixture.session, second.id());
+        String firstLock = acquireLock(fixture, WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, first.id());
+        String secondLock = acquireLock(fixture, WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, second.id());
+        WebAdminWriteResult entered = enter(fixture, "editor.multi.action.channel");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.multi.action.channel");
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ActionEditDraft firstEdit = actionEditDraftRequest("editor.multi.action.channel", lockId(entered), fingerprint(entered), "listener", first.id(), "", 0, messageAction("first replaced action")).actionEdits.getFirst();
+        firstEdit.expectedFingerprint = string(firstBefore.get("expectedFingerprint"));
+        firstEdit.lockId = firstLock;
+        WebAdminLogicChainEditorRequest.ActionEditDraft secondEdit = actionEditDraftRequest("editor.multi.action.channel", lockId(entered), fingerprint(entered), "listener", second.id(), "", 0, messageAction("second replaced action")).actionEdits.getFirst();
+        secondEdit.expectedFingerprint = string(secondBefore.get("expectedFingerprint"));
+        secondEdit.lockId = secondLock;
+        edit.actionEdits = List.of(firstEdit, secondEdit);
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(saved.success(), "multiple action edits for different owners save together");
+        requireEquals("first replaced action", requireSignalListener(fixture, first.id()).actions().getFirst().value(), "first owner action edit saved");
+        requireEquals("second replaced action", requireSignalListener(fixture, second.id()).actions().getFirst().value(), "second owner action edit saved");
+    }
+
+    private static void testTimerExistingNodeEditCannotMutateActionList() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult createdEditor = enter(fixture, "editor.existing.timer.action-guard.create");
+        WebAdminLogicChainEditorRequest create = timerDraftRequest("editor.existing.timer.action-guard.create", lockId(createdEditor), fingerprint(createdEditor), "editor.existing.timer.action-guard.saved");
+        create.nodes.getFirst().timer.onCompleteActions = List.of(messageAction("protected old action"));
+        WebAdminWriteResult created = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture Timer exists before action-list guard test");
+
+        Map<?, ?> before = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.existing.timer.action-guard.saved");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_TIMER_CONFIG, "editor.existing.timer.action-guard.saved");
+        WebAdminWriteResult entered = enter(fixture, "timer", "editor.existing.timer.action-guard.saved");
+        WebAdminLogicChainEditorRequest edit = rootRequest("editor.existing.timer.action-guard.saved");
+        edit.rootType = "timer";
+        edit.lockId = lockId(entered);
+        edit.baseGraphFingerprint = fingerprint(entered);
+        edit.nodes = List.of();
+        edit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "timer";
+        draft.targetId = "editor.existing.timer.action-guard.saved";
+        WebAdminTimerRequest timer = new WebAdminTimerRequest();
+        timer.id = "editor.existing.timer.action-guard.saved";
+        timer.displayName = "Timer Action Guard Edited";
+        timer.mode = "DELAY";
+        timer.scopeMode = "GLOBAL";
+        timer.durationTicks = 100L;
+        timer.intervalTicks = 0L;
+        timer.maxRuns = 1;
+        timer.startPolicy = "RESTART";
+        timer.outputChannel = "editor.existing.timer.action-guard.out";
+        timer.onCompleteActions = List.of(messageAction("forged replacement"), messageAction("forged extra"));
+        timer.expectedFingerprint = string(before.get("expectedFingerprint"));
+        timer.lockId = typedLockId;
+        draft.timer = timer;
+        edit.existingNodeEdits = List.of(draft);
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(saved.success(), "existing Timer node edit saves while preserving old action list");
+        Map<?, ?> after = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.existing.timer.action-guard.saved");
+        List<?> actions = (List<?>) after.get("onCompleteActions");
+        requireEquals(1, actions.size(), "existing Timer node edit cannot add or delete old actions");
+        requireEquals("protected old action", string(((Map<?, ?>) actions.getFirst()).get("value")), "existing Timer node edit cannot replace old action content");
+    }
+
+    private static void testTimerSameIndexActionEditReplacesWithoutReorder() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult createdEditor = enter(fixture, "editor.timer.action.edit.create");
+        WebAdminLogicChainEditorRequest create = timerDraftRequest("editor.timer.action.edit.create", lockId(createdEditor), fingerprint(createdEditor), "editor.timer.action.edit.saved");
+        create.nodes.getFirst().timer.onCompleteActions = List.of(messageAction("first action"), messageAction("second action"));
+        create.edges = List.of();
+        WebAdminWriteResult created = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture Timer exists before action edit");
+
+        Map<?, ?> before = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.timer.action.edit.saved");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_TIMER_CONFIG, "editor.timer.action.edit.saved");
+        WebAdminWriteResult entered = enter(fixture, "timer", "editor.timer.action.edit.saved");
+        WebAdminLogicChainEditorRequest edit = actionEditDraftRequest(
+                "editor.timer.action.edit.saved",
+                lockId(entered),
+                fingerprint(entered),
+                "timer",
+                "editor.timer.action.edit.saved",
+                "complete",
+                0,
+                messageAction("replaced first action")
+        );
+        edit.rootType = "timer";
+        edit.actionEdits.getFirst().expectedFingerprint = string(before.get("expectedFingerprint"));
+        edit.actionEdits.getFirst().lockId = typedLockId;
+
+        WebAdminWriteResult result = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+        requireTrue(result.success(), "Timer same-index action edit saves through Timer action bucket");
+        Map<?, ?> after = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.timer.action.edit.saved");
+        List<?> actions = (List<?>) after.get("onCompleteActions");
+        requireEquals(2, actions.size(), "same-index action edit preserves Timer action count");
+        requireEquals("replaced first action", string(((Map<?, ?>) actions.get(0)).get("value")), "same-index action edit replaces target action");
+        requireEquals("second action", string(((Map<?, ?>) actions.get(1)).get("value")), "same-index action edit preserves following action order");
+    }
+
+    private static void testSignalListenerSameIndexActionEditReplacesWithoutReorder() throws Exception {
+        Fixture fixture = fixture();
+        SignalListenerData listener = saveSignalListenerFixture(
+                fixture,
+                "listener.action.edit.saved",
+                "listener.action.edit.in",
+                List.of(
+                        WebAdminActionRelayActionsService.actionFromEntry(messageAction("listener first action")),
+                        WebAdminActionRelayActionsService.actionFromEntry(messageAction("listener second action"))
+                )
+        );
+        Map<String, Object> before = fixture.signalListenerActionsService.actionsFor(null, fixture.editor, fixture.session, listener.id());
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listener.id());
+        WebAdminWriteResult entered = enter(fixture, "listener", listener.id());
+        WebAdminLogicChainEditorRequest edit = actionEditDraftRequest(
+                listener.id(),
+                lockId(entered),
+                fingerprint(entered),
+                "listener",
+                listener.id(),
+                "",
+                0,
+                messageAction("listener replaced first action")
+        );
+        edit.rootType = "listener";
+        edit.actionEdits.getFirst().expectedFingerprint = string(before.get("expectedFingerprint"));
+        edit.actionEdits.getFirst().lockId = typedLockId;
+
+        WebAdminWriteResult result = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(result.success(), "SignalListener same-index action edit saves through listener action service errors=" + result.validationErrors());
+        SignalListenerData after = requireSignalListener(fixture, listener.id());
+        requireEquals(2, after.actions().size(), "same-index listener action edit preserves action count");
+        requireEquals("listener replaced first action", after.actions().get(0).value(), "same-index listener action edit replaces target action");
+        requireEquals("listener second action", after.actions().get(1).value(), "same-index listener action edit preserves following action order");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "editor and listener action typed locks released after save");
+    }
+
+    private static void testExistingActionEditStructuredPayloadConversion() {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry state = stateVariableAction();
+        var convertedState = WebAdminActionRelayActionsService.actionFromEntry(state);
+        requireEquals("state_variable", convertedState.type().id(), "existing action edit payload supports state_variable type");
+        requireEquals("mission.count", convertedState.stateKey(), "existing action edit payload preserves state key");
+        requireEquals("set_variable", convertedState.stateOperation(), "existing action edit payload preserves state operation");
+
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry timer = timerStartAction("editor.structured.timer");
+        var convertedTimer = WebAdminActionRelayActionsService.actionFromEntry(timer);
+        requireEquals("timer_start", convertedTimer.type().id(), "existing action edit payload supports timer_start type");
+        requireEquals("editor.structured.timer", convertedTimer.timerId(), "existing action edit payload preserves timerId");
+        requireEquals("RESTART", convertedTimer.timerStartPolicyOverride(), "existing action edit payload normalizes Timer start policy");
+    }
+
+    private static void testExistingActionEditStructuredSaveRoundtrip() throws Exception {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry state = stateVariableAction();
+        state.conditionGroupId = "always";
+        ActionConfig savedState = saveSingleListenerActionEditRoundtrip("listener.structured.state", state);
+        requireEquals("state_variable", savedState.type().id(), "Logic Chain actionEdits save roundtrip preserves state_variable type");
+        requireEquals("mission.count", savedState.stateKey(), "Logic Chain actionEdits save roundtrip preserves state key");
+        requireEquals("set_variable", savedState.stateOperation(), "Logic Chain actionEdits save roundtrip preserves state operation");
+        requireEquals("always", savedState.conditionGroupId(), "Logic Chain actionEdits save roundtrip preserves action conditionGroupId");
+
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry timerStart = timerStartAction("editor.structured.timer.start");
+        timerStart.conditionGroupId = "always";
+        ActionConfig savedStart = saveSingleListenerActionEditRoundtrip("listener.structured.timer.start", timerStart);
+        requireEquals("timer_start", savedStart.type().id(), "Logic Chain actionEdits save roundtrip preserves timer_start type");
+        requireEquals("editor.structured.timer.start", savedStart.timerId(), "Logic Chain actionEdits save roundtrip preserves timer_start timerId");
+        requireEquals("RESTART", savedStart.timerStartPolicyOverride(), "Logic Chain actionEdits save roundtrip preserves timer start policy");
+        requireEquals("always", savedStart.conditionGroupId(), "Logic Chain actionEdits timer_start preserves conditionGroupId");
+
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry timerCancel = timerCancelAction("editor.structured.timer.cancel");
+        timerCancel.conditionGroupId = "always";
+        ActionConfig savedCancel = saveSingleListenerActionEditRoundtrip("listener.structured.timer.cancel", timerCancel);
+        requireEquals("timer_cancel", savedCancel.type().id(), "Logic Chain actionEdits save roundtrip preserves timer_cancel type");
+        requireEquals("editor.structured.timer.cancel", savedCancel.timerId(), "Logic Chain actionEdits save roundtrip preserves timer_cancel timerId");
+        requireEquals("fail", savedCancel.timerMissingBehavior(), "Logic Chain actionEdits save roundtrip preserves timer_cancel missing behavior");
+        requireEquals("always", savedCancel.conditionGroupId(), "Logic Chain actionEdits timer_cancel preserves conditionGroupId");
+    }
+
+    private static void testActionDisableCoercedServerSide() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult createdEditor = enter(fixture, "editor.timer.action.disable.create");
+        WebAdminLogicChainEditorRequest create = timerDraftRequest("editor.timer.action.disable.create", lockId(createdEditor), fingerprint(createdEditor), "editor.timer.action.disable.saved");
+        create.nodes.getFirst().timer.onCompleteActions = List.of(messageAction("disable me"));
+        create.edges = List.of();
+        WebAdminWriteResult created = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture Timer exists before disable action edit");
+
+        Map<?, ?> before = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.timer.action.disable.saved");
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_TIMER_CONFIG, "editor.timer.action.disable.saved");
+        WebAdminWriteResult entered = enter(fixture, "timer", "editor.timer.action.disable.saved");
+        WebAdminLogicChainEditorRequest edit = actionEditDraftRequest(
+                "editor.timer.action.disable.saved",
+                lockId(entered),
+                fingerprint(entered),
+                "timer",
+                "editor.timer.action.disable.saved",
+                "complete",
+                0,
+                messageAction("disable me")
+        );
+        edit.rootType = "timer";
+        edit.actionEdits.getFirst().operation = "disable";
+        edit.actionEdits.getFirst().action.enabled = Boolean.TRUE;
+        edit.actionEdits.getFirst().expectedFingerprint = string(before.get("expectedFingerprint"));
+        edit.actionEdits.getFirst().lockId = typedLockId;
+
+        WebAdminWriteResult result = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+
+        requireTrue(result.success(), "Action disable edit saves through backend coercion");
+        Map<?, ?> after = fixture.timerService.detail(null, fixture.editor, fixture.session, "editor.timer.action.disable.saved");
+        List<?> actions = (List<?>) after.get("onCompleteActions");
+        requireEquals(Boolean.FALSE, ((Map<?, ?>) actions.getFirst()).get("enabled"), "operation=disable forces enabled=false even if payload sent true");
+    }
+
+    private static void testActionEditRejectsDeleteAndReorderOperations() throws Exception {
+        for (String operation : List.of("delete", "reorder")) {
+            Fixture fixture = fixture();
+            WebAdminWriteResult entered = enter(fixture, "editor.action.operation." + operation);
+            WebAdminLogicChainEditorRequest edit = actionEditDraftRequest(
+                    "editor.action.operation." + operation,
+                    lockId(entered),
+                    fingerprint(entered),
+                    "listener",
+                    "listener.action.operation." + operation,
+                    "",
+                    0,
+                    messageAction("blocked")
+            );
+            edit.actionEdits.getFirst().operation = operation;
+            edit.actionEdits.getFirst().expectedFingerprint = "typed-fingerprint";
+            edit.actionEdits.getFirst().lockId = "typed-lock";
+
+            WebAdminWriteResult result = fixture.service.validateDraft(null, fixture.editor, fixture.session, edit, fixture.csrf, true);
+            requireFalse(result.success(), "old action " + operation + " operation is rejected");
+            requireValidationCode(result, "logic_chain_action_edit_operation_invalid");
+        }
+    }
+
     private static WebAdminWriteResult enter(Fixture fixture, String rootRef) {
         WebAdminWriteResult result = fixture.service.enter(null, fixture.editor, fixture.session, "127.0.0.1", rootRequest(rootRef), fixture.csrf, true);
         requireTrue(result.success(), "enter edit mode for " + rootRef);
+        return result;
+    }
+
+    private static WebAdminWriteResult enter(Fixture fixture, String rootType, String rootRef) {
+        WebAdminLogicChainEditorRequest request = rootRequest(rootRef);
+        request.rootType = rootType;
+        request.rootRef = rootRef;
+        WebAdminWriteResult result = fixture.service.enter(null, fixture.editor, fixture.session, "127.0.0.1", request, fixture.csrf, true);
+        requireTrue(result.success(), "enter edit mode for " + rootType + ":" + rootRef);
         return result;
     }
 
@@ -988,12 +1657,61 @@ public final class WebAdminLogicChainEditorServiceTest {
         return request;
     }
 
+    private static WebAdminLogicChainEditorRequest actionEditDraftRequest(
+            String rootRef,
+            String lockId,
+            String fingerprint,
+            String ownerType,
+            String ownerId,
+            String bucket,
+            int actionIndex,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry action
+    ) {
+        WebAdminLogicChainEditorRequest request = rootRequest(rootRef);
+        request.lockId = lockId;
+        request.baseGraphFingerprint = fingerprint;
+        request.nodes = List.of();
+        request.edges = List.of();
+        WebAdminLogicChainEditorRequest.ActionEditDraft edit = new WebAdminLogicChainEditorRequest.ActionEditDraft();
+        edit.ownerType = ownerType;
+        edit.ownerId = ownerId;
+        edit.bucket = bucket;
+        edit.actionIndex = actionIndex;
+        edit.operation = "replace";
+        edit.action = action;
+        edit.expectedFingerprint = "typed-owner-fingerprint";
+        edit.lockId = "typed-owner-lock";
+        request.actionEdits = List.of(edit);
+        return request;
+    }
+
     private static WebAdminLogicChainEditorRequest.ChannelMetadataDraft channelMetadataDraft(String channel, String displayName, String note) {
         WebAdminLogicChainEditorRequest.ChannelMetadataDraft draft = new WebAdminLogicChainEditorRequest.ChannelMetadataDraft();
         draft.channel = channel;
         draft.displayName = displayName;
         draft.note = note;
         draft.iconKey = "auto";
+        return draft;
+    }
+
+    private static WebAdminLogicChainEditorRequest.ExistingNodeEditDraft channelMetadataExistingEdit(
+            Fixture fixture,
+            String channel,
+            String displayName
+    ) {
+        WebAdminDtos.ChannelMetadataDto before = fixture.channelMetadataService.metadataFor(null, fixture.editor, fixture.session, channel, "signal");
+        String lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_CHANNEL_METADATA, channel);
+        WebAdminChannelMetadataUpdateRequest metadata = new WebAdminChannelMetadataUpdateRequest();
+        metadata.channel = channel;
+        metadata.displayName = displayName;
+        metadata.note = "multi draft session";
+        metadata.iconKey = "auto";
+        metadata.expectedFingerprint = before.expectedFingerprint();
+        metadata.lockId = lockId;
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        draft.nodeType = "channel_metadata";
+        draft.targetId = channel;
+        draft.channelMetadata = metadata;
         return draft;
     }
 
@@ -1014,6 +1732,119 @@ public final class WebAdminLogicChainEditorServiceTest {
         return entry;
     }
 
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry stateVariableAction() {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = messageAction("");
+        entry.type = "state_variable";
+        entry.stateOperation = "set_variable";
+        entry.stateScope = "GLOBAL";
+        entry.stateTargetMode = "global";
+        entry.stateKey = "mission.count";
+        entry.stateValueType = "INTEGER";
+        entry.stateValue = "5";
+        entry.stateCreateIfMissing = Boolean.TRUE;
+        entry.stateInitialValue = "0";
+        return entry;
+    }
+
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry timerStartAction(String timerId) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = messageAction("");
+        entry.type = "timer_start";
+        entry.timerId = timerId;
+        entry.timerTargetMode = "global";
+        entry.timerStartPolicyOverride = "RESTART";
+        entry.timerDurationOverrideTicks = 0;
+        return entry;
+    }
+
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry timerCancelAction(String timerId) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = messageAction("");
+        entry.type = "timer_cancel";
+        entry.timerId = timerId;
+        entry.timerTargetMode = "global";
+        entry.timerMissingBehavior = "fail";
+        entry.timerDurationOverrideTicks = 0;
+        return entry;
+    }
+
+    private static ActionConfig saveSingleListenerActionEditRoundtrip(
+            String listenerId,
+            WebAdminActionRelayActionsUpdateRequest.ActionEntry replacement
+    ) throws Exception {
+        Fixture fixture = fixture();
+        saveAlwaysConditionGroup(fixture);
+        SignalListenerData listener = saveSignalListenerFixture(
+                fixture,
+                listenerId,
+                listenerId + ".in",
+                List.of(WebAdminActionRelayActionsService.actionFromEntry(messageAction("structured old action")))
+        );
+        Map<String, Object> before = fixture.signalListenerActionsService.actionsFor(null, fixture.editor, fixture.session, listener.id());
+        String typedLockId = acquireLock(fixture, WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listener.id());
+        WebAdminWriteResult entered = enter(fixture, "listener", listener.id());
+        WebAdminLogicChainEditorRequest edit = actionEditDraftRequest(
+                listener.id(),
+                lockId(entered),
+                fingerprint(entered),
+                "listener",
+                listener.id(),
+                "",
+                0,
+                replacement
+        );
+        edit.rootType = "listener";
+        edit.actionEdits.getFirst().expectedFingerprint = string(before.get("expectedFingerprint"));
+        edit.actionEdits.getFirst().lockId = typedLockId;
+
+        WebAdminWriteResult saved = fixture.service.saveDraft(null, fixture.editor, fixture.session, "127.0.0.1", edit, fixture.csrf, true);
+        requireTrue(saved.success(), "structured Logic Chain actionEdits save roundtrip succeeds for " + replacement.type + " errors=" + saved.validationErrors());
+        SignalListenerData after = requireSignalListener(fixture, listener.id());
+        requireEquals(1, after.actions().size(), "structured action edit keeps same action count for " + replacement.type);
+        requireEquals(0, fixture.editLockService.activeLockCount(), "structured action edit releases locks for " + replacement.type);
+        return after.actions().getFirst();
+    }
+
+    private static void saveAlwaysConditionGroup(Fixture fixture) {
+        WebAdminConditionGroupStore.ConditionGroupFile file = WebAdminConditionGroupStore.load(fixture.directory.resolve(WebAdminConditionGroupStore.FILE_NAME));
+        WebAdminConditionGroupStore.ConditionGroupEntry entry = new WebAdminConditionGroupStore.ConditionGroupEntry();
+        entry.id = "always";
+        entry.displayName = "始终通过";
+        entry.enabled = true;
+        entry.groupDefinition = WebAdminConditionGroupStore.defaultDefinition("always", "始终通过");
+        file.groups.put("always", entry);
+        requireTrue(WebAdminConditionGroupStore.save(fixture.directory.resolve(WebAdminConditionGroupStore.FILE_NAME), file), "save always condition group fixture");
+    }
+
+    private static SignalListenerData saveSignalListenerFixture(
+            Fixture fixture,
+            String id,
+            String channel,
+            List<ActionConfig> actions
+    ) {
+        SignalListenerStore.DataFile file = SignalListenerStore.loadWithStatus(fixture.directory.resolve(SignalListenerStore.FILE_NAME)).file();
+        SignalListenerData listener = new SignalListenerData(
+                id,
+                "Listener " + id,
+                channel,
+                true,
+                0,
+                "",
+                actions == null ? List.of() : actions
+        ).normalized();
+        file.listeners.removeIf(existing -> existing.id().equals(listener.id()));
+        file.listeners.add(listener);
+        requireTrue(SignalListenerStore.save(fixture.directory.resolve(SignalListenerStore.FILE_NAME), file), "save SignalListener fixture " + id);
+        return listener;
+    }
+
+    private static SignalListenerData requireSignalListener(Fixture fixture, String id) {
+        for (SignalListenerData listener : SignalListenerStore.loadWithStatus(fixture.directory.resolve(SignalListenerStore.FILE_NAME)).file().listeners) {
+            if (listener.id().equals(id)) {
+                return listener.normalized();
+            }
+        }
+        throw new AssertionError("missing SignalListener fixture " + id);
+    }
+
     private static Fixture fixture() throws Exception {
         return fixture(60_000L);
     }
@@ -1026,7 +1857,9 @@ public final class WebAdminLogicChainEditorServiceTest {
         WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permission, security, editLockService, directory.resolve("signal_joins.json"));
         WebAdminTimerService timerService = new WebAdminTimerService(permission, security, editLockService, directory.resolve("timers.json"));
         WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permission, security, editLockService);
-        WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permission, security, editLockService);
+        WebAdminChannelMetadataService channelMetadataService = new WebAdminChannelMetadataService(permission, security, editLockService, directory.resolve("web_admin_channel_metadata.json"));
+        WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permission, security, editLockService, directory.resolve(SignalListenerStore.FILE_NAME));
+        WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permission, security, editLockService, directory.resolve(SignalListenerStore.FILE_NAME));
         WebAdminActionRelayActionsService actionRelayActionsService = new WebAdminActionRelayActionsService(permission, security, editLockService);
         WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permission, security, editLockService);
         WebAdminLogicChainEditorService service = new WebAdminLogicChainEditorService(
@@ -1036,13 +1869,15 @@ public final class WebAdminLogicChainEditorServiceTest {
                 logicChainService,
                 signalJoinService,
                 timerService,
+                channelMetadataService,
+                signalListenerBasicConfigService,
                 signalListenerActionsService,
                 actionRelayActionsService,
                 regionControllerService
         );
         WebAdminUser editor = user(WebAdminRole.EDITOR);
         WebAdminSession session = session(editor);
-        return new Fixture(service, signalJoinService, timerService, security, editLockService, editor, session, security.csrfTokenFor(session));
+        return new Fixture(directory, service, signalJoinService, timerService, channelMetadataService, signalListenerBasicConfigService, signalListenerActionsService, security, editLockService, editor, session, security.csrfTokenFor(session));
     }
 
     private static String lockId(WebAdminWriteResult result) {
@@ -1147,9 +1982,13 @@ public final class WebAdminLogicChainEditorServiceTest {
     }
 
     private record Fixture(
+            Path directory,
             WebAdminLogicChainEditorService service,
             WebAdminSignalJoinService signalJoinService,
             WebAdminTimerService timerService,
+            WebAdminChannelMetadataService channelMetadataService,
+            WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService,
+            WebAdminSignalListenerActionsService signalListenerActionsService,
             WebAdminWriteSecurityService security,
             WebAdminEditLockService editLockService,
             WebAdminUser editor,

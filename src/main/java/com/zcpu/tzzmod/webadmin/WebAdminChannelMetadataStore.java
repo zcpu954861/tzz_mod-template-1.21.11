@@ -18,8 +18,12 @@ public final class WebAdminChannelMetadataStore {
     }
 
     public static synchronized MetadataFile load(MinecraftServer server) {
+        return load(path(server));
+    }
+
+    public static synchronized MetadataFile load(Path path) {
         MetadataFile file = JsonStoreSupport.readOrDefault(
-                path(server),
+                path,
                 MetadataFile.class,
                 MetadataFile::new,
                 "web admin channel metadata"
@@ -28,8 +32,12 @@ public final class WebAdminChannelMetadataStore {
     }
 
     public static synchronized boolean save(MinecraftServer server, MetadataFile file) {
+        return save(path(server), file);
+    }
+
+    public static synchronized boolean save(Path path, MetadataFile file) {
         MetadataFile safeFile = file == null ? new MetadataFile() : file.normalized();
-        return JsonStoreSupport.write(path(server), safeFile, "web admin channel metadata");
+        return JsonStoreSupport.write(path, safeFile, "web admin channel metadata");
     }
 
     public static final class MetadataFile {

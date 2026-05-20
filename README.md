@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.60.0-logic-chain-editor-mvp-new-node-placement`
-- 当前开发基线：`8.15 Templates / Prefab / Import-Export`；本阶段新增 WebAdmin 模板中心，用 `tzz_template_v1`、built-in starter templates、world-scoped user template store `templates.json`、Import JSON、Export JSON、dry-run 和 safe apply，把 channel metadata、`SignalJoinDefinition`、`TimerDefinition`、`SignalListener` 与 owned `ActionConfig` 落地为真实配置。内置模板详情显式保留 `source=built_in`，并在后端支持 blank-source built-in-first lookup；模板详情 JSON 预览位于右侧栏，主 UI 资源类型和预览 / 应用文案保持中文。Logic Chain 列表按 connected component 展示一个入口，包含 `componentId`、`defaultFocusChannel` 和 `includedChannels`，metadata root 与同组件自动发现频道合并，焦点频道在详情页切换，并兼容旧 channel 入口。外部 channel / timer 引用 fail closed；placeholder binding apply deferred；StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred；发布后建议版本为 `v1.61.0-templates-prefab-import-export`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.61.0-templates-prefab-import-export`
+- 当前开发基线：`8.16 Logic Chain Editor Existing Node Editing`；本阶段在 8.14 当前 Viewer 画布编辑模式中加入已有节点受控维护：Channel metadata、Signal Join、Timer、SignalListener 基础配置、SignalListener / Timer 上已有 ActionConfig 的同 index 替换 / 禁用，以及 Join input/output、Timer outputChannel、Listener channel、Signal action output channel 的局部重连。保存仍写入真实配置服务，不保存假图，不移动/删除/重排旧节点，不删除/重排旧 action；VBD、Region、ActionRelay block、SignalReceiver 等世界实体节点仍为只读引用。发布后建议版本为 `v1.62.0-logic-chain-editor-existing-node-editing`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -65,10 +65,13 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [Logic Chain Editor Capability Matrix 8.14](docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_14.md)
 - [8.15 Templates / Prefab / Import-Export Current Context](docs/TEMPLATES_PREFAB_IMPORT_EXPORT_8_15_CURRENT_CONTEXT.md)
 - [Templates / Prefab Capability Matrix 8.15](docs/TEMPLATES_PREFAB_CAPABILITY_MATRIX_8_15.md)
+- [8.16 Logic Chain Editor Existing Node Editing Current Context](docs/LOGIC_CHAIN_EDITOR_EXISTING_NODE_EDITING_8_16_CURRENT_CONTEXT.md)
+- [Logic Chain Editor Capability Matrix 8.16](docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_16.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.15；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；8.15 也不恢复旧 full Logic Chain Editor，不做自动世界实体复制。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.16；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；8.16 也不恢复旧 full Logic Chain Editor，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
+- 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
@@ -428,6 +431,40 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不跑 MCP scenario。
 - 不启动 Minecraft。
 - 不生成截图矩阵。
+- 本阶段不 commit / push / merge / tag。
+
+## 8.16 Logic Chain Editor Existing Node Editing
+
+8.16 继续复用当前 Logic Chain Viewer 画布内的编辑模式，把 8.14 的新增节点 MVP 扩展为已有节点受控维护。它仍不是 full Logic Chain Editor，不是 Scratch editor，也不新增 runtime 语义。
+
+8.16 已实现方向：
+
+- 已有节点编辑入口：进入编辑模式后点击已有可编辑节点，打开统一 modal；不可编辑的世界实体 / 引用节点显示 readonly reason，包含 `data-logic-chain-world-entity-readonly-reference`。旧节点仍带 `data-logic-chain-existing-node-not-draggable`，不允许移动、删除、重排。
+- 支持节点：Channel metadata 可改 displayName / note / iconKey；Signal Join 可改 displayName / note / enabled / mode / threshold / scope / resetPolicy / timeout / cooldown / inputChannels / outputChannel；Timer 可改 displayName / note / enabled / mode-specific timing / scope / startPolicy / outputChannel；SignalListener 可改 enabled / channel / cooldownTicks / conditionGroupId。
+- ActionConfig 编辑：SignalListener actions 和 Timer start / tick / complete / cancel bucket actions 支持同 index 替换；禁用通过现有 `enabled=false` 表达；action conditionGroupId、state_variable、timer_start / timer_cancel 结构化字段沿用现有 ActionConfig editor / payload。旧 action 删除、移动、重排仍禁止，UI 和 guard 使用 `data-logic-chain-action-replace-same-index`、`data-logic-chain-no-old-action-delete`、`data-logic-chain-no-old-action-reorder`。
+- 局部重连：Join input / output、Timer outputChannel、Listener channel、Signal action output channel 保存为真实配置字段，已保存卡片通过画布绿色加号重连，编辑弹窗只保留连接摘要和隐藏 typed 值，带 `data-logic-chain-local-reconnect`、`data-logic-chain-reconnect-cancel`、`data-logic-chain-existing-canvas-reconnect`、`data-logic-chain-existing-reconnect-no-modal-fields`、`data-logic-chain-green-plus-reconnect` marker；连接模式中拖动画布不退出，发起卡片保留自己的绿点用于再次点击退出，其他旧节点编辑点隐藏，仅合法频道候选显示绿点，包含 `data-logic-chain-connection-mode-pan-keeps-active`、`data-logic-chain-connection-target-keeps-own-handles`、`data-logic-chain-existing-reconnect-any-legal-channel`。已有节点 / Action 编辑 payload 不携带 draft `edges`，不会保存假图连线。
+- 草稿预览：已有 Channel / Join / Timer / Listener / Action 的草稿字段会通过 `data-logic-chain-draft-overlay` / `data-logic-chain-rendered-graph-overlay` 叠加到当前画布，保存前不写 runtime，保存失败仍保留预览；旧节点连线草稿只把真正新增 / 替换的边渲染成绿色虚线，未变化的旧线保持原样，取消或替换的原始边会立即隐藏但以 layout-only 形式保留到退出连接模式，退出后再裁剪完全脱钩的卡片和重排结构，带 `data-logic-chain-only-changed-edge-draft-highlight`、`data-logic-chain-unchanged-existing-edge-keeps-style`、`data-logic-chain-connection-prune-deferred-until-exit`、`data-logic-chain-removed-edge-hidden-during-connection`、`data-logic-chain-prune-detached-after-connection-exit`。
+- 新增频道端点与草稿布局：`新增节点` 包含频道端点 / Channel Endpoint，创建 draft channel card；选择已有 channel 会尽量复用画布上已有频道卡，输入新 channel 或修改 display metadata 时保存为 referenced channel metadata，不保存假图节点。新增 Join / Timer 弹窗暴露 note / enabled 等完整创建字段，并按模式切换可配置项，Join ALL 隐藏 threshold。草稿连线和箭头保持绿色；草稿 Join / Timer 单击用于选中查看详情和编辑草稿配置，按住后拖动才移动，拖动过程中 rerender 不因 pointer capture 丢失而回弹；未连接的频道端点默认放在当前焦点/root 频道卡下方，新建下游频道端点在无其它连接时贴到 Join / Timer 右侧相邻列，不再制造强制空白列。Timer 下游连到已有频道时会移动到该频道卡左侧并直接连到频道卡，不创建额外输出引用卡，带 `data-logic-chain-timer-output-move-left-of-channel`、`data-logic-chain-timer-output-no-reference-card`。
+- 既有节点维护入口：点击单个可编辑旧节点打开维护弹窗；“新增 Action”入口从右侧详情栏移入该弹窗，使用 `data-logic-chain-action-append-in-existing-node-modal`，旧 action 删除、移动、重排仍禁止。
+- 草稿门控与多操作会话：打开已有节点 / Action 编辑 modal 不会直接变成可保存草稿；检测到字段变化并点击“加入草稿”后进入统一 draft session。一个保存请求可同时包含新增节点、频道端点、Action append、多个不同已有节点编辑、多个不同 Action 编辑和被引用的 channel metadata；重复同一目标会被拒绝，旧节点移动 / 删除 / 重排仍不可用。
+- Draft diff：编辑 modal 和画布 toolbar 显示 `data-logic-chain-draft-diff`，画布上方使用固定高度 compact banner，只显示最近一条和总数，可展开全部；并区分字段变更、连接变更和 Action 变更：`data-logic-chain-diff-field-change`、`data-logic-chain-diff-connection-change`、`data-logic-chain-diff-action-change`。
+- 保存链路：保存仍需要主 `logic_chain_editor` lock、目标 typed config lock、expectedFingerprint、permission、CSRF / same-origin、后端 validation、audit、realtime。保存失败保留主编辑锁和草稿；只有结果明确标记主编辑锁失效时才要求重新进入。
+- 保存落地：后端先统一 validation，然后按新增节点、Action append、已有节点编辑、Action 编辑、被引用 channel metadata 的顺序写入真实服务；`existingNodeEdits` 调用 Channel metadata / Signal Join / Timer / SignalListener basic config 的真实 update service；`actionEdits` 调用 SignalListener action update 或 Timer bucket same-index update；Action append 仍保留 8.14 末尾追加能力。
+
+8.16 约束：
+
+- 不做旧节点移动 / 删除 / 重排。
+- 不做旧 action 删除 / 重排 / 跨列表移动。
+- 不做 VBD / Region / SignalReceiver / ActionRelay block 的画布内直接绑定或坐标编辑。
+- 不做 full Logic Chain Editor。
+- 不做 Scratch editor。
+- 不做 if / else runtime。
+- 不做 GameController / MissionSystem / PhaseController。
+- 不新增 ActionType。
+- 不新增 ConditionNodeType。
+- 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction / Condition runtime 语义。
+- 不做 raw JSON editor。
+- 不启动 Minecraft，不跑 MCP scenario，不生成截图矩阵。
 - 本阶段不 commit / push / merge / tag。
 
 ## WebAdmin UI 规范

@@ -7,6 +7,7 @@ import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainEditorRequest;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
@@ -25,6 +26,7 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -43,15 +45,26 @@ public final class WebAdminChannelMetadataService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
+    private final Path testStorePath;
 
     public WebAdminChannelMetadataService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService,
             WebAdminEditLockService editLockService
     ) {
+        this(permissionService, securityService, editLockService, null);
+    }
+
+    WebAdminChannelMetadataService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path testStorePath
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
+        this.testStorePath = testStorePath;
     }
 
     public WebAdminDtos.ChannelMetadataDto metadataFor(
@@ -62,7 +75,7 @@ public final class WebAdminChannelMetadataService {
             String fallbackIconKey
     ) {
         String channel = SignalChannel.normalize(rawChannel);
-        WebAdminChannelMetadataStore.MetadataFile file = WebAdminChannelMetadataStore.load(server);
+        WebAdminChannelMetadataStore.MetadataFile file = load(server);
         WebAdminChannelMetadataStore.MetadataEntry entry = WebAdminChannelMetadataStore.MetadataEntry.normalized(
                 channel,
                 file.channels.get(channel)
@@ -137,7 +150,7 @@ public final class WebAdminChannelMetadataService {
             }
         }
 
-        WebAdminChannelMetadataStore.MetadataFile file = WebAdminChannelMetadataStore.load(server);
+        WebAdminChannelMetadataStore.MetadataFile file = load(server);
         WebAdminChannelMetadataStore.MetadataEntry before = WebAdminChannelMetadataStore.MetadataEntry.normalized(
                 channel,
                 file.channels.get(channel)
@@ -180,7 +193,7 @@ public final class WebAdminChannelMetadataService {
         after.updatedBy = user == null ? "" : user.username;
         after.version = before.version + 1L;
         file.channels.put(channel, after);
-        if (!WebAdminChannelMetadataStore.save(server, file)) {
+        if (!save(server, file)) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "频道显示信息保存失败，请查看服务端日志。");
             audit(context, result, beforeSummary(before), normalized.summary());
             return result;
@@ -208,6 +221,51 @@ public final class WebAdminChannelMetadataService {
         publishRealtime(after, auditEvent, changedFields, user);
         releaseLockAfterWrite(request, user, session, remoteAddress);
         return result;
+    }
+
+    WebAdminWriteResult saveDraftsFromLogicChainEditor(
+            MinecraftServer server,
+            WebAdminUser user,
+            List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> drafts
+    ) {
+        List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> safeDrafts = drafts == null ? List.of() : drafts;
+        WebAdminWriteTarget target = new WebAdminWriteTarget("CHANNEL_METADATA", "drafts", "频道端点 metadata");
+        if (safeDrafts.isEmpty() || (server == null && testStorePath == null)) {
+            return WebAdminWriteResult.ok(target, false, "无频道 metadata 草稿。");
+        }
+        WebAdminChannelMetadataStore.MetadataFile file = load(server);
+        boolean changed = false;
+        String actor = user == null ? "" : safe(user.username);
+        for (WebAdminLogicChainEditorRequest.ChannelMetadataDraft draft : safeDrafts) {
+            String channel = SignalChannel.normalize(draft == null ? "" : draft.channel);
+            if (channel.isBlank()) {
+                continue;
+            }
+            WebAdminChannelMetadataStore.MetadataEntry before = WebAdminChannelMetadataStore.MetadataEntry.normalized(channel, file.channels.get(channel));
+            WebAdminChannelMetadataStore.MetadataEntry after = new WebAdminChannelMetadataStore.MetadataEntry();
+            after.channel = channel;
+            after.displayName = safe(draft == null ? "" : draft.displayName).trim();
+            after.note = safe(draft == null ? "" : draft.note).trim();
+            after.iconKey = normalizeIcon(draft == null ? "" : draft.iconKey);
+            after.updatedAt = Instant.now().toString();
+            after.updatedBy = actor;
+            after.version = before.version + 1L;
+            if (safe(before.displayName).equals(after.displayName)
+                    && safe(before.note).equals(after.note)
+                    && safe(before.iconKey).equals(after.iconKey)
+                    && file.channels.containsKey(channel)) {
+                continue;
+            }
+            file.channels.put(channel, after);
+            changed = true;
+        }
+        if (!changed) {
+            return WebAdminWriteResult.noChange(target, "频道端点 metadata 无变化。");
+        }
+        if (!save(server, file)) {
+            return WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "频道端点 metadata 保存失败。");
+        }
+        return WebAdminWriteResult.ok(target, true, "频道端点 metadata 已保存。");
     }
 
     public static String fingerprintFor(WebAdminChannelMetadataStore.MetadataEntry rawEntry) {
@@ -335,6 +393,18 @@ public final class WebAdminChannelMetadataService {
                 .payload("auditId", auditEvent == null ? "" : auditEvent.auditId())
                 .payload("configEventId", configEvent == null ? "" : configEvent.id())
                 .payload("channelEventId", channelEvent == null ? "" : channelEvent.id()));
+    }
+
+    private WebAdminChannelMetadataStore.MetadataFile load(MinecraftServer server) {
+        return testStorePath == null
+                ? WebAdminChannelMetadataStore.load(server)
+                : WebAdminChannelMetadataStore.load(testStorePath);
+    }
+
+    private boolean save(MinecraftServer server, WebAdminChannelMetadataStore.MetadataFile file) {
+        return testStorePath == null
+                ? WebAdminChannelMetadataStore.save(server, file)
+                : WebAdminChannelMetadataStore.save(testStorePath, file);
     }
 
     private void releaseLockAfterWrite(WebAdminChannelMetadataUpdateRequest request, WebAdminUser user, WebAdminSession session, String remoteAddress) {

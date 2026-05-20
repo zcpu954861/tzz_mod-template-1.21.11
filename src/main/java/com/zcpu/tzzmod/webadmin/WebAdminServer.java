@@ -116,7 +116,7 @@ public final class WebAdminServer {
     private final WebAdminTimerService timerService = new WebAdminTimerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminTemplateService templateService = new WebAdminTemplateService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
-    private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
+    private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, channelMetadataService, signalListenerBasicConfigService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
     private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
     private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
