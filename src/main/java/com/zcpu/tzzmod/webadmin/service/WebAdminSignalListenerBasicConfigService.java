@@ -30,6 +30,7 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -47,16 +48,34 @@ public final class WebAdminSignalListenerBasicConfigService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
-    private final WebAdminConditionGateBindingValidator gateBindingValidator = new WebAdminConditionGateBindingValidator();
+    private final WebAdminConditionGateBindingValidator gateBindingValidator;
+    private final Path testStorePath;
 
     public WebAdminSignalListenerBasicConfigService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService,
             WebAdminEditLockService editLockService
     ) {
+        this(permissionService, securityService, editLockService, null);
+    }
+
+    WebAdminSignalListenerBasicConfigService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path testStorePath
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
+        this.testStorePath = testStorePath;
+        this.gateBindingValidator = new WebAdminConditionGateBindingValidator(conditionGroupTestPath(testStorePath));
+    }
+
+    private static Path conditionGroupTestPath(Path signalListenerTestStorePath) {
+        return signalListenerTestStorePath == null || signalListenerTestStorePath.getParent() == null
+                ? null
+                : signalListenerTestStorePath.getParent().resolve(WebAdminConditionGroupStore.FILE_NAME);
     }
 
     public WebAdminDtos.SignalListenerBasicConfigDto configFor(
@@ -170,8 +189,10 @@ public final class WebAdminSignalListenerBasicConfigService {
             return result;
         }
 
-        SignalListenerData updated = SignalListenerStore.updateBasicConfigForWebAdmin(server, listener.id(), enabled, channel, cooldownTicks, conditionGroupId);
-        SignalListenerStore.flushDirty(server);
+        SignalListenerData updated = updateBasicConfig(server, listener.id(), enabled, channel, cooldownTicks, conditionGroupId);
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         if (updated == null) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 不存在或已被删除。");
             audit(context, result, currentSummary(listener), requestSummary(request));
@@ -284,11 +305,26 @@ public final class WebAdminSignalListenerBasicConfigService {
     }
 
     private SignalListenerData findListener(MinecraftServer server, String listenerRef) {
-        if (server == null || isBlank(listenerRef)) {
+        if ((server == null && testStorePath == null) || isBlank(listenerRef)) {
             return null;
         }
-        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(server, listenerRef);
+        SignalListenerStore.ResolveResult resolved = testStorePath == null
+                ? SignalListenerStore.resolveListener(server, listenerRef)
+                : SignalListenerStore.resolveListener(testStorePath, listenerRef);
         return resolved.foundUnique() ? resolved.listener().normalized() : null;
+    }
+
+    private SignalListenerData updateBasicConfig(
+            MinecraftServer server,
+            String listenerId,
+            boolean enabled,
+            String channel,
+            int cooldownTicks,
+            String conditionGroupId
+    ) {
+        return testStorePath == null
+                ? SignalListenerStore.updateBasicConfigForWebAdmin(server, listenerId, enabled, channel, cooldownTicks, conditionGroupId)
+                : SignalListenerStore.updateBasicConfigForWebAdmin(testStorePath, listenerId, enabled, channel, cooldownTicks, conditionGroupId);
     }
 
     private WebAdminAuditEvent audit(WebAdminWriteContext context, WebAdminWriteResult result, Map<String, ?> before, Map<String, ?> after) {

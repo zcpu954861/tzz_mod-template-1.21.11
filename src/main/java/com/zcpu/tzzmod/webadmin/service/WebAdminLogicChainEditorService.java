@@ -10,12 +10,14 @@ import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.region.RegionTriggerType;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminChannelMetadataUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminLogicChainEditorRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerBasicConfigUpdateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminTimerRequest;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
@@ -61,6 +63,8 @@ public final class WebAdminLogicChainEditorService {
     private final WebAdminLogicChainService logicChainService;
     private final WebAdminSignalJoinService signalJoinService;
     private final WebAdminTimerService timerService;
+    private final WebAdminChannelMetadataService channelMetadataService;
+    private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService;
     private final WebAdminSignalListenerActionsService signalListenerActionsService;
     private final WebAdminActionRelayActionsService actionRelayActionsService;
     private final WebAdminRegionControllerService regionControllerService;
@@ -72,6 +76,8 @@ public final class WebAdminLogicChainEditorService {
             WebAdminLogicChainService logicChainService,
             WebAdminSignalJoinService signalJoinService,
             WebAdminTimerService timerService,
+            WebAdminChannelMetadataService channelMetadataService,
+            WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService,
             WebAdminSignalListenerActionsService signalListenerActionsService,
             WebAdminActionRelayActionsService actionRelayActionsService,
             WebAdminRegionControllerService regionControllerService
@@ -82,6 +88,8 @@ public final class WebAdminLogicChainEditorService {
         this.logicChainService = logicChainService == null ? new WebAdminLogicChainService(this.permissionService, this.securityService, editLockService) : logicChainService;
         this.signalJoinService = signalJoinService == null ? new WebAdminSignalJoinService(this.permissionService, this.securityService, editLockService) : signalJoinService;
         this.timerService = timerService == null ? new WebAdminTimerService(this.permissionService, this.securityService, editLockService) : timerService;
+        this.channelMetadataService = channelMetadataService == null ? new WebAdminChannelMetadataService(this.permissionService, this.securityService, editLockService) : channelMetadataService;
+        this.signalListenerBasicConfigService = signalListenerBasicConfigService == null ? new WebAdminSignalListenerBasicConfigService(this.permissionService, this.securityService, editLockService) : signalListenerBasicConfigService;
         this.signalListenerActionsService = signalListenerActionsService == null ? new WebAdminSignalListenerActionsService(this.permissionService, this.securityService, editLockService) : signalListenerActionsService;
         this.actionRelayActionsService = actionRelayActionsService == null ? new WebAdminActionRelayActionsService(this.permissionService, this.securityService, editLockService) : actionRelayActionsService;
         this.regionControllerService = regionControllerService == null ? new WebAdminRegionControllerService(this.permissionService, this.securityService, editLockService) : regionControllerService;
@@ -89,21 +97,29 @@ public final class WebAdminLogicChainEditorService {
 
     public Map<String, Object> capabilities(WebAdminUser user) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("stage", "8.14 Logic Chain Editor MVP");
+        data.put("stage", "8.16 Logic Chain Editor existing node editing");
         data.put("editMode", true);
-        data.put("newNodeOnly", true);
+        data.put("newNodeOnly", false);
+        data.put("existingNodeEditing", true);
+        data.put("sameIndexActionEditing", true);
+        data.put("localReconnect", true);
         data.put("maxDraftNodesPerSave", MAX_DRAFT_NODES_PER_SAVE);
         data.put("supportedNodeTypes", List.of(
                 capability("signal_join", "Signal Join", "创建 SignalJoinDefinition；输入/输出频道写入现有 Signal Join 配置。", List.of("dynamic_downstream_channel_column"), true),
                 capability("timer", "Timer", "创建 TimerDefinition；输出频道写入现有 Scheduler Timer 配置；C5 Timer 引用 / 目标位需要 action-list 映射，已 deferred。", List.of("C0"), true),
-                capability("action_append", "Action", "在已有 SignalListener / ActionRelay / Region / Timer action list 后追加 1 条 ActionConfig；不移动、不删除、不重排旧 action。", List.of(), true)
+                capability("channel_metadata", "Channel metadata", "编辑已有频道 displayName / note / iconKey；不重命名 channel id。", List.of(), true),
+                capability("signal_listener", "Signal Listener", "编辑已有虚拟监听器 enabled / channel / cooldownTicks / conditionGroupId。", List.of(), true),
+                capability("action_append", "Action append", "在已有 SignalListener / ActionRelay / Region / Timer action list 后追加 1 条 ActionConfig；不移动、不删除、不重排旧 action。", List.of(), true),
+                capability("action_edit", "Action edit", "替换或禁用已有 SignalListener / Timer action 的同一 index；保持顺序和长度不变。", List.of(), true)
         ));
         data.put("deferredNodeTypes", List.of(
                 "Virtual SignalListener create (pure config, disabled until Logic Chain editor write path has its own listener create lock)",
                 "Condition gate",
                 "StateVariable direct create",
                 "world device / receiver / region create",
-                "old node move/delete/reorder"
+                "ActionRelay / Region existing-node binding edit",
+                "old node move/delete/reorder",
+                "old action delete/reorder"
         ));
         data.put("virtualSignalListenerRequirement", "虚拟监听器是纯配置对象，不需要世界实体；当前画布新增路径暂未接入安全 listener create edit lock，因此必须先在虚拟监听器页面创建。");
         data.put("worldEntityRequirement", "设备、接收器、ActionRelay、区域等世界实体必须先在游戏内或对应 WebAdmin 页面创建，本编辑器只引用已有对象。");
@@ -221,12 +237,13 @@ public final class WebAdminLogicChainEditorService {
             audit(context, result, requestSummary(safeRequest), Map.of("attempt", "validation_failed", "errorCount", errors.size()));
             return result;
         }
-        WebAdminWriteResult result;
+        WebAdminWriteResult result = ok(target, "逻辑链草稿已保存。", multiDraftSaveData(safeRequest));
         WebAdminLogicChainEditorRequest.DraftNode draftNode = null;
-        if (hasActionAppend(safeRequest)) {
-            result = saveActionAppend(server, user, session, remoteAddress, safeRequest.actionAppend, csrfToken, sameOrigin);
-        } else {
-            draftNode = safeRequest.nodes.getFirst();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit = null;
+        WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit = null;
+        List<WebAdminLogicChainEditorRequest.DraftNode> draftNodes = safeRequest.nodes == null ? List.of() : safeRequest.nodes;
+        if (!draftNodes.isEmpty()) {
+            draftNode = draftNodes.getFirst();
             result = switch (normalizeNodeType(draftNode.type)) {
                 case "signal_join" -> saveSignalJoin(server, user, session, remoteAddress, draftNode, safeRequest.edges, csrfToken, sameOrigin);
                 case "timer" -> saveTimer(server, user, session, remoteAddress, draftNode, safeRequest.edges, csrfToken, sameOrigin);
@@ -242,11 +259,38 @@ public final class WebAdminLogicChainEditorService {
                 )));
             };
         }
+        if (result.success() && hasActionAppend(safeRequest)) {
+            result = saveActionAppend(server, user, session, remoteAddress, safeRequest.actionAppend, csrfToken, sameOrigin);
+        }
+        if (result.success()) {
+            for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : safeRequest.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : safeRequest.existingNodeEdits) {
+                if (!isExistingNodeEditDraftPresent(edit)) {
+                    continue;
+                }
+                existingNodeEdit = edit;
+                result = saveExistingNodeEdit(server, user, session, remoteAddress, edit, csrfToken, sameOrigin);
+                if (!result.success()) {
+                    break;
+                }
+            }
+        }
+        if (result.success()) {
+            for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : safeRequest.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : safeRequest.actionEdits) {
+                if (!isActionEditDraftPresent(edit)) {
+                    continue;
+                }
+                actionEdit = edit;
+                result = saveActionEdit(server, user, session, remoteAddress, edit, csrfToken, sameOrigin);
+                if (!result.success()) {
+                    break;
+                }
+            }
+        }
         if (!result.success()) {
-            result = logicChainSaveFailurePreservingEditorLock(safeRequest, result, draftNode, safeRequest.actionAppend);
+            result = logicChainSaveFailurePreservingEditorLock(safeRequest, result, draftNode, safeRequest.actionAppend, existingNodeEdit, actionEdit);
             Map<String, Object> after = new LinkedHashMap<>();
             after.put("attempt", "typed_write_failed");
-            after.put("mode", hasActionAppend(safeRequest) ? "action_append" : "new_node");
+            after.put("mode", logicChainFailedWriteMode(draftNode, safeRequest.actionAppend, existingNodeEdit, actionEdit));
             after.put("code", safe(result.code()));
             after.put("targetType", safe(result.targetType()));
             after.put("targetId", safe(result.targetId()));
@@ -257,6 +301,7 @@ public final class WebAdminLogicChainEditorService {
             if (!metadataResult.success()) {
                 audit(context, metadataResult, requestSummary(safeRequest), Map.of("attempt", "channel_metadata_draft_failed_after_typed_write"));
             }
+            result = ok(target, "逻辑链草稿已保存。", multiDraftSaveData(safeRequest));
         }
         if (result.success() && editLockService != null && !safe(safeRequest.lockId).isBlank()) {
             editLockService.releaseAfterWrite(WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR, targetId(safeRequest), safeRequest.lockId, user, session, remoteAddress);
@@ -407,11 +452,118 @@ public final class WebAdminLogicChainEditorService {
         )));
     }
 
+    private WebAdminWriteResult saveExistingNodeEdit(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft safeDraft = draft == null ? new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft() : draft;
+        String nodeType = normalizeExistingNodeEditType(safeDraft.nodeType);
+        String targetId = safe(safeDraft.targetId);
+        if ("channel_metadata".equals(nodeType)) {
+            WebAdminChannelMetadataUpdateRequest request = safeDraft.channelMetadata == null ? new WebAdminChannelMetadataUpdateRequest() : safeDraft.channelMetadata;
+            if (safe(request.channel).isBlank()) {
+                request.channel = targetId;
+            }
+            return channelMetadataService.update(server, user, session, remoteAddress, request, csrfToken, sameOrigin);
+        }
+        if ("signal_join".equals(nodeType)) {
+            WebAdminSignalJoinRequest request = safeDraft.signalJoin == null ? new WebAdminSignalJoinRequest() : safeDraft.signalJoin;
+            if (safe(request.id).isBlank()) {
+                request.id = targetId;
+            }
+            String joinId = SignalJoinStore.normalizeId(request.id);
+            return signalJoinService.update(server, user, session, remoteAddress, joinId, request, csrfToken, sameOrigin);
+        }
+        if ("timer".equals(nodeType)) {
+            WebAdminTimerRequest request = safeDraft.timer == null ? new WebAdminTimerRequest() : safeDraft.timer;
+            if (safe(request.id).isBlank()) {
+                request.id = targetId;
+            }
+            String timerId = TimerStore.normalizeId(request.id);
+            return timerService.updateBasicConfigPreservingActions(server, user, session, remoteAddress, timerId, request, csrfToken, sameOrigin);
+        }
+        if ("signal_listener".equals(nodeType)) {
+            WebAdminSignalListenerBasicConfigUpdateRequest request = safeDraft.signalListenerBasic == null ? new WebAdminSignalListenerBasicConfigUpdateRequest() : safeDraft.signalListenerBasic;
+            if (safe(request.listenerRef).isBlank()) {
+                request.listenerRef = targetId;
+            }
+            return signalListenerBasicConfigService.update(server, user, session, remoteAddress, request, csrfToken, sameOrigin);
+        }
+        return WebAdminWriteResult.validationFailed(target(new WebAdminLogicChainEditorRequest()), List.of(error(
+                "existingNodeEdits[0].nodeType",
+                "logic_chain_existing_node_type_deferred",
+                "此节点当前只能查看，编辑能力后续支持。",
+                safeDraft.nodeType,
+                targetId,
+                "",
+                "",
+                "本阶段只支持 Channel metadata、Signal Join、Timer 和 SignalListener 基础配置。"
+        )));
+    }
+
+    private WebAdminWriteResult saveActionEdit(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            WebAdminLogicChainEditorRequest.ActionEditDraft draft,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        WebAdminLogicChainEditorRequest.ActionEditDraft safeDraft = draft == null ? new WebAdminLogicChainEditorRequest.ActionEditDraft() : draft;
+        String ownerType = normalizeOwnerType(safeDraft.ownerType);
+        String ownerId = safe(safeDraft.ownerId);
+        String bucket = normalizeBucket(safeDraft.bucket);
+        if ("listener".equals(ownerType)) {
+            WebAdminSignalListenerActionRequests.ActionUpdateRequest request = new WebAdminSignalListenerActionRequests.ActionUpdateRequest();
+            request.listenerId = ownerId;
+            request.actionIndex = safeDraft.actionIndex;
+            request.action = actionEntryForActionEditOperation(safeDraft);
+            request.expectedFingerprint = safeDraft.expectedFingerprint;
+            request.lockId = safeDraft.lockId;
+            return signalListenerActionsService.updateAction(server, user, session, remoteAddress, ownerId, request, csrfToken, sameOrigin);
+        }
+        if ("timer".equals(ownerType)) {
+            return timerService.updateActionInBucket(
+                    server,
+                    user,
+                    session,
+                    remoteAddress,
+                    ownerId,
+                    bucket,
+                    safeDraft.actionIndex,
+                    actionEntryForActionEditOperation(safeDraft),
+                    safeDraft.expectedFingerprint,
+                    safeDraft.lockId,
+                    csrfToken,
+                    sameOrigin
+            );
+        }
+        return WebAdminWriteResult.validationFailed(target(new WebAdminLogicChainEditorRequest()), List.of(error(
+                "actionEdits[0].ownerType",
+                "logic_chain_action_edit_owner_type_deferred",
+                "当前只支持编辑 SignalListener 或 Timer 上的已有 Action；其它 action owner 后续支持。",
+                safeDraft.ownerType,
+                actionAppendNodeId(ownerType, ownerId),
+                "",
+                "",
+                "从 SignalListener 或 Timer 的 Action 卡片进入同 index 编辑；ActionRelay / Region 先保持只读或追加。"
+        )));
+    }
+
     private WebAdminWriteResult saveChannelMetadataDrafts(
             MinecraftServer server,
             WebAdminUser user,
             List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> drafts
     ) {
+        if (channelMetadataService != null) {
+            return channelMetadataService.saveDraftsFromLogicChainEditor(server, user, drafts);
+        }
         List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> safeDrafts = drafts == null ? List.of() : drafts;
         if (safeDrafts.isEmpty() || server == null) {
             return WebAdminWriteResult.ok(new WebAdminWriteTarget("CHANNEL_METADATA", "drafts", "频道端点 metadata"), false, "无频道 metadata 草稿。");
@@ -559,7 +711,9 @@ public final class WebAdminLogicChainEditorService {
             WebAdminLogicChainEditorRequest request,
             WebAdminWriteResult result,
             WebAdminLogicChainEditorRequest.DraftNode draftNode,
-            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend
+            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit,
+            WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit
     ) {
         if (result == null || result.success()) {
             return result;
@@ -574,7 +728,7 @@ public final class WebAdminLogicChainEditorService {
                 "targetType", safe(result.targetType()),
                 "targetId", safe(result.targetId())
         ));
-        List<WebAdminValidationError> errors = logicChainEnrichTypedFailureErrors(result, draftNode, actionAppend);
+        List<WebAdminValidationError> errors = logicChainEnrichTypedFailureErrors(result, draftNode, actionAppend, existingNodeEdit, actionEdit);
         return new WebAdminWriteResult(
                 false,
                 result.code(),
@@ -594,9 +748,11 @@ public final class WebAdminLogicChainEditorService {
     private static List<WebAdminValidationError> logicChainEnrichTypedFailureErrors(
             WebAdminWriteResult result,
             WebAdminLogicChainEditorRequest.DraftNode draftNode,
-            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend
+            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit,
+            WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit
     ) {
-        String nodeId = logicChainDraftContextNodeId(draftNode, actionAppend);
+        String nodeId = logicChainDraftContextNodeId(draftNode, actionAppend, existingNodeEdit, actionEdit);
         String fallbackHint = logicChainTypedFailureFixHint(result == null ? "" : result.code());
         List<WebAdminValidationError> source = result == null ? List.of() : result.validationErrors();
         if (source.isEmpty()) {
@@ -631,7 +787,9 @@ public final class WebAdminLogicChainEditorService {
 
     private static String logicChainDraftContextNodeId(
             WebAdminLogicChainEditorRequest.DraftNode draftNode,
-            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend
+            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit,
+            WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit
     ) {
         if (draftNode != null && !safe(draftNode.id).isBlank()) {
             return safe(draftNode.id);
@@ -640,6 +798,16 @@ public final class WebAdminLogicChainEditorService {
             String ownerType = normalizeOwnerType(actionAppend.ownerType);
             String ownerId = safe(actionAppend.ownerId);
             return ownerId.isBlank() ? ownerType : ownerType + ":" + ownerId;
+        }
+        if (existingNodeEdit != null) {
+            String type = normalizeExistingNodeEditType(existingNodeEdit.nodeType);
+            String id = safe(existingNodeEdit.targetId);
+            return id.isBlank() ? type : type + ":" + id;
+        }
+        if (actionEdit != null) {
+            String ownerType = normalizeOwnerType(actionEdit.ownerType);
+            String ownerId = safe(actionEdit.ownerId);
+            return ownerId.isBlank() ? ownerType : ownerType + ":" + ownerId + ":action:" + parseActionIndex(actionEdit.actionIndex);
         }
         return "";
     }
@@ -787,16 +955,20 @@ public final class WebAdminLogicChainEditorService {
         List<WebAdminLogicChainEditorRequest.DraftNode> nodes = request.nodes == null ? List.of() : request.nodes;
         List<WebAdminLogicChainEditorRequest.DraftEdge> edges = request.edges == null ? List.of() : request.edges;
         boolean actionAppend = hasActionAppend(request);
+        boolean existingNodeEdit = hasExistingNodeEdit(request);
+        boolean actionEdit = hasActionEdit(request);
         validateChannelMetadataDrafts(request, errors);
-        if (nodes.isEmpty() && !actionAppend) {
-            errors.add(error("nodes", "logic_chain_draft_node_required", "请先新增一个草稿节点，或从已有 action 容器追加 1 条 Action。", "", "", "", "", "点击“新增节点”创建 Signal Join / Timer，或从已有 action 容器选择“追加 Action”。"));
+        boolean hasAnyWrite = !nodes.isEmpty() || actionAppend || existingNodeEdit || actionEdit;
+        if (!hasAnyWrite) {
+            errors.add(error("nodes", "logic_chain_draft_node_required", "请先新增一个草稿节点、编辑已有节点，或从已有 action 容器追加/编辑 1 条 Action。", "", "", "", "", "点击“新增节点”、点击可编辑旧节点，或从已有 action 容器选择 Action 维护入口。"));
         }
-        if (!nodes.isEmpty() && actionAppend) {
-            errors.add(error("actionAppend", "logic_chain_draft_single_write_only", "一次保存只能新增一个节点，或追加一条 Action，不能混合提交。", "", "", "", "", "保留一种草稿类型：要么保存新增节点，要么保存追加 Action。"));
+        if (actionAppend && nodes.isEmpty() && !edges.isEmpty()) {
+            errors.add(error("edges", "logic_chain_action_append_edges_not_allowed", "Action 追加草稿不能携带新增节点连线。", String.valueOf(edges.size()), "", "", "", "Action 追加只修改目标 action list；新增节点连线请使用新增节点草稿。"));
+        } else if ((existingNodeEdit || actionEdit) && nodes.isEmpty() && !edges.isEmpty()) {
+            errors.add(error("edges", "logic_chain_existing_edit_edges_not_allowed", "已有节点 / Action 维护草稿不能携带新增节点连线。", String.valueOf(edges.size()), "", "", "", "局部重连会保存为具体配置字段，不通过 draft edges 修改旧图。"));
         }
-        if (actionAppend && !edges.isEmpty()) {
-            errors.add(error("edges", "logic_chain_action_append_edges_not_allowed", "追加 Action 草稿不能携带新增节点连线。", String.valueOf(edges.size()), "", "", "", "删除 payload 中的 draft edges；Action append 只允许通过 actionAppend.action 写入。"));
-        }
+        validateDuplicateExistingNodeEdits(request, errors);
+        validateDuplicateActionEdits(request, errors);
         if (nodes.size() > MAX_DRAFT_NODES_PER_SAVE) {
             errors.add(error("nodes", "logic_chain_draft_single_node_only", "8.14 MVP 每次保存只支持 1 个新增节点。", String.valueOf(nodes.size()), "", "", "", "删除多余草稿节点，本阶段一次只保存一个新增节点。"));
         }
@@ -808,6 +980,22 @@ public final class WebAdminLogicChainEditorService {
         }
         if (actionAppend) {
             validateActionAppendDraft(request.actionAppend, errors);
+        }
+        if (existingNodeEdit) {
+            for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : request.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : request.existingNodeEdits) {
+                if (isExistingNodeEditDraftPresent(edit)) {
+                    validateExistingNodeEditDraft(graph, edit, errors);
+                }
+            }
+        }
+        if (actionEdit) {
+            for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : request.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : request.actionEdits) {
+                if (isActionEditDraftPresent(edit)) {
+                    validateActionEditDraft(graph, edit, errors);
+                }
+            }
+        }
+        if (nodes.isEmpty()) {
             return errors;
         }
 
@@ -832,6 +1020,46 @@ public final class WebAdminLogicChainEditorService {
             validateTimerDraft(node, edges, requireComplete, errors);
         }
         return errors;
+    }
+
+    private static void validateDuplicateExistingNodeEdits(
+            WebAdminLogicChainEditorRequest request,
+            List<WebAdminValidationError> errors
+    ) {
+        Set<String> seen = new LinkedHashSet<>();
+        int index = 0;
+        for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : request == null || request.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : request.existingNodeEdits) {
+            if (!isExistingNodeEditDraftPresent(edit)) {
+                index++;
+                continue;
+            }
+            String key = normalizeExistingNodeEditType(edit.nodeType) + ":" + safe(edit.targetId);
+            if (!key.endsWith(":") && !seen.add(key)) {
+                errors.add(error("existingNodeEdits[" + index + "]", "logic_chain_existing_node_duplicate_edit", "同一保存会话不能重复提交同一个已有节点。", key, key, "", "", "保留该节点的一份草稿；同一目标的字段会在前端合并。"));
+            }
+            index++;
+        }
+    }
+
+    private static void validateDuplicateActionEdits(
+            WebAdminLogicChainEditorRequest request,
+            List<WebAdminValidationError> errors
+    ) {
+        Set<String> seen = new LinkedHashSet<>();
+        int index = 0;
+        for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : request == null || request.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : request.actionEdits) {
+            if (!isActionEditDraftPresent(edit)) {
+                index++;
+                continue;
+            }
+            String ownerType = normalizeOwnerType(edit.ownerType);
+            String bucket = normalizeBucket(edit.bucket);
+            String key = ownerType + ":" + safe(edit.ownerId) + ":" + bucket + ":" + parseActionIndex(edit.actionIndex);
+            if (!seen.add(key)) {
+                errors.add(error("actionEdits[" + index + "]", "logic_chain_action_duplicate_edit", "同一保存会话不能重复提交同一个 Action index。", key, actionAppendNodeId(ownerType, safe(edit.ownerId)), "", "", "保留该 Action 的一份草稿；同一 index 的字段会在前端合并。"));
+            }
+            index++;
+        }
     }
 
     private void validateSlot(WebAdminLogicChainEditorRequest.DraftNode node, String nodeType, List<WebAdminValidationError> errors) {
@@ -1277,14 +1505,100 @@ public final class WebAdminLogicChainEditorService {
         stats.put("disabledNodeCount", 0);
         stats.put("maxDepth", depth);
         stats.put("fallback", true);
+        List<WebAdminDtos.LogicChainNodeDto> nodes = new ArrayList<>();
+        if ("signal_join".equals(rootType) && !rootRef.isBlank()) {
+            root = new WebAdminDtos.LogicChainNodeDto(
+                    "signal_join:" + rootRef,
+                    "signal_join",
+                    "signal_join",
+                    SignalJoinStore.normalizeId(rootRef),
+                    rootRef,
+                    "测试环境 Signal Join root",
+                    "",
+                    true,
+                    "OK",
+                    "OK",
+                    "",
+                    "",
+                    Map.of("kind", "signal_join", "nodeKind", "primary", "joinId", SignalJoinStore.normalizeId(rootRef))
+            );
+        } else if ("timer".equals(rootType) && !rootRef.isBlank()) {
+            root = new WebAdminDtos.LogicChainNodeDto(
+                    "timer:" + rootRef,
+                    "timer",
+                    "timer",
+                    TimerStore.normalizeId(rootRef),
+                    rootRef,
+                    "测试环境 Timer root",
+                    rootChannel,
+                    true,
+                    "OK",
+                    "OK",
+                    "",
+                    "",
+                    Map.of("kind", "timer", "nodeKind", "primary", "timerId", TimerStore.normalizeId(rootRef))
+            );
+            for (String bucket : List.of("start", "tick", "complete", "cancel")) {
+                nodes.add(fallbackActionNode("timer", TimerStore.normalizeId(rootRef), bucket, 0));
+            }
+        } else if ("listener".equals(rootType) && !rootRef.isBlank()) {
+            root = new WebAdminDtos.LogicChainNodeDto(
+                    "consumer:listener:" + rootRef,
+                    "consumer",
+                    "listener",
+                    rootRef,
+                    rootRef,
+                    "测试环境 Listener root",
+                    rootChannel,
+                    true,
+                    "OK",
+                    "OK",
+                    "",
+                    "",
+                    Map.of("kind", "signal_listener", "nodeKind", "primary", "listenerId", rootRef)
+            );
+            nodes.add(fallbackActionNode("listener", rootRef, "", 0));
+        }
+        nodes.addFirst(root);
         return new WebAdminDtos.LogicChainGraphDto(
                 metadata,
                 root,
                 List.of(),
-                List.of(root),
+                List.copyOf(nodes),
                 List.of(),
                 rootRef.isBlank() ? List.of("当前 root 无法解析到 Signal 频道，图谱为空。") : List.of(),
                 stats
+        );
+    }
+
+    private static WebAdminDtos.LogicChainNodeDto fallbackActionNode(String ownerType, String ownerId, String bucket, int actionIndex) {
+        String type = "timer".equals(ownerType) ? "timer_action" : "action";
+        String id = "timer".equals(ownerType)
+                ? "action:timer:" + ownerId + ":" + bucket + ":" + actionIndex
+                : "action:listener:" + ownerId + ":" + actionIndex;
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("nodeKind", "primary");
+        metadata.put("ownerType", ownerType);
+        metadata.put("ownerId", ownerId);
+        metadata.put("actionIndex", actionIndex);
+        metadata.put("actionType", "message");
+        if ("timer".equals(ownerType)) {
+            metadata.put("timerBucket", bucket);
+        }
+        return new WebAdminDtos.LogicChainNodeDto(
+                id,
+                type,
+                type,
+                ownerType + ":" + ownerId + ":" + (bucket.isBlank() ? "" : bucket + ":") + actionIndex,
+                "测试环境 Action #" + (actionIndex + 1),
+                "测试环境 action root",
+                "",
+                true,
+                "OK",
+                "OK",
+                "",
+                "",
+                Map.copyOf(metadata)
         );
     }
 
@@ -1368,6 +1682,33 @@ public final class WebAdminLogicChainEditorService {
         return draft != null && (!safe(draft.ownerType).isBlank() || !safe(draft.ownerId).isBlank() || draft.action != null);
     }
 
+    private static boolean hasExistingNodeEdit(WebAdminLogicChainEditorRequest request) {
+        List<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft> edits = request == null || request.existingNodeEdits == null ? List.of() : request.existingNodeEdits;
+        return edits.stream().anyMatch(WebAdminLogicChainEditorService::isExistingNodeEditDraftPresent);
+    }
+
+    private static boolean isExistingNodeEditDraftPresent(WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft) {
+        return draft != null && (!safe(draft.nodeType).isBlank()
+                || !safe(draft.targetId).isBlank()
+                || draft.channelMetadata != null
+                || draft.signalJoin != null
+                || draft.timer != null
+                || draft.signalListenerBasic != null);
+    }
+
+    private static boolean hasActionEdit(WebAdminLogicChainEditorRequest request) {
+        List<WebAdminLogicChainEditorRequest.ActionEditDraft> edits = request == null || request.actionEdits == null ? List.of() : request.actionEdits;
+        return edits.stream().anyMatch(WebAdminLogicChainEditorService::isActionEditDraftPresent);
+    }
+
+    private static boolean isActionEditDraftPresent(WebAdminLogicChainEditorRequest.ActionEditDraft draft) {
+        return draft != null && (!safe(draft.ownerType).isBlank()
+                || !safe(draft.ownerId).isBlank()
+                || draft.action != null
+                || !safe(draft.expectedFingerprint).isBlank()
+                || !safe(draft.lockId).isBlank());
+    }
+
     private static String actionAppendNodeId(String ownerType, String ownerId) {
         String type = normalizeOwnerType(ownerType);
         String id = safe(ownerId);
@@ -1408,6 +1749,357 @@ public final class WebAdminLogicChainEditorService {
         }
         if (safe(safeDraft.lockId).isBlank()) {
             errors.add(error("actionAppend.lockId", "edit_lock_required", "追加 Action 需要对应 action 容器编辑锁。", "", ownerNodeId, "", "", "重新打开该 action 容器的追加流程，获取对应编辑锁。"));
+        }
+    }
+
+    private static void validateExistingNodeEditDraft(
+            WebAdminDtos.LogicChainGraphDto graph,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft,
+            List<WebAdminValidationError> errors
+    ) {
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft safeDraft = draft == null ? new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft() : draft;
+        String nodeType = normalizeExistingNodeEditType(safeDraft.nodeType);
+        String targetId = safe(safeDraft.targetId);
+        if (!Set.of("channel_metadata", "signal_join", "timer", "signal_listener").contains(nodeType)) {
+            errors.add(error("existingNodeEdits[0].nodeType", "logic_chain_existing_node_type_deferred", "此节点当前只能查看，编辑能力后续支持。", safeDraft.nodeType, targetId, "", "", "本阶段只支持 Channel metadata、Signal Join、Timer 和 SignalListener 基础配置。"));
+            return;
+        }
+        if (targetId.isBlank()) {
+            errors.add(error("existingNodeEdits[0].targetId", "required", "编辑已有节点需要目标 ID。", "", "", "", "", "从画布上的已有节点进入编辑，避免手写 targetId。"));
+        }
+        if ("channel_metadata".equals(nodeType)) {
+            WebAdminChannelMetadataUpdateRequest request = safeDraft.channelMetadata == null ? new WebAdminChannelMetadataUpdateRequest() : safeDraft.channelMetadata;
+            String channel = SignalChannel.normalize(safe(request.channel).isBlank() ? targetId : request.channel);
+            validateExistingEditGraphMembership(graph, nodeType, channel, "existingNodeEdits[0].targetId", errors);
+            validateExistingEditTargetMatches("existingNodeEdits[0].channelMetadata.channel", nodeType, targetId, channel, errors);
+            for (WebAdminValidationError channelError : WebAdminChannelMetadataService.validateChannel(channel, safe(request.channel).isBlank() ? targetId : request.channel)) {
+                errors.add(error("existingNodeEdits[0].channelMetadata." + channelError.field(), channelError.code(), channelError.message(), channelError.rejectedValueSummary(), "channel:" + channel, "", channel, "修正频道显示信息后再保存；channel id 本阶段不可重命名。"));
+            }
+            for (WebAdminValidationError metadataError : WebAdminChannelMetadataService.validateRequest(request)) {
+                errors.add(error("existingNodeEdits[0].channelMetadata." + metadataError.field(), metadataError.code(), metadataError.message(), metadataError.rejectedValueSummary(), "channel:" + channel, "", channel, "修正频道 displayName / note / iconKey 后再保存。"));
+            }
+            requireTypedWriteIdentity("existingNodeEdits[0].channelMetadata", request.expectedFingerprint, request.lockId, "channel:" + channel, errors);
+            return;
+        }
+        if ("signal_join".equals(nodeType)) {
+            WebAdminSignalJoinRequest request = safeDraft.signalJoin == null ? new WebAdminSignalJoinRequest() : safeDraft.signalJoin;
+            String joinId = SignalJoinStore.normalizeId(safe(request.id).isBlank() ? targetId : request.id);
+            validateExistingEditGraphMembership(graph, nodeType, joinId, "existingNodeEdits[0].targetId", errors);
+            validateExistingEditTargetMatches("existingNodeEdits[0].signalJoin.id", nodeType, targetId, joinId, errors);
+            if (joinId.isBlank()) {
+                errors.add(error("existingNodeEdits[0].signalJoin.id", "signal_join_id_required", "Signal Join ID 不能为空。", safe(request.id).isBlank() ? targetId : request.id, "signal_join:" + targetId, "", "", "从已有 Signal Join 节点进入编辑，不要手写空 ID。"));
+            }
+            Set<String> inputChannels = signalJoinRequestInputChannels(request);
+            String outputChannel = SignalChannel.normalize(request.outputChannel);
+            if (!outputChannel.isBlank() && inputChannels.contains(outputChannel)) {
+                errors.add(error("existingNodeEdits[0].signalJoin.outputChannel", "logic_chain_join_input_output_channel_conflict", "同一个信号汇合中，输入频道不能同时作为输出频道：" + outputChannel, outputChannel, "signal_join:" + joinId, "", outputChannel, "移除该频道的输入，或选择另一个输出频道。"));
+            }
+            validateDraftJoinCycleGuard(graph, inputChannels, outputChannel.isBlank() ? Set.of() : Set.of(outputChannel), "signal_join:" + joinId, errors);
+            requireTypedWriteIdentity("existingNodeEdits[0].signalJoin", request.expectedFingerprint, request.lockId, "signal_join:" + joinId, errors);
+            return;
+        }
+        if ("timer".equals(nodeType)) {
+            WebAdminTimerRequest request = safeDraft.timer == null ? new WebAdminTimerRequest() : safeDraft.timer;
+            String timerId = TimerStore.normalizeId(safe(request.id).isBlank() ? targetId : request.id);
+            validateExistingEditGraphMembership(graph, nodeType, timerId, "existingNodeEdits[0].targetId", errors);
+            validateExistingEditTargetMatches("existingNodeEdits[0].timer.id", nodeType, targetId, timerId, errors);
+            if (timerId.isBlank()) {
+                errors.add(error("existingNodeEdits[0].timer.id", "timer_id_required", "Timer ID 不能为空。", safe(request.id).isBlank() ? targetId : request.id, "timer:" + targetId, "", "", "从已有 Timer 节点进入编辑，不要手写空 ID。"));
+            }
+            requireTypedWriteIdentity("existingNodeEdits[0].timer", request.expectedFingerprint, request.lockId, "timer:" + timerId, errors);
+            return;
+        }
+        WebAdminSignalListenerBasicConfigUpdateRequest request = safeDraft.signalListenerBasic == null ? new WebAdminSignalListenerBasicConfigUpdateRequest() : safeDraft.signalListenerBasic;
+        String listenerRef = safe(request.listenerRef).isBlank() ? targetId : safe(request.listenerRef);
+        validateExistingEditGraphMembership(graph, nodeType, listenerRef, "existingNodeEdits[0].targetId", errors);
+        validateExistingEditTargetMatches("existingNodeEdits[0].signalListenerBasic.listenerRef", nodeType, targetId, listenerRef, errors);
+        requireTypedWriteIdentity("existingNodeEdits[0].signalListenerBasic", request.expectedFingerprint, request.lockId, "listener:" + (safe(request.listenerRef).isBlank() ? targetId : request.listenerRef), errors);
+    }
+
+    private static void validateActionEditDraft(
+            WebAdminDtos.LogicChainGraphDto graph,
+            WebAdminLogicChainEditorRequest.ActionEditDraft draft,
+            List<WebAdminValidationError> errors
+    ) {
+        WebAdminLogicChainEditorRequest.ActionEditDraft safeDraft = draft == null ? new WebAdminLogicChainEditorRequest.ActionEditDraft() : draft;
+        String ownerType = normalizeOwnerType(safeDraft.ownerType);
+        String ownerId = normalizedActionOwnerId(ownerType, safeDraft.ownerId);
+        String ownerNodeId = actionAppendNodeId(ownerType, ownerId);
+        int actionIndex = parseActionIndex(safeDraft.actionIndex);
+        if (!Set.of("listener", "timer").contains(ownerType)) {
+            errors.add(error("actionEdits[0].ownerType", "logic_chain_action_edit_owner_type_deferred", "当前只支持编辑 SignalListener 或 Timer 上的已有 Action；其它 action owner 后续支持。", safeDraft.ownerType, ownerNodeId, "", "", "ActionRelay / Region 暂时保持只读或只追加。"));
+        }
+        if (ownerId.isBlank()) {
+            errors.add(error("actionEdits[0].ownerId", "required", "编辑已有 Action 需要 owner ID。", "", ownerNodeId, "", "", "从已有 Action 卡片进入编辑，保留 owner 信息。"));
+        }
+        if (actionIndex < 0) {
+            errors.add(error("actionEdits[0].actionIndex", "required", "编辑已有 Action 需要合法的同 index。", String.valueOf(safeDraft.actionIndex), ownerNodeId, "", "", "从已有 Action 卡片进入编辑，不允许删除或重排旧 Action。"));
+        }
+        String operation = safe(safeDraft.operation).toLowerCase(Locale.ROOT);
+        if (!Set.of("", "replace", "disable").contains(operation)) {
+            errors.add(error("actionEdits[0].operation", "logic_chain_action_edit_operation_invalid", "Action 维护只支持同 index 替换或禁用。", operation, ownerNodeId, "", "", "选择 replace 或 disable；不支持 delete / reorder。"));
+        }
+        if ("timer".equals(ownerType) && !Set.of("start", "tick", "complete", "cancel", "onstart", "ontick", "oncomplete", "oncancel", "on_start", "on_tick", "on_complete", "on_cancel", "onStartActions", "onTickActions", "onCompleteActions", "onCancelActions").contains(safe(safeDraft.bucket))) {
+            errors.add(error("actionEdits[0].bucket", "logic_chain_timer_action_bucket_invalid", "Timer action bucket 只支持 start / tick / complete / cancel。", safeDraft.bucket, ownerNodeId, "", "", "选择 Timer 的 onStart、onTick、onComplete 或 onCancel action bucket。"));
+        }
+        if (!ownerId.isBlank() && actionIndex >= 0) {
+            validateActionEditGraphMembership(graph, ownerType, ownerId, normalizeBucket(safeDraft.bucket), actionIndex, errors);
+        }
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = actionEntryForActionEditOperation(safeDraft);
+        List<WebAdminValidationError> actionErrors = WebAdminActionRelayActionsService.validateActionEntries(List.of(entry));
+        for (WebAdminValidationError actionError : actionErrors) {
+            errors.add(error("actionEdits[0].action." + actionError.field(), actionError.code(), actionError.message(), actionError.rejectedValueSummary(), ownerNodeId, "", channelRef(actionError.rejectedValueSummary()), "修正待替换 Action 的字段后再保存；旧 Action 顺序和数量不会变化。"));
+        }
+        requireTypedWriteIdentity("actionEdits[0]", safeDraft.expectedFingerprint, safeDraft.lockId, ownerNodeId, errors);
+    }
+
+    private static void validateExistingEditGraphMembership(
+            WebAdminDtos.LogicChainGraphDto graph,
+            String nodeType,
+            String targetId,
+            String field,
+            List<WebAdminValidationError> errors
+    ) {
+        if (safe(targetId).isBlank()) {
+            return;
+        }
+        if ("channel_metadata".equals(nodeType) && isFallbackGraph(graph)) {
+            return;
+        }
+        if (findExistingEditGraphNode(graph, nodeType, targetId) == null) {
+            errors.add(error(field, "logic_chain_existing_node_not_in_graph", "只能编辑当前逻辑链画布中可见的已有主节点。", targetId, existingNodeIdForError(nodeType, targetId), "", channelForExistingNode(nodeType, targetId), "从当前画布上的节点进入编辑；引用卡、其它逻辑链或不可见配置不能通过本保存接口修改。"));
+        }
+    }
+
+    private static boolean isFallbackGraph(WebAdminDtos.LogicChainGraphDto graph) {
+        Object fallback = graph == null || graph.stats() == null ? null : graph.stats().get("fallback");
+        return Boolean.TRUE.equals(fallback) || "true".equalsIgnoreCase(String.valueOf(fallback));
+    }
+
+    private static void validateExistingEditTargetMatches(
+            String field,
+            String nodeType,
+            String targetId,
+            String requestTarget,
+            List<WebAdminValidationError> errors
+    ) {
+        String expected = canonicalExistingTarget(nodeType, targetId);
+        String actual = canonicalExistingTarget(nodeType, requestTarget);
+        if (!expected.isBlank() && !actual.isBlank() && !expected.equals(actual)) {
+            errors.add(error(field, "logic_chain_existing_node_target_mismatch", "编辑 payload 的目标 ID 必须与画布节点一致。", requestTarget, existingNodeIdForError(nodeType, targetId), "", channelForExistingNode(nodeType, targetId), "重新从画布节点打开编辑面板，不要手写或替换嵌套配置 ID。"));
+        }
+    }
+
+    private static WebAdminDtos.LogicChainNodeDto findExistingEditGraphNode(
+            WebAdminDtos.LogicChainGraphDto graph,
+            String nodeType,
+            String targetId
+    ) {
+        for (WebAdminDtos.LogicChainNodeDto node : graphNodes(graph)) {
+            if (existingEditNodeMatches(node, nodeType, targetId)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private static boolean existingEditNodeMatches(WebAdminDtos.LogicChainNodeDto node, String nodeType, String targetId) {
+        if (node == null || isReferenceNode(node)) {
+            return false;
+        }
+        String type = safe(node.type()).toLowerCase(Locale.ROOT);
+        String refType = safe(node.refType()).toLowerCase(Locale.ROOT);
+        Map<String, Object> metadata = node.metadata() == null ? Map.of() : node.metadata();
+        String kind = safe(metadata.get("kind")).toLowerCase(Locale.ROOT);
+        String target = canonicalExistingTarget(nodeType, targetId);
+        if (target.isBlank()) {
+            return false;
+        }
+        if ("channel_metadata".equals(nodeType)) {
+            if (!"channel".equals(type)) {
+                return false;
+            }
+            return target.equals(SignalChannel.normalize(node.channel()))
+                    || target.equals(SignalChannel.normalize(node.refId()))
+                    || (safe(node.id()).startsWith("channel:") && target.equals(SignalChannel.normalize(safe(node.id()).substring("channel:".length()))));
+        }
+        if ("signal_join".equals(nodeType)) {
+            if (!"signal_join".equals(type) && !"signal_join".equals(refType) && !"signal_join".equals(kind)) {
+                return false;
+            }
+            return target.equals(SignalJoinStore.normalizeId(node.refId()))
+                    || target.equals(SignalJoinStore.normalizeId(safe(metadata.get("joinId"))));
+        }
+        if ("timer".equals(nodeType)) {
+            if (!"timer".equals(type) && !"timer".equals(refType) && !"timer".equals(kind)) {
+                return false;
+            }
+            return target.equals(TimerStore.normalizeId(node.refId()))
+                    || target.equals(TimerStore.normalizeId(safe(metadata.get("timerId"))));
+        }
+        if ("signal_listener".equals(nodeType)) {
+            if (!"listener".equals(refType) && !"signal_listener".equals(type) && !"signal_listener".equals(kind) && !safe(node.id()).startsWith("consumer:listener:")) {
+                return false;
+            }
+            return target.equals(safe(node.refId()))
+                    || target.equals(safe(metadata.get("listenerId")))
+                    || target.equals(safe(metadata.get("ownerId")));
+        }
+        return false;
+    }
+
+    private static void validateActionEditGraphMembership(
+            WebAdminDtos.LogicChainGraphDto graph,
+            String ownerType,
+            String ownerId,
+            String bucket,
+            int actionIndex,
+            List<WebAdminValidationError> errors
+    ) {
+        if (isFallbackGraph(graph)) {
+            return;
+        }
+        if (findActionEditGraphNode(graph, ownerType, ownerId, bucket, actionIndex) == null) {
+            String ownerNodeId = actionAppendNodeId(ownerType, ownerId);
+            errors.add(error("actionEdits[0].ownerId", "logic_chain_action_edit_target_not_in_graph", "只能编辑当前逻辑链画布中可见的已有 Action。", ownerId, ownerNodeId, "", "", "从当前画布上的 Action 卡片进入编辑；其它 owner 或不可见 action 不能通过本保存接口修改。"));
+        }
+    }
+
+    private static WebAdminDtos.LogicChainNodeDto findActionEditGraphNode(
+            WebAdminDtos.LogicChainGraphDto graph,
+            String ownerType,
+            String ownerId,
+            String bucket,
+            int actionIndex
+    ) {
+        for (WebAdminDtos.LogicChainNodeDto node : graphNodes(graph)) {
+            if (actionEditNodeMatches(node, ownerType, ownerId, bucket, actionIndex)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private static boolean actionEditNodeMatches(
+            WebAdminDtos.LogicChainNodeDto node,
+            String ownerType,
+            String ownerId,
+            String bucket,
+            int actionIndex
+    ) {
+        if (node == null || isReferenceNode(node)) {
+            return false;
+        }
+        String type = safe(node.type()).toLowerCase(Locale.ROOT);
+        if (!Set.of("action", "state_action", "timer_action").contains(type)) {
+            return false;
+        }
+        Map<String, Object> metadata = node.metadata() == null ? Map.of() : node.metadata();
+        String metaOwnerType = normalizeOwnerType(safe(metadata.get("ownerType")));
+        String metaOwnerId = normalizedActionOwnerId(metaOwnerType, safe(metadata.get("ownerId")));
+        int metaIndex = parseActionIndex(metadata.get("actionIndex"));
+        if (!ownerType.equals(metaOwnerType) || !ownerId.equals(metaOwnerId) || actionIndex != metaIndex) {
+            return false;
+        }
+        if ("timer".equals(ownerType)) {
+            String requestedBucket = normalizeTimerActionBucketAlias(bucket);
+            String metaBucket = normalizeTimerActionBucketAlias(safe(metadata.get("timerBucket")));
+            return !requestedBucket.isBlank() && requestedBucket.equals(metaBucket);
+        }
+        return true;
+    }
+
+    private static List<WebAdminDtos.LogicChainNodeDto> graphNodes(WebAdminDtos.LogicChainGraphDto graph) {
+        return graph == null || graph.nodes() == null ? List.of() : graph.nodes();
+    }
+
+    private static boolean isReferenceNode(WebAdminDtos.LogicChainNodeDto node) {
+        Map<String, Object> metadata = node == null || node.metadata() == null ? Map.of() : node.metadata();
+        return "reference".equals(safe(metadata.get("nodeKind")))
+                || Boolean.TRUE.equals(metadata.get("isReferenceCard"));
+    }
+
+    private static String canonicalExistingTarget(String nodeType, String targetId) {
+        return switch (nodeType) {
+            case "channel_metadata" -> SignalChannel.normalize(targetId);
+            case "signal_join" -> SignalJoinStore.normalizeId(targetId);
+            case "timer" -> TimerStore.normalizeId(targetId);
+            case "signal_listener" -> safe(targetId);
+            default -> safe(targetId);
+        };
+    }
+
+    private static String existingNodeIdForError(String nodeType, String targetId) {
+        return switch (nodeType) {
+            case "channel_metadata" -> "channel:" + SignalChannel.normalize(targetId);
+            case "signal_join" -> "signal_join:" + SignalJoinStore.normalizeId(targetId);
+            case "timer" -> "timer:" + TimerStore.normalizeId(targetId);
+            case "signal_listener" -> "listener:" + safe(targetId);
+            default -> safe(targetId);
+        };
+    }
+
+    private static String channelForExistingNode(String nodeType, String targetId) {
+        return "channel_metadata".equals(nodeType) ? SignalChannel.normalize(targetId) : "";
+    }
+
+    private static String normalizedActionOwnerId(String ownerType, String ownerId) {
+        return "timer".equals(ownerType) ? TimerStore.normalizeId(ownerId) : safe(ownerId);
+    }
+
+    private static String normalizeTimerActionBucketAlias(String bucket) {
+        return switch (safe(bucket).trim().toLowerCase(Locale.ROOT)) {
+            case "start", "onstart", "on_start", "onstartactions" -> "start";
+            case "tick", "ontick", "on_tick", "ontickactions" -> "tick";
+            case "complete", "oncomplete", "on_complete", "oncompleteactions" -> "complete";
+            case "cancel", "oncancel", "on_cancel", "oncancelactions" -> "cancel";
+            default -> normalizeBucket(bucket);
+        };
+    }
+
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry actionEntryForActionEditOperation(WebAdminLogicChainEditorRequest.ActionEditDraft draft) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = copyActionEntry(draft == null ? null : draft.action);
+        if ("disable".equals(safe(draft == null ? "" : draft.operation).toLowerCase(Locale.ROOT))) {
+            entry.enabled = Boolean.FALSE;
+        }
+        return entry;
+    }
+
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry copyActionEntry(WebAdminActionRelayActionsUpdateRequest.ActionEntry source) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry src = source == null ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry() : source;
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry copy = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        copy.type = src.type;
+        copy.value = src.value;
+        copy.enabled = src.enabled;
+        copy.requiresOp = src.requiresOp;
+        copy.cooldownTicks = src.cooldownTicks;
+        copy.notifyOps = src.notifyOps;
+        copy.conditionGroupId = src.conditionGroupId;
+        copy.stateOperation = src.stateOperation;
+        copy.stateScope = src.stateScope;
+        copy.stateTargetMode = src.stateTargetMode;
+        copy.stateTargetId = src.stateTargetId;
+        copy.stateKey = src.stateKey;
+        copy.stateValueType = src.stateValueType;
+        copy.stateValue = src.stateValue;
+        copy.stateDelta = src.stateDelta;
+        copy.stateCreateIfMissing = src.stateCreateIfMissing;
+        copy.stateInitialValue = src.stateInitialValue;
+        copy.timerId = src.timerId;
+        copy.timerTargetMode = src.timerTargetMode;
+        copy.timerTargetId = src.timerTargetId;
+        copy.timerStartPolicyOverride = src.timerStartPolicyOverride;
+        copy.timerDurationOverrideTicks = src.timerDurationOverrideTicks;
+        copy.timerMissingBehavior = src.timerMissingBehavior;
+        return copy;
+    }
+
+    private static void requireTypedWriteIdentity(String field, String expectedFingerprint, String lockId, String nodeId, List<WebAdminValidationError> errors) {
+        if (safe(expectedFingerprint).isBlank()) {
+            errors.add(error(field + ".expectedFingerprint", "required", "保存已有配置需要 expectedFingerprint。", "", nodeId, "", "", "重新从节点编辑入口打开，获取最新 fingerprint。"));
+        }
+        if (safe(lockId).isBlank()) {
+            errors.add(error(field + ".lockId", "edit_lock_required", "保存已有配置需要对应目标编辑锁。", "", nodeId, "", "", "重新打开该节点编辑面板，获取对应配置锁。"));
         }
     }
 
@@ -1470,12 +2162,51 @@ public final class WebAdminLogicChainEditorService {
                     channels.add(channel);
                 }
             }
-            return channels;
         }
-        for (WebAdminLogicChainEditorRequest.DraftEdge edge : request.edges == null ? List.<WebAdminLogicChainEditorRequest.DraftEdge>of() : request.edges) {
-            String channel = edgeChannelId(edge);
-            if (!channel.isBlank()) {
-                channels.add(channel);
+        if (hasActionEdit(request)) {
+            for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : request.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : request.actionEdits) {
+                WebAdminActionRelayActionsUpdateRequest.ActionEntry action = edit == null ? null : edit.action;
+                if (action != null && "signal".equalsIgnoreCase(safe(action.type))) {
+                    String channel = channelRef(action.value);
+                    if (!channel.isBlank()) {
+                        channels.add(channel);
+                    }
+                }
+            }
+        }
+        if (hasExistingNodeEdit(request)) {
+            for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : request.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : request.existingNodeEdits) {
+                String nodeType = normalizeExistingNodeEditType(edit == null ? "" : edit.nodeType);
+                if ("signal_join".equals(nodeType) && edit != null && edit.signalJoin != null) {
+                    channels.addAll(signalJoinRequestInputChannels(edit.signalJoin));
+                    String output = SignalChannel.normalize(edit.signalJoin.outputChannel);
+                    if (!output.isBlank()) {
+                        channels.add(output);
+                    }
+                } else if ("timer".equals(nodeType) && edit != null && edit.timer != null) {
+                    String output = SignalChannel.normalize(edit.timer.outputChannel);
+                    if (!output.isBlank()) {
+                        channels.add(output);
+                    }
+                } else if ("signal_listener".equals(nodeType) && edit != null && edit.signalListenerBasic != null) {
+                    String channel = SignalChannel.normalize(edit.signalListenerBasic.channel);
+                    if (!channel.isBlank()) {
+                        channels.add(channel);
+                    }
+                } else if ("channel_metadata".equals(nodeType) && edit != null && edit.channelMetadata != null) {
+                    String channel = SignalChannel.normalize(edit.channelMetadata.channel);
+                    if (!channel.isBlank()) {
+                        channels.add(channel);
+                    }
+                }
+            }
+        }
+        if (request.nodes != null && !request.nodes.isEmpty()) {
+            for (WebAdminLogicChainEditorRequest.DraftEdge edge : request.edges == null ? List.<WebAdminLogicChainEditorRequest.DraftEdge>of() : request.edges) {
+                String channel = edgeChannelId(edge);
+                if (!channel.isBlank()) {
+                    channels.add(channel);
+                }
             }
         }
         return channels;
@@ -1488,6 +2219,28 @@ public final class WebAdminLogicChainEditorService {
             case "stay" -> RegionTriggerType.STAY;
             default -> null;
         };
+    }
+
+    private static String normalizeExistingNodeEditType(String nodeType) {
+        String value = safe(nodeType).trim().toLowerCase(Locale.ROOT);
+        return switch (value) {
+            case "channel", "channel_metadata", "downstream_channel" -> "channel_metadata";
+            case "join", "signal_join" -> "signal_join";
+            case "listener", "signal_listener", "virtual_listener" -> "signal_listener";
+            default -> value;
+        };
+    }
+
+    private static Set<String> signalJoinRequestInputChannels(WebAdminSignalJoinRequest request) {
+        Set<String> channels = new LinkedHashSet<>();
+        List<SignalJoinInputDefinition> inputs = request == null || request.inputChannels == null ? List.of() : request.inputChannels;
+        for (SignalJoinInputDefinition input : inputs) {
+            String channel = SignalChannel.normalize(input == null ? "" : input.channel);
+            if (!channel.isBlank()) {
+                channels.add(channel);
+            }
+        }
+        return channels;
     }
 
     private static String normalizeOwnerType(String ownerType) {
@@ -1503,6 +2256,17 @@ public final class WebAdminLogicChainEditorService {
 
     private static String normalizeBucket(String bucket) {
         return safe(bucket).trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static int parseActionIndex(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value == null ? "" : value).trim());
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 
     private static String normalizeIcon(String iconKey) {
@@ -1561,12 +2325,27 @@ public final class WebAdminLogicChainEditorService {
         summary.put("draftNodeCount", safeRequest.nodes == null ? 0 : safeRequest.nodes.size());
         summary.put("draftEdgeCount", safeRequest.edges == null ? 0 : safeRequest.edges.size());
         summary.put("channelMetadataDraftCount", safeRequest.channelMetadataDrafts == null ? 0 : safeRequest.channelMetadataDrafts.size());
+        summary.put("existingNodeEditCount", safeRequest.existingNodeEdits == null ? 0 : safeRequest.existingNodeEdits.size());
+        summary.put("actionEditCount", safeRequest.actionEdits == null ? 0 : safeRequest.actionEdits.size());
         if (hasActionAppend(safeRequest)) {
             WebAdminLogicChainEditorRequest.ActionAppendDraft draft = safeRequest.actionAppend;
             summary.put("actionAppendOwnerType", normalizeOwnerType(draft.ownerType));
             summary.put("actionAppendOwnerId", safe(draft.ownerId));
             summary.put("actionAppendBucket", normalizeBucket(draft.bucket));
             summary.put("actionAppendType", draft.action == null ? "" : safe(draft.action.type));
+        }
+        if (hasExistingNodeEdit(safeRequest)) {
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft = safeRequest.existingNodeEdits.getFirst();
+            summary.put("existingNodeEditType", normalizeExistingNodeEditType(draft.nodeType));
+            summary.put("existingNodeEditTargetId", safe(draft.targetId));
+        }
+        if (hasActionEdit(safeRequest)) {
+            WebAdminLogicChainEditorRequest.ActionEditDraft draft = safeRequest.actionEdits.getFirst();
+            summary.put("actionEditOwnerType", normalizeOwnerType(draft.ownerType));
+            summary.put("actionEditOwnerId", safe(draft.ownerId));
+            summary.put("actionEditBucket", normalizeBucket(draft.bucket));
+            summary.put("actionEditIndex", parseActionIndex(draft.actionIndex));
+            summary.put("actionEditType", draft.action == null ? "" : safe(draft.action.type));
         }
         if (safeRequest.nodes != null && !safeRequest.nodes.isEmpty()) {
             WebAdminLogicChainEditorRequest.DraftNode node = safeRequest.nodes.getFirst();
@@ -1587,8 +2366,36 @@ public final class WebAdminLogicChainEditorService {
         return summary;
     }
 
+    private static Map<String, Object> multiDraftSaveData(WebAdminLogicChainEditorRequest request) {
+        Map<String, Object> data = new LinkedHashMap<>(requestSummary(request));
+        data.put("multiDraftSession", true);
+        data.put("draftOverlaySaved", true);
+        return data;
+    }
+
+    private static String logicChainFailedWriteMode(
+            WebAdminLogicChainEditorRequest.DraftNode draftNode,
+            WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,
+            WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit,
+            WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit
+    ) {
+        if (actionEdit != null) {
+            return "action_edit";
+        }
+        if (existingNodeEdit != null) {
+            return "existing_node_edit";
+        }
+        if (actionAppend != null) {
+            return "action_append";
+        }
+        if (draftNode != null) {
+            return "new_node";
+        }
+        return "multi_draft_session";
+    }
+
     private static WebAdminWriteTarget target(WebAdminLogicChainEditorRequest request) {
-        return new WebAdminWriteTarget("LOGIC_CHAIN_EDITOR", targetId(request), "Logic Chain 新增节点草稿");
+        return new WebAdminWriteTarget("LOGIC_CHAIN_EDITOR", targetId(request), "Logic Chain 编辑草稿");
     }
 
     private static String targetId(WebAdminLogicChainEditorRequest request) {
@@ -1653,6 +2460,10 @@ public final class WebAdminLogicChainEditorService {
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String safe(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 
     private static WebAdminWriteResultCode resultCode(String code) {

@@ -16,6 +16,8 @@ public final class WebAdminLogicChainEditorRequest {
     public List<DraftEdge> edges = new ArrayList<>();
     public List<ChannelMetadataDraft> channelMetadataDrafts = new ArrayList<>();
     public ActionAppendDraft actionAppend = null;
+    public List<ExistingNodeEditDraft> existingNodeEdits = new ArrayList<>();
+    public List<ActionEditDraft> actionEdits = new ArrayList<>();
 
     public static final class DraftNode {
         public String id = "";
@@ -46,6 +48,26 @@ public final class WebAdminLogicChainEditorRequest {
         public String ownerType = "";
         public String ownerId = "";
         public String bucket = "";
+        public WebAdminActionRelayActionsUpdateRequest.ActionEntry action = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        public String expectedFingerprint = "";
+        public String lockId = "";
+    }
+
+    public static final class ExistingNodeEditDraft {
+        public String nodeType = "";
+        public String targetId = "";
+        public WebAdminChannelMetadataUpdateRequest channelMetadata = null;
+        public WebAdminSignalJoinRequest signalJoin = null;
+        public WebAdminTimerRequest timer = null;
+        public WebAdminSignalListenerBasicConfigUpdateRequest signalListenerBasic = null;
+    }
+
+    public static final class ActionEditDraft {
+        public String ownerType = "";
+        public String ownerId = "";
+        public String bucket = "";
+        public Object actionIndex = 0;
+        public String operation = "replace";
         public WebAdminActionRelayActionsUpdateRequest.ActionEntry action = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
         public String expectedFingerprint = "";
         public String lockId = "";

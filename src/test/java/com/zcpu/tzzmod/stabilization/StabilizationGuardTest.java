@@ -208,6 +208,7 @@ public final class StabilizationGuardTest {
         testLogicChainViewerEnhancement813();
         testLogicChainEditorMvp814();
         testTemplatesPrefabImportExport815();
+        testLogicChainEditorExistingNodeEditing816();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -9066,7 +9067,7 @@ public final class StabilizationGuardTest {
                 "logicChainRuntimeStatusLabel",
                 "data-no-condition-engine-editing",
                 "condition_gate_history_appended",
-                "TZZ_WEBADMIN_ASSET_VERSION='8.14-logic-chain-editor-mvp'"
+                "TZZ_WEBADMIN_ASSET_VERSION"
         )) {
             requireContains(scripts, marker, "8.13 frontend marker: " + marker);
         }
@@ -9319,7 +9320,7 @@ public final class StabilizationGuardTest {
                 "TimerStore.normalizeId(request.id)",
                 "validateActionAppendDraft",
                 "validateChannelMetadataDrafts",
-                "logic_chain_draft_single_write_only",
+                "multiDraftSession",
                 "logic_chain_action_append_owner_id_required",
                 "logic_chain_channel_metadata_drafts_too_many",
                 "signalJoinService.create",
@@ -9443,7 +9444,7 @@ public final class StabilizationGuardTest {
                 "data-logic-chain-drag-primary-path",
                 "data-logic-chain-click-placement-fallback",
                 "pointercancel",
-                "lostpointercapture",
+                "data-logic-chain-draft-drag-no-capture-snapback",
                 "logicChainDraftPointerMatches",
                 "cleanupLogicChainDraftPointerDrag",
                 "data-logic-chain-draft-edge-toggle",
@@ -9496,7 +9497,9 @@ public final class StabilizationGuardTest {
                 "data-logic-chain-same-side-primary-no-reference",
                 "data-logic-chain-same-side-reference-no-duplicate",
                 "data-logic-chain-connection-mode-same-side-exits",
-                "data-logic-chain-connection-mode-canvas-exits",
+                "data-logic-chain-connection-mode-pan-keeps-active",
+                "data-logic-chain-connection-exit-only-same-green-point",
+                "data-logic-chain-connection-prune-deferred-until-exit",
                 "data-logic-chain-escape-exits-connection-mode",
                 "data-logic-chain-channel-endpoint-picker",
                 "data-logic-chain-channel-picker-existing-channel",
@@ -9628,7 +9631,7 @@ public final class StabilizationGuardTest {
                 "testChannelMetadataDraftValidation",
                 "testSaveRejectsModeSpecificJoinThresholdErrors",
                 "testSaveRejectsInvalidPlacementAndUnplacedDraft",
-                "testActionAppendRejectsInvalidShapeAndMixedDraft",
+                "testActionAppendRejectsInvalidShapeAndAllowsMixedDraft",
                 "testActionAppendValidationCoversSupportedOwnersBucketsAndConditionGroup",
                 "testSaveRejectsWrongLockAndSameOriginFailure",
                 "testSaveSignalJoinDraftWritesUnderlyingConfig",
@@ -9657,7 +9660,7 @@ public final class StabilizationGuardTest {
                 "logic_chain_timer_output_edge_single_required",
                 "logic_chain_action_append_owner_id_required",
                 "logic_chain_timer_action_bucket_invalid",
-                "logic_chain_draft_single_write_only",
+                "testActionAppendRejectsInvalidShapeAndAllowsMixedDraft",
                 "logic_chain_edge_endpoint_not_channel",
                 "duplicate_channel",
                 "logic_chain_channel_metadata_unreferenced",
@@ -9738,7 +9741,7 @@ public final class StabilizationGuardTest {
         requireFalse(editorService.contains("WebAdminSignalListenerLifecycleService"), "8.14 Logic Chain canvas editor must not wire SignalListener lifecycle create service");
         requireFalse(editorService.contains("WebAdminSignalListenerCreateRequest"), "8.14 Logic Chain canvas editor must not wire SignalListener create request");
         requireContains(editorService, "channelMetadataDraftReferencedChannels", "8.14 backend validates channel metadata drafts against connected draft endpoints");
-        requireContains(editorService, "if (actionAppend && !edges.isEmpty())", "8.14 action append payload must reject draft edges");
+        requireContains(editorService, "if (actionAppend && nodes.isEmpty() && !edges.isEmpty())", "8.16 mixed draft payload rejects standalone action append edges while preserving new-node draft edges");
         String metadataRefFunction = extractBetween(editorService, "private static Set<String> channelMetadataDraftReferencedChannels", "private static RegionTriggerType parseRegionTrigger");
         requireContains(metadataRefFunction, "if (hasActionAppend(request))", "8.14 action append metadata refs must use actionAppend.action instead of draft edges");
         requireContains(editorService, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
@@ -10168,6 +10171,290 @@ public final class StabilizationGuardTest {
                 "SCRATCH_BLOCK"
         )) {
             requireFalse(actionType.contains(forbidden), "8.15 must not add ActionType marker: " + forbidden);
+        }
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void testLogicChainEditorExistingNodeEditing816() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/LOGIC_CHAIN_EDITOR_EXISTING_NODE_EDITING_8_16_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_16.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String request = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java"), StandardCharsets.UTF_8);
+        String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String timerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerService.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String editorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/LOGIC_CHAIN_EDITOR_EXISTING_NODE_EDITING_8_16_CURRENT_CONTEXT.md",
+                "docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_16.md"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.16 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.16 Logic Chain Editor Existing Node Editing",
+                "existing node controlled editing",
+                "Channel metadata",
+                "Signal Join",
+                "Timer",
+                "SignalListener",
+                "ActionConfig same-index",
+                "same-index Action replace",
+                "local reconnect",
+                "draft diff",
+                "existingNodeEdits",
+                "actionEdits",
+                "save writes underlying config",
+                "old node move",
+                "old node delete",
+                "old node reorder",
+                "old action delete",
+                "old action reorder",
+                "full Logic Chain Editor",
+                "Scratch editor",
+                "if / else runtime",
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "new ActionType",
+                "new ConditionNodeType",
+                "data-logic-chain-draft-edge-green-arrow",
+                "data-logic-chain-draft-click-selects",
+                "data-logic-chain-draft-long-press-drag",
+                "data-logic-chain-draft-drag-no-capture-snapback",
+                "data-logic-chain-draft-node-detail-selectable",
+                "data-logic-chain-draft-detail-selects",
+                "data-logic-chain-draft-modal-full-config-fields",
+                "data-logic-chain-draft-modal-mode-fields",
+                "data-logic-chain-draft-channel-default-under-focus-channel",
+                "data-logic-chain-draft-channel-direct-downstream-of-join",
+                "data-logic-chain-draft-channel-adjacent-to-join-output",
+                "data-logic-chain-no-forced-draft-output-c3-gap",
+                "data-logic-chain-existing-canvas-reconnect",
+                "data-logic-chain-existing-reconnect-no-modal-fields",
+                "data-logic-chain-connection-mode-pan-keeps-active",
+                "data-logic-chain-connection-target-keeps-own-handles",
+                "data-logic-chain-existing-reconnect-any-legal-channel",
+                "data-logic-chain-only-changed-edge-draft-highlight",
+                "data-logic-chain-unchanged-existing-edge-keeps-style",
+                "data-logic-chain-connection-prune-deferred-until-exit",
+                "data-logic-chain-removed-edge-hidden-during-connection",
+                "data-logic-chain-prune-detached-after-connection-exit",
+                "data-logic-chain-timer-output-move-left-of-channel",
+                "data-logic-chain-timer-output-no-reference-card",
+                "data-logic-chain-action-append-in-existing-node-modal"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.16 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "existingNodeEdits",
+                "actionEdits",
+                "ExistingNodeEditDraft",
+                "ActionEditDraft",
+                "existingNodeEditing",
+                "sameIndexActionEditing",
+                "localReconnect",
+                "newNodeOnly\", false",
+                "saveExistingNodeEdit",
+                "saveActionEdit",
+                "channelMetadataService.update",
+                "signalJoinService.update",
+                "timerService.update",
+                "signalListenerBasicConfigService.update",
+                "signalListenerActionsService.updateAction",
+                "timerService.updateActionInBucket",
+                "logic_chain_existing_edit_edges_not_allowed",
+                "logic_chain_action_edit_operation_invalid",
+                "logic_chain_action_edit_owner_type_deferred",
+                "logic_chain_existing_node_type_deferred",
+                "logic_chain_existing_node_duplicate_edit",
+                "logic_chain_action_duplicate_edit",
+                "multiDraftSaveData"
+        )) {
+            requireContains(request + "\n" + editorService + "\n" + timerService, marker, "8.16 backend marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminChannelMetadataService",
+                "WebAdminSignalListenerBasicConfigService",
+                "logicChainEditorService"
+        )) {
+            requireContains(server + "\n" + editorService, marker, "8.16 service wiring marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-logic-chain-existing-node-editing",
+                "data-logic-chain-edit-existing-node",
+                "data-logic-chain-existing-node-edit-modal",
+                "data-logic-chain-draft-diff",
+                "data-logic-chain-diff-field-change",
+                "data-logic-chain-diff-connection-change",
+                "data-logic-chain-diff-action-change",
+                "data-logic-chain-local-reconnect",
+                "data-logic-chain-reconnect-cancel",
+                "data-logic-chain-existing-canvas-reconnect",
+                "data-logic-chain-existing-reconnect-no-modal-fields",
+                "data-logic-chain-existing-reconnect-picker",
+                "data-logic-chain-green-plus-reconnect",
+                "data-logic-chain-connection-target-keeps-own-handles",
+                "data-logic-chain-existing-reconnect-any-legal-channel",
+                "data-logic-chain-new-node-connection-hides-old-edit-handles",
+                "data-logic-chain-new-node-connection-legal-candidates",
+                "data-logic-chain-connection-mode-card-click-ignored",
+                "data-logic-chain-only-changed-edge-draft-highlight",
+                "data-logic-chain-unchanged-existing-edge-keeps-style",
+                "data-logic-chain-removed-edge-hidden-during-connection",
+                "data-logic-chain-prune-detached-after-connection-exit",
+                "data-logic-chain-reconnect-reference-card",
+                "data-logic-chain-draft-modal-full-config-fields",
+                "data-logic-chain-draft-modal-mode-fields",
+                "data-logic-chain-timer-output-move-left-of-channel",
+                "data-logic-chain-timer-output-no-reference-card",
+                "data-logic-chain-action-append-in-existing-node-modal",
+                "data-logic-chain-no-op-save-disabled",
+                "data-logic-chain-existing-node-not-draggable",
+                "data-logic-chain-action-edit",
+                "data-logic-chain-action-replace-same-index",
+                "data-logic-chain-no-old-action-delete",
+                "data-logic-chain-no-old-action-reorder",
+                "data-logic-chain-no-old-node-delete",
+                "data-logic-chain-no-old-node-reorder",
+                "data-logic-chain-world-entity-readonly-reference",
+                "logicChainExistingNodeEditSavePayload",
+                "logicChainActionEditSavePayload",
+                "logicChainEditorHasAnySaveDraft",
+                "logicChainExistingEditHasChanges",
+                "logicChainDraftDiffHtml",
+                "logicChainConnectionHandlesForNode",
+                "logicChainPruneDraftChannelsAfterConnection",
+                "logicChainOverlayEdgeMatchesChannel",
+                "startLogicChainExistingNodeEdit",
+                "startLogicChainExistingActionEdit",
+                "releaseLogicChainExistingEditLock",
+                "scheduleLogicChainExistingEditLockHeartbeat",
+                "TZZ_WEBADMIN_ASSET_VERSION='8.16-logic-chain-editor-existing-node-editing'"
+        )) {
+            requireContains(scripts, marker, "8.16 frontend marker: " + marker);
+        }
+        for (String marker : List.of(
+                "data-logic-chain-draft-overlay",
+                "data-logic-chain-rendered-graph-overlay",
+                "data-logic-chain-draft-diff-compact-banner",
+                "data-logic-chain-draft-diff-latest-only",
+                "data-logic-chain-draft-diff-change-count",
+                "data-logic-chain-draft-diff-expand-all",
+                "data-logic-chain-draft-diff-collapse",
+                "data-logic-chain-channel-endpoint-add-node-type",
+                "data-logic-chain-channel-endpoint-draft-card",
+                "data-logic-chain-channel-endpoint-single-card",
+                "data-logic-chain-channel-endpoint-no-duplicate-card",
+                "data-logic-chain-draft-channel-candidate-connectable",
+                "data-logic-chain-draft-channel-no-own-connect-mode",
+                "data-logic-chain-draft-channel-card-not-pruned",
+                "data-logic-chain-draft-edge-green-arrow",
+                "data-logic-chain-draft-click-selects",
+                "data-logic-chain-draft-long-press-drag",
+                "data-logic-chain-draft-drag-no-capture-snapback",
+                "data-logic-chain-draft-node-detail-selectable",
+                "data-logic-chain-draft-detail-selects",
+                "data-logic-chain-draft-channel-default-under-focus-channel",
+                "data-logic-chain-draft-channel-direct-downstream-of-join",
+                "data-logic-chain-draft-channel-adjacent-to-join-output",
+                "data-logic-chain-no-forced-draft-output-c3-gap",
+                "data-logic-chain-multi-draft-session"
+        )) {
+            requireContains(scripts, marker, "8.16 draft overlay / multi draft frontend marker: " + marker);
+        }
+        requireContains(scripts, "draft:'#34d399'", "8.16 draft edge arrow marker must use green draft marker");
+        requireContains(scripts, "marker=['signal','consumer','execution','downstream','join','gate','timer','state','draft']", "8.16 draft edge path group must not fall back to blue signal arrow");
+        requireContains(scripts, "queueLogicChainDraftPointerDrag", "8.16 draft card pointerdown must queue hold drag instead of immediate move");
+        requireContains(scripts, "logicChainGraphWithNewDraftDetails", "8.16 selected draft node must remain available to the right detail panel");
+        requireContains(scripts, "logicChainStartPendingDraftDrag", "8.16 long-press drag must start reliably after the hold threshold");
+        requireFalse(scripts.contains("lostpointercapture"), "8.16 draft drag must not cancel on lost pointer capture after rerender");
+        requireContains(scripts, "logicChainDefaultDraftChannelAnchor", "8.16 unconnected draft channel endpoints must default under the focus channel");
+        requireContains(scripts, "logicChainPlaceDraftChannelEndpointNearConnection", "8.16 downstream draft channel endpoint must compact next to Join / Timer output");
+        requireContains(scripts, "to=logicChainResolveDraftVisualEndpoint(edge.to,type,'downstream',draftCol+1)", "8.16 Join output draft endpoint must use adjacent downstream column");
+        requireContains(scripts, "logicChainMoveTimerDraftLeftOfChannel", "8.16 Timer downstream selection must move the Timer left of the target channel");
+        requireContains(scripts, "if(candidate.type==='timer_outputs_channel')logicChainMoveTimerDraftLeftOfChannel", "8.16 Timer output must move before rendering the downstream connection");
+        requireContains(scripts, "logicChainExistingConnectionHandles", "8.16 existing connectable nodes must expose canvas green-plus reconnect handles");
+        requireContains(scripts, "logicChainMarkRemovedPreviewEdge", "8.16 removed reconnect preview edges must stay layout-only during connection mode");
+        requireContains(scripts, "hideDuringConnection===true", "8.16 removed reconnect preview edges must not render while connection mode stays active");
+        requireContains(scripts, "logicChainPruneOverlayDisconnectedNodes", "8.16 disconnected overlay nodes must be pruned after connection mode exits");
+        requireContains(scripts, "prunedDisconnectedAfterConnectionExit", "8.16 overlay metadata must record post-exit disconnected pruning");
+        requireContains(scripts, "function logicChainNodeDetailCards(node,graph,nodes,incoming,outgoing){return [logicChainNewDraftNodeEditCard(node),logicChainExistingEditCard(node),logicChainReferenceCard", "8.16 right detail cards must not keep the action append entry");
+        requireContains(scripts, "logicChainActionAppendSectionForNode(node)", "8.16 action append entry must live inside the existing-node modal");
+        requireContains(scripts, "existing=byId[canonical]||null", "8.16 channel endpoint draft card must reuse existing canonical layout item");
+        requireContains(scripts, "layout.draftChannelEndpointSingleCard=true", "8.16 channel endpoint draft card must record single-card layout behavior");
+        requireContains(scripts, "draftChannelEndpoint=m.channelEndpointDraft===true||m.cardDraft===true", "8.16 draft channel endpoint cards must be detected separately from draggable new nodes");
+        requireContains(scripts, "handles=logicChainConnectionHandlesForNode(node,draftPlacement)", "8.16 connection mode must route handles through target/candidate-aware rendering");
+        requireContains(scripts, "item?.cardDraft===true||refs.has", "8.16 cardDraft channel endpoint cards must survive reconnect pruning until explicitly removed or saved");
+        requireFalse(scripts.contains("Math.max(draftCol+1,3)"), "8.16 Join output draft endpoint must not force a C3 output gap");
+        requireFalse(scripts.contains("stopLogicChainConnectionMode('canvas')"), "8.16 connection mode must not close from canvas click or pan");
+        requireFalse(scripts.contains("data-logic-chain-connection-mode-canvas-exits"), "8.16 connection mode must not advertise canvas-click exit");
+        requireFalse(scripts.contains("return startLogicChainDraftPointerDrag(event,card);"), "8.16 draft card click must not be consumed by immediate pointer drag");
+        requireFalse(scripts.contains("`draft:channel_endpoint:${channel}`:canonical"), "8.16 channel endpoint draft card must not mint a duplicate alias when canonical exists");
+        requireFalse(scripts.contains("filter(item=>refs.has(normalizeLogicChainDraftChannel(item.channel)))"), "8.16 reconnect pruning must not drop unreferenced cardDraft channel endpoints");
+        requireFalse(scripts.contains("一次只能保存一种"), "8.16 frontend must not show legacy single-draft copy");
+        requireFalse(editorService.contains("logic_chain_draft_single_write_only"), "8.16 backend must not reject mixed draft modes");
+        requireFalse(editorService.contains("logic_chain_existing_node_single_edit_only"), "8.16 backend must allow multiple existing-node edit targets");
+        requireFalse(editorService.contains("logic_chain_action_single_edit_only"), "8.16 backend must allow multiple action edit targets");
+
+        for (String marker : List.of(
+                "testExistingTimerNodeEditWritesUnderlyingConfig",
+                "testExistingChannelMetadataEditValidatesTypedPayload",
+                "testExistingChannelMetadataEditSavesUnderlyingMetadata",
+                "testExistingSignalListenerBasicEditWritesUnderlyingConfig",
+                "testExistingSignalJoinEditRejectsInputOutputOverlap",
+                "testExistingTypedEditsRejectDraftEdgesAndAllowMultipleTargets",
+                "testMultiDraftSessionSavesNewNodeExistingEditAndMetadata",
+                "testMultiActionEditsSaveAcrossOwners",
+                "testExistingActionEditStructuredPayloadConversion",
+                "testExistingActionEditStructuredSaveRoundtrip",
+                "testTimerSameIndexActionEditReplacesWithoutReorder",
+                "testSignalListenerSameIndexActionEditReplacesWithoutReorder",
+                "testActionEditRejectsDeleteAndReorderOperations",
+                "logic_chain_existing_edit_edges_not_allowed",
+                "logic_chain_existing_node_duplicate_edit",
+                "logic_chain_action_duplicate_edit",
+                "logic_chain_join_input_output_channel_conflict",
+                "logic_chain_action_edit_operation_invalid"
+        )) {
+            requireContains(editorTest, marker, "8.16 service test marker: " + marker);
+        }
+
+        String editorSection = extractBetween(scripts, "function logicChainEditorAction", "function logicChainMetadataAction");
+        for (String forbidden : List.of(
+                "alert(",
+                "confirm(",
+                "prompt(",
+                "window.alert",
+                "window.confirm",
+                "window.prompt",
+                "moveExistingLogicChainNode",
+                "deleteLogicChainNode",
+                "reorderLogicChainNode",
+                "deleteLogicChainAction",
+                "clearLogicChainActions",
+                "reorderLogicChainAction",
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "RawJsonEditor"
+        )) {
+            requireFalse(editorSection.contains(forbidden), "8.16 Logic Chain editor section must not contain forbidden marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "LOGIC_CHAIN_BRANCH",
+                "IF_ELSE",
+                "SCRATCH_BLOCK",
+                "GAME_PROGRAM_CALL"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.16 must not add action type: " + forbidden);
         }
         requireConditionNodeTypeSetUnchangedFor813();
     }

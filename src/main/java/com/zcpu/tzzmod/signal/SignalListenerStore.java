@@ -179,6 +179,17 @@ public final class SignalListenerStore {
         return replaceReturning(server, listenerRef, listener -> withBasicConfigForWebAdmin(listener, enabled, channel, cooldownTicks, conditionGroupId));
     }
 
+    public static synchronized SignalListenerData updateBasicConfigForWebAdmin(
+            Path path,
+            String listenerRef,
+            boolean enabled,
+            String channel,
+            int cooldownTicks,
+            String conditionGroupId
+    ) {
+        return replaceReturning(path, listenerRef, listener -> withBasicConfigForWebAdmin(listener, enabled, channel, cooldownTicks, conditionGroupId));
+    }
+
     public static SignalListenerData withBasicConfigForWebAdmin(
             SignalListenerData listener,
             boolean enabled,
@@ -238,6 +249,21 @@ public final class SignalListenerStore {
         return updated != null;
     }
 
+    public static synchronized boolean addAction(Path path, String listenerRef, ActionConfig action) {
+        if (action == null) {
+            return false;
+        }
+        return replaceReturning(path, listenerRef, listener -> new SignalListenerData(
+                listener.id(),
+                listener.name(),
+                listener.channel(),
+                listener.enabled(),
+                listener.cooldownTicks(),
+                listener.conditionGroupId(),
+                appendAction(listener.actions(), action)
+        ).normalized()) != null;
+    }
+
     public static synchronized boolean clearActions(MinecraftServer server, String listenerRef) {
         SignalListenerData updated = replaceReturning(server, listenerRef, listener -> new SignalListenerData(
                 listener.id(),
@@ -256,6 +282,18 @@ public final class SignalListenerStore {
             );
         }
         return updated != null;
+    }
+
+    public static synchronized boolean clearActions(Path path, String listenerRef) {
+        return replaceReturning(path, listenerRef, listener -> new SignalListenerData(
+                listener.id(),
+                listener.name(),
+                listener.channel(),
+                listener.enabled(),
+                listener.cooldownTicks(),
+                listener.conditionGroupId(),
+                List.of()
+        ).normalized()) != null;
     }
 
     public static synchronized SignalListenerData replaceActionsForWebAdmin(
@@ -283,6 +321,23 @@ public final class SignalListenerStore {
         return updated;
     }
 
+    public static synchronized SignalListenerData replaceActionsForWebAdmin(
+            Path path,
+            String listenerRef,
+            List<ActionConfig> actions
+    ) {
+        List<ActionConfig> safeActions = actions == null ? List.of() : List.copyOf(actions);
+        return replaceReturning(path, listenerRef, listener -> new SignalListenerData(
+                listener.id(),
+                listener.name(),
+                listener.channel(),
+                listener.enabled(),
+                listener.cooldownTicks(),
+                listener.conditionGroupId(),
+                safeActions
+        ).normalized());
+    }
+
     public static synchronized void flushDirty(MinecraftServer server) {
         State state = CACHE.get(server);
         if (state != null) {
@@ -295,12 +350,25 @@ public final class SignalListenerStore {
     }
 
     public static synchronized ResolveResult resolveListener(MinecraftServer server, String listenerRef) {
+        return resolveListener(getState(server).listeners, listenerRef);
+    }
+
+    public static synchronized ResolveResult resolveListener(Path path, String listenerRef) {
+        SignalListenerLoadResult loaded = loadWithStatus(path);
+        if (loaded.degraded()) {
+            return ResolveResult.none();
+        }
+        return resolveListener(loaded.file().listeners, listenerRef);
+    }
+
+    private static ResolveResult resolveListener(List<SignalListenerData> listeners, String listenerRef) {
         if (listenerRef == null || listenerRef.isBlank()) {
             return ResolveResult.none();
         }
 
         String query = cleanUserText(listenerRef);
-        for (SignalListenerData listener : getState(server).listeners) {
+        List<SignalListenerData> safeListeners = listeners == null ? List.of() : listeners;
+        for (SignalListenerData listener : safeListeners) {
             if (listener.id().equals(query)) {
                 return ResolveResult.unique(listener);
             }
@@ -308,7 +376,7 @@ public final class SignalListenerStore {
 
         String shortQuery = query.endsWith("...") ? query.substring(0, query.length() - 3) : query;
         List<SignalListenerData> matches = new ArrayList<>();
-        for (SignalListenerData listener : getState(server).listeners) {
+        for (SignalListenerData listener : safeListeners) {
             if (cleanUserText(listener.name()).equals(query)
                     || shortId(listener.id()).equals(query)
                     || (shortQuery.length() >= 8 && listener.id().startsWith(shortQuery))) {
@@ -350,6 +418,28 @@ public final class SignalListenerStore {
             state.listeners.set(i, updated);
             state.markDirty();
             return updated;
+        }
+        return null;
+    }
+
+    private static SignalListenerData replaceReturning(Path path, String listenerRef, Function<SignalListenerData, SignalListenerData> updater) {
+        SignalListenerLoadResult loaded = loadWithStatus(path);
+        if (loaded.degraded()) {
+            return null;
+        }
+        DataFile file = loaded.file();
+        ResolveResult resolved = resolveListener(file.listeners, listenerRef);
+        if (!resolved.foundUnique()) {
+            return null;
+        }
+        for (int i = 0; i < file.listeners.size(); i++) {
+            SignalListenerData listener = file.listeners.get(i);
+            if (!listener.id().equals(resolved.listener().id())) {
+                continue;
+            }
+            SignalListenerData updated = updater.apply(listener).normalized();
+            file.listeners.set(i, updated);
+            return save(path, file) ? updated : null;
         }
         return null;
     }
