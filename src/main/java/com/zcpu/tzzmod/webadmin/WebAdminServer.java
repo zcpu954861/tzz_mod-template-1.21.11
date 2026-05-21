@@ -47,6 +47,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminChannelMetadataService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionCatalogService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGateHistoryService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminConditionGroupService;
+import com.zcpu.tzzmod.webadmin.service.WebAdminHelpCatalogService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
@@ -108,6 +109,7 @@ public final class WebAdminServer {
     private final WebAdminConditionCatalogService conditionCatalogService = new WebAdminConditionCatalogService();
     private final WebAdminConditionGateHistoryService conditionGateHistoryService = new WebAdminConditionGateHistoryService();
     private final WebAdminConditionGroupService conditionGroupService = new WebAdminConditionGroupService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminHelpCatalogService helpCatalogService = new WebAdminHelpCatalogService();
     private final WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
@@ -258,6 +260,14 @@ public final class WebAdminServer {
                     return;
                 }
                 handleWebAdminWriteCapabilities(exchange, auth);
+                return;
+            }
+            if (path.equals("/api/webadmin/help")) {
+                if (!method.equalsIgnoreCase("GET")) {
+                    WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                    return;
+                }
+                WebAdminJsonResponse.ok(exchange, helpCatalogService.catalog());
                 return;
             }
             if (path.equals("/api/webadmin/users/me/password")) {

@@ -12,7 +12,7 @@ public final class WebAdminFrontendScripts {
             "receiver-outputting", "receiver-trigger-today", "pulse-duration", "redstone-output", "receiver-row", "channel-list", "refresh", "more",
             "clock", "selection", "condition-group", "condition-debugger", "runtime-gate", "replay", "signal-join", "signal-barrier",
             "signal-aggregator", "join-status", "scheduler", "timer", "timer-start", "timer-cancel", "delay", "countdown", "repeat",
-            "state-variable-global", "state-variable-player", "state-action", "logic-chain", "logic-node", "template-package", "chevron-left", "chevron-right", "chevron-down"
+            "state-variable-global", "state-variable-player", "state-action", "logic-chain", "logic-node", "template-package", "help-center", "example-center", "chevron-left", "chevron-right", "chevron-down"
     };
 
     private static final String[][] FLAT_ICON_GEOMETRY = {
@@ -105,6 +105,8 @@ public final class WebAdminFrontendScripts {
             {"logic-chain", "<circle cx=\"5\" cy=\"12\" r=\"2\"/><circle cx=\"12\" cy=\"7\" r=\"2\"/><circle cx=\"12\" cy=\"17\" r=\"2\"/><circle cx=\"19\" cy=\"12\" r=\"2\"/><path d=\"M7 11.4 10 8.4M7 12.6l3 3M14 8.4l3 2.2M14 15.6l3-2.2\"/>"},
             {"logic-node", "<rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"2\"/><path d=\"M3 12h4M17 12h4M12 3v4M12 17v4\"/>"},
             {"template-package", "<path d=\"M5 5h8l3 3v11H5V5Z\"/><path d=\"M13 5v4h4\"/><path d=\"M8 12h3M8 15h6\"/><path d=\"M18 10l2 1.2v5.6L16 19\"/>"},
+            {"help-center", "<path d=\"M6 5h8.5A3.5 3.5 0 0 1 18 8.5V20H7.5A2.5 2.5 0 0 0 5 17.5V7a2 2 0 0 1 2-2Z\"/><path d=\"M8 9h6M8 12h7M8 15h4\"/><path d=\"M18 8.5H8a3 3 0 0 0-3 3\"/>"},
+            {"example-center", "<rect x=\"5\" y=\"5\" width=\"14\" height=\"14\" rx=\"2\"/><path d=\"M8 9h8M8 13h5\"/><path d=\"M14 15l2 2 4-5\"/>"},
             {"chevron-left", "<path d=\"M15 6l-6 6 6 6\"/>"},
             {"chevron-right", "<path d=\"M9 6l6 6-6 6\"/>"},
             {"chevron-down", "<path d=\"M6 9l6 6 6-6\"/>"}
@@ -156,11 +158,13 @@ public final class WebAdminFrontendScripts {
                 class ApiError extends Error{
                   constructor(status, code, message){super(message || '请求失败');this.status=status;this.code=code || 'ERROR';}
                 }
-                const TZZ_WEBADMIN_ASSET_VERSION='8.16-logic-chain-editor-existing-node-editing';
+                const TZZ_WEBADMIN_ASSET_VERSION='8.17-webadmin-help-example-center';
                 if(typeof window!=='undefined')window.__TZZ_WEBADMIN_ASSET_VERSION=TZZ_WEBADMIN_ASSET_VERSION;
                 const appState={me:null,status:null,capabilities:null,channelOptions:null,channelOptionsError:null,channelOptionsDirty:false,onlinePlayerOptions:null,onlinePlayerOptionsError:null,currentDeviceDetail:null,deviceConfigEdit:null,deviceMetadataEdit:null,deviceMetadataLockTimer:null,deviceBasicConfigEdit:null,deviceBasicConfigLockTimer:null,deviceExtendedConfigEdit:null,deviceExtendedConfigLockTimer:null,actionRelayActionsEdit:null,actionRelayActionsLockTimer:null,vbdNativeTriggerEdit:null,vbdNativeTriggerLockTimer:null,interactionItemMatcherEdit:null,interactionItemMatcherLockTimer:null,containerTemplateSession:null,containerTemplateSessionLockTimer:null,containerTemplateSessionStatusTimer:null,containerTemplateCancelConfirm:null,singleItemSubmitSession:null,singleItemSubmitSessionLockTimer:null,singleItemSubmitSessionStatusTimer:null,singleItemSubmitCancelConfirm:null,channelMetadataEdit:null,channelMetadataLockTimer:null,signalListenerBasicConfigEdit:null,signalListenerBasicConfigLockTimer:null,signalListenerActionsEdit:null,signalListenerActionsLockTimer:null,signalJoinEdit:null,signalJoinLockTimer:null,regionControllerEdit:null,regionControllerLockTimer:null,logicChainMetadataEdit:null,logicChainMetadataLockTimer:null,logicChainEditor:null,logicChainEditorLockTimer:null,logicChainActionAppendLockTimer:null,logicChainExistingEditLockTimer:null,conditionGroupEdit:null,conditionGroupLockTimer:null,conditionNodeEditor:null,conditionNodeEditorRerenderTimer:null,conditionCatalog:null,currentConditionGroup:null,conditionPreviewForms:{},conditionPreviewResult:null,conditionGroupLockNotice:null,currentLogicChainGraph:null,conditionDebuggerData:null,conditionDebuggerDetail:null,conditionDebuggerReplay:null,currentStateVariableDetail:null,selectionCreateVirtualBlock:null,virtualBlockDelete:null,signalListenerCreate:null,signalListenerDelete:null,selectionTerminalById:{},deviceEditLocks:{},openDeviceMoreMenuId:'',deviceMorePopover:null,deviceFilters:{search:'',type:'ALL',enabled:'ALL',doctor:'ALL',world:'ALL'},signalFilters:{search:'',consumer:'ALL',status:'ALL',sort:'RECENT'},signalJoinFilters:{search:'',enabled:'ALL',mode:'ALL',scope:'ALL'},logicChainFilters:{search:'',status:'ALL',saved:'ALL',expanded:{}},conditionFilters:{search:'',enabled:'ALL',suite:'ALL'},conditionDebuggerFilters:{search:'',targetType:'ALL',result:'ALL',conditionGroupId:'',channel:''},stateVariableFilters:{search:'',scope:'ALL',type:'ALL',target:''},logicChainCanvas:{zoom:1,panX:0,panY:0,selectedNodeId:'',focusNodeId:'',hoverNodeId:'',detailOpen:true,graphKey:'',collapsedChannels:{},viewMode:'BOTH',nodeTypeFilter:'ALL'},doctorFilters:{search:'',severity:'ALL',objectType:'ALL',jump:'ALL'},historyFilters:{search:'',channel:'ALL',sourceType:'ALL',result:'ALL',range:'ALL',sort:'NEWEST'},userFilters:{search:'',role:'ALL',enabled:'ALL',online:'ALL'},regionFilters:{search:'',world:'ALL',enabled:'ALL',doctor:'ALL',players:'ALL'},regionControllerFilters:{search:'',enabled:'ALL',target:'ALL',event:'ALL'},actionFilters:{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'},templateFilters:{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'},advancedDetailOpen:{}};
                 appState.timerEdit=null;appState.timerLockTimer=null;appState.timerFilters={search:'',enabled:'ALL',mode:'ALL',scope:'ALL'};appState.timers=[];
                 appState.templates=[];appState.templateCenter=null;appState.templateImport=null;appState.templateApply=null;appState.templateApplyLockTimer=null;appState.templateImportLockTimer=null;appState.templateCenterFilters={search:'',source:'ALL',category:'ALL',placeholder:'ALL'};
+                appState.helpCatalog=null;appState.helpCenterFilters={search:'',category:'ALL',kind:'ALL',mode:'basic',topicId:'',view:'docs',composing:false,topicListScrollTop:0,documentScrollTop:0,rightPanelScrollTop:0};
+                appState.helpInlineTermPopover=null;appState.helpInlineTermCloseTimer=null;appState.pendingHelpReturnContext=null;
                 appState.modalClosePromise=null;appState.modalDismissPromise=null;appState.modalCloseHandler=null;appState.modalDirtyChecker=null;appState.modalSyncBeforeClose=null;appState.modalDiscardConfirmOpen=false;
                 appState.realtime={source:null,status:'DISCONNECTED',reconnectTimer:null,reconnectAttempt:0,lastEventAt:'',lastSeenSeq:0,lastEventId:'',wasDisconnected:false,missed:false,offline:typeof navigator!=='undefined'&&!navigator.onLine,refreshTimers:{},dirtyRoutes:{},pendingRefresh:{},refreshSeq:{},pollTimer:null,pollHash:null};
                 function esc(value){return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -177,7 +181,7 @@ public final class WebAdminFrontendScripts {
                     active:'active-region',consumers:'listener-receiver',consumer:'listener-receiver',response:'response-time',avgresponse:'response-time',today:'today-trigger',lightning:'action-overview',pulse:'pulse-duration',
                     users:'user-total',role:'current-role',status:'doctor-ok',enabled:'enabled',disabled:'receiver-disabled',pause:'receiver-disabled',play:'enabled',
                     orphan:'channel-orphan',search:'doctor-overview',eye:'current-user',login:'logout',plus:'receiver-total',upload:'action-binding',download:'channel-total',archive:'history',copy:'session',edit:'settings',pencil:'settings',close:'channel-error',chevronleft:'chevron-left',chevronright:'chevron-right',chevrondown:'chevron-down','import':'action-binding','export':'channel-total',
-                    key:'current-role',chest:'channel-total',door:'logout',custom1:'device-overview',
+                    key:'current-role',chest:'channel-total',door:'logout',custom1:'device-overview',help:'help-center',helpcenter:'help-center',example:'example-center',examplecenter:'example-center',glossary:'help-center',troubleshooting:'doctor-overview',
                     conditioneditor:'condition-group',conditiongroups:'condition-group',conditiongroup:'condition-group',conditiondebugger:'condition-debugger',conditiongate:'runtime-gate',gate:'runtime-gate',
                     signaljoin:'signal-join',barrier:'signal-barrier',aggregator:'signal-aggregator',joinstatus:'join-status',
                     timerstart:'timer-start',timercancel:'timer-cancel',scheduler:'scheduler',timer:'timer',delay:'delay',countdown:'countdown',repeat:'repeat',
@@ -471,12 +475,19 @@ public final class WebAdminFrontendScripts {
                 }
                 function historyHash(channel){return isBlank(channel)?'#/history':`#/history?channel=${encodeURIComponent(channel)}`;}
                 function currentRouteHash(){return location.hash||'#/dashboard';}
+                function routeBase(hash){const h=String(hash||'');const index=h.indexOf('?');return index>=0?h.substring(0,index):h;}
                 function conditionDebuggerDetailIdFromHash(hash){const h=String(hash||'');if(h.startsWith('#/condition-debugger/'))return detailRoute(h.substring('#/condition-debugger/'.length),'#/condition-debugger').id;if(h.startsWith('#/condition-debugger?'))return parseHashParams(h).id||'';return '';}
                 function isConditionDebuggerDetailHash(hash){return !isBlank(conditionDebuggerDetailIdFromHash(hash));}
                 function isDetailHash(hash){const h=String(hash||'');return h.startsWith('#/devices/')||h.startsWith('#/signals/')||h.startsWith('#/listeners/')||h.startsWith('#/signal-listeners/')||h.startsWith('#/signal-joins/')||h.startsWith('#/timers/')||h.startsWith('#/logic-chains/')||h.startsWith('#/templates/')||h.startsWith('#/condition-groups/')||h.startsWith('#/conditions/')||h.startsWith('#/state-variables/')||isConditionDebuggerDetailHash(h)||h.startsWith('#/regions/')||h.startsWith('#/region-controllers/')||h.startsWith('#/actions/');}
-                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/signal-joins','#/timers','#/logic-chains','#/condition-groups','#/conditions','#/condition-debugger','#/state-variables','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
+                function isValidReturnHash(hash){const h=String(hash||'');if(!h.startsWith('#/'))return false;if(h.startsWith('#/login'))return false;if(h.includes('://'))return false;return ['#/dashboard','#/devices','#/virtual-block-devices','#/block-devices','#/receivers','#/listeners','#/signal-listeners','#/signals','#/signalbridge','#/signal-joins','#/timers','#/logic-chains','#/condition-groups','#/conditions','#/condition-debugger','#/state-variables','#/doctor','#/diagnostics','#/signal-doctor','#/history','#/events','#/users','#/permissions','#/users-permissions','#/settings','#/system-settings','#/config','#/config-management','#/settings/config','#/regions','#/region-list','#/region-controllers','#/regionctl','#/actions','#/action-templates','#/templates','#/help','#/examples'].some(prefix=>h===prefix||h.startsWith(prefix+'/')||h.startsWith(prefix+'?'));}
                 function withReturnContext(targetHash){const target=String(targetHash||'#/dashboard');if(!isDetailHash(target))return target;let source=currentRouteHash();if(source.startsWith('#/condition-debugger')&&!isConditionDebuggerDetailHash(source))source=conditionDebuggerListHash();if(!isValidReturnHash(source))return target;return `${target}${target.includes('?')?'&':'?'}returnTo=${encodeURIComponent(source)}`;}
                 function navigateTo(targetHash){captureConditionDebuggerListState(targetHash);location.hash=withReturnContext(targetHash);}
+                function appendHashParams(hash,params){
+                  const target=String(hash||'#/dashboard'), base=routeBase(target), query=target.includes('?')?target.substring(target.indexOf('?')+1):'', next=new URLSearchParams(query);
+                  Object.entries(params||{}).forEach(([key,value])=>{if(!isBlank(value))next.set(key,String(value));});
+                  const qs=next.toString();
+                  return `${base}${qs?'?'+qs:''}`;
+                }
                 function safeDecodeRoutePart(value){try{return decodeURIComponent(String(value||''));}catch(_){return String(value||'');}}
                 function detailRoute(raw,fallback){const text=String(raw||''), index=text.indexOf('?'), encodedId=index>=0?text.substring(0,index):text, query=index>=0?text.substring(index+1):'', id=safeDecodeRoutePart(encodedId), params=new URLSearchParams(query);const returnTo=params.get('returnTo')||'';return {id, fallback, returnTo:isValidReturnHash(returnTo)?returnTo:''};}
                 function goBackOrFallback(returnTo,fallback){location.hash=isValidReturnHash(returnTo)?returnTo:fallback;}
@@ -668,6 +679,7 @@ public final class WebAdminFrontendScripts {
                   }
                 }
                 function routeUnsafe(hash,options={}){
+                  const base=routeBase(hash);
                   closeDeviceMoreMenu(false);
                   maybeReleaseDeviceMetadataEditForRoute(hash);
                   maybeReleaseDeviceBasicConfigEditForRoute(hash);
@@ -687,44 +699,45 @@ public final class WebAdminFrontendScripts {
                   maybeReleaseConditionGroupEditForRoute(hash);
                   document.querySelectorAll('.nav-item').forEach(btn=>btn.classList.toggle('active', isRouteActive(btn.dataset.route,hash)));
                   enterRealtimeRoute(hash);
-                  if(hash==='#/dashboard') return renderDashboard(options);
-                  if(hash==='#/devices') return renderDevices(options);
+                  if(base==='#/dashboard') return renderDashboard(options);
+                  if(base==='#/devices') return renderDevices(options);
                   if(hash.startsWith('#/devices/')) return renderDeviceDetail(hash.substring('#/devices/'.length),options);
-                  if(hash==='#/virtual-block-devices'||hash==='#/block-devices') return renderVirtualBlockDevices(options);
-                  if(hash==='#/listeners'||hash==='#/signal-listeners') return renderListeners(options);
+                  if(base==='#/virtual-block-devices'||base==='#/block-devices') return renderVirtualBlockDevices(options);
+                  if(base==='#/listeners'||base==='#/signal-listeners') return renderListeners(options);
                   if(hash.startsWith('#/listeners/')) return renderSignalListenerDetail(hash.substring('#/listeners/'.length),options);
                   if(hash.startsWith('#/signal-listeners/')) return renderSignalListenerDetail(hash.substring('#/signal-listeners/'.length),options);
-                  if(hash==='#/receivers') return renderReceivers(options);
-                  if(hash==='#/signals'||hash==='#/signalbridge') return renderSignals(options);
-                  if(hash==='#/signal-joins') return renderSignalJoinsPage(options);
+                  if(base==='#/receivers') return renderReceivers(options);
+                  if(base==='#/signals'||base==='#/signalbridge') return renderSignals(options);
+                  if(base==='#/signal-joins') return renderSignalJoinsPage(options);
                   if(hash.startsWith('#/signal-joins/')) return renderSignalJoinDetail(hash.substring('#/signal-joins/'.length),options);
-                  if(hash==='#/timers') return renderTimersPage(options);
+                  if(base==='#/timers') return renderTimersPage(options);
                   if(hash.startsWith('#/timers/')) return renderTimerDetail(hash.substring('#/timers/'.length),options);
-                  if(hash==='#/conditions'||hash==='#/condition-groups') return renderConditionGroupsPage(options);
+                  if(base==='#/conditions'||base==='#/condition-groups') return renderConditionGroupsPage(options);
                   if(hash.startsWith('#/conditions/')) return renderConditionGroupDetail(hash.substring('#/conditions/'.length),options);
                   if(hash.startsWith('#/condition-groups/')) return renderConditionGroupDetail(hash.substring('#/condition-groups/'.length),options);
                   if(hash.startsWith('#/condition-debugger')) return renderConditionDebuggerPage(hash.substring('#/condition-debugger'.length),options);
-                  if(hash==='#/state-variables') return renderStateVariablesPage(options);
+                  if(base==='#/state-variables') return renderStateVariablesPage(options);
                   if(hash.startsWith('#/state-variables/')) return renderStateVariableDetail(hash.substring('#/state-variables/'.length),options);
-                  if(hash==='#/logic-chains') return renderLogicChainsPage(options);
-                  if(hash.startsWith('#/logic-chains?')) return renderLogicChainLegacyChannelRoute(hash,options);
+                  if(hash.startsWith('#/logic-chains?')&&!parseHashParams(hash).fromHelp) return renderLogicChainLegacyChannelRoute(hash,options);
+                  if(base==='#/logic-chains') return renderLogicChainsPage(options);
                   if(isLogicChainResolveRoute(hash)) return renderLogicChainResolve(hash,options);
                   if(hash.startsWith('#/logic-chains/')) return renderLogicChainDetail(hash.substring('#/logic-chains/'.length),options);
                   if(hash.startsWith('#/signals/')) return renderSignalDetail(hash.substring('#/signals/'.length),options);
-                  if(hash==='#/doctor'||hash==='#/diagnostics'||hash==='#/signal-doctor') return renderDoctorPage(options);
+                  if(base==='#/doctor'||base==='#/diagnostics'||base==='#/signal-doctor') return renderDoctorPage(options);
                   if(hash.startsWith('#/history')) return renderHistoryPage(hash.substring('#/history'.length),options);
                   if(hash.startsWith('#/events')) return renderHistoryPage(hash.substring('#/events'.length),options);
-                  if(hash==='#/config'||hash==='#/config-management'||hash==='#/settings/config') return renderConfigPage(options);
-                  if(hash==='#/users'||hash==='#/permissions'||hash==='#/users-permissions') return renderUsersPage(options);
-                  if(hash==='#/settings'||hash==='#/system-settings') return renderSettingsPage(options);
-                  if(hash==='#/regions'||hash==='#/region-list') return renderRegionsPage(options);
-                  if(hash==='#/region-controllers'||hash==='#/regionctl') return renderRegionControllersPage(options);
+                  if(base==='#/config'||base==='#/config-management'||base==='#/settings/config') return renderConfigPage(options);
+                  if(base==='#/users'||base==='#/permissions'||base==='#/users-permissions') return renderUsersPage(options);
+                  if(base==='#/settings'||base==='#/system-settings') return renderSettingsPage(options);
+                  if(base==='#/regions'||base==='#/region-list') return renderRegionsPage(options);
+                  if(base==='#/region-controllers'||base==='#/regionctl') return renderRegionControllersPage(options);
                   if(hash.startsWith('#/region-controllers/')) return renderRegionControllerDetail(hash.substring('#/region-controllers/'.length),options);
                   if(hash.startsWith('#/regions/')) return renderRegionDetail(hash.substring('#/regions/'.length),options);
-                  if(hash==='#/templates') return renderTemplatesPage(options);
+                  if(base==='#/templates') return renderTemplatesPage(options);
                   if(hash.startsWith('#/templates/')) return renderTemplateDetailPage(hash.substring('#/templates/'.length),options);
-                  if(hash==='#/actions') return renderActionsPage(options);
-                  if(hash==='#/action-templates') return renderActionTemplatesPage(options);
+                  if(base==='#/help'||base==='#/examples') return renderHelpCenterPage(hash,options);
+                  if(base==='#/actions') return renderActionsPage(options);
+                  if(base==='#/action-templates') return renderActionTemplatesPage(options);
                   if(hash.startsWith('#/actions/')) return renderActionDetail(hash.substring('#/actions/'.length),options);
                   renderPlaceholder('页面暂未接入','该页面将在后续版本接入。');
                 }
@@ -754,6 +767,7 @@ public final class WebAdminFrontendScripts {
                   if(r==='#/devices')return h==='#/devices'||h.startsWith('#/devices/');
                   if(r==='#/virtual-block-devices')return h==='#/virtual-block-devices'||h==='#/block-devices';
                   if(r==='#/templates')return h==='#/templates'||h.startsWith('#/templates/');
+                  if(r==='#/help')return h==='#/help'||h.startsWith('#/help?')||h.startsWith('#/examples');
                   if(r==='#/actions')return h==='#/actions'||h.startsWith('#/actions/')||h==='#/action-templates';
                   if(r==='#/regions')return h==='#/regions'||h==='#/region-list'||h.startsWith('#/regions/');
                   if(r==='#/region-controllers')return h==='#/region-controllers'||h==='#/regionctl';
@@ -765,7 +779,7 @@ public final class WebAdminFrontendScripts {
                 }
                 async function settle(path){try{return{ok:true,data:await api(path)}}catch(err){return{ok:false,error:err}}}
                 const REALTIME_EVENT_TYPES=['realtime_connected','heartbeat','sync_required','device_registered','device_removed','device_changed','device_config_changed','device_metadata_changed','receiver_changed','receiver_pulse_changed','virtual_block_device_changed','selection_started','selection_completed','selection_cancelled','selection_failed','container_template_session_started','container_template_session_opened','container_template_session_saved','container_template_session_cancelled','container_template_session_failed','container_template_session_expired','single_item_submit_template_session_started','single_item_submit_template_session_opened','single_item_submit_template_session_saved','single_item_submit_template_session_cancelled','single_item_submit_template_session_failed','single_item_submit_template_session_expired','signal_channel_changed','signal_emitted','signal_history_appended','history_appended','signal_listener_changed','signal_listener_enabled_changed','signal_listener_action_changed','signal_join_changed','timer_changed','timer_runtime_changed','action_changed','action_history_appended','action_execution_appended','region_changed','region_controller_changed','region_event_appended','logic_chain_metadata_changed','template_store_changed','template_applied','condition_group_changed','condition_gate_history_appended','doctor_issues_changed','webadmin_user_changed','webadmin_audit_appended','webadmin_settings_changed','device_updated','doctor_changed','action_executed','receiver_pulse','region_event','config_changed','write_audit_appended','permission_denied','validation_failed','user_changed','system_settings_changed','signal_config_changed','channel_metadata_changed','signal_listener_config_changed','region_config_changed','action_config_changed','edit_lock_changed','webadmin_user_connected','webadmin_user_disconnected'];
-                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','signalJoins','timers','logicChains','templates','conditionGroups','conditionDebugger','stateVariables','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
+                const REALTIME_KNOWN_ROUTE_KEYS=['dashboard','signals','signalJoins','timers','logicChains','templates','help','conditionGroups','conditionDebugger','stateVariables','receivers','listeners','actions','actionTemplates','devices','virtualBlockDevices','history','doctor','regions','regionControllers','users','settings','config'];
                 function setRealtimeStatus(status,lastEventAt){
                   appState.realtime.status=status;
                   if(lastEventAt)appState.realtime.lastEventAt=lastEventAt;
@@ -1275,6 +1289,8 @@ public final class WebAdminFrontendScripts {
                     if(!(target&&target.closest&&target.closest('.selection-channel-combo'))){selection.channelComboOpen=false;}
                     syncSelectionCombos();
                   }
+                  if(handleHelpCenterDelegatedClick(event))return;
+                  if(document.querySelector('[data-help-term-popover]')&&!(target&&target.closest&&target.closest('[data-help-term-popover],[data-help-inline-term]')))hideHelpInlineTermPopover();
                   const nav=target&&target.closest?target.closest('[data-nav-route]'):null;
                   if(nav){
                     const interactive=target.closest('button,a,input,select,textarea,[data-no-nav]');
@@ -1282,6 +1298,7 @@ public final class WebAdminFrontendScripts {
                   }
                 });
                 document.addEventListener('keydown',event=>{
+                  if(event.key==='Escape'&&document.querySelector('[data-help-term-popover]')){event.preventDefault();event.stopPropagation();hideHelpInlineTermPopover();return;}
                   if(event.key==='Escape'&&appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return;}
                   if(event.key==='Escape'&&clearLogicChainHighlightByEscape(event))return;
                   if(event.key!=='Enter'&&event.key!==' ')return;
@@ -1292,6 +1309,11 @@ public final class WebAdminFrontendScripts {
                   if(!nav||event.target!==nav||nav.tagName==='BUTTON'||nav.tagName==='A')return;
                   event.preventDefault();activateNavRoute(nav);
                 });
+                document.addEventListener('mouseover',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)showHelpInlineTermPopover(term);const pop=event.target&&event.target.closest?event.target.closest('[data-help-term-popover]'):null;if(pop)helpClearInlineTermCloseTimer();});
+                document.addEventListener('focusin',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)showHelpInlineTermPopover(term);const pop=event.target&&event.target.closest?event.target.closest('[data-help-term-popover]'):null;if(pop)helpClearInlineTermCloseTimer();});
+                document.addEventListener('mouseout',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(!term)return;const next=event.relatedTarget;if(next?.closest?.(`[data-help-term-popover],[data-help-inline-term][data-term-id="${cssEscape(term.dataset.termId||'')}"]`))return;helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);});
+                document.addEventListener('focusout',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);});
+                document.addEventListener('scroll',event=>{if(document.querySelector('[data-help-term-popover]')&&event.target?.closest?.('.help-document-scroll,.help-topic-list,.help-right-panel'))hideHelpInlineTermPopover();},true);
                 window.addEventListener('beforeunload',event=>{if(logicChainEditorHasUnsavedWork(appState.logicChainEditor)){event.preventDefault();event.returnValue='';}});
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
@@ -4436,6 +4458,7 @@ public final class WebAdminFrontendScripts {
                   appState.actionFilters=appState.actionFilters||{search:'',type:'ALL',owner:'ALL',result:'ALL',doctor:'ALL',sort:'NAME'};
                   appState.templateFilters=appState.templateFilters||{search:'',type:'ALL',status:'ALL',favorite:'ALL',sort:'NAME'};
                   appState.templateCenterFilters=appState.templateCenterFilters||{search:'',source:'ALL',category:'ALL',placeholder:'ALL'};
+                  appState.helpCenterFilters=appState.helpCenterFilters||{search:'',category:'ALL',kind:'ALL',mode:'basic',topicId:'',view:'docs',composing:false,topicListScrollTop:0};
                   appState.receiverFilters=appState.receiverFilters||{search:'',enabled:'ALL',output:'ALL',channel:'ALL'};
                   appState.receiverDetailCache=appState.receiverDetailCache||{};
                   appState.configFilters=appState.configFilters||{search:'',status:'ALL',type:'ALL'};
@@ -4455,7 +4478,9 @@ public final class WebAdminFrontendScripts {
                   return `<article class="wa-metric ${esc(kind)}"><div class="wa-metric-top"><div class="wa-metric-label">${esc(label)}</div><span class="wa-icon-bubble ${esc(kind)} icon-bubble-${iconClassName(iconName)}">${icon(iconName)}</span></div><div class="wa-metric-value">${esc(value)}</div>${sub?`<div class="wa-metric-sub">${esc(sub)}</div>`:''}</article>`;
                 }
                 function waPageHead(title,desc,actions=''){
-                  return `<div class="wa-head"><div><h1>${esc(title)}</h1><p>${esc(desc)}</p></div>${actions?`<div class="wa-actions">${actions}</div>`:''}</div>`;
+                  const helpTopic=helpTopicForPageTitle(title), help=helpTopic?pageHelpLink(helpTopic,currentRouteHash()):'';
+                  const actionHtml=[helpReturnButton(),actions,help].filter(Boolean).join('');
+                  return `<div class="wa-head"><div><h1>${esc(title)}</h1><p>${esc(desc)}</p></div>${actionHtml?`<div class="wa-actions">${actionHtml}</div>`:''}</div>`;
                 }
                 function waButton(label,iconName='',attrs='',kind='ghost'){
                   const safeAttrs=String(attrs||''), typeAttr=/\\btype\\s*=/.test(safeAttrs)?'':'type="button" ';
@@ -4464,6 +4489,37 @@ public final class WebAdminFrontendScripts {
                 function waIconButton(label,iconName,attrs=''){
                   const safeAttrs=String(attrs||''), typeAttr=/\\btype\\s*=/.test(safeAttrs)?'':'type="button" ';
                   return `<button class="wa-icon-btn" ${typeAttr}aria-label="${esc(label)}" title="${esc(label)}" ${safeAttrs}>${icon(iconName)}</button>`;
+                }
+                function helpTopicForPageTitle(title){
+                  const text=String(title||'');
+                  if(text.includes('总览'))return 'getting-started.overview';
+                  if(text.includes('SignalBridge'))return 'signalbridge.channel-basics';
+                  if(text.includes('信号汇合'))return 'signal-join.basics';
+                  if(text.includes('调度器')||text.includes('计时器'))return 'timer.delay';
+                  if(text.includes('信号监听器'))return 'signalbridge.listener-flow';
+                  if(text.includes('接收器'))return 'device-trigger.references';
+                  if(text.includes('条件组'))return 'condition.group-basics';
+                  if(text.includes('条件调试'))return 'debugger.doctor-replay';
+                  if(text.includes('状态变量'))return 'state-variable.basics';
+                  if(text.includes('逻辑链'))return 'logic-chain.viewer';
+                  if(text.includes('模板中心')||text.includes('模板详情'))return 'templates.prefab';
+                  if(text.includes('Doctor')||text.includes('信号诊断'))return 'debugger.doctor-replay';
+                  if(text.includes('区域控制器')||text.includes('区域列表')||text.includes('区域详情'))return 'region.controller';
+                  if(text.includes('虚拟方块')||text.includes('信号设备')||text.includes('设备'))return 'device-trigger.references';
+                  if(text.includes('动作列表')||text.includes('动作系统')||text.includes('动作模板'))return 'action.config-basics';
+                  if(text.includes('事件历史'))return 'signalbridge.channel-basics';
+                  if(text.includes('配置管理')||text.includes('系统设置'))return 'getting-started.overview';
+                  return '';
+                }
+                function helpTopicHash(topicId='',returnTo=currentRouteHash()){
+                  const params=new URLSearchParams();
+                  if(!isBlank(topicId))params.set('topic',String(topicId));
+                  if(isValidReturnHash(returnTo))params.set('returnTo',returnTo);
+                  const qs=params.toString();
+                  return `#/help${qs?'?'+qs:''}`;
+                }
+                function pageHelpLink(topicId,returnTo=currentRouteHash()){
+                  return waButton('帮助','help-center',navDataAttr(helpTopicHash(topicId,returnTo),'打开帮助')+` data-page-help-link="true" data-page-help-topic="${esc(topicId)}" data-page-help-return-to="${esc(returnTo)}"`,'ghost');
                 }
                 function safeHtml(value){return {__waHtml:String(value||'')};}
                 function detailValue(value){
@@ -4480,9 +4536,440 @@ public final class WebAdminFrontendScripts {
                     toast('当前浏览器不允许直接复制，请手动选择文本复制。');
                   }
                 }
+                async function loadHelpCatalog(force=false){
+                  if(!force&&appState.helpCatalog)return appState.helpCatalog;
+                  appState.helpCatalog=await api('/api/webadmin/help');
+                  return appState.helpCatalog;
+                }
+                function helpKindLabel(kind){return {topic:'模块',example:'示例',troubleshooting:'排错',glossary:'术语'}[String(kind||'topic')]||kind;}
+                const HELP_CENTER_VIEW_ROUTE_MARKERS='#/help?view=examples #/help?view=troubleshooting #/help?view=glossary';
+                function helpViewLabel(view){return {docs:'文档区',examples:'示例中心',troubleshooting:'排错中心',glossary:'术语表'}[String(view||'docs')]||'文档区';}
+                function helpNormalizeView(view){const value=String(view||'docs');return ['docs','examples','troubleshooting','glossary'].includes(value)?value:'docs';}
+                function helpKindForView(view){return {docs:'topic',examples:'example',troubleshooting:'troubleshooting',glossary:'glossary'}[helpNormalizeView(view)]||'topic';}
+                function helpViewHash(view='docs',topicId='',returnTo=''){
+                  const normalized=helpNormalizeView(view), params=new URLSearchParams();
+                  if(normalized!=='docs')params.set('view',normalized);
+                  if(normalized==='docs'&&!isBlank(topicId))params.set('topic',String(topicId));
+                  if(isValidReturnHash(returnTo))params.set('returnTo',returnTo);
+                  const qs=params.toString();
+                  return `#/help${qs?'?'+qs:''}`;
+                }
+                function helpStorageGet(key){try{return sessionStorage.getItem(key);}catch(_){return null;}}
+                function helpStorageSet(key,value){try{sessionStorage.setItem(key,value);return true;}catch(_){return false;}}
+                function helpSafeReturnId(){return `help-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`.replace(/[^a-zA-Z0-9_-]/g,'');}
+                function helpReturnStorageKey(id){return `tzzHelpReturn:${String(id||'').replace(/[^a-zA-Z0-9_-]/g,'')}`;}
+                function helpReadReturnContext(id){
+                  const safe=String(id||'').replace(/[^a-zA-Z0-9_-]/g,'');
+                  if(!safe)return null;
+                  try{
+                    const raw=helpStorageGet(helpReturnStorageKey(safe));
+                    if(!raw)return null;
+                    const ctx=JSON.parse(raw);
+                    if(!ctx||Date.now()-Number(ctx.timestamp||0)>86400000)return null;
+                    return ctx;
+                  }catch(_){return null;}
+                }
+                function helpCaptureReturnContext(){
+                  const f=appState.helpCenterFilters||{}, doc=document.querySelector('.help-document-scroll'), list=document.querySelector('.help-topic-list'), right=document.querySelector('.help-right-panel');
+                  const context={
+                    route:currentRouteHash(),
+                    view:helpNormalizeView(f.view||'docs'),
+                    topic:f.topicId||parseHashParams(currentRouteHash()).topic||'',
+                    mode:f.mode==='professional'?'professional':'basic',
+                    search:f.search||'',
+                    category:f.category||'ALL',
+                    type:f.kind||'ALL',
+                    docScrollTop:doc?doc.scrollTop:0,
+                    topicListScrollTop:list?list.scrollTop:Number(f.topicListScrollTop||0),
+                    rightPanelScrollTop:right?right.scrollTop:Number(f.rightPanelScrollTop||0),
+                    timestamp:Date.now()
+                  };
+                  return context;
+                }
+                function helpSaveReturnContext(){
+                  const context=helpCaptureReturnContext(), id=helpSafeReturnId();
+                  if(!helpStorageSet(helpReturnStorageKey(id),JSON.stringify(context)))context.fallbackRoute=helpViewHash(context.view,context.topic);
+                  return id;
+                }
+                function helpTargetRouteWithReturn(targetRoute){
+                  const id=helpSaveReturnContext();
+                  return appendHashParams(targetRoute,{fromHelp:'1',helpReturn:id});
+                }
+                function helpReturnContextFromRoute(){
+                  const params=parseHashParams(currentRouteHash()), id=String(params.helpReturn||'').replace(/[^a-zA-Z0-9_-]/g,'');
+                  if(params.fromHelp!=='1'||!id)return null;
+                  const ctx=helpReadReturnContext(id);
+                  return ctx?{id,ctx}:null;
+                }
+                function helpReturnButton(){
+                  const context=helpReturnContextFromRoute();
+                  if(!context||routeBase(currentRouteHash())==='#/help'||routeBase(currentRouteHash())==='#/examples')return '';
+                  return waButton('返回文档','chevron-left',`data-help-return-action="true" data-help-example-center-return-to-help-only-from-inline="true" data-help-return-id="${esc(context.id)}"`,'ghost');
+                }
+                function restoreHelpReturnContext(id){
+                  const ctx=helpReadReturnContext(id);
+                  if(!ctx){toast('返回文档上下文已过期。');location.hash='#/help';return;}
+                  appState.helpCenterFilters={...(appState.helpCenterFilters||{}),search:ctx.search||'',category:ctx.category||'ALL',kind:ctx.type||'ALL',mode:ctx.mode==='professional'?'professional':'basic',topicId:ctx.topic||'',view:helpNormalizeView(ctx.view||'docs'),topicListScrollTop:Number(ctx.topicListScrollTop||0),documentScrollTop:Number(ctx.docScrollTop||0),rightPanelScrollTop:Number(ctx.rightPanelScrollTop||0),composing:false};
+                  appState.pendingHelpReturnContext=ctx;
+                  const target=isValidReturnHash(ctx.route)?ctx.route:helpViewHash(ctx.view||'docs',ctx.topic||'');
+                  location.hash=target;
+                }
+                function applyPendingHelpReturnContext(){
+                  const ctx=appState.pendingHelpReturnContext;if(!ctx)return;
+                  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                    const list=document.querySelector('.help-topic-list'), doc=document.querySelector('.help-document-scroll'), right=document.querySelector('.help-right-panel');
+                    if(list)list.scrollTop=Number(ctx.topicListScrollTop||0);
+                    if(doc)doc.scrollTop=Number(ctx.docScrollTop||0);
+                    if(right)right.scrollTop=Number(ctx.rightPanelScrollTop||0);
+                    appState.pendingHelpReturnContext=null;
+                  }));
+                }
+                function helpCategoryTitle(catalog,category){const item=(catalog?.categories||[]).find(c=>String(c.id)===String(category));return item?.title||category||'未分类';}
+                function helpAllItems(catalog){
+                  const topics=(catalog?.topics||[]).map(item=>({...item,kind:'topic'}));
+                  const examples=(catalog?.examples||[]).map(item=>({...item,kind:'example',title:item.title||item.id,summary:item.goal||item.whenToUse||''}));
+                  const troubleshooting=(catalog?.troubleshooting||[]).map(item=>({...item,kind:'troubleshooting',title:item.title||item.symptom||item.id,summary:helpPhraseList(item.likelyCauses||[])}));
+                  const glossary=(catalog?.glossary||[]).map(item=>({...item,kind:'glossary',title:item.term||item.title||item.id,summary:item.definition||''}));
+                  return [...topics,...examples,...troubleshooting,...glossary];
+                }
+                function helpTopicById(catalog,id){return (catalog?.topics||[]).find(t=>String(t.id)===String(id))||null;}
+                function helpExampleById(catalog,id){return (catalog?.examples||[]).find(t=>String(t.id)===String(id))||null;}
+                function helpTroubleById(catalog,id){return (catalog?.troubleshooting||[]).find(t=>String(t.id)===String(id))||null;}
+                function helpGlossaryById(catalog,id){return (catalog?.glossary||[]).find(t=>String(t.id)===String(id))||null;}
+                function helpCategoryKeywordMap(view){
+                  const common={
+                    signal:['signal','channel','bridge','listener','receiver','join','频道','监听器','接收器'],
+                    action:['action','ActionConfig','message','timer_start','state_variable','动作'],
+                    condition:['condition','gate','ConditionGroup','debugger','条件'],
+                    state:['state','StateVariable','状态变量'],
+                    'logic-chain':['logic chain','logic-chain','editor','viewer','component','逻辑链','编辑器'],
+                    template:['template','prefab','dry-run','apply','placeholder','模板'],
+                    timer:['timer','scheduler','计时器','调度器'],
+                    join:['join','barrier','aggregator','汇合'],
+                    listener:['listener','SignalListener','监听器'],
+                    device:['device','vbd','region','receiver','relay','设备'],
+                    diagnostics:['doctor','debugger','history','replay','诊断','排错']
+                  };
+                  if(view==='examples')return {
+                    join:['join','signal join','汇合'],timer:['timer','scheduler','timer_start'],listener:['listener','SignalListener','监听器'],state:['state','StateVariable','state_variable'],condition:['condition','ConditionGroup','gate'],template:['template','prefab','dry-run','apply'],logicChain:['logic chain','logic-chain','editor'],signal:['signal','SignalBridge','channel']
+                  };
+                  if(view==='troubleshooting')return {
+                    condition:['condition','ConditionGroup','gate','条件'],join:['join','汇合'],timer:['timer','计时器'],listener:['listener','SignalListener','监听器'],template:['template','prefab','apply','模板'],editor:['editor','logic chain','lock','fingerprint','编辑器'],signal:['signal','SignalBridge','channel','consumer'],state:['state','StateVariable','状态变量']
+                  };
+                  if(view==='glossary')return {
+                    signal:['signal','SignalBridge','channel','listener','receiver','join','频道'],action:['action','ActionEngine','ActionConfig','动作'],condition:['condition','ConditionGroup','gate','条件'],logicChain:['logic chain','logic-chain','component','focus','逻辑链'],template:['template','prefab','dry-run','placeholder','模板'],runtime:['runtime','scheduler','replay','gate'],editLock:['edit lock','fingerprint','lock','编辑锁'],device:['device','vbd','region','relay','receiver'],state:['state','StateVariable'],timer:['timer','scheduler']
+                  };
+                  return common;
+                }
+                function helpCategoryMatchesKeywords(item,category,view){
+                  const map=helpCategoryKeywordMap(view), keywords=map[category]||[];
+                  if(!keywords.length)return false;
+                  const haystack=helpSearchText(item).toLowerCase();
+                  return keywords.some(keyword=>haystack.includes(String(keyword).toLowerCase()));
+                }
+                function helpItemMatchesCategory(catalog,item,category,view='docs'){
+                  if(category==='ALL')return true;
+                  if(item.kind==='topic')return String(item.category||'')===category;
+                  if(view!=='docs')return helpCategoryMatchesKeywords(item,category,view);
+                  const related=[...(item.relatedTopicIds||[]),...(item.relatedTopics||[])];
+                  return related.some(id=>String(helpTopicById(catalog,id)?.category||'')===category);
+                }
+                function helpSearchText(item){
+                  return [
+                    item.id,item.title,item.summary,item.searchText,item.term,item.definition,item.goal,item.whenToUse,item.professionalExplanation,item.technicalNotes,
+                    (item.tags||[]).join(' '),(item.modules||[]).join(' '),(item.aliases||[]).join(' '),(item.steps||[]).join(' '),(item.commonErrors||[]).join(' '),
+                    (item.professionalNotes||[]).join(' '),(item.likelyCauses||[]).join(' '),(item.checks||[]).join(' '),(item.fixHints||[]).join(' ')
+                  ].join(' ').toLowerCase();
+                }
+                function helpFilterItems(catalog,overrides={}){
+                  const f={...(appState.helpCenterFilters||{}),...(overrides||{})}, q=String(f.search||'').trim().toLowerCase(), kind=String(f.kind||'ALL'), category=String(f.category||'ALL'), view=helpNormalizeView(f.view||appState.helpCenterFilters?.view||'docs');
+                  return helpAllItems(catalog).filter(item=>{
+                    if(kind!=='ALL'&&String(item.kind)!==kind)return false;
+                    if(!helpItemMatchesCategory(catalog,item,category,view))return false;
+                    if(!q)return true;
+                    return helpSearchText(item).includes(q);
+                  });
+                }
+                function helpCleanPhrase(value){return String(value||'').trim().replace(/[。．.]+$/,'');}
+                function helpPhraseList(items){return (items||[]).map(helpCleanPhrase).filter(Boolean).join(' / ');}
+                """).append("""
+                function helpInlineTermDefinitions(){
+                  return [
+                    {termId:'signalbridge',display:'SignalBridge',aliases:['SignalBridge','事件总线','频道'],shortDefinition:'负责接收和分发 signal 的事件总线。',targetRoute:'#/signals',targetHelpTopic:'signalbridge.channel-basics',category:'Signal'},
+                    {termId:'signal-listener',display:'SignalListener',aliases:['SignalListener','信号监听器','监听器'],shortDefinition:'监听指定频道并触发后续 Action 的配置。',targetRoute:'#/listeners',targetHelpTopic:'signalbridge.listener-flow',category:'Signal'},
+                    {termId:'timer',display:'Timer',aliases:['Timer','调度器','计时器'],shortDefinition:'负责延迟、倒计时和重复触发的时间轴能力。',targetRoute:'#/timers',targetHelpTopic:'timer.delay',category:'Scheduler'},
+                    {termId:'condition-group',display:'ConditionGroup',aliases:['ConditionGroup','条件组'],shortDefinition:'只读判断规则组，用作 runtime gate 或 action gate。',targetRoute:'#/condition-groups',targetHelpTopic:'condition.group-basics',category:'Condition'},
+                    {termId:'state-variable',display:'StateVariable',aliases:['StateVariable','状态变量'],shortDefinition:'保存全局或玩家维度的 typed 状态。',targetRoute:'#/state-variables',targetHelpTopic:'state-variable.basics',category:'State'},
+                    {termId:'logic-chain',display:'Logic Chain',aliases:['Logic Chain','LogicChain','逻辑链'],shortDefinition:'把频道、监听器、Join、Timer 和 Action 的关系可视化为组件图。',targetRoute:'#/logic-chains',targetHelpTopic:'logic-chain.viewer',category:'Graph'},
+                    {termId:'templates',display:'Templates',aliases:['Templates','Template Center','模板中心','模板','Prefab'],shortDefinition:'复用配置组合的只读预览和受控 apply 入口。',targetRoute:'#/templates',targetHelpTopic:'templates.prefab',category:'Template'},
+                    {termId:'debugger',display:'Debugger',aliases:['Debugger','调试器','Replay'],shortDefinition:'查看 gate 评估、历史和 replay 的排查入口。',targetRoute:'#/condition-debugger',targetHelpTopic:'debugger.doctor-replay',category:'Debug'},
+                    {termId:'doctor',display:'Doctor',aliases:['Doctor','诊断'],shortDefinition:'聚合 Signal、设备、监听器和动作问题的只读诊断页。',targetRoute:'#/doctor',targetHelpTopic:'debugger.doctor-replay',category:'Debug'},
+                    {termId:'signal-join',display:'Signal Join',aliases:['Signal Join','Join','信号汇合'],shortDefinition:'等待多个输入频道满足规则后输出到下游频道。',targetRoute:'#/signal-joins',targetHelpTopic:'signal-join.basics',category:'Signal'},
+                    {termId:'action',display:'Action',aliases:['Action','动作'],shortDefinition:'由监听器、Timer 或 ActionRelay 调用的受控执行单元。',targetRoute:'#/actions',targetHelpTopic:'action.config-basics',category:'Action'},
+                    {termId:'action-relay',display:'ActionRelay',aliases:['ActionRelay','动作继电器'],shortDefinition:'设备侧承载 Action 列表的世界对象引用。',targetRoute:'#/devices',targetHelpTopic:'device-trigger.references',category:'Device'},
+                    {termId:'vbd',display:'VBD',aliases:['VBD','VirtualBlockDevice','虚拟方块'],shortDefinition:'用虚拟设备把世界交互接入 Signal / Action 工作流。',targetRoute:'#/virtual-block-devices',targetHelpTopic:'device-trigger.references',category:'Device'},
+                    {termId:'region',display:'Region',aliases:['Region','区域'],shortDefinition:'区域与区域控制器提供 enter / exit / stay 类触发来源。',targetRoute:'#/regions',targetHelpTopic:'region.controller',category:'Region'},
+                    {termId:'signal-receiver',display:'SignalReceiver',aliases:['SignalReceiver','接收器'],shortDefinition:'作为世界侧 Signal 接收或展示引用的设备类型。',targetRoute:'#/receivers',targetHelpTopic:'device-trigger.references',category:'Device'}
+                  ];
+                }
+                function helpInlineTermById(termId){return helpInlineTermDefinitions().find(t=>String(t.termId)===String(termId))||null;}
+                function helpInlineTermButton(term,matched){
+                  return `<button class="help-inline-term" type="button" data-help-inline-term="true" data-help-example-center-inline-term="true" data-help-example-center-inline-term-data-id="true" data-term-id="${esc(term.termId)}" aria-haspopup="dialog" aria-label="查看术语 ${esc(term.display)}">${esc(matched)}</button>`;
+                }
+                function helpInlineText(value,mode='basic'){
+                  const text=String(value||'');
+                  if(!text)return '';
+                  const lower=text.toLowerCase(), defs=helpInlineTermDefinitions(), candidates=[];
+                  defs.forEach((term,termOrder)=>(term.aliases||[]).forEach(alias=>{
+                    const raw=String(alias||''), index=lower.indexOf(raw.toLowerCase());
+                    if(index>=0)candidates.push({index,end:index+raw.length,term,alias:raw,termOrder});
+                  }));
+                  const limit=mode==='professional'?4:2, chosen=[], usedTerms=new Set();
+                  candidates.sort((a,b)=>a.index-b.index||(b.end-b.index)-(a.end-a.index)||a.termOrder-b.termOrder).forEach(c=>{
+                    if(chosen.length>=limit||usedTerms.has(c.term.termId))return;
+                    if(chosen.some(x=>c.index<x.end&&c.end>x.index))return;
+                    chosen.push(c);usedTerms.add(c.term.termId);
+                  });
+                  if(!chosen.length)return esc(text);
+                  chosen.sort((a,b)=>a.index-b.index);
+                  let cursor=0, html='';
+                  chosen.forEach(c=>{html+=esc(text.substring(cursor,c.index));html+=helpInlineTermButton(c.term,text.substring(c.index,c.end));cursor=c.end;});
+                  return html+esc(text.substring(cursor));
+                }
+                function helpInlineTermPopoverHtml(term){
+                  const helpAction=term.targetHelpTopic?waButton('查看文档','help-center',`data-help-term-open-help="true" data-term-id="${esc(term.termId)}" data-help-example-center-inline-term-related-help-action="true"`,'ghost'):'';
+                  return `<div class="help-term-popover" data-help-term-popover="true" data-term-id="${esc(term.termId)}" data-help-example-center-inline-term-popover="true" data-help-example-center-single-active-popover="true" data-help-example-center-popover-close-timer-term-id="true" data-help-example-center-popover-fast-switch-stable="true" data-help-example-center-popover-scroll-close="true" data-help-example-center-popover-bottom-safe="true" role="dialog" aria-label="${esc(term.display)} 术语解释"><header><strong>${esc(term.display)}</strong><span>${esc(term.category||'模块')}</span></header><p data-help-example-center-inline-term-definition="true">${esc(term.shortDefinition||'暂无说明。')}</p><div class="help-term-popover-actions">${waButton('打开页面','chevron-right',`data-help-term-open-page="true" data-term-id="${esc(term.termId)}" data-help-example-center-inline-term-open-page-action="true"`,'primary')}${helpAction}</div></div>`;
+                }
+                function helpClearInlineTermCloseTimer(){
+                  if(appState.helpInlineTermCloseTimer){clearTimeout(appState.helpInlineTermCloseTimer);appState.helpInlineTermCloseTimer=null;}
+                }
+                function helpActiveTermId(){return appState.helpInlineTermPopover?.termId||'';}
+                function helpTermHoverOrFocus(termId){
+                  const id=String(termId||helpActiveTermId()||'');
+                  const active=document.activeElement;
+                  const pop=document.querySelector('[data-help-term-popover]');
+                  if(pop&&(pop.matches(':hover')||pop.contains(active)))return true;
+                  return Array.from(document.querySelectorAll(`[data-help-inline-term][data-term-id="${cssEscape(id)}"]`)).some(el=>el.matches(':hover')||el===active||el.contains(active));
+                }
+                function helpScheduleInlineTermPopoverClose(termId,delay=140){
+                  const id=String(termId||helpActiveTermId()||'');
+                  helpClearInlineTermCloseTimer();
+                  appState.helpInlineTermCloseTimer=setTimeout(()=>{if(helpActiveTermId()!==id)return;if(!helpTermHoverOrFocus(id))hideHelpInlineTermPopover(id);},delay);
+                }
+                function hideHelpInlineTermPopover(termId=''){
+                  if(termId&&helpActiveTermId()!==String(termId))return;
+                  helpClearInlineTermCloseTimer();
+                  const pop=document.querySelector('[data-help-term-popover]');
+                  if(pop)pop.remove();
+                  appState.helpInlineTermPopover=null;
+                }
+                function positionHelpInlineTermPopover(el,pop){
+                  if(!el||!pop)return;
+                  const rect=el.getBoundingClientRect(), margin=10, gap=8;
+                  const width=pop.offsetWidth||320, height=pop.offsetHeight||160;
+                  let top=rect.bottom+gap;
+                  if(top+height>window.innerHeight-margin)top=rect.top-height-gap;
+                  top=Math.min(window.innerHeight-height-margin,Math.max(margin,top));
+                  const left=Math.min(window.innerWidth-width-margin,Math.max(margin,rect.left));
+                  pop.style.top=`${top}px`;pop.style.left=`${left}px`;
+                }
+                function showHelpInlineTermPopover(el){
+                  const term=helpInlineTermById(el?.dataset?.termId||'');
+                  if(!term)return;
+                  helpClearInlineTermCloseTimer();
+                  const existing=document.querySelector('[data-help-term-popover]');
+                  if(existing&&helpActiveTermId()===term.termId){positionHelpInlineTermPopover(el,existing);return;}
+                  hideHelpInlineTermPopover();
+                  const wrapper=document.createElement('div');
+                  wrapper.innerHTML=helpInlineTermPopoverHtml(term);
+                  const pop=wrapper.firstElementChild;
+                  document.body.appendChild(pop);
+                  pop.addEventListener('mouseenter',()=>helpClearInlineTermCloseTimer());
+                  pop.addEventListener('mouseleave',()=>helpScheduleInlineTermPopoverClose(term.termId,140));
+                  pop.addEventListener('focusin',()=>helpClearInlineTermCloseTimer());
+                  pop.addEventListener('focusout',()=>helpScheduleInlineTermPopoverClose(term.termId,140));
+                  positionHelpInlineTermPopover(el,pop);
+                  appState.helpInlineTermPopover={termId:term.termId};
+                }
+                function openHelpInlineTermPage(termId){
+                  const term=helpInlineTermById(termId);
+                  if(!term||!isValidReturnHash(term.targetRoute)){toast('该术语暂未配置可打开页面。');return;}
+                  hideHelpInlineTermPopover();
+                  location.hash=helpTargetRouteWithReturn(term.targetRoute);
+                }
+                function openHelpInlineTermHelp(termId){
+                  const term=helpInlineTermById(termId);
+                  if(!term?.targetHelpTopic)return;
+                  hideHelpInlineTermPopover();
+                  navigateTo(helpViewHash('docs',term.targetHelpTopic));
+                }
+                function openHelpInlineTermDefault(termId,anchor){
+                  const term=helpInlineTermById(termId);
+                  if(!term)return;
+                  if(term.targetHelpTopic){
+                    const params=parseHashParams(currentRouteHash());
+                    if(routeBase(currentRouteHash())==='#/help'&&String(params.topic||'')===String(term.targetHelpTopic)){showHelpInlineTermPopover(anchor);return;}
+                    hideHelpInlineTermPopover();
+                    navigateTo(helpViewHash('docs',term.targetHelpTopic));
+                    return;
+                  }
+                  showHelpInlineTermPopover(anchor);
+                }
+                function helpSectionList(sections){
+                  const list=sections||[];
+                  if(list.length===0)return empty('这个分类的专业文档还在补充中。');
+                  const mode=appState.helpCenterFilters?.mode||'basic';
+                  return `<div class="help-section-list">${list.map(section=>`<section class="help-section"><h3>${helpInlineText(section.title||'说明',mode)}</h3><ul>${(section.bullets||[]).map(item=>`<li>${helpInlineText(item,mode)}</li>`).join('')}</ul></section>`).join('')}</div>`;
+                }
+                function helpRouteLinks(links){
+                  if(!links||links.length===0)return '<span class="muted">暂无页面链接。</span>';
+                  return `<div class="help-link-row">${links.map(link=>{const route=String(link.route||''), attrs=[navDataAttr(route,link.label||route||'打开'),'data-help-example-center-route-link="true"'];if(route.startsWith('#/doctor')||route.includes('debugger')||route.includes('diagnostic'))attrs.push('data-help-example-center-doctor-link="true"');if(route.startsWith('#/templates'))attrs.push('data-help-example-center-template-link="true"');return waButton(link.label||route||'打开','chevron-right',attrs.join(' '),'ghost');}).join('')}</div>`;
+                }
+                function helpTopicCards(catalog,items,selectedId=''){
+                  const topics=items.filter(item=>item.kind==='topic');
+                  if(topics.length===0)return empty('这个分类的专业文档还在补充中。');
+                  return topics.map(topic=>{const active=String(topic.id)===String(selectedId);return `<article class="help-topic-card ${active?'active':''}" data-help-example-center-topic-card="true" data-help-example-center-topic-active="${active?'true':'false'}" data-help-topic-id="${esc(topic.id)}" data-page-help-topic="${esc(topic.id)}" ${navDataAttr(helpViewHash('docs',topic.id),'打开帮助主题')}><div><span class="pill info">${esc(helpCategoryTitle(catalog,topic.category))}</span>${active?'<span class="pill ok">当前</span>':''}<strong>${esc(topic.title)}</strong><p>${esc(topic.summary)}</p></div><small>${esc(helpPhraseList((topic.tags||[]).slice(0,4)))}</small></article>`;}).join('');
+                }
+                function helpExampleCard(catalog,example,mode='basic'){
+                  const templateLink=example.relatedTemplateId?waButton('去模板中心','template-package',navDataAttr('#/templates','去模板中心')+' data-help-example-center-template-link="true" data-help-example-center-template-cta-aligned="true"','ghost'):'<span class="muted" data-help-example-center-no-template-aligned="true">无模板关联</span>';
+                  const pro=mode==='professional'&&Array.isArray(example.professionalNotes)&&example.professionalNotes.length?`<div class="help-mini-list"><strong>专业说明</strong><ul>${example.professionalNotes.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></div>`:'';
+                  return `<article class="help-example-card" data-help-example-center-example-card="true"><header><span class="pill ok">示例</span><h3>${helpInlineText(example.title||example.id,mode)}</h3><p>${helpInlineText(example.goal||example.whenToUse||'',mode)}</p></header><div class="help-mini-list"><strong>基础步骤</strong><ol>${(example.steps||[]).map(step=>`<li>${helpInlineText(step,mode)}</li>`).join('')}</ol></div>${pro}<div class="help-mini-list"><strong>常见错误</strong><ul>${(example.commonErrors||[]).map(item=>`<li>${helpInlineText(helpCleanPhrase(item),mode)}</li>`).join('')}</ul></div><footer class="help-example-footer" data-help-example-center-template-relation-footer="true"><div class="help-example-routes">${helpRouteLinks(example.relatedRoutes||[])}</div><div class="help-template-relation">${templateLink}</div></footer></article>`;
+                }
+                function helpTroubleCard(item,mode='basic'){
+                  const pro=mode==='professional'&&item.professionalExplanation?`<small class="muted">${esc(item.professionalExplanation)}</small>`:'';
+                  return `<article class="event-row help-trouble-card" data-help-example-center-clean-reason-list="true"><strong>${helpInlineText(item.title||item.symptom||item.id,mode)}</strong><span class="meta">可能原因：${helpInlineText(helpPhraseList(item.likelyCauses)||'暂无',mode)}</span><span>检查位置：${helpInlineText(helpPhraseList(item.checks)||'暂无',mode)}</span><span>推荐操作：${helpInlineText(helpPhraseList(item.fixHints)||'暂无',mode)}</span>${pro}${helpRouteLinks(item.relatedRoutes||[])}</article>`;
+                }
+                function helpGlossaryTerm(item,mode='basic'){
+                  const notes=mode==='professional'&&item.technicalNotes?` · ${esc(item.technicalNotes)}`:'';
+                  return `<div class="help-glossary-term"><strong>${helpInlineText(item.term||item.title||item.id,mode)}</strong><span>${helpInlineText(item.definition||'',mode)}</span><small>${esc((item.aliases||[]).join(' / '))}${notes}</small></div>`;
+                }
+                function helpTopicDetail(catalog,selectedId,mode,returnTo=''){
+                  const topic=helpTopicById(catalog,selectedId)||helpTopicById(catalog,(catalog?.featuredTopicIds||[])[0])||(catalog?.topics||[])[0];
+                  if(!topic)return `<article class="help-detail-panel" data-help-example-center-topic-detail="true">${empty('帮助目录暂无主题。')}</article>`;
+                  const missing=selectedId&&!helpTopicById(catalog,selectedId)?`<div class="empty-state">未找到请求的帮助主题：${esc(selectedId)}。已显示推荐入门主题。</div>`:'';
+                  const examples=(topic.examples||[]).map(id=>helpExampleById(catalog,id)).filter(Boolean);
+                  const trouble=(topic.troubleshootingLinks||[]).map(id=>helpTroubleById(catalog,id)).filter(Boolean);
+                  const terms=(topic.glossaryTerms||[]).map(id=>helpGlossaryById(catalog,id)).filter(Boolean);
+                  const sections=mode==='professional'?topic.professionalSections:topic.basicSections;
+                  const back=isValidReturnHash(returnTo)?waButton('返回原页面','chevron-left',navDataAttr(returnTo,'返回原页面')+' data-page-help-return-action="true"','ghost'):'';
+                  return `<article class="help-detail-panel" data-help-example-center-topic-detail="true" data-page-help-topic="${esc(topic.id)}">${missing}<header><h2>${helpInlineText(mode==='professional'?topic.professionalTitle||topic.title:topic.basicTitle||topic.title,mode)}</h2><p>${helpInlineText(mode==='professional'?topic.professionalSummary||topic.summary:topic.basicSummary||topic.summary,mode)}</p>${back}</header>${helpSectionList(sections)}<section><h3>相关页面</h3>${helpRouteLinks(topic.pageLinks||[])}</section><section><h3>相关示例</h3><div class="help-example-inline">${examples.length?examples.map(example=>helpExampleCard(catalog,example,mode)).join(''):empty('暂无直接关联示例。')}</div></section><section><h3>排错入口</h3><div class="list-stack">${trouble.length?trouble.map(item=>helpTroubleCard(item,mode)).join(''):empty('暂无直接关联排错。')}</div></section><section><h3>术语</h3><div class="help-glossary-grid">${terms.length?terms.map(term=>helpGlossaryTerm(term,mode)).join(''):empty('暂无直接关联术语。')}</div></section></article>`;
+                }
+                function helpViewTabs(view){
+                  const tabs=[['docs','文档区','help-center'],['examples','示例中心','example-center'],['troubleshooting','排错中心','doctor-overview'],['glossary','术语表','help-center']];
+                  return `<nav class="help-view-tabs" data-help-example-center-view-tabs="true" aria-label="帮助中心主视图">${tabs.map(([id,label,iconName])=>`<button class="wa-btn ${view===id?'primary':'ghost'}" type="button" data-help-view="${esc(id)}" data-help-example-center-view-tab="${esc(id)}">${icon(iconName)}<span>${esc(label)}</span></button>`).join('')}</nav>`;
+                }
+                function helpRightNavCategories(catalog,view){
+                  if(view==='docs')return (catalog?.categories||[]).map(c=>({id:String(c.id),title:c.title,summary:c.summary||''}));
+                  if(view==='examples')return [
+                    {id:'join',title:'Join',summary:'多输入汇合示例。'},{id:'timer',title:'Timer',summary:'延迟、倒计时和启动动作。'},{id:'listener',title:'Listener',summary:'监听频道后执行动作。'},{id:'state',title:'StateVariable',summary:'状态变量写入示例。'},{id:'condition',title:'Condition',summary:'条件组控制 action。'},{id:'template',title:'Template',summary:'模板、prefab 和 apply。'},{id:'logicChain',title:'Logic Chain',summary:'逻辑链草稿和可视化。'},{id:'signal',title:'Signal',summary:'频道、消费者和历史。'}
+                  ];
+                  if(view==='troubleshooting')return [
+                    {id:'condition',title:'条件',summary:'条件组不可选、gate 调试。'},{id:'join',title:'Join',summary:'汇合无输出或输入未满足。'},{id:'timer',title:'Timer',summary:'计时器未启动或无输出。'},{id:'listener',title:'Listener',summary:'监听器未执行 action。'},{id:'template',title:'模板',summary:'apply 冲突或导入未生效。'},{id:'editor',title:'编辑器',summary:'保存失败、锁和节点可见性。'},{id:'signal',title:'Signal',summary:'频道无消费者或拼写问题。'},{id:'state',title:'状态变量',summary:'状态变量动作失败。'}
+                  ];
+                  if(view==='glossary')return [
+                    {id:'signal',title:'Signal',summary:'频道、监听器、接收器和 Join。'},{id:'action',title:'Action',summary:'动作、动作配置和动作引擎。'},{id:'condition',title:'Condition',summary:'条件组、条件引擎和 gate。'},{id:'logicChain',title:'Logic Chain',summary:'逻辑链、组件和焦点频道。'},{id:'template',title:'Template',summary:'模板、prefab、dry-run 和 placeholder。'},{id:'runtime',title:'Runtime',summary:'运行态、调度和 replay。'},{id:'editLock',title:'编辑锁',summary:'锁、fingerprint 和冲突。'},{id:'device',title:'设备',summary:'VBD、Region、Relay 和 Receiver。'}
+                  ];
+                  return [];
+                }
+                function helpRightPanel(catalog,view,category,topic=null){
+                  const categories=helpRightNavCategories(catalog,view);
+                  const related=(topic?.relatedTopics||[]).map(id=>helpTopicById(catalog,id)).filter(Boolean);
+                  const title=category==='ALL'?'全部':(categories.find(c=>String(c.id)===String(category))?.title||helpCategoryTitle(catalog,category));
+                  return `<aside class="help-right-panel" data-help-example-center-right-category-nav="true" data-help-example-center-right-nav-per-view="true" data-help-example-center-right-nav-view="${esc(view)}"><section><h2>${esc(view==='docs'?'分类导航':view==='examples'?'示例分类':view==='troubleshooting'?'排错分类':'术语分类')}</h2><button class="help-category-button ${category==='ALL'?'active':''}" type="button" data-help-category="ALL" data-help-example-center-category-clickable="true" data-help-example-center-category-active="${category==='ALL'?'true':'false'}">全部</button>${categories.map(c=>`<button class="help-category-button ${String(c.id)===String(category)?'active':''}" type="button" data-help-category="${esc(c.id)}" data-help-example-center-category-clickable="true" data-help-example-center-category-active="${String(c.id)===String(category)?'true':'false'}"><strong>${esc(c.title)}</strong><span>${esc(c.summary||'')}</span></button>`).join('')}</section>${view==='docs'?`<section><h2>相关主题</h2><div class="help-related-list">${related.length?related.map(t=>`<button class="help-related-topic" type="button" data-help-topic-id="${esc(t.id)}">${esc(t.title)}</button>`).join(''):'<span class="muted">暂无直接关联主题。</span>'}</div></section>`:''}<section><h2>当前视图</h2><p class="muted">${esc(helpViewLabel(view))} · ${esc(title)}</p></section></aside>`;
+                }
+                function helpDocsView(catalog,items,selected,mode,returnTo,category){
+                  const topic=helpTopicById(catalog,selected)||helpTopicById(catalog,(catalog?.featuredTopicIds||[])[0])||(catalog?.topics||[])[0]||null;
+                  const selectedId=topic?.id||selected||'';
+                  return `<section class="help-center-layout help-docs-layout" data-help-example-center-docs-view="true" data-help-example-center-fixed-viewport="true" data-help-example-center-no-whole-page-long-scroll="true"><aside class="help-topic-list-panel" data-help-example-center-topic-list-scroll-shell="true"><h2>主题列表</h2><div class="help-topic-list" data-help-example-center-topic-list="true" data-help-example-center-topic-list-internal-scroll="true" data-help-example-center-topic-list-preserve-scroll="true">${helpTopicCards(catalog,items,selectedId)}</div></aside><main class="help-document-scroll" data-help-example-center-document-scroll="true">${helpTopicDetail(catalog,selectedId,mode,returnTo)}</main>${helpRightPanel(catalog,'docs',category,topic)}</section>`;
+                }
+                function helpExamplesView(catalog,examples,mode,category){
+                  return `<section class="help-center-layout help-single-view-layout" data-help-example-center-examples-view="true" data-help-example-center-fixed-viewport="true" data-help-example-center-no-whole-page-long-scroll="true"><main class="help-document-scroll" data-help-example-center-document-scroll="true"><section class="help-example-section" data-help-example-center-example-list="true"><header><h2>示例中心</h2><p>示例是文档示例，不会自动创建配置。</p></header><div class="help-example-grid">${examples.length?examples.map(example=>helpExampleCard(catalog,example,mode)).join(''):empty('当前筛选下暂无示例。')}</div></section></main>${helpRightPanel(catalog,'examples',category)}</section>`;
+                }
+                function helpTroubleshootingView(catalog,troubles,mode,category){
+                  return `<section class="help-center-layout help-single-view-layout" data-help-example-center-troubleshooting-view="true" data-help-example-center-fixed-viewport="true" data-help-example-center-no-whole-page-long-scroll="true"><main class="help-document-scroll" data-help-example-center-document-scroll="true"><section class="help-troubleshooting-section" data-help-example-center-troubleshooting-list="true" data-help-example-center-clean-reason-list="true"><header><h2>排错中心</h2><p>从现象出发，定位检查位置和推荐操作。</p></header><div class="list-stack">${troubles.length?troubles.map(item=>helpTroubleCard(item,mode)).join(''):empty('当前筛选下暂无排错条目。')}</div></section></main>${helpRightPanel(catalog,'troubleshooting',category)}</section>`;
+                }
+                function helpGlossaryView(catalog,terms,mode,category){
+                  return `<section class="help-center-layout help-single-view-layout" data-help-example-center-glossary-view="true" data-help-example-center-fixed-viewport="true" data-help-example-center-no-whole-page-long-scroll="true"><main class="help-document-scroll" data-help-example-center-document-scroll="true"><section class="help-glossary-section" data-help-example-center-glossary="true"><header><h2>术语表</h2><p>中文主文案，技术术语作为副文本。</p></header><div class="help-glossary-grid">${terms.length?terms.map(term=>helpGlossaryTerm(term,mode)).join(''):empty('当前筛选下暂无术语。')}</div></section></main>${helpRightPanel(catalog,'glossary',category)}</section>`;
+                }
+                """).append("""
+                async function renderHelpCenterPage(hash=currentRouteHash(),options={}){
+                  waEnsureState();
+                  const routeHash=String(hash||currentRouteHash()), params=parseHashParams(routeHash), f=appState.helpCenterFilters;
+                  const previousList=document.querySelector('.help-topic-list');
+                  const previousDoc=document.querySelector('.help-document-scroll'), previousRight=document.querySelector('.help-right-panel');
+                  if(previousList&&!options.resetTopicListScroll)f.topicListScrollTop=previousList.scrollTop||0;
+                  if(previousDoc)f.documentScrollTop=previousDoc.scrollTop||0;
+                  if(previousRight)f.rightPanelScrollTop=previousRight.scrollTop||0;
+                  if(routeHash.startsWith('#/examples'))f.view='examples';else f.view=helpNormalizeView(params.view||f.view||'docs');
+                  if(routeHash==='#/help')f.view='docs';
+                  if(params.topic){f.topicId=params.topic;f.view='docs';}else if(routeHash==='#/help'||routeHash==='#/examples')f.topicId='';
+                  if(params.mode==='professional'||params.mode==='basic')f.mode=params.mode;
+                  if(!options.silent)setView(loading('正在加载帮助中心...'));
+                  let catalog;try{catalog=await loadHelpCatalog();}catch(err){if(options.silent){toast('帮助中心实时刷新失败，已保留当前页面。');return;}setView(errorBlock(err.message||'帮助中心加载失败'));return;}
+                  const view=helpNormalizeView(f.view), effectiveKind=helpKindForView(view);
+                  const items=helpFilterItems(catalog,{kind:effectiveKind}), topicItems=helpFilterItems(catalog,{kind:'topic'}), mode=f.mode==='professional'?'professional':'basic', selected=f.topicId||params.topic||(catalog.featuredTopicIds||[])[0]||'';
+                  const examples=items.filter(item=>item.kind==='example'), troubles=items.filter(item=>item.kind==='troubleshooting'), terms=items.filter(item=>item.kind==='glossary');
+                  const body=view==='examples'?helpExamplesView(catalog,examples,mode,f.category):(view==='troubleshooting'?helpTroubleshootingView(catalog,troubles,mode,f.category):(view==='glossary'?helpGlossaryView(catalog,terms,mode,f.category):helpDocsView(catalog,topicItems,selected,mode,params.returnTo||'',f.category)));
+                  const rendered=setView(`<section class="wa-page help-center-page" data-help-example-center-route="true" data-help-example-center-view="${esc(view)}" data-help-example-center-default-view="${view==='docs'?'true':'false'}" data-help-example-center-readonly="true" data-help-example-center-no-write-api="true" data-help-example-center-copy-only="true" data-help-example-center-no-browser-dialogs="true" data-help-example-center-responsive-stack="true" data-help-example-center-event-delegation="true" data-help-example-center-button-type-button="true" data-help-example-center-no-unsafe-inline-onclick="true" data-help-example-center-no-toolbar="true" data-help-example-center-no-topic-category-pill="true" data-help-example-center-inline-term-click-opens-topic="true" data-help-example-center-inline-term-click-not-feature-page="true" data-help-example-center-open-page-return-context-only="true" data-help-example-center-no-unexpected-end-of-input="true" data-help-example-center-no-punctuation-before-slash="true" data-help-example-center-return-context-session="true" data-help-example-center-return-context-safe-id="true" data-help-example-center-return-restore-view-topic-mode="true" data-help-example-center-return-restore-scroll="true">
+                    ${waPageHead('帮助中心 / 示例中心','基础入门、专业参考、示例、排错和术语都在这里；内容只读，不写用户笔记或收藏。',waButton('刷新','refresh','data-help-refresh="true"','ghost'))}
+                    ${helpViewTabs(view)}
+                    ${body}
+                  </section>`,options);
+                  if(rendered){bindHelpCenterFilters(options.resetTopicListScroll);applyPendingHelpReturnContext();}
+                }
+                function bindHelpCenterFilters(resetTopicListScroll=false){
+                  const list=document.querySelector('.help-topic-list');
+                  if(list&&!resetTopicListScroll)list.scrollTop=Number(appState.helpCenterFilters.topicListScrollTop||0);
+                  const doc=document.querySelector('.help-document-scroll'), right=document.querySelector('.help-right-panel');
+                  if(doc&&!resetTopicListScroll)doc.scrollTop=Number(appState.helpCenterFilters.documentScrollTop||0);
+                  if(right&&!resetTopicListScroll)right.scrollTop=Number(appState.helpCenterFilters.rightPanelScrollTop||0);
+                  const search=document.getElementById('help-search');
+                  if(search){
+                    search.addEventListener('compositionstart',()=>{appState.helpCenterFilters.composing=true;});
+                    search.addEventListener('compositionend',event=>{appState.helpCenterFilters.composing=false;updateHelpFiltersFromInputs(event,true);});
+                    search.addEventListener('input',event=>{if(appState.helpCenterFilters.composing)return;updateHelpFiltersFromInputs(event,true);});
+                  }
+                  document.getElementById('help-category')?.addEventListener('change',event=>updateHelpFiltersFromInputs(event,true));
+                }
+                function updateHelpFiltersFromInputs(event,resetScroll=false){
+                  const f=appState.helpCenterFilters;
+                  f.search=document.getElementById('help-search')?.value||'';
+                  f.category=document.getElementById('help-category')?.value||'ALL';
+                  if(resetScroll)f.topicListScrollTop=0;
+                  renderHelpCenterPage(currentRouteHash(),{silent:true,resetTopicListScroll:resetScroll});
+                  const focusId=event?.target?.id;
+                  if(focusId)restoreFocusEnd(focusId);
+                }
+                function handleHelpCenterDelegatedClick(event){
+                  const target=event?.target;if(!target?.closest)return false;
+                  const returnHelp=target.closest('[data-help-return-action]');
+                  if(returnHelp){event.preventDefault();event.stopPropagation();restoreHelpReturnContext(returnHelp.dataset.helpReturnId||'');return true;}
+                  const popPage=target.closest('[data-help-term-open-page]');
+                  if(popPage){event.preventDefault();event.stopPropagation();openHelpInlineTermPage(popPage.dataset.termId||'');return true;}
+                  const popHelp=target.closest('[data-help-term-open-help]');
+                  if(popHelp){event.preventDefault();event.stopPropagation();openHelpInlineTermHelp(popHelp.dataset.termId||'');return true;}
+                  const root=target.closest('.help-center-page');if(!root)return false;
+                  const inlineTerm=target.closest('[data-help-inline-term]');
+                  if(inlineTerm){event.preventDefault();event.stopPropagation();openHelpInlineTermDefault(inlineTerm.dataset.termId||'',inlineTerm);return true;}
+                  const refresh=target.closest('[data-help-refresh]');
+                  if(refresh){event.preventDefault();event.stopPropagation();loadHelpCatalog(true).then(()=>renderHelpCenterPage(currentRouteHash(),{silent:true}));return true;}
+                  const mode=target.closest('[data-help-mode]');
+                  if(mode){event.preventDefault();event.stopPropagation();setHelpMode(mode.dataset.helpMode||'basic');return true;}
+                  const view=target.closest('[data-help-view]');
+                  if(view){event.preventDefault();event.stopPropagation();setHelpView(view.dataset.helpView||'docs');return true;}
+                  const category=target.closest('[data-help-category]');
+                  if(category){event.preventDefault();event.stopPropagation();setHelpCategory(category.dataset.helpCategory||'ALL');return true;}
+                  const topic=target.closest('[data-help-topic-id]');
+                  if(topic){event.preventDefault();event.stopPropagation();navigateTo(helpViewHash('docs',topic.dataset.helpTopicId||''));return true;}
+                  return false;
+                }
+                function setHelpMode(mode){appState.helpCenterFilters.mode=mode==='professional'?'professional':'basic';renderHelpCenterPage(currentRouteHash(),{silent:true});}
+                function setHelpView(view){const normalized=helpNormalizeView(view);appState.helpCenterFilters.view=normalized;appState.helpCenterFilters.category='ALL';if(normalized!=='docs')appState.helpCenterFilters.topicId='';navigateTo(helpViewHash(normalized));}
+                function setHelpCategory(category){appState.helpCenterFilters.category=category||'ALL';appState.helpCenterFilters.topicListScrollTop=0;renderHelpCenterPage(currentRouteHash(),{silent:true,resetTopicListScroll:true});}
                 function detailHeader(opts){
                   const badges=(opts.badges||[]).filter(Boolean).join('');
-                  const actions=(opts.actions||[]).filter(Boolean).join('');
+                  const help=opts.helpTopic?pageHelpLink(opts.helpTopic,currentRouteHash()):'';
+                  const actions=[helpReturnButton(),help,...(opts.actions||[])].filter(Boolean).join('');
                   const copy=opts.copyValue?waIconButton('复制 ID','copy',htmlHandler(`copyTextToClipboard(${jsString(opts.copyValue)})`)):'';
                   return `<header class="wa-detail-head">
                     <div class="wa-detail-title-wrap">
@@ -4576,8 +5063,8 @@ public final class WebAdminFrontendScripts {
                   const body=open?`<div class="wa-advanced-groups">${groups.map(group=>`<section class="wa-advanced-group"><h3>${esc(group.title)}</h3>${advancedTable(group.rows)}</section>`).join('')||advancedTable(summaryRows)}</div>`:advancedTable(preview);
                   return `<article class="wa-detail-card wa-advanced-card detail-bottom-full ${open?'is-open':'is-closed'}" data-collapsible-detail="true" data-detail-bottom-card="advanced" data-detail-full-width="true" data-advanced-open="${open?'true':'false'}"><header class="wa-detail-card-head"><h2>完整详情</h2><button class="wa-btn ghost" type="button" ${htmlHandler(`toggleAdvancedDetail(${jsString(kind)},${jsString(id)})`)}>${esc(button)}</button></header><div class="wa-advanced-body">${body}</div></article>`;
                 }
-                function waSelect(id,options,value,labeler=(v)=>v){
-                  return `<select class="select" id="${esc(id)}">${options.map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(labeler(o))}</option>`).join('')}</select>`;
+                function waSelect(id,options,value,labeler=(v)=>v,attrs=''){
+                  return `<select class="select" id="${esc(id)}" ${String(attrs||'')}>${options.map(o=>`<option value="${esc(o)}" ${String(o)===String(value)?'selected':''}>${esc(labeler(o))}</option>`).join('')}</select>`;
                 }
                 function waPageItems(key,items,pageSize=10){
                   waEnsureState();
@@ -5996,7 +6483,8 @@ public final class WebAdminFrontendScripts {
                   return safeHtml(pill(kind)+' '+esc(text));
                 }
                 function settingsHeader(actions=''){
-                  return `<header class="wa-settings-header"><div class="wa-settings-title"><span class="wa-settings-icon">${icon('settings')}</span><div><div class="wa-detail-kicker">系统管理 / 系统设置</div><h1>系统设置</h1><p>查看 WebAdmin 服务状态、运行环境、安全边界和功能开关。</p></div></div><div class="wa-settings-notice"><strong>只读设置</strong><span>当前仅展示已有服务信息，未实现的写操作保持不可用。</span></div>${actions?`<div class="wa-actions">${actions}</div>`:''}</header>`;
+                  const actionHtml=[pageHelpLink('getting-started.overview',currentRouteHash()),actions].filter(Boolean).join('');
+                  return `<header class="wa-settings-header"><div class="wa-settings-title"><span class="wa-settings-icon">${icon('settings')}</span><div><div class="wa-detail-kicker">系统管理 / 系统设置</div><h1>系统设置</h1><p>查看 WebAdmin 服务状态、运行环境、安全边界和功能开关。</p></div></div><div class="wa-settings-notice"><strong>只读设置</strong><span>当前仅展示已有服务信息，未实现的写操作保持不可用。</span></div>${actionHtml?`<div class="wa-actions">${actionHtml}</div>`:''}</header>`;
                 }
                 function settingsInfoGrid(items){
                   return `<div class="wa-settings-info-grid">${(items||[]).map(item=>`<div class="wa-settings-info-item"><span class="wa-settings-mini-icon">${icon(item.icon||'settings')}</span><span><small>${esc(item.label)}</small><strong>${detailValue(item.value)}</strong></span></div>`).join('')}</div>`;
@@ -6797,7 +7285,7 @@ public final class WebAdminFrontendScripts {
                   const editor=appState.logicChainEditor||{}, editorMode=!!editor.active;
                   const actions=[logicChainMetadataAction(graph),logicChainEditorAction(graph),waButton('刷新','refresh',htmlHandler('route({silent:true})'),'ghost'),waButton('自动布局','logic-chain','onclick="resetLogicChainLayout()"','ghost')].filter(Boolean);
                   const rendered=setView(`<section class="wa-page logic-chain-page" data-logic-chain-viewer-page="true" data-logic-chain-enhanced-runtime-graph="true" data-logic-chain-detail-focus-channel-selector="true" data-logic-chain-focus-switch-updates-route-state="true" data-logic-chain-old-channel-route-compatible="true" data-logic-chain-editor-mvp="${editorMode?'true':'available'}" data-logic-chain-readonly-graph="true" data-logic-chain-readonly-graph-mode="${editorMode?'draft-overlay':'true'}" data-logic-chain-draft-overlay="${editorMode?'true':'false'}" data-logic-chain-rendered-graph-overlay="${editorMode?'true':'false'}" data-no-condition-engine-editing="true" data-no-runtime-node-creation="true" data-no-runtime-node-creation-mode="${editorMode?'config-only-new-node':'true'}" data-logic-chain-no-runtime-mutation="true" data-logic-chain-save-writes-underlying-config="${editorMode?'true':'available'}">
-                    ${detailHeader({back:backButton(appState.logicChainCanvas.routeInfo,'返回逻辑链'),kicker:'WebAdmin / 跨频道逻辑链',iconName:metadata.effectiveIconKey||'logic-chain',title,subtitle:'思维导图模式：只读视图由现有 SignalBridge 关系推导跨频道逻辑树，不修改运行时。',copyValue:metadata.id||metadata.rootRef||metadata.rootChannel,badges:[`<span class="pill info">根节点: ${esc(logicChainRootTypeLabel(metadata.rootType||root.refType))}</span>`,`<span class="pill">${esc(metadata.rootChannel||root.channel||'未解析频道')}</span>`,pill(logicChainGraphDoctorStatus(graph))],actions})}
+                    ${detailHeader({back:backButton(appState.logicChainCanvas.routeInfo,'返回逻辑链'),kicker:'WebAdmin / 跨频道逻辑链',iconName:metadata.effectiveIconKey||'logic-chain',title,subtitle:'思维导图模式：只读视图由现有 SignalBridge 关系推导跨频道逻辑树，不修改运行时。',copyValue:metadata.id||metadata.rootRef||metadata.rootChannel,helpTopic:'logic-chain.editor-draft',badges:[`<span class="pill info">根节点: ${esc(logicChainRootTypeLabel(metadata.rootType||root.refType))}</span>`,`<span class="pill">${esc(metadata.rootChannel||root.channel||'未解析频道')}</span>`,pill(logicChainGraphDoctorStatus(graph))],actions})}
                     ${warningHtml}
                     ${logicChainComponentFocusCard(graph)}
                     <section class="logic-chain-layout">

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.61.0-templates-prefab-import-export`
-- 当前开发基线：`8.16 Logic Chain Editor Existing Node Editing`；本阶段在 8.14 当前 Viewer 画布编辑模式中加入已有节点受控维护：Channel metadata、Signal Join、Timer、SignalListener 基础配置、SignalListener / Timer 上已有 ActionConfig 的同 index 替换 / 禁用，以及 Join input/output、Timer outputChannel、Listener channel、Signal action output channel 的局部重连。保存仍写入真实配置服务，不保存假图，不移动/删除/重排旧节点，不删除/重排旧 action；VBD、Region、ActionRelay block、SignalReceiver 等世界实体节点仍为只读引用。发布后建议版本为 `v1.62.0-logic-chain-editor-existing-node-editing`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.62.0-logic-chain-editor-existing-node-editing`
+- 当前开发基线：`8.17 WebAdmin Help / Example Center`；本阶段给 WebAdmin 加入只读帮助中心 / 示例中心 / 排错中心 / 术语表。帮助内容采用基础 / 专业分层，提供 `#/help`、`#/examples`、`GET /api/webadmin/help` 和主要页面级帮助入口；不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做用户自定义笔记 / 收藏，不做 GameController / MissionSystem / PhaseController、full Logic Chain Editor、Scratch editor、if / else runtime 或版本 rollback。发布后建议版本为 `v1.63.0-webadmin-help-example-center`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -67,10 +67,12 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [Templates / Prefab Capability Matrix 8.15](docs/TEMPLATES_PREFAB_CAPABILITY_MATRIX_8_15.md)
 - [8.16 Logic Chain Editor Existing Node Editing Current Context](docs/LOGIC_CHAIN_EDITOR_EXISTING_NODE_EDITING_8_16_CURRENT_CONTEXT.md)
 - [Logic Chain Editor Capability Matrix 8.16](docs/LOGIC_CHAIN_EDITOR_CAPABILITY_MATRIX_8_16.md)
+- [8.17 WebAdmin Help / Example Center Current Context](docs/WEBADMIN_HELP_EXAMPLE_CENTER_8_17_CURRENT_CONTEXT.md)
+- [WebAdmin Help Capability Matrix 8.17](docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.16；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；8.16 也不恢复旧 full Logic Chain Editor，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.17；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连，8.17 加入只读 Help / Example / Troubleshooting / Glossary Center。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；8.17 也不做用户自定义笔记 / 收藏，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
 - 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred。
 - 后续：GameController / MissionSystem / PhaseController。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
@@ -464,6 +466,48 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不新增 ConditionNodeType。
 - 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction / Condition runtime 语义。
 - 不做 raw JSON editor。
+- 不启动 Minecraft，不跑 MCP scenario，不生成截图矩阵。
+- 本阶段不 commit / push / merge / tag。
+
+## 8.17 WebAdmin Help / Example Center
+
+8.17 在 WebAdmin 内加入只读 Help / Example / Troubleshooting / Glossary Center。它用于解释当前越来越复杂的 SignalBridge、Action、Condition、StateVariable、Join、Timer、Logic Chain、Templates 和 Doctor 能力，不改变任何 runtime 语义。
+
+8.17 已实现方向：
+
+- 帮助中心入口：侧边栏“模板与复用”下新增“帮助中心 / 示例中心”，路由为 `#/help`；`#/examples` 作为示例中心入口。
+- 页面结构：帮助中心拆成文档区、示例中心、排错中心、术语表四个同级主视图；`#/help` 默认文档区，`#/help?view=examples` / `#/help?view=troubleshooting` / `#/help?view=glossary` 保留当前视图。
+- 只读目录 API：`GET /api/webadmin/help` 返回内置 catalog，包含 `readOnly=true`、`noWriteApi=true`、`copyOnly=true`，不按世界写入，也不保存用户自定义笔记 / 收藏。
+- 基础 / 专业：每个主要主题保留基础 / 专业 双层文档字段；页面不再渲染顶部模式切换 toolbar。
+- Help topic model：topic 包含 basic/pro sections、examples、troubleshootingLinks、relatedTopics、glossaryTerms 和 pageLinks。
+- 固定布局：帮助中心外层限制为应用内视口；文档区左侧主题列表、中间正文、右侧分类导航分别内部滚动。主题切换会高亮当前主题并保留主题列表滚动位置。
+- 导航：四个主视图入口下方不再渲染搜索 / 分类 / 模式 toolbar；右侧导航按当前主视图切换为文档分类、示例模块、排错域或术语分组，并实际筛选当前视图内容。Help Center 内部按钮使用 `data-*` 事件委托，不拼接复杂 inline onclick。
+- 内联术语：文档中的 SignalBridge、SignalListener、Timer、ConditionGroup、StateVariable、Logic Chain、Templates、Doctor 等真实模块术语通过集中 mapping 变成克制的 inline term；点击词条默认打开对应帮助主题，不跳真实功能页。hover/focus 显示短解释。
+- 术语 popover：同一时间只保留一个 active popover；旧关闭 timer 会校验 term id，快速切换词条不会关闭新的 popover；滚动正文时关闭当前 popover，避免卡死在页面底部。
+- 返回上下文：只有术语 popover 的“打开页面”按钮跳真实功能页，并使用 `fromHelp=1` + sessionStorage `helpReturn` 保存上下文；目标页面只在该来源下显示“返回文档”，返回时恢复帮助视图、主题、基础 / 专业模式、筛选和内部滚动位置。
+- 示例中心：覆盖 Join 两输入汇合、Timer 延迟触发频道、监听频道后发送消息、监听频道后写入 StateVariable、用 ConditionGroup 控制 action、用 Template Center 预览并应用 Join/Timer/Listener 组合、Signal 无消费者、Template import 与 apply 区别、Logic Chain 新增 Join / Timer 草稿。
+- 示例卡片：模板关联区域固定在卡片底部；有模板显示模板中心 CTA，无模板在同一位置显示“无模板关联”。
+- 排错中心：覆盖条件组不可选、Join 无输出、Timer 未触发、Listener 未执行 action、模板 apply 冲突、逻辑链一个入口多个频道、编辑器保存失败、节点不可见、只读节点、导入 JSON 不生效、空 gate 无历史、状态变量动作失败、Signal 有事件但无后续动作。
+- 排错文案：短语列表使用 `A / B / C` 或列表形式，不再出现 `。/`、`。 /`、`./` 这类标点加斜杠格式。
+- 术语表：覆盖频道、逻辑链、焦点频道、关联组件、SignalBridge、SignalListener、Action、ActionConfig、ConditionGroup、StateVariable、Join、Barrier、Timer、Template、Prefab、Edit Lock、Fingerprint、Dry-run、Placeholder、Runtime Gate、Action Gate、Debugger、Doctor、Replay。
+- 页面级帮助入口：总览、SignalBridge、信号汇合、Timer、信号监听器、条件组、条件调试、状态变量、逻辑链、模板中心、Doctor 等页面通过 `data-page-help-link` 跳转到对应帮助主题。
+- 筛选：支持右侧分类筛选和顶部类型视图切换；搜索 / 顶部模式切换 toolbar 已移除。
+
+8.17 约束：
+
+- 只读帮助内容，不做用户自定义笔记 / 收藏 deferred。
+- 不做 GameController / MissionSystem / PhaseController deferred。
+- 不做 full Logic Chain Editor deferred。
+- 不做 Scratch editor deferred。
+- 不做 if / else runtime deferred。
+- 不做旧节点任意移动 / 删除 / 重排 deferred。
+- 不做旧 action 任意删除 / 重排 deferred。
+- 不做 world entity in-editor draft create documented as deferred。
+- 继续记录模板安全边界：placeholder binding apply deferred，component export deferred，ConditionGroup apply deferred，StateVariable definition apply deferred，external reference fail closed。
+- 不新增 ActionType。
+- 不新增 ConditionNodeType。
+- 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction / Condition runtime 语义。
+- 不做 version rollback / Git-like branch merge。
 - 不启动 Minecraft，不跑 MCP scenario，不生成截图矩阵。
 - 本阶段不 commit / push / merge / tag。
 
