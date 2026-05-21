@@ -86,6 +86,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminSignalJoinServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTemplateServiceTest;
+import com.zcpu.tzzmod.webadmin.service.WebAdminHelpCatalogServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
 import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -192,6 +193,7 @@ public final class StabilizationGuardTest {
         WebAdminLogicChainServiceTest.run();
         WebAdminLogicChainEditorServiceTest.run();
         WebAdminTemplateServiceTest.run();
+        WebAdminHelpCatalogServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
         testConditionStateVariables82();
@@ -209,6 +211,7 @@ public final class StabilizationGuardTest {
         testLogicChainEditorMvp814();
         testTemplatesPrefabImportExport815();
         testLogicChainEditorExistingNodeEditing816();
+        testWebAdminHelpExampleCenter817();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1398,6 +1401,23 @@ public final class StabilizationGuardTest {
                     { type:'signal_event_count_compare', displayName:'信号事件数量比较', description:'检查信号历史事件数。', category:'信号条件', suite:'region-signal-logic-chain', fields:[{ key:'signalHistoryKey', displayName:'信号历史快照键', kind:'string', required:true }, { key:'operator', displayName:'比较方式', kind:'enum:eq,ne,gt,gte,lt,lte', required:true }, { key:'count', displayName:'目标数量', kind:'integer', required:true }] },
                     { type:'logic_chain_has_cycle', displayName:'逻辑链存在循环', description:'检查逻辑链循环标记。', category:'逻辑链条件', suite:'region-signal-logic-chain', fields:[{ key:'logicChainKey', displayName:'逻辑链快照键', kind:'string', required:true }, { key:'expected', displayName:'期望循环状态', kind:'boolean', required:false }] }
                   ] };
+                  if (url === '/api/webadmin/help') return {
+                    version:'8.17',
+                    readOnly:true,
+                    noWriteApi:true,
+                    copyOnly:true,
+                    categories:[{id:'getting-started',title:'入门',summary:'先从频道开始。'},{id:'signal',title:'Signal / 频道',summary:'SignalBridge。'},{id:'logic-chain',title:'Logic Chain / 逻辑链',summary:'Viewer。'},{id:'template',title:'Templates / 模板',summary:'Prefab。'}],
+                    featuredTopicIds:['getting-started.overview','signalbridge.channel-basics'],
+                    topics:[
+                      {id:'getting-started.overview',kind:'topic',title:'从帮助中心开始',summary:'基础入门',category:'getting-started',tags:['入门'],basicTitle:'基础',basicSummary:'基础',basicSections:[{title:'这是什么',bullets:['帮助中心是只读目录。']}],professionalTitle:'专业',professionalSummary:'专业',professionalSections:[{title:'边界',bullets:['GameController deferred','if / else runtime deferred']}],examples:['example.listener-message'],troubleshootingLinks:['trouble.signal-no-consumer'],glossaryTerms:['channel'],pageLinks:[{label:'模板中心',route:'#/templates'}],relatedTopics:['signalbridge.channel-basics']},
+                      {id:'signalbridge.channel-basics',kind:'topic',title:'频道 / SignalBridge',summary:'频道是事件通道。',category:'signal',tags:['channel'],basicTitle:'基础',basicSummary:'基础',basicSections:[{title:'最小路线',bullets:['发 signal。']}],professionalTitle:'专业',professionalSummary:'专业',professionalSections:[{title:'运行语义',bullets:['SignalBridge 是事件总线，不是状态数据库。']}],examples:['example.listener-message'],troubleshootingLinks:['trouble.signal-no-consumer'],glossaryTerms:['channel'],pageLinks:[{label:'SignalBridge',route:'#/signals'}],relatedTopics:[]},
+                      {id:'logic-chain.viewer',kind:'topic',title:'Logic Chain Viewer',summary:'可视化关系。',category:'logic-chain',tags:['logic-chain'],basicTitle:'基础',basicSummary:'基础',basicSections:[{title:'查看',bullets:['只读查看。']}],professionalTitle:'专业',professionalSummary:'专业',professionalSections:[{title:'边界',bullets:['不保存假图。']}],examples:[],troubleshootingLinks:[],glossaryTerms:['logic-chain'],pageLinks:[{label:'逻辑链',route:'#/logic-chains'}],relatedTopics:[]},
+                      {id:'templates.prefab',kind:'topic',title:'Templates / Prefab',summary:'模板中心。',category:'template',tags:['template'],basicTitle:'基础',basicSummary:'基础',basicSections:[{title:'使用',bullets:['先 dry-run。']}],professionalTitle:'专业',professionalSummary:'专业',professionalSections:[{title:'安全边界',bullets:['placeholder binding apply deferred','external reference fail closed']}],examples:['example.template-join-timer-listener'],troubleshootingLinks:['trouble.template-apply-conflict'],glossaryTerms:['template'],pageLinks:[{label:'模板中心',route:'#/templates'}],relatedTopics:[]}
+                    ],
+                    examples:[{id:'example.listener-message',kind:'example',title:'监听频道后发送消息',goal:'监听 signal 后执行 message action。',steps:['创建监听器','添加 message action'],commonErrors:['channel 拼写不一致'],professionalNotes:['示例只读'],relatedRoutes:[{label:'监听器',route:'#/listeners'}],relatedTopicIds:['signalbridge.channel-basics'],readOnlyExample:true},{id:'example.template-join-timer-listener',kind:'example',title:'模板组合',goal:'用模板创建组合。',steps:['打开模板中心','预览并应用'],commonErrors:['前缀冲突'],professionalNotes:['apply 写真实配置'],relatedRoutes:[{label:'模板中心',route:'#/templates'}],relatedTemplateId:'join_all_two_inputs',relatedTopicIds:['templates.prefab'],readOnlyExample:true}],
+                    troubleshooting:[{id:'trouble.signal-no-consumer',kind:'troubleshooting',title:'为什么 Signal 有事件但无后续动作？',symptom:'无后续动作',likelyCauses:['无消费者'],checks:['频道详情'],fixHints:['新增监听器'],professionalExplanation:'SignalBridge 只负责派发事件。',relatedRoutes:[{label:'Doctor',route:'#/doctor'}]},{id:'trouble.template-apply-conflict',kind:'troubleshooting',title:'为什么模板 apply 冲突？',likelyCauses:['前缀冲突'],checks:['dry-run'],fixHints:['换前缀'],professionalExplanation:'fail closed。',relatedRoutes:[{label:'模板中心',route:'#/templates'}]}],
+                    glossary:[{id:'channel',kind:'glossary',term:'频道',title:'频道',aliases:['Channel'],definition:'SignalBridge 中命名事件通道。',technicalNotes:'不是状态存储。'},{id:'logic-chain',kind:'glossary',term:'逻辑链',title:'逻辑链',aliases:['Logic Chain'],definition:'按强关联组件展示的链路。',technicalNotes:'可包含多个频道。'},{id:'template',kind:'glossary',term:'Template',title:'Template',aliases:['模板'],definition:'可导入导出的配置包。',technicalNotes:'import 不等于 apply。'}]
+                  };
                   if (url === '/api/webadmin/condition-gates/history/smoke-record/replay') return { success:true, recordId:'smoke-record', readOnly:true, noSideEffects:true, noLiveWorldRead:true, originalResult:'BLOCKED', replayResult:'BLOCKED', resultConsistent:true, failureReason:'always_false 阻断', warnings:[], debugTree:{ matched:false, label:'Root 条件组', type:'group', nodeId:'root', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[{ matched:false, label:'永远不通过', type:'always_false', nodeId:'false-node', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[] }] } };
                   if (url === '/api/webadmin/condition-gates/history/smoke-record') { if (failConditionDebuggerDetail) throw new Error('transient condition debugger detail failure'); return { id:'smoke-record', occurredAt:'2026-05-09T10:00:00Z', targetType:'SIGNAL_LISTENER', targetId:'test-listener', channel:'test.channel', conditionGroupId:'smoke.roundtrip', conditionGroupDisplayName:'Smoke 条件组', result:'BLOCKED', allowed:false, code:'CONDITION_FALSE', failureReason:'always_false 阻断', debugSummary:'Root 条件组未通过', evaluatedCount:2, durationNanos:123000, conditionFingerprint:'condition-fp', definitionFingerprint:'definition-fp', replayable:true, replayReadOnly:true, noActionExecution:true, noSignalEmit:true, noRawJsonEditor:true, contextSummary:{ player:'Owner', sourceType:'SIGNAL_LISTENER', channel:'test.channel', world:'minecraft:overworld', listenerId:'test-listener', itemSnapshotCount:0, inventorySnapshotCount:1, containerSnapshotCount:0, stateVariableCount:2 }, debugTree:{ matched:false, label:'Root 条件组', type:'group', nodeId:'root', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[{ matched:false, label:'永远不通过', type:'always_false', nodeId:'false-node', reasonCode:'always_false', failureReason:'always_false 阻断', debugSummary:'blocked', childResults:[] }] } }; }
                   if (url === '/api/webadmin/condition-gates/history/missing-record') return null;
@@ -1433,6 +1453,9 @@ public final class StabilizationGuardTest {
                   if (url.startsWith('/api/webadmin/signal-joins/') && url.endsWith('/status')) return signalJoinSmoke.status;
                   if (url.startsWith('/api/webadmin/signal-joins/')) return { ...signalJoinSmoke, id:decodeURIComponent(url.substring('/api/webadmin/signal-joins/'.length).split('/')[0].split('?')[0]) || signalJoinSmoke.id };
                   if (url.startsWith('/api/webadmin/signal-joins')) return { joins:[signalJoinSmoke], storeDegraded:false };
+                  if (url === '/api/webadmin/timers') return { timers:[{ id:'timer.smoke', displayName:'Smoke Timer', note:'Timer smoke fixture', enabled:true, mode:'DELAY', scopeMode:'GLOBAL', durationTicks:20, intervalTicks:20, maxRuns:1, startPolicy:'RESTART', outputChannel:'timer.done', onStartActions:[], onTickActions:[], onCompleteActions:[{ type:'signal', value:'timer.done', enabled:true, cooldownTicks:0 }], onCancelActions:[], activeInstanceCount:0, lastResult:'SUCCESS', expectedFingerprint:'timer-fp', version:1, updatedAt:'2026-05-16T10:00:00Z', updatedBy:'Owner' }], storeDegraded:false, storeFile:'timers.json' };
+                  if (url === '/api/webadmin/logic-chains') return [{ id:'chain-smoke', componentId:'component-smoke', displayName:'Smoke Logic Chain', rootType:'CHANNEL', rootRef:'test.channel', rootChannel:'test.channel', defaultFocusChannel:'test.channel', includedChannels:['test.channel','timer.done'], saved:true, source:'metadata', doctorStatus:'OK', signalJoinCount:1, timerCount:1, listenerCount:1, actionCount:1, metadata:{ note:'Smoke metadata', effectiveIconKey:'logic-chain' } }];
+                  if (url === '/api/webadmin/state-variables' || url.startsWith('/api/webadmin/state-variables?')) return { variables:[{ id:'global:mission.count', key:'mission.count', displayPath:'GLOBAL / mission.count', scope:'GLOBAL', scopeLabel:'全局', targetId:'', targetLabel:'全局', type:'INTEGER', typeLabel:'整数', value:1, valuePreview:'1', valueText:'1', version:1, updatedAt:'2026-05-16T10:00:00Z', updatedBy:'Owner', fingerprint:'state-fp' }], summary:{ totalCount:1, globalCount:1, playerCount:0, integerCount:1, booleanCount:0, stringCount:0 } };
                   if (url.startsWith('/api/signals/channels/')) { const channel = decodeURIComponent(url.substring('/api/signals/channels/'.length).split('?')[0]); return { channel, type:'CUSTOM', metadata:{effectiveDisplayName:'Test Channel', note:'Test note', updatedAt:'2026-05-09T10:00:00Z', updatedBy:'Owner'}, stats:{listenerCount:1, receiverCount:1, actionRelayCount:0, sourceDeviceCount:1, triggerCountToday:3, totalTriggerCount:9, lastTriggeredAt:'2026-05-09T10:00:00Z'}, listeners:[{id:'test-listener', name:'Test Listener', enabled:true, cooldownTicks:0, actionCount:1, lastTriggeredAt:'2026-05-09T10:00:00Z', actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}]}], receivers:[{id:'recv-1', name:'Receiver'}], actionRelays:[], actions:[{id:'action-1', type:'COMMAND', summary:'say test', doctorStatus:'OK'}], sources:[{id:'test-device', name:'Emitter'}], downstreamSignals:[], recentHistory:[{ time:'2026-05-09T10:00:00Z', channel, sourceType:'DEVICE', sourceName:'Emitter', result:'SUCCESS' }], doctorIssues:[], doctorStatus:'OK' }; }
                   if (url.startsWith('/api/signals/channels')) return [{ channel:'test.channel', displayName:'Test Channel', listenerCount:1, receiverCount:1, actionRelayCount:0, consumerCount:2, doctorStatus:'OK' }];
                   if (url.startsWith('/api/webadmin/signal-listener-basic-config/')) return { listenerRef:'test-listener', listenerId:'test-listener', displayName:'Test Listener', enabled:true, channel:'test.channel', cooldownTicks:0, actionCount:1, expectedFingerprint:'listener-fp', lockStatus:{ locked:false } };
@@ -1787,6 +1810,20 @@ public final class StabilizationGuardTest {
                   '#/region-controllers',
                   '#/action-templates',
                   '#/templates',
+                  '#/timers',
+                  '#/logic-chains',
+                  '#/state-variables',
+                  '#/help',
+                  '#/examples',
+                  '#/help',
+                  '#/help?view=examples',
+                  '#/help?view=troubleshooting',
+                  '#/help?view=glossary',
+                  '#/help?topic=signalbridge.channel-basics',
+                  '#/help?topic=logic-chain.viewer',
+                  '#/help?topic=logic-chain.editor-draft',
+                  '#/help?topic=templates.prefab',
+                  '#/help?topic=missing',
                   '#/condition-groups',
                   '#/condition-groups/smoke.roundtrip',
                   '#/conditions',
@@ -1826,6 +1863,28 @@ public final class StabilizationGuardTest {
                   '#/settings',
                   '#/system-settings'
                 ]);
+                const pageHelpTopics = new Map([
+                  ['#/dashboard','getting-started.overview'],
+                  ['#/signals','signalbridge.channel-basics'],
+                  ['#/receivers','device-trigger.references'],
+                  ['#/listeners','signalbridge.listener-flow'],
+                  ['#/actions','action.config-basics'],
+                  ['#/action-templates','action.config-basics'],
+                  ['#/history','signalbridge.channel-basics'],
+                  ['#/settings','getting-started.overview'],
+                  ['#/system-settings','getting-started.overview'],
+                  ['#/regions','region.controller'],
+                  ['#/region-controllers','region.controller'],
+                  ['#/templates','templates.prefab'],
+                  ['#/timers','timer.delay'],
+                  ['#/logic-chains','logic-chain.viewer'],
+                  ['#/state-variables','state-variable.basics'],
+                  ['#/condition-groups','condition.group-basics'],
+                  ['#/condition-debugger','debugger.doctor-replay'],
+                  ['#/doctor','debugger.doctor-replay'],
+                  ['#/signal-joins','signal-join.basics']
+                ]);
+                const pageHelpRoutes = new Set(pageHelpTopics.keys());
                 const responsiveListRoutes = new Set([
                   '#/action-templates',
                   '#/doctor',
@@ -1847,6 +1906,7 @@ public final class StabilizationGuardTest {
                 };
                 (async () => {
                   const failures = [];
+                  let helpCatalogApiSeen = false;
                   for (const route of routes) {
                     errors.length = 0;
                     view.innerHTML = '';
@@ -1867,6 +1927,59 @@ public final class StabilizationGuardTest {
                       failures.push(`${route}: remained in loading-state`);
                     } else if (!html.trim()) {
                       failures.push(`${route}: rendered empty view`);
+                    }
+                    if (route === '#/help' || route === '#/examples' || route.startsWith('#/help?')) {
+                      if (!html.includes('data-help-example-center-route="true"') || !html.includes('data-help-example-center-no-toolbar="true"') || !html.includes('data-help-example-center-no-topic-category-pill="true"') || !html.includes('data-help-example-center-inline-term-click-opens-topic="true"') || !html.includes('data-help-example-center-open-page-return-context-only="true"') || !html.includes('data-help-example-center-view-tabs="true"') || !html.includes('data-help-example-center-fixed-viewport="true"') || !html.includes('data-help-example-center-no-whole-page-long-scroll="true"') || !html.includes('data-help-example-center-document-scroll="true"') || !html.includes('data-help-example-center-event-delegation="true"') || !html.includes('data-help-example-center-no-unsafe-inline-onclick="true"')) {
+                        failures.push(`${route}: help center route missing required 8.17 markers`);
+                      }
+                      if (!html.includes('data-help-example-center-right-nav-per-view="true"') || !html.includes(`data-help-example-center-right-nav-view="${route === '#/examples' || route === '#/help?view=examples' ? 'examples' : route === '#/help?view=troubleshooting' ? 'troubleshooting' : route === '#/help?view=glossary' ? 'glossary' : 'docs'}"`)) {
+                        failures.push(`${route}: right nav did not adapt to the current help view`);
+                      }
+                      if (html.includes('help-center-toolbar') || html.includes('data-help-example-center-search="true"') || html.includes('data-help-example-center-category-filter="true"') || html.includes('data-help-example-center-basic-pro-toggle="true"')) {
+                        failures.push(`${route}: deleted help toolbar or controls rendered again`);
+                      }
+                      if ((route === '#/help?topic=signalbridge.channel-basics' || route === '#/help?topic=logic-chain.viewer' || route === '#/help?topic=templates.prefab') && (!html.includes('data-help-example-center-inline-term="true"') || !html.includes('data-help-example-center-return-context-session="true"') || !html.includes('data-help-example-center-return-restore-scroll="true"'))) {
+                        failures.push(`${route}: help center route missing inline term or return context markers`);
+                      }
+                      if (/\\sonclick\\s*=/.test(html)) {
+                        failures.push(`${route}: help center still contains unsafe inline onclick`);
+                      }
+                      const routeUrls = context.__smokeRequestedUrls();
+                      if (routeUrls.includes('/api/webadmin/help')) {
+                        helpCatalogApiSeen = true;
+                      }
+                      if (!helpCatalogApiSeen) {
+                        failures.push(`${route}: did not execute help catalog API before rendering cached catalog`);
+                      }
+                      if (route === '#/help') {
+                        if (!html.includes('data-help-example-center-default-view="true"') || !html.includes('data-help-example-center-docs-view="true"') || !html.includes('data-help-example-center-topic-list="true"') || !html.includes('data-help-example-center-topic-detail="true"')) failures.push(`${route}: docs view missing docs-only markers`);
+                        if (html.includes('data-help-example-center-example-list="true"') || html.includes('data-help-example-center-troubleshooting-list="true"') || html.includes('data-help-example-center-glossary="true"')) failures.push(`${route}: docs view still renders examples/troubleshooting/glossary sections`);
+                      }
+                      if (route === '#/examples' || route === '#/help?view=examples') {
+                        if (!html.includes('data-help-example-center-examples-view="true"') || !html.includes('data-help-example-center-example-list="true"') || !html.includes('data-help-example-center-template-relation-footer="true"') || !html.includes('data-help-example-center-no-template-aligned="true"') || !html.includes('data-help-example-center-template-cta-aligned="true"')) failures.push(`${route}: examples view missing split view or aligned template footer markers`);
+                        if (html.includes('data-help-example-center-topic-list="true"') || html.includes('data-help-example-center-troubleshooting-list="true"') || html.includes('data-help-example-center-glossary="true"')) failures.push(`${route}: examples view renders other main view content`);
+                      }
+                      if (route === '#/help?view=troubleshooting') {
+                        if (!html.includes('data-help-example-center-troubleshooting-view="true"') || !html.includes('data-help-example-center-troubleshooting-list="true"') || !html.includes('data-help-example-center-clean-reason-list="true"')) failures.push(`${route}: troubleshooting view missing split view or clean reason markers`);
+                        if (html.includes('。 /') || html.includes('。/') || html.includes('./')) failures.push(`${route}: troubleshooting view contains punctuation-before-slash formatting`);
+                        if (html.includes('data-help-example-center-topic-list="true"') || html.includes('data-help-example-center-example-list="true"') || html.includes('data-help-example-center-glossary="true"')) failures.push(`${route}: troubleshooting view renders other main view content`);
+                      }
+                      if (route === '#/help?view=glossary') {
+                        if (!html.includes('data-help-example-center-glossary-view="true"') || !html.includes('data-help-example-center-glossary="true"')) failures.push(`${route}: glossary view missing split view markers`);
+                        if (html.includes('data-help-example-center-topic-list="true"') || html.includes('data-help-example-center-example-list="true"') || html.includes('data-help-example-center-troubleshooting-list="true"')) failures.push(`${route}: glossary view renders other main view content`);
+                      }
+                      if (route.startsWith('#/help?topic=')) {
+                        if (!html.includes('data-help-example-center-topic-active="true"') || !html.includes('data-help-example-center-topic-list-preserve-scroll="true"') || !html.includes('data-help-example-center-right-category-nav="true"') || !html.includes('data-help-example-center-category-clickable="true"') || !html.includes('data-help-example-center-category-active="true"')) failures.push(`${route}: topic route missing active topic, preserved scroll, or right category nav markers`);
+                      }
+                    }
+                    if (pageHelpRoutes.has(route)) {
+                      if (!html.includes('data-page-help-link="true"') || !html.includes('data-page-help-topic="') || !html.includes('data-page-help-return-to="')) {
+                        failures.push(`${route}: page-level help link missing required 8.17 markers`);
+                      }
+                      const expectedTopic = pageHelpTopics.get(route);
+                      if (expectedTopic && !html.includes(`data-page-help-topic="${expectedTopic}"`)) {
+                        failures.push(`${route}: page-level help link expected topic ${expectedTopic}`);
+                      }
                     }
                     if (route === '#/condition-debugger') {
                       if (!html.includes('data-condition-gate-list-route="true"') || !html.includes('data-condition-gate-history-table="true"') || !html.includes('data-condition-gate-row-click-navigates-detail="true"') || !html.includes('data-condition-gate-list-full-width="true"') || !html.includes('data-condition-gate-list-no-full-debug-rail="true"')) {
@@ -7352,8 +7465,7 @@ public final class StabilizationGuardTest {
                     "8.6/8.7 receiver-side gates must not reuse the VBD runtime gate store inside receiver runtimes");
         }
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
-        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
-                "8.6 must not add GameController/MissionSystem/PhaseController");
+        requireNoControllerSystemImplementations(allMain, "8.6 must not add GameController/MissionSystem/PhaseController");
         requireFalse(allMain.contains("condition-runtime-raw-json-editor") || allMain.contains("scriptExpression"),
                 "8.6 must not add raw JSON editor or generic script expression");
     }
@@ -7546,8 +7658,7 @@ public final class StabilizationGuardTest {
         }
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
-        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
-                "8.7 must not add GameController/MissionSystem/PhaseController");
+        requireNoControllerSystemImplementations(allMain, "8.7 must not add GameController/MissionSystem/PhaseController");
         requireFalse(allMain.contains("singleActionConditionGroupId") || allMain.contains("SignalReceiver condition gate"),
                 "8.7 must not add single Action gates or SignalReceiver output gate");
     }
@@ -7791,8 +7902,7 @@ public final class StabilizationGuardTest {
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
         requireFalse(allMain.contains("singleActionConditionGroupId") || allMain.contains("SignalReceiver condition gate"),
                 "8.8 must not add single Action gates or SignalReceiver output gate");
-        requireFalse(allMain.contains("MissionSystem") || allMain.contains("GameController") || allMain.contains("PhaseController"),
-                "8.8 must not add GameController/MissionSystem/PhaseController");
+        requireNoControllerSystemImplementations(allMain, "8.8 must not add GameController/MissionSystem/PhaseController");
         requireFalse(scripts.contains("conditionGateRawJson") || scripts.contains("condition-runtime-raw-json-editor") || scripts.contains("rawJsonEditor"),
                 "8.8 condition debugger must not expose a raw JSON editor");
     }
@@ -8016,10 +8126,8 @@ public final class StabilizationGuardTest {
         }
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireNoControllerSystemImplementations(allMain, "8.9 must not add GameController/MissionSystem/PhaseController");
         for (String forbidden : List.of(
-                "GameController",
-                "MissionSystem",
-                "PhaseController",
                 "ActionFailurePolicy",
                 "FallbackAction",
                 "StopListPolicy"
@@ -8184,10 +8292,8 @@ public final class StabilizationGuardTest {
         }
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireNoControllerSystemImplementations(allMain, "8.10 must not add GameController/MissionSystem/PhaseController");
         for (String forbidden : List.of(
-                "GameController",
-                "MissionSystem",
-                "PhaseController",
                 "ActionFailurePolicy",
                 "FallbackAction",
                 "StopListPolicy",
@@ -8792,10 +8898,8 @@ public final class StabilizationGuardTest {
         }
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireNoControllerSystemImplementations(allMain, "8.12 must not add GameController/MissionSystem/PhaseController");
         for (String forbidden : List.of(
-                "GameController",
-                "MissionSystem",
-                "PhaseController",
                 "ScratchEditor",
                 "CronScheduler",
                 "CalendarScheduler",
@@ -9842,13 +9946,11 @@ public final class StabilizationGuardTest {
         }
 
         String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        requireNoControllerSystemImplementations(allMain, "8.14 must not add GameController/MissionSystem/PhaseController");
         for (String forbidden : List.of(
                 "FullLogicChainEditor",
                 "ScratchEditor",
                 "IfElseRuntime",
-                "GameController",
-                "MissionSystem",
-                "PhaseController",
                 "LogicChainRuntimeEditor",
                 "class RawJsonEditor",
                 "McpScenario",
@@ -10336,8 +10438,7 @@ public final class StabilizationGuardTest {
                 "startLogicChainExistingNodeEdit",
                 "startLogicChainExistingActionEdit",
                 "releaseLogicChainExistingEditLock",
-                "scheduleLogicChainExistingEditLockHeartbeat",
-                "TZZ_WEBADMIN_ASSET_VERSION='8.16-logic-chain-editor-existing-node-editing'"
+                "scheduleLogicChainExistingEditLockHeartbeat"
         )) {
             requireContains(scripts, marker, "8.16 frontend marker: " + marker);
         }
@@ -10459,6 +10560,331 @@ public final class StabilizationGuardTest {
         requireConditionNodeTypeSetUnchangedFor813();
     }
 
+    private static void testWebAdminHelpExampleCenter817() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/WEBADMIN_HELP_EXAMPLE_CENTER_8_17_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java"), StandardCharsets.UTF_8);
+        String serviceTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogServiceTest.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/WEBADMIN_HELP_EXAMPLE_CENTER_8_17_CURRENT_CONTEXT.md",
+                "docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.17 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.17 WebAdmin Help / Example Center",
+                "基础 / 专业",
+                "只读帮助内容",
+                "Help topic model",
+                "Examples",
+                "Troubleshooting",
+                "Glossary",
+                "Page-level help",
+                "Top toolbar",
+                "用户自定义笔记 / 收藏 deferred",
+                "GameController / MissionSystem / PhaseController deferred",
+                "full Logic Chain Editor deferred",
+                "Scratch editor deferred",
+                "if / else runtime deferred",
+                "world entity in-editor draft create documented as deferred",
+                "placeholder binding apply deferred",
+                "ConditionGroup apply deferred",
+                "StateVariable definition apply deferred",
+                "external reference fail closed"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.17 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminHelpCatalogService",
+                "helpCatalogService.catalog()",
+                "path.equals(\"/api/webadmin/help\")",
+                "该接口只支持 GET"
+        )) {
+            requireContains(server, marker, "8.17 help API marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-help-example-center-nav",
+                "data-route=\"#/help\"",
+                "help-center",
+                "example-center",
+                "TZZ_WEBADMIN_ASSET_VERSION='8.17-webadmin-help-example-center'",
+                "appState.helpCatalog",
+                "appState.helpCenterFilters",
+                "renderHelpCenterPage",
+                "loadHelpCatalog",
+                "/api/webadmin/help",
+                "#/examples",
+                "#/help?view=examples",
+                "#/help?view=troubleshooting",
+                "#/help?view=glossary",
+                "#/help",
+                "data-help-example-center-view-tabs",
+                "data-help-example-center-view-tab",
+                "data-help-example-center-docs-view",
+                "data-help-example-center-examples-view",
+                "data-help-example-center-troubleshooting-view",
+                "data-help-example-center-glossary-view",
+                "data-help-example-center-fixed-viewport",
+                "data-help-example-center-no-whole-page-long-scroll",
+                "data-help-example-center-topic-list-internal-scroll",
+                "data-help-example-center-topic-list-preserve-scroll",
+                "data-help-example-center-topic-active",
+                "data-help-example-center-right-category-nav",
+                "data-help-example-center-right-nav-per-view",
+                "data-help-example-center-right-nav-view",
+                "data-help-example-center-category-clickable",
+                "data-help-example-center-category-active",
+                "data-help-example-center-clean-reason-list",
+                "data-help-example-center-template-relation-footer",
+                "data-help-example-center-no-template-aligned",
+                "data-help-example-center-template-cta-aligned",
+                "data-help-example-center-no-toolbar",
+                "data-help-example-center-no-topic-category-pill",
+                "data-help-example-center-event-delegation",
+                "data-help-example-center-button-type-button",
+                "data-help-example-center-no-unsafe-inline-onclick",
+                "data-help-example-center-no-unexpected-end-of-input",
+                "data-help-example-center-no-punctuation-before-slash",
+                "data-help-example-center-inline-term",
+                "data-help-example-center-inline-term-data-id",
+                "data-help-example-center-inline-term-click-opens-topic",
+                "data-help-example-center-inline-term-click-not-feature-page",
+                "data-help-example-center-inline-term-popover",
+                "data-help-example-center-inline-term-definition",
+                "data-help-example-center-inline-term-open-page-action",
+                "data-help-example-center-inline-term-related-help-action",
+                "data-help-example-center-single-active-popover",
+                "data-help-example-center-popover-close-timer-term-id",
+                "data-help-example-center-popover-fast-switch-stable",
+                "data-help-example-center-popover-scroll-close",
+                "data-help-example-center-popover-bottom-safe",
+                "openHelpInlineTermDefault",
+                "helpScheduleInlineTermPopoverClose",
+                "helpClearInlineTermCloseTimer",
+                "helpRightNavCategories",
+                "helpCategoryKeywordMap",
+                "data-help-example-center-return-context-session",
+                "data-help-example-center-return-context-safe-id",
+                "data-help-example-center-return-restore-view-topic-mode",
+                "data-help-example-center-return-restore-scroll",
+                "data-help-example-center-return-to-help-only-from-inline",
+                "data-help-example-center-route",
+                "data-help-example-center-topic-list",
+                "data-help-example-center-topic-card",
+                "data-help-example-center-topic-detail",
+                "data-help-example-center-example-list",
+                "data-help-example-center-example-card",
+                "data-help-example-center-troubleshooting-list",
+                "data-help-example-center-glossary",
+                "data-help-example-center-readonly",
+                "data-help-example-center-no-write-api",
+                "data-help-example-center-copy-only",
+                "data-help-example-center-template-link",
+                "data-help-example-center-doctor-link",
+                "data-help-example-center-route-link",
+                "data-help-example-center-no-browser-dialogs",
+                "data-help-example-center-responsive-stack",
+                "data-page-help-link",
+                "data-page-help-topic",
+                "data-page-help-return-to",
+                "data-page-help-return-action",
+                "pageHelpLink",
+                "helpTopicHash",
+                "helpTopicForPageTitle",
+                "help-center-page",
+                "help-center-layout"
+        )) {
+            requireContains(shell + "\n" + scripts + "\n" + styles, marker, "8.17 frontend marker: " + marker);
+        }
+        requireFalse(scripts.contains("if(inlineTerm){event.preventDefault();event.stopPropagation();openHelpInlineTermPage"),
+                "8.17 inline term click must not default to opening the feature page");
+
+        for (String marker : List.of(
+                "version\", \"8.17\"",
+                "readOnly\", true",
+                "noWriteApi\", true",
+                "copyOnly\", true",
+                "worldScoped\", false",
+                "basicSections",
+                "professionalSections",
+                "example.join-two-inputs",
+                "example.timer-delay-channel",
+                "example.listener-message",
+                "example.listener-state-variable",
+                "example.condition-controls-action",
+                "example.template-join-timer-listener",
+                "example.signal-no-consumer",
+                "example.template-import-vs-apply",
+                "example.editor-draft-join-timer",
+                "trouble.condition-not-selectable",
+                "trouble.join-no-output",
+                "trouble.timer-not-triggered",
+                "trouble.listener-action-not-executed",
+                "trouble.template-apply-conflict",
+                "trouble.logic-chain-one-entry-many-channels",
+                "trouble.editor-save-failed",
+                "trouble.node-hidden-missing",
+                "trouble.readonly-nodes",
+                "trouble.import-json-no-effect",
+                "trouble.blank-gate-no-history",
+                "trouble.state-variable-action-failed",
+                "trouble.signal-no-consumer",
+                "ConditionEngine 只判断，不写状态，不发信号，不执行动作。",
+                "SignalBridge 是事件总线，不是状态数据库。",
+                "StateVariable 保存状态。",
+                "Logic Chain Viewer 的顺序是可视化顺序，不是全局执行顺序。",
+                "Logic Chain Editor 保存 typed config，不保存假图。"
+        )) {
+            requireContains(service, marker, "8.17 help catalog marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "WebAdminHelpCatalogServiceTest",
+                "required help topic exists",
+                "required example exists",
+                "required troubleshooting exists",
+                "required glossary term exists",
+                "topic glossary terms resolve",
+                "example related topics resolve",
+                "troubleshooting routes stay internal",
+                "readOnlyExample",
+                "GameController / MissionSystem / PhaseController deferred",
+                "if / else runtime deferred"
+        )) {
+            requireContains(serviceTest, marker, "8.17 service test marker: " + marker);
+        }
+
+        String helpSection = extractBetween(scripts, "async function renderHelpCenterPage", "function detailHeader");
+        for (String forbidden : List.of(
+                "alert(",
+                "confirm(",
+                "prompt(",
+                "window.alert",
+                "window.confirm",
+                "window.prompt",
+                "userNotes",
+                "favorites",
+                "POST /api/webadmin/help",
+                "PATCH /api/webadmin/help",
+                "DELETE /api/webadmin/help"
+        )) {
+            requireFalse(helpSection.contains(forbidden), "8.17 help UI must stay read-only and avoid browser dialogs: " + forbidden);
+        }
+
+        for (String marker : List.of(
+                "helpTopicForPageTitle(title)",
+                "SignalBridge",
+                "信号汇合",
+                "调度器",
+                "信号监听器",
+                "条件组",
+                "条件调试",
+                "状态变量",
+                "逻辑链",
+                "模板中心",
+                "区域控制器",
+                "Doctor"
+        )) {
+            requireContains(scripts, marker, "8.17 page-level help marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "function helpInlineTermDefinitions()",
+                "termId:'signalbridge'",
+                "targetRoute:'#/signals'",
+                "termId:'signal-listener'",
+                "targetRoute:'#/listeners'",
+                "termId:'timer'",
+                "targetRoute:'#/timers'",
+                "termId:'condition-group'",
+                "targetRoute:'#/condition-groups'",
+                "termId:'logic-chain'",
+                "targetRoute:'#/logic-chains'",
+                "termId:'templates'",
+                "targetRoute:'#/templates'",
+                "data-help-inline-term",
+                "data-term-id",
+                "helpInlineText(",
+                "helpInlineTermPopoverHtml",
+                "data-help-term-open-page",
+                "data-help-term-open-help",
+                "helpSaveReturnContext",
+                "sessionStorage",
+                "tzzHelpReturn:",
+                "fromHelp:'1'",
+                "helpReturn",
+                "restoreHelpReturnContext",
+                "applyPendingHelpReturnContext",
+                "topicListScrollTop",
+                "docScrollTop",
+                "rightPanelScrollTop",
+                "helpReturnButton()"
+        )) {
+            requireContains(scripts, marker, "8.17 inline term / return context marker: " + marker);
+        }
+
+        requireFalse(scripts.contains("data-help-inline-term") && scripts.contains("onclick=\"openHelpInlineTerm"),
+                "8.17 inline terms must not use unsafe inline onclick");
+        requireFalse(scripts.contains("replace(/SignalBridge") || scripts.contains("replaceAll('SignalBridge'"),
+                "8.17 inline terms must use curated mapping instead of blind whole-text replacement");
+
+        String allMain = readJavaDirectory(root.resolve("src/main/java/com/zcpu/tzzmod"));
+        for (String forbidden : List.of(
+                "class GameController",
+                "class MissionSystem",
+                "class PhaseController",
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "VersionRollback",
+                "CREATE_HELP_NOTE",
+                "HELP_FAVORITE",
+                "HELP_WRITE_API"
+        )) {
+            requireFalse(allMain.contains(forbidden), "8.17 must not add out-of-scope source marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "GAME_CONTROLLER",
+                "MISSION_SYSTEM",
+                "IF_ELSE",
+                "SCRATCH_BLOCK"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.17 must not add ActionType marker: " + forbidden);
+        }
+        requireActionTypeSetUnchangedFor812();
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void requireActionTypeSetUnchangedFor812() {
+        Set<String> actual = new LinkedHashSet<>();
+        for (ActionType value : ActionType.values()) {
+            actual.add(value.id());
+        }
+        Set<String> expected = new LinkedHashSet<>(List.of(
+                "command",
+                "message",
+                "sound",
+                "signal",
+                "state_variable",
+                "timer_start",
+                "timer_cancel"
+        ));
+        requireEquals(expected, actual, "8.17 must not add or remove ActionType values");
+    }
+
     private static void requireConditionNodeTypeSetUnchangedFor813() {
         Set<String> actual = new LinkedHashSet<>();
         for (var field : ConditionNodeType.class.getDeclaredFields()) {
@@ -10552,6 +10978,16 @@ public final class StabilizationGuardTest {
             throw exception.getCause();
         }
         return content.toString();
+    }
+
+    private static void requireNoControllerSystemImplementations(String javaContent, String message) {
+        for (String forbidden : List.of("GameController", "MissionSystem", "PhaseController")) {
+            requireFalse(javaContent.contains("class " + forbidden)
+                            || javaContent.contains("interface " + forbidden)
+                            || javaContent.contains("record " + forbidden)
+                            || javaContent.contains("enum " + forbidden),
+                    message + ": " + forbidden);
+        }
     }
 
     private static void requireTrue(boolean value, String message) {
