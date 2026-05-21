@@ -20,6 +20,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceContainerTemplateSessionService;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -260,6 +261,18 @@ public final class WebAdminContainerTemplateSessions {
         if (before == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(before.type())) {
             return failSession(session, "device_missing", "目标 virtual_block_device 不存在，容器模板保存失败。", true);
         }
+        if (lockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = lockService.validateLock(
+                    WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE,
+                    session.deviceId,
+                    session.lockId,
+                    session.actorUser,
+                    session.actorSession
+            );
+            if (!lockValidation.success()) {
+                return failSession(session, "edit_lock_invalid", lockValidation.result().message(), true);
+            }
+        }
         String requestFingerprint = getString(body, "expectedFingerprint");
         String currentFingerprint = WebAdminVirtualBlockDeviceContainerTemplateSessionService.fingerprintFor(before);
         if (!session.expectedFingerprint.equals(currentFingerprint)
@@ -271,6 +284,18 @@ public final class WebAdminContainerTemplateSessions {
             nextConditions = parseItemConditions(body);
         } catch (IllegalArgumentException exception) {
             return failSession(session, "invalid_item_conditions", exception.getMessage(), true);
+        }
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = WebAdminSnapshotService.createAutoBeforeTrustedWrite(
+                activeServer,
+                session.actorUser,
+                WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE,
+                "Virtual Block Device",
+                WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE,
+                session.deviceId,
+                "保存 VBD 容器变化模板前自动保存"
+        );
+        if (!autoSnapshot.created() && !autoSnapshot.skipped()) {
+            return failSession(session, "auto_snapshot_failed", "写入前自动保存点创建失败，容器模板保存已停止。请检查快照存储或损坏配置文件。", true);
         }
         SignalDeviceData after = SignalDeviceStore.updateVirtualItemConditionsForWebAdmin(activeServer, session.deviceId, nextConditions);
         if (after == null) {

@@ -20,6 +20,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -289,6 +290,18 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         }
         List<ItemSubmitRequirementData> nextRequirements = requirementsFromDraft(before, draft);
         boolean nextItemSubmitEnabled = draft.itemSubmitEnabled() && !nextRequirements.isEmpty();
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = WebAdminSnapshotService.createAutoBeforeTrustedWrite(
+                activeServer,
+                session.actorUser,
+                WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT,
+                "Virtual Block Device",
+                WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT,
+                session.deviceId,
+                "保存 VBD 单物品提交模板前自动保存"
+        );
+        if (!autoSnapshot.created() && !autoSnapshot.skipped()) {
+            return failSession(session, "auto_snapshot_failed", "写入前自动保存点创建失败，itemSubmit requirement 保存已停止。请检查快照存储或损坏配置文件。", true);
+        }
         SignalDeviceData after = SignalDeviceStore.updateVirtualItemSubmitForWebAdmin(
                 activeServer,
                 session.deviceId,

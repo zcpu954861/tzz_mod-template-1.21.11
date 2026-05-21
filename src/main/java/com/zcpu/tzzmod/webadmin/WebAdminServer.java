@@ -64,8 +64,12 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminRegionControllerService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminUserSettingsService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceLifecycleService;
 import com.zcpu.tzzmod.webadmin.service.WebAdminVirtualBlockDeviceNativeTriggerService;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotService;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotService.WebAdminSnapshotRequest;
 import com.zcpu.tzzmod.webadmin.testbridge.WebAdminTestBridgeRoutes;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
+import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionDecision;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteFoundationService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
@@ -117,6 +121,7 @@ public final class WebAdminServer {
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
     private final WebAdminTimerService timerService = new WebAdminTimerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminTemplateService templateService = new WebAdminTemplateService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminSnapshotService snapshotService = new WebAdminSnapshotService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, channelMetadataService, signalListenerBasicConfigService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
     private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
@@ -270,6 +275,10 @@ public final class WebAdminServer {
                 WebAdminJsonResponse.ok(exchange, helpCatalogService.catalog());
                 return;
             }
+            if (path.equals("/api/webadmin/snapshots") || path.startsWith("/api/webadmin/snapshots/")) {
+                runOnServerThread(() -> handleSnapshots(exchange, auth, path, method));
+                return;
+            }
             if (path.equals("/api/webadmin/users/me/password")) {
                 handleWebAdminOwnPassword(exchange, auth, method);
                 return;
@@ -388,6 +397,11 @@ public final class WebAdminServer {
                 return;
             }
             WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "接口不存在。");
+        } catch (AutoSnapshotFailedException exception) {
+            Tzz_mod.LOGGER.warn("WebAdmin auto snapshot blocked write: {}", exception.result.message());
+            if (exchange.getResponseCode() < 0) {
+                WebAdminJsonResponse.ok(exchange, exception.result);
+            }
         } catch (Exception exception) {
             Tzz_mod.LOGGER.warn("WebAdmin request failed: {}", exception.getMessage());
             if (exchange.getResponseCode() < 0) {
@@ -429,6 +443,15 @@ public final class WebAdminServer {
     @FunctionalInterface
     private interface ServerThreadAction {
         void run() throws Exception;
+    }
+
+    private static final class AutoSnapshotFailedException extends RuntimeException {
+        private final WebAdminWriteResult result;
+
+        private AutoSnapshotFailedException(WebAdminWriteResult result) {
+            super(result == null ? "" : result.message());
+            this.result = result;
+        }
     }
 
     private void handleLogin(HttpExchange exchange) throws IOException {
@@ -540,6 +563,144 @@ public final class WebAdminServer {
 
     private void handleWebAdminWriteCapabilities(HttpExchange exchange, AuthContext auth) throws IOException {
         WebAdminJsonResponse.ok(exchange, writeFoundationService.capabilities(auth.user, auth.session));
+    }
+
+    private WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshotBeforeWrite(HttpExchange exchange, AuthContext auth, WebAdminOperationType operationType, String module, String targetType, String targetId, String reason) {
+        if (exchange == null || auth == null || auth.user == null || operationType == null) {
+            return WebAdminSnapshotService.WebAdminSnapshotAutoResult.skipped("missing context");
+        }
+        WebAdminPermissionDecision permission = permissionService.decide(auth.user, operationType);
+        if (!permission.allowed()) {
+            return WebAdminSnapshotService.WebAdminSnapshotAutoResult.skipped("permission denied");
+        }
+        WebAdminWriteResult csrf = writeSecurityService.requireValidCsrf(auth.session, header(exchange, "X-TZZ-WebAdmin-CSRF"));
+        if (!csrf.success() || !isWriteSameOrigin(exchange)) {
+            return WebAdminSnapshotService.WebAdminSnapshotAutoResult.skipped("write security failed");
+        }
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult result = snapshotService.createAutoBeforeWrite(
+                minecraftServer,
+                auth.user,
+                operationType,
+                module,
+                targetType,
+                targetId,
+                reason
+        );
+        if (!result.created() && !result.skipped()) {
+            Tzz_mod.LOGGER.warn("WebAdmin auto snapshot before {} did not complete: {}", operationType, result.message());
+            WebAdminWriteTarget target = new WebAdminWriteTarget("SNAPSHOT_AUTO", safe(targetId), "自动快照");
+            throw new AutoSnapshotFailedException(WebAdminWriteResult.failed(
+                    WebAdminWriteResultCode.INTERNAL_ERROR,
+                    target,
+                    "写入前自动保存点创建失败，已停止本次写入。请检查快照存储或损坏配置文件。"
+            ));
+        }
+        return result;
+    }
+
+    private void annotateAutoSnapshotAfterWrite(WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot, WebAdminWriteResult result) {
+        if (autoSnapshot == null || !autoSnapshot.created() || autoSnapshot.record() == null || result == null || !result.success()) {
+            return;
+        }
+        snapshotService.updateAutoSnapshotOperationDiff(minecraftServer, autoSnapshot.record());
+    }
+
+    private void handleSnapshots(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
+        String root = "/api/webadmin/snapshots";
+        if (path.equals(root)) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, snapshotService.list(minecraftServer, auth.user, queryParams(exchange)));
+            return;
+        }
+        if (path.equals(root + "/manual")) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSnapshotRequest request = readJson(exchange, WebAdminSnapshotRequest.class);
+            if (request == null) {
+                request = new WebAdminSnapshotRequest();
+            }
+            WebAdminWriteResult result = snapshotService.createManual(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+
+        String tail = path.startsWith(root + "/") ? path.substring((root + "/").length()) : "";
+        if (tail.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "快照 ID 不能为空。");
+            return;
+        }
+        String[] parts = tail.split("/");
+        String snapshotId = decodePathSegment(parts[0]);
+        if (snapshotId.isBlank()) {
+            WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "快照 ID 不能为空。");
+            return;
+        }
+        if (parts.length == 1) {
+            if (!method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
+                return;
+            }
+            WebAdminJsonResponse.ok(exchange, snapshotService.detail(minecraftServer, auth.user, snapshotId));
+            return;
+        }
+        if (parts.length == 3 && "rollback".equals(parts[1]) && "dry-run".equals(parts[2])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSnapshotRequest request = readJson(exchange, WebAdminSnapshotRequest.class);
+            if (request == null) {
+                request = new WebAdminSnapshotRequest();
+            }
+            WebAdminWriteResult result = snapshotService.dryRunRollback(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    snapshotId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if (parts.length == 3 && "rollback".equals(parts[1]) && "apply".equals(parts[2])) {
+            if (!method.equalsIgnoreCase("POST")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 POST。");
+                return;
+            }
+            WebAdminSnapshotRequest request = readJson(exchange, WebAdminSnapshotRequest.class);
+            if (request == null) {
+                request = new WebAdminSnapshotRequest();
+            }
+            WebAdminWriteResult result = snapshotService.applyRollback(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    snapshotId,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        WebAdminJsonResponse.error(exchange, 404, "NOT_FOUND", "配置快照接口不存在。");
     }
 
     private void handleWebAdminOwnPassword(HttpExchange exchange, AuthContext auth, String method) throws IOException {
@@ -704,6 +865,7 @@ public final class WebAdminServer {
             request = new WebAdminDeviceMetadataUpdateRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_DEVICE_METADATA, "Device", WebAdminEditLockService.TARGET_DEVICE_METADATA, deviceId, "编辑设备显示信息前自动保存");
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result = deviceMetadataService.update(
@@ -743,6 +905,7 @@ public final class WebAdminServer {
             request = new WebAdminDeviceBasicConfigUpdateRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_DEVICE_BASIC_CONFIG, "Device", WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG, deviceId, "编辑设备基础配置前自动保存");
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result = deviceBasicConfigService.update(
@@ -782,6 +945,7 @@ public final class WebAdminServer {
             request = new WebAdminDeviceExtendedConfigUpdateRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_DEVICE_EXTENDED_CONFIG, "Device", WebAdminEditLockService.TARGET_DEVICE_EXTENDED_CONFIG, deviceId, "编辑设备扩展配置前自动保存");
         String csrfToken = header(exchange, "X-TZZ-WebAdmin-CSRF");
         boolean sameOrigin = isWriteSameOrigin(exchange);
         WebAdminWriteResult result = deviceExtendedConfigService.update(
@@ -846,6 +1010,7 @@ public final class WebAdminServer {
             request = new WebAdminActionRelayActionsUpdateRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, "ActionRelay", WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS, deviceId, "编辑 Action Relay 动作前自动保存");
         WebAdminWriteResult result = actionRelayActionsService.update(
                 minecraftServer,
                 auth.user,
@@ -884,6 +1049,7 @@ public final class WebAdminServer {
             request = new WebAdminInteractionItemMatcherUpdateRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_ITEM_MATCHER, "VirtualBlockDevice", WebAdminEditLockService.TARGET_INTERACTION_ITEM_MATCHER, deviceId, "编辑交互物品匹配前自动保存");
         WebAdminWriteResult result = interactionItemMatcherService.update(
                 minecraftServer,
                 auth.user,
@@ -923,6 +1089,7 @@ public final class WebAdminServer {
             request = new WebAdminChannelMetadataUpdateRequest();
         }
         request.channel = channel;
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_CHANNEL_METADATA, "SignalBridge", WebAdminEditLockService.TARGET_CHANNEL_METADATA, channel, "编辑频道显示信息前自动保存");
         WebAdminWriteResult result = channelMetadataService.update(
                 minecraftServer,
                 auth.user,
@@ -932,6 +1099,7 @@ public final class WebAdminServer {
                 header(exchange, "X-TZZ-WebAdmin-CSRF"),
                 isWriteSameOrigin(exchange)
         );
+        annotateAutoSnapshotAfterWrite(autoSnapshot, result);
         WebAdminJsonResponse.ok(exchange, result);
     }
 
@@ -979,6 +1147,7 @@ public final class WebAdminServer {
                     isWriteSameOrigin(exchange)
             );
         } else if ("save-draft".equals(tail)) {
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_LOGIC_CHAIN, "Logic Chain", WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR, safe(request.rootType) + ":" + safe(request.rootRef), "保存 Logic Chain 草稿前自动保存");
             result = logicChainEditorService.saveDraft(
                     minecraftServer,
                     auth.user,
@@ -988,6 +1157,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
         } else if ("cancel".equals(tail)) {
             result = logicChainEditorService.cancel(
                     auth.user,
@@ -1016,6 +1186,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminLogicChainMetadataRequest();
                 }
+                autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA, "Logic Chain", WebAdminEditLockService.TARGET_LOGIC_CHAIN_METADATA, safe(request.chainId), "创建逻辑链显示信息前自动保存");
                 WebAdminWriteResult result = logicChainService.upsertMetadata(
                         minecraftServer,
                         auth.user,
@@ -1078,6 +1249,7 @@ public final class WebAdminServer {
                     request = new WebAdminLogicChainMetadataRequest();
                 }
                 request.chainId = chainId;
+                autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA, "Logic Chain", WebAdminEditLockService.TARGET_LOGIC_CHAIN_METADATA, chainId, "编辑逻辑链显示信息前自动保存");
                 WebAdminWriteResult result = logicChainService.upsertMetadata(
                         minecraftServer,
                         auth.user,
@@ -1103,6 +1275,7 @@ public final class WebAdminServer {
                 request = new WebAdminLogicChainMetadataRequest();
             }
             request.chainId = chainId;
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_LOGIC_CHAIN_METADATA, "Logic Chain", WebAdminEditLockService.TARGET_LOGIC_CHAIN_METADATA, chainId, "删除逻辑链显示信息前自动保存");
             WebAdminWriteResult result = logicChainService.deleteMetadata(
                     minecraftServer,
                     auth.user,
@@ -1131,6 +1304,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminSignalJoinRequest();
                 }
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_JOIN, "Signal Join", WebAdminEditLockService.TARGET_SIGNAL_JOIN_CONFIG, safe(request.id), "创建 Signal Join 前自动保存");
                 WebAdminWriteResult result = signalJoinService.create(
                         minecraftServer,
                         auth.user,
@@ -1140,6 +1314,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1176,6 +1351,7 @@ public final class WebAdminServer {
                     request = new WebAdminSignalJoinRequest();
                 }
                 request.id = joinId;
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_JOIN, "Signal Join", WebAdminEditLockService.TARGET_SIGNAL_JOIN_CONFIG, joinId, "编辑 Signal Join 前自动保存");
                 WebAdminWriteResult result = signalJoinService.update(
                         minecraftServer,
                         auth.user,
@@ -1186,6 +1362,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1195,6 +1372,7 @@ public final class WebAdminServer {
                     request = new WebAdminSignalJoinRequest();
                 }
                 request.id = joinId;
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_JOIN, "Signal Join", WebAdminEditLockService.TARGET_SIGNAL_JOIN_CONFIG, joinId, "删除 Signal Join 前自动保存");
                 WebAdminWriteResult result = signalJoinService.delete(
                         minecraftServer,
                         auth.user,
@@ -1205,6 +1383,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1255,6 +1434,7 @@ public final class WebAdminServer {
                 request = new WebAdminSignalJoinRequest();
             }
             request.id = joinId;
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_JOIN, "Signal Join", WebAdminEditLockService.TARGET_SIGNAL_JOIN_CONFIG, joinId, "删除 Signal Join 前自动保存");
             WebAdminWriteResult result = signalJoinService.delete(
                     minecraftServer,
                     auth.user,
@@ -1265,6 +1445,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -1326,6 +1507,7 @@ public final class WebAdminServer {
             return;
         }
         if (tail.equals("import")) {
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.IMPORT_TEMPLATE, "Template", WebAdminEditLockService.TARGET_TEMPLATE_STORE, safe(request.templateId), "导入模板前自动保存");
             WebAdminWriteResult result = templateService.importUserTemplate(
                     minecraftServer,
                     auth.user,
@@ -1335,6 +1517,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -1351,6 +1534,7 @@ public final class WebAdminServer {
             return;
         }
         if (tail.equals("apply")) {
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.APPLY_TEMPLATE, "Template", WebAdminEditLockService.TARGET_TEMPLATE_APPLY, safe(request.templateId), "应用模板前自动保存");
             WebAdminWriteResult result = templateService.apply(
                     minecraftServer,
                     auth.user,
@@ -1360,6 +1544,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -1378,6 +1563,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminTimerRequest();
                 }
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_TIMER, "Timer", WebAdminEditLockService.TARGET_TIMER_CONFIG, safe(request.id), "创建 Timer 前自动保存");
                 WebAdminWriteResult result = timerService.create(
                         minecraftServer,
                         auth.user,
@@ -1387,6 +1573,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1423,6 +1610,7 @@ public final class WebAdminServer {
                     request = new WebAdminTimerRequest();
                 }
                 request.id = timerId;
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_TIMER, "Timer", WebAdminEditLockService.TARGET_TIMER_CONFIG, timerId, "编辑 Timer 前自动保存");
                 WebAdminWriteResult result = timerService.update(
                         minecraftServer,
                         auth.user,
@@ -1433,6 +1621,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1442,6 +1631,7 @@ public final class WebAdminServer {
                     request = new WebAdminTimerRequest();
                 }
                 request.id = timerId;
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_TIMER, "Timer", WebAdminEditLockService.TARGET_TIMER_CONFIG, timerId, "删除 Timer 前自动保存");
                 WebAdminWriteResult result = timerService.delete(
                         minecraftServer,
                         auth.user,
@@ -1452,6 +1642,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1550,6 +1741,7 @@ public final class WebAdminServer {
                 request = new WebAdminTimerRequest();
             }
             request.id = timerId;
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_TIMER, "Timer", WebAdminEditLockService.TARGET_TIMER_CONFIG, timerId, "删除 Timer 前自动保存");
             WebAdminWriteResult result = timerService.delete(
                     minecraftServer,
                     auth.user,
@@ -1560,6 +1752,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -1634,6 +1827,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminConditionGroupRequest();
                 }
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_CONDITION_GROUP, "Condition", WebAdminEditLockService.TARGET_CONDITION_GROUP, safe(request.id), "创建条件组前自动保存");
                 WebAdminWriteResult result = conditionGroupService.create(
                         minecraftServer,
                         auth.user,
@@ -1643,6 +1837,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1683,6 +1878,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminConditionGroupRequest();
                 }
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_CONDITION_GROUP, "Condition", WebAdminEditLockService.TARGET_CONDITION_GROUP, groupId, "编辑条件组前自动保存");
                 WebAdminWriteResult result = conditionGroupService.update(
                         minecraftServer,
                         auth.user,
@@ -1693,6 +1889,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -1709,6 +1906,7 @@ public final class WebAdminServer {
             if (request == null) {
                 request = new WebAdminConditionGroupRequest();
             }
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_CONDITION_GROUP, "Condition", WebAdminEditLockService.TARGET_CONDITION_GROUP, groupId, "删除条件组前自动保存");
             WebAdminWriteResult result = conditionGroupService.delete(
                     minecraftServer,
                     auth.user,
@@ -1719,6 +1917,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -1843,6 +2042,7 @@ public final class WebAdminServer {
             request = new WebAdminVirtualBlockDeviceDeleteRequest();
         }
         request.deviceId = deviceId;
+        autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.DELETE_VIRTUAL_BLOCK_DEVICE, "VirtualBlockDevice", "virtual_block_device", deviceId, "删除虚拟方块设备前自动保存");
         WebAdminWriteResult result = virtualBlockDeviceLifecycleService.delete(
                 minecraftServer,
                 auth.user,
@@ -1879,6 +2079,7 @@ public final class WebAdminServer {
                 request = new WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest();
             }
             request.deviceId = deviceId;
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS, "VirtualBlockDevice", WebAdminEditLockService.TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS, deviceId, "编辑 VBD 原生触发配置前自动保存");
             WebAdminWriteResult result = virtualBlockDeviceNativeTriggerService.update(
                     minecraftServer,
                     auth.user,
@@ -2110,6 +2311,7 @@ public final class WebAdminServer {
             if (request == null) {
                 request = new WebAdminSignalListenerCreateRequest();
             }
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.CREATE_SIGNAL_LISTENER, "Signal Listener", "signal_listener", safe(request.name), "创建 Signal Listener 前自动保存");
             WebAdminWriteResult result = signalListenerLifecycleService.create(
                     minecraftServer,
                     auth.user,
@@ -2119,6 +2321,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -2152,6 +2355,7 @@ public final class WebAdminServer {
                     request = new WebAdminSignalListenerActionRequests.ActionAddRequest();
                 }
                 request.listenerId = listenerId;
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listenerId, "追加 Signal Listener Action 前自动保存");
                 WebAdminWriteResult result = signalListenerActionsService.addAction(
                         minecraftServer,
                         auth.user,
@@ -2162,6 +2366,7 @@ public final class WebAdminServer {
                         header(exchange, "X-TZZ-WebAdmin-CSRF"),
                         isWriteSameOrigin(exchange)
                 );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
                 WebAdminJsonResponse.ok(exchange, result);
                 return;
             }
@@ -2179,6 +2384,7 @@ public final class WebAdminServer {
                 request = new WebAdminSignalListenerActionRequests.ActionClearRequest();
             }
             request.listenerId = listenerId;
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listenerId, "清空 Signal Listener Action 前自动保存");
             WebAdminWriteResult result = signalListenerActionsService.clearActions(
                     minecraftServer,
                     auth.user,
@@ -2189,6 +2395,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -2204,6 +2411,7 @@ public final class WebAdminServer {
             }
             request.listenerId = listenerId;
             request.actionIndex = decodePathSegment(parts[2]);
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listenerId, "编辑 Signal Listener Action 前自动保存");
             WebAdminWriteResult result = signalListenerActionsService.updateAction(
                     minecraftServer,
                     auth.user,
@@ -2214,6 +2422,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -2229,6 +2438,7 @@ public final class WebAdminServer {
             }
             request.listenerId = listenerId;
             request.actionIndex = decodePathSegment(parts[2]);
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_ACTIONS, listenerId, "删除 Signal Listener Action 前自动保存");
             WebAdminWriteResult result = signalListenerActionsService.deleteAction(
                     minecraftServer,
                     auth.user,
@@ -2239,6 +2449,7 @@ public final class WebAdminServer {
                     header(exchange, "X-TZZ-WebAdmin-CSRF"),
                     isWriteSameOrigin(exchange)
             );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
             WebAdminJsonResponse.ok(exchange, result);
             return;
         }
@@ -2256,6 +2467,7 @@ public final class WebAdminServer {
             request = new WebAdminSignalListenerDeleteRequest();
         }
         request.listenerId = listenerId;
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.DELETE_SIGNAL_LISTENER, "Signal Listener", "signal_listener", listenerId, "删除 Signal Listener 前自动保存");
         WebAdminWriteResult result = signalListenerLifecycleService.delete(
                 minecraftServer,
                 auth.user,
@@ -2266,6 +2478,7 @@ public final class WebAdminServer {
                 header(exchange, "X-TZZ-WebAdmin-CSRF"),
                 isWriteSameOrigin(exchange)
         );
+        annotateAutoSnapshotAfterWrite(autoSnapshot, result);
         WebAdminJsonResponse.ok(exchange, result);
     }
 
@@ -2294,6 +2507,7 @@ public final class WebAdminServer {
             request = new WebAdminSignalListenerBasicConfigUpdateRequest();
         }
         request.listenerRef = listenerRef;
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG, listenerRef, "编辑 Signal Listener 基础配置前自动保存");
         WebAdminWriteResult result = signalListenerBasicConfigService.update(
                 minecraftServer,
                 auth.user,
@@ -2303,6 +2517,7 @@ public final class WebAdminServer {
                 header(exchange, "X-TZZ-WebAdmin-CSRF"),
                 isWriteSameOrigin(exchange)
         );
+        annotateAutoSnapshotAfterWrite(autoSnapshot, result);
         WebAdminJsonResponse.ok(exchange, result);
     }
 
@@ -2318,6 +2533,7 @@ public final class WebAdminServer {
                 if (request == null) {
                     request = new WebAdminRegionControllerRequests.CreateRequest();
                 }
+                autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, safe(request.regionId), "创建 RegionController 前自动保存");
                 WebAdminWriteResult result = regionControllerService.create(
                         minecraftServer,
                         auth.user,
@@ -2363,6 +2579,7 @@ public final class WebAdminServer {
                     request = new WebAdminRegionControllerRequests.UpdateRequest();
                 }
                 request.controllerId = controllerId;
+                autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "编辑 RegionController 前自动保存");
                 WebAdminWriteResult result = regionControllerService.update(
                         minecraftServer,
                         auth.user,
@@ -2390,6 +2607,7 @@ public final class WebAdminServer {
                 request = new WebAdminRegionControllerRequests.DeleteRequest();
             }
             request.controllerId = controllerId;
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "删除 RegionController 前自动保存");
             WebAdminWriteResult result = regionControllerService.delete(
                     minecraftServer,
                     auth.user,
@@ -2417,6 +2635,7 @@ public final class WebAdminServer {
                 }
                 request.controllerId = controllerId;
                 request.triggerType = triggerType.name();
+                autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "追加 RegionController Action 前自动保存");
                 WebAdminWriteResult result = regionControllerService.addAction(
                         minecraftServer,
                         auth.user,
@@ -2451,6 +2670,7 @@ public final class WebAdminServer {
             }
             request.controllerId = controllerId;
             request.triggerType = triggerType.name();
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "清空 RegionController Action 前自动保存");
             WebAdminWriteResult result = regionControllerService.clearActions(
                     minecraftServer,
                     auth.user,
@@ -2483,6 +2703,7 @@ public final class WebAdminServer {
             request.controllerId = controllerId;
             request.triggerType = triggerType.name();
             request.actionIndex = decodePathSegment(parts[3]);
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "编辑 RegionController Action 前自动保存");
             WebAdminWriteResult result = regionControllerService.updateAction(
                     minecraftServer,
                     auth.user,
@@ -2515,6 +2736,7 @@ public final class WebAdminServer {
             request.controllerId = controllerId;
             request.triggerType = triggerType.name();
             request.actionIndex = decodePathSegment(parts[3]);
+            autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_REGION, "Region", WebAdminEditLockService.TARGET_REGION_CONTROLLER_CONFIG, controllerId, "删除 RegionController Action 前自动保存");
             WebAdminWriteResult result = regionControllerService.deleteAction(
                     minecraftServer,
                     auth.user,

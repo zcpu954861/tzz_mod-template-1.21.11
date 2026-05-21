@@ -37,6 +37,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_SIGNAL_JOIN_CONFIG = "signal_join_config";
     public static final String TARGET_TIMER_CONFIG = "timer_config";
     public static final String TARGET_REGION_CONTROLLER_CONFIG = "region_controller_config";
+    public static final String TARGET_SNAPSHOT_ROLLBACK = "snapshot_rollback";
     public static final long DEFAULT_TTL_MILLIS = 5L * 60L * 1000L;
 
     private final Map<String, WebAdminEditLock> locks = new ConcurrentHashMap<>();
@@ -579,6 +580,9 @@ public final class WebAdminEditLockService {
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
             return "RegionController 配置";
         }
+        if (TARGET_SNAPSHOT_ROLLBACK.equals(safeTargetType)) {
+            return "配置快照回滚";
+        }
         return "WebAdmin";
     }
 
@@ -661,6 +665,9 @@ public final class WebAdminEditLockService {
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_REGION;
         }
+        if (TARGET_SNAPSHOT_ROLLBACK.equals(safeTargetType)) {
+            return WebAdminOperationType.ROLLBACK_SNAPSHOT;
+        }
         return null;
     }
 
@@ -697,6 +704,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_REGION_CONTROLLER_CONFIG.equals(lock.targetType())) {
             return "#/region-controllers/" + encode(lock.targetId());
+        }
+        if (TARGET_SNAPSHOT_ROLLBACK.equals(lock.targetType())) {
+            return "#/snapshots";
         }
         return "";
     }
