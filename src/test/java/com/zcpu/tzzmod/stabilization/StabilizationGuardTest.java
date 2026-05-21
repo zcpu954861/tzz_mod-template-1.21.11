@@ -87,6 +87,7 @@ import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTemplateServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminHelpCatalogServiceTest;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotServiceTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminTimerServiceTest;
 import com.zcpu.tzzmod.webadmin.service.TimerDoctorTest;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceBasicConfigService;
@@ -193,6 +194,7 @@ public final class StabilizationGuardTest {
         WebAdminLogicChainServiceTest.run();
         WebAdminLogicChainEditorServiceTest.run();
         WebAdminTemplateServiceTest.run();
+        WebAdminSnapshotServiceTest.run();
         WebAdminHelpCatalogServiceTest.run();
         testConditionEngineCore80();
         testConditionBasicPlayerContext81();
@@ -212,6 +214,7 @@ public final class StabilizationGuardTest {
         testTemplatesPrefabImportExport815();
         testLogicChainEditorExistingNodeEditing816();
         testWebAdminHelpExampleCenter817();
+        testSnapshotRollbackTimeline818();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1391,6 +1394,10 @@ public final class StabilizationGuardTest {
                   const method = String(options.method || 'GET').toUpperCase();
                   if (url.startsWith('/api/webadmin/edit-locks/acquire')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, holderUsername:'Owner', expiresAt:'2026-05-09T10:10:00Z' } } };
                   if (url.startsWith('/api/webadmin/edit-locks/release') || url.startsWith('/api/webadmin/edit-locks/heartbeat')) return { success:true, data:{ lock:{ lockId:'lock-1', locked:true, heldByCurrentUser:true, expiresAt:'2026-05-09T10:10:00Z' } } };
+                  if (url === '/api/webadmin/snapshots' || url.startsWith('/api/webadmin/snapshots?')) return { records:[{ snapshotId:'snap-1', sequence:1, createdAt:'2026-05-21T10:00:00Z', createdBy:'Owner', kind:'manual', title:'Smoke Snapshot', note:'route smoke', tags:['smoke'], trigger:{ operation:'CREATE_SNAPSHOT', module:'Snapshot', targetType:'snapshot', targetId:'snap-1', reason:'manual', routeTarget:'#/snapshots' }, previousSnapshotId:'', resourceCounts:{ channel:1, timer:1 }, diffSummary:{ created:1, updated:0, deleted:0, unchanged:0, byType:{ channel:1 }, warnings:[] }, packageFingerprint:'pack-fp', storagePath:'snapshots/data/snap-1.json', warnings:[] }], manifestFingerprint:'manifest-fp', storagePath:'tzz/webadmin/snapshots', degraded:false, message:'', stats:{ total:1, manual:1, auto:0, preRollback:0 }, filters:{ modules:['Snapshot'], users:['Owner'], resourceTypes:['channel','timer'] }, retention:{ autoRetentionLimit:200, manualProtected:true, preRollbackProtected:true } };
+                  if (url === '/api/webadmin/snapshots/snap-1') return { record:{ snapshotId:'snap-1', sequence:1, createdAt:'2026-05-21T10:00:00Z', createdBy:'Owner', kind:'manual', title:'Smoke Snapshot', note:'route smoke', tags:['smoke'], trigger:{ operation:'CREATE_SNAPSHOT', module:'Snapshot', targetType:'snapshot', targetId:'snap-1', reason:'manual', routeTarget:'#/snapshots' }, previousSnapshotId:'', resourceCounts:{ channel:1 }, diffSummary:{ created:1, updated:0, deleted:0, unchanged:0, byType:{ channel:1 }, warnings:[] }, packageFingerprint:'pack-fp', storagePath:'snapshots/data/snap-1.json', warnings:[] }, previousRecord:{}, resources:[{ resourceType:'channel', resourceId:'test.channel', displayName:'Test Channel', sourceStore:'channel_metadata', pathKey:'channel_metadata', fingerprint:'res-fp', restoreResource:false, metadata:{ module:'SignalBridge' } }], diff:{ summary:{ created:1, updated:0, deleted:0, unchanged:0, byType:{ channel:1 }, warnings:[] }, entries:[{ changeType:'created', resourceType:'channel', resourceId:'test.channel', displayName:'Test Channel', sourceStore:'channel_metadata', beforeFingerprint:'', afterFingerprint:'res-fp' }], warnings:[] }, manifestFingerprint:'manifest-fp', degraded:false, message:'' };
+                  if (url.endsWith('/rollback/dry-run')) return { success:true, message:'回滚 dry-run 已完成。', data:{ plan:{ snapshotId:'snap-1', targetSequence:1, currentFingerprint:'current-fp', targetFingerprint:'pack-fp', manifestFingerprint:'manifest-fp', dryRunFingerprint:'dry-fp', operations:[{ operation:'update', pathKey:'channel_metadata', resourceType:'store_file', resourceId:'channel_metadata', displayName:'channel_metadata', beforeFingerprint:'before', afterFingerprint:'after', destructive:false }], warnings:['smoke warning'], blockers:[], summary:{ created:0, updated:1, deleted:0, unchanged:0, byType:{ channel:1 }, warnings:[] } } } };
+                  if (url.endsWith('/rollback/apply')) return { success:true, message:'配置已回滚到选中的保存点。', data:{ preRollbackSnapshotId:'snap-pre', routeTarget:'#/snapshots' } };
                   if (url === '/api/webadmin/condition-types') return { readOnly:true, count:7, types:[
                     { type:'always_true', displayName:'永远通过', description:'总是通过。', category:'调试条件', suite:'core', fields:[] },
                     { type:'context_equals', displayName:'上下文字段匹配', description:'检查上下文字段。', category:'上下文条件', suite:'core', fields:[{ key:'field', displayName:'上下文字段', kind:'string', required:true }, { key:'expected', displayName:'期望值', kind:'string', required:true }] },
@@ -1810,6 +1817,8 @@ public final class StabilizationGuardTest {
                   '#/region-controllers',
                   '#/action-templates',
                   '#/templates',
+                  '#/snapshots',
+                  '#/snapshots/snap-1',
                   '#/timers',
                   '#/logic-chains',
                   '#/state-variables',
@@ -10620,7 +10629,7 @@ public final class StabilizationGuardTest {
                 "data-route=\"#/help\"",
                 "help-center",
                 "example-center",
-                "TZZ_WEBADMIN_ASSET_VERSION='8.17-webadmin-help-example-center'",
+                "TZZ_WEBADMIN_ASSET_VERSION='8.18-snapshot-rollback-timeline-clickfix'",
                 "appState.helpCatalog",
                 "appState.helpCenterFilters",
                 "renderHelpCenterPage",
@@ -10863,6 +10872,368 @@ public final class StabilizationGuardTest {
                 "SCRATCH_BLOCK"
         )) {
             requireFalse(actionType.contains(forbidden), "8.17 must not add ActionType marker: " + forbidden);
+        }
+        requireActionTypeSetUnchangedFor812();
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void testSnapshotRollbackTimeline818() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        String context = Files.readString(root.resolve("docs/SNAPSHOT_ROLLBACK_TIMELINE_8_18_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String matrix = Files.readString(root.resolve("docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md"), StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String models = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotModels.java"), StandardCharsets.UTF_8);
+        String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotStore.java"), StandardCharsets.UTF_8);
+        String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotService.java"), StandardCharsets.UTF_8);
+        String selectionSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/selection/WebAdminSelectionSessions.java"), StandardCharsets.UTF_8);
+        String containerTemplateSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/container/WebAdminContainerTemplateSessions.java"), StandardCharsets.UTF_8);
+        String singleItemSubmitTemplateSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/itemsubmit/WebAdminSingleItemSubmitTemplateSessions.java"), StandardCharsets.UTF_8);
+        String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String rolePolicy = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminRolePolicy.java"), StandardCharsets.UTF_8);
+        String editLock = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String foundation = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminWriteFoundationService.java"), StandardCharsets.UTF_8);
+        String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+        String snapshotTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotServiceTest.java"), StandardCharsets.UTF_8);
+        String jsonStoreSupport = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/core/storage/JsonStoreSupport.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/SNAPSHOT_ROLLBACK_TIMELINE_8_18_CURRENT_CONTEXT.md",
+                "docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotModels.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotStore.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotService.java",
+                "src/test/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotServiceTest.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.18 file exists: " + file);
+        }
+
+        for (String marker : List.of(
+                "8.18 Snapshot Timeline / Rollback Graph",
+                "manual snapshot",
+                "auto snapshot",
+                "pre_rollback",
+                "covered write operations",
+                "snapshot schema",
+                "storage path",
+                "timeline UI",
+                "rollback dry-run",
+                "rollback apply",
+                "permission/security",
+                "retention",
+                "Git branch / merge / rebase",
+                "runtime history",
+                "GameController / MissionSystem / PhaseController",
+                "new ActionType",
+                "new ConditionNodeType"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme, marker, "8.18 docs/README marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-snapshot-timeline-nav",
+                "data-route=\"#/snapshots\"",
+                "snapshot",
+                "TZZ_WEBADMIN_ASSET_VERSION='8.18-snapshot-rollback-timeline-clickfix'",
+                "appState.snapshotTimeline",
+                "renderSnapshotTimelinePage",
+                "#/snapshots",
+                "/api/webadmin/snapshots",
+                "data-snapshot-timeline-page",
+                "data-snapshot-timeline-graph",
+                "data-snapshot-timeline-not-table",
+                "data-snapshot-filter-search",
+                "data-snapshot-filter-ime-safe",
+                "data-snapshot-filter-resource",
+                "data-snapshot-node-kind-manual",
+                "data-snapshot-node-kind-auto",
+                "data-snapshot-node-kind-pre-rollback",
+                "data-snapshot-detail-rail",
+                "data-snapshot-detail-diff",
+                "data-snapshot-before-write-explained",
+                "data-snapshot-operation-diff",
+                "data-snapshot-rollback-operation-diff",
+                "data-snapshot-operation-timer-updated",
+                "data-snapshot-diff-entry",
+                "data-snapshot-diff-clickable",
+                "data-snapshot-operation-diff-item",
+                "data-snapshot-previous-diff-item",
+                "data-snapshot-diff-detail-modal",
+                "data-snapshot-diff-detail-readonly",
+                "data-snapshot-diff-detail-no-save",
+                "data-snapshot-diff-detail-resource-metadata",
+                "data-snapshot-diff-detail-updated-summary",
+                "data-snapshot-diff-detail-created-summary",
+                "data-snapshot-diff-detail-deleted-summary",
+                "data-snapshot-diff-entry-event-delegation",
+                "data-snapshot-diff-button-type",
+                "data-snapshot-manual-modal",
+                "data-snapshot-rollback-dry-run-modal",
+                "data-snapshot-rollback-confirm-modal",
+                "data-snapshot-json-preview",
+                "data-snapshot-selection-within-filtered-graph",
+                "snapshot-timeline-layout",
+                "snapshot-graph-stream",
+                "snapshot-detail-rail",
+                "snapshotKindClass",
+                "snapshotClientFilterRecords",
+                "applySnapshotSearchPreview",
+                "snapshotOperationLabel",
+                "data-snapshot-node-select=\"true\"",
+                "function handleSnapshotTimelineNodeClick",
+                "openSnapshotRollbackDryRun",
+                "applySnapshotRollback"
+        )) {
+            requireContains(shell + "\n" + scripts + "\n" + styles, marker, "8.18 frontend marker: " + marker);
+        }
+
+        String snapshotSection = extractBetween(scripts, "function snapshotKindLabel", "async function renderTemplatesPage");
+        for (String forbidden : List.of(
+                "alert(",
+                "confirm(",
+                "prompt(",
+                "window.alert",
+                "window.confirm",
+                "window.prompt",
+                "<table",
+                "branchEditor",
+                "mergeSnapshot",
+                "rebaseSnapshot"
+        )) {
+            requireFalse(snapshotSection.contains(forbidden), "8.18 snapshot UI must avoid tables/dialogs/Git operations: " + forbidden);
+        }
+        requireContains(snapshotSection, "function handleSnapshotDiffDelegatedClick", "8.18 snapshot diff entries must use event delegation");
+        requireContains(snapshotSection, "function handleSnapshotTimelineNodeClick", "8.18 snapshot timeline node selection must use event delegation");
+        requireContains(snapshotSection, "oncompositionstart=\"setSnapshotSearchComposing(true,this)\"", "8.18 snapshot search must not refresh during IME composition");
+        requireContains(snapshotSection, "this.dataset.snapshotComposing==='true'||appState.snapshotSearchComposing", "8.18 snapshot search must preserve Chinese IME input without relying on inline event globals");
+        requireFalse(snapshotSection.contains("event.isComposing"), "8.18 snapshot search must not rely on inline event globals");
+        requireContains(snapshotSection, "snapshotRecordSearchHaystack", "8.18 snapshot search must match localized display labels");
+        requireContains(service, "snapshotKindLabel(record.kind)", "8.18 snapshot server search must match localized kind labels");
+        requireContains(service, "snapshotOperationLabel(record.trigger == null ? \"\" : record.trigger.operation)", "8.18 snapshot server search must match localized operation labels");
+        requireContains(scripts, "if(handleSnapshotTimelineNodeClick(event))return;", "8.18 snapshot timeline delegated click handler is registered");
+        requireContains(scripts, "if(handleSnapshotDiffDelegatedClick(event))return;", "8.18 snapshot diff delegated click handler is registered");
+        requireContains(snapshotSection, "<button type=\"button\" class=\"snapshot-diff-row", "8.18 snapshot diff items are safe buttons");
+        requireFalse(snapshotSection.contains("onclick=\"openSnapshotTimelineNode"),
+                "8.18 snapshot timeline nodes must not generate broken inline onclick with nested double quotes");
+        requireFalse(snapshotSection.contains("data-snapshot-diff-entry=\"true\" onclick=")
+                        || snapshotSection.contains("data-snapshot-diff-clickable=\"true\" onclick="),
+                "8.18 snapshot diff entries must not use unsafe inline onclick");
+
+        for (String marker : List.of(
+                "path.equals(\"/api/webadmin/snapshots\")",
+                "handleSnapshots",
+                "autoSnapshotBeforeWrite",
+                "createAutoBeforeWrite",
+                "updateAutoSnapshotOperationDiff",
+                "updatePreRollbackOperationDiff",
+                "CREATE_SNAPSHOT",
+                "ROLLBACK_SNAPSHOT",
+                "VIEW_SNAPSHOTS",
+                "TARGET_SNAPSHOT_ROLLBACK",
+                "SNAPSHOT_CREATED",
+                "SNAPSHOT_ROLLBACK_APPLIED",
+                "SNAPSHOT_TIMELINE_CHANGED"
+        )) {
+            requireContains(server + "\n" + service + "\n" + operationType + "\n" + editLock + "\n" + realtime, marker, "8.18 backend/security marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "createAutoBeforeTrustedWrite",
+                "START_OBJECT_SELECTION",
+                "SAVE_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT",
+                "TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "validateLock",
+                "auto_snapshot_failed",
+                "signal_devices.json"
+        )) {
+            requireContains(service + "\n" + selectionSessions + "\n" + containerTemplateSessions + "\n" + singleItemSubmitTemplateSessions + "\n" + matrix,
+                    marker, "8.18 session callback auto snapshot marker: " + marker);
+        }
+        for (String marker : List.of(
+                "lockService.validateLock",
+                "TARGET_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE",
+                "createAutoBeforeTrustedWrite"
+        )) {
+            requireContains(containerTemplateSessions, marker, "8.18 container template callback lock/snapshot marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SnapshotManifest",
+                "SnapshotRecord",
+                "SnapshotPackage",
+                "SnapshotResource",
+                "SnapshotDiffSummary",
+                "SnapshotFieldDiff",
+                "fieldDiffs",
+                "beforeSummary",
+                "afterSummary",
+                "beforeJsonPreview",
+                "afterJsonPreview",
+                "operationDiff",
+                "RollbackPlan",
+                "SnapshotKind",
+                "MANUAL(\"manual\"",
+                "AUTO(\"auto\"",
+                "PRE_ROLLBACK(\"pre_rollback\""
+        )) {
+            requireContains(models, marker, "8.18 schema marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SNAPSHOT_DIR = \"snapshots\"",
+                "SNAPSHOT_DATA_DIR = \"data\"",
+                "MANIFEST_FILE = \"manifest.json\"",
+                "AUTO_RETENTION_LIMIT = 200",
+                "applyAutoRetention",
+                "\"store_file\"",
+                "web_admin_channel_metadata.json",
+                "web_admin_logic_chain_metadata.json",
+                "web_admin_device_metadata.json",
+                "templates.json",
+                "condition_groups.json",
+                "condition_runtime_gates.json",
+                "signal_devices.json",
+                "signal_joins.json",
+                "timers.json",
+                "state_variables.json",
+                "signal_listeners.json",
+                "region_controllers.json",
+                "canonicalJson",
+                "restoreResource",
+                "详细错误请查看服务端日志"
+        )) {
+            requireContains(store, marker, "8.18 snapshot store marker: " + marker);
+        }
+        requireFalse(store.contains("读取失败：\" + exception.getMessage()")
+                        || store.contains("读取失败，已返回空列表以避免覆盖损坏文件：\" + exception.getMessage()")
+                        || store.contains("已阻断快照以避免保存半可信数据：\" + exception.getMessage()"),
+                "8.18 snapshot store degraded messages must not expose raw parser or IO exception text to UI");
+
+        for (String marker : List.of(
+                "SUPPRESS_AUTO_CAPTURE",
+                "runSuppressed",
+                "dryRunRollback",
+                "applyRollback",
+                "pre_rollback",
+                "buildRollbackPlan",
+                "applyRollbackFiles",
+                "dryRunFingerprint",
+                "expectedFingerprint",
+                "manifestFingerprint",
+                "writePreflight",
+                "requireValidCsrf",
+                "sameOrigin",
+                "validateLock",
+                "rollback-staging",
+                "mergeStateVariableDefinitionsForRollback",
+                "jsonFieldDiffs",
+                "DIFF_FIELD_LIMIT",
+                "resourceSummary",
+                "SignalDeviceStore.clearCache",
+                "autoSnapshotAuditData",
+                "autoSnapshotAudit",
+                "operationDiff",
+                "viewRecordWithEffectiveSummary",
+                "effectiveOperationDiff",
+                "diffAgainstPreviousRecord",
+                "updatePreRollbackOperationDiff",
+                "详细错误请查看服务端日志",
+                "audit(",
+                "publishSnapshotRealtime"
+        )) {
+            requireContains(service, marker, "8.18 snapshot service marker: " + marker);
+        }
+        requireFalse(service.contains("回滚写入失败，已创建回滚前保护点：\" + exception.getMessage()"),
+                "8.18 rollback apply must not return raw exception details to snapshot UI");
+
+        for (String marker : List.of(
+                "VIEW_SNAPSHOTS",
+                "CREATE_SNAPSHOT",
+                "ROLLBACK_SNAPSHOT",
+                "DELETE_SNAPSHOT",
+                "snapshotTimelineEnabled",
+                "snapshotRollbackEnabled",
+                "WebAdminRole.EDITOR",
+                "WebAdminRole.VIEWER",
+                "WebAdminRole.TESTER"
+        )) {
+            requireContains(operationType + "\n" + rolePolicy + "\n" + foundation, marker, "8.18 permission/foundation marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "testManualSnapshotManifestPackageAndDiff",
+                "testTimerBeforeWriteAutoSnapshotRecordsOperationDiff",
+                "testOperationDiffCoversSnapshotResourceTypes",
+                "testResourceMetadataChangesProduceUpdatedDiffs",
+                "testBadManifestAndPackageFallback",
+                "testPackageFingerprintMismatchBlocksRollbackPlan",
+                "testRollbackPlanAndApplyRestoresStoreFiles",
+                "testRollbackRestoresSignalDeviceConfigAndPreservesRuntime",
+                "testRollbackPreservesExistingStateVariableValues",
+                "testAutoRetentionProtectsManualAndPreRollback",
+                "testCollectExcludesForbiddenDirectories",
+                "pre_rollback snapshot is persisted before rollback apply",
+                "pre_rollback operation diff shows rollback changes",
+                "pre_rollback operation diff direction is current before rollback to rollback target",
+                "fingerprint mismatch blocks rollback dry-run",
+                "rollback preserves current signal device runtime fields",
+                "rollback preserves current state variable value",
+                "bad manifest message hides parser details from UI",
+                "bad snapshot package message hides parser details from UI",
+                "bad store warning hides parser details from UI",
+                "snapshot collect excludes forbidden directories",
+                "Timer rename is reported as operation updated diff",
+                "before-write snapshot keeps previous diff independent from operation diff",
+                "next before-write snapshot does not repeat the previous operation diff as previous-snapshot diff",
+                "operation diff entries carry read-only detail summaries",
+                "Timer operation diff exposes shallow field diff",
+                "created diff carries new resource summary",
+                "deleted diff carries old resource summary",
+                "metadata/config change is detected as updated"
+        )) {
+            requireContains(snapshotTest, marker, "8.18 snapshot test marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "Before-write operation diff",
+                "operationDiff",
+                "Timer rename",
+                "本次操作变化",
+                "pre_rollback operation diff"
+        )) {
+            requireContains(context + "\n" + matrix + "\n" + readme + "\n" + scripts, marker, "8.18 before-write operation diff marker: " + marker);
+        }
+
+        requireFalse(jsonStoreSupport.contains("Snapshot") || jsonStoreSupport.contains("snapshot"),
+                "8.18 must not hook global JsonStoreSupport write path for snapshots");
+        for (String forbidden : List.of(
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "FullLogicChainEditor",
+                "ScratchEditor",
+                "IfElseRuntime",
+                "BranchMergeRebase",
+                "SnapshotBranch",
+                "SnapshotMerge",
+                "SnapshotRebase"
+        )) {
+            requireFalse(service.contains(forbidden) || store.contains(forbidden) || models.contains(forbidden),
+                    "8.18 snapshot source must not add out-of-scope marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "GAME_CONTROLLER",
+                "MISSION_SYSTEM",
+                "PHASE_CONTROLLER",
+                "IF_ELSE",
+                "SCRATCH_BLOCK"
+        )) {
+            requireFalse(actionType.contains(forbidden), "8.18 must not add ActionType marker: " + forbidden);
         }
         requireActionTypeSetUnchangedFor812();
         requireConditionNodeTypeSetUnchangedFor813();

@@ -1,7 +1,7 @@
 package com.zcpu.tzzmod.webadmin;
 
 public final class WebAdminFrontendShell {
-    private static final String ASSET_VERSION = "8.17-webadmin-help-example-center";
+    private static final String ASSET_VERSION = "8.18-snapshot-rollback-timeline-clickfix";
     private static final String LEGACY_RUNTIME_GATE_ASSET_MARKER = "8.6-runtime-gates";
 
     private WebAdminFrontendShell() {
@@ -108,6 +108,7 @@ public final class WebAdminFrontendShell {
                         <div class="nav-section">
                           <div class="nav-section-title">模板与复用</div>
                           <button class="nav-item" data-route="#/templates" data-template-center-nav="true"><span class="nav-icon" data-icon="template-package"></span>模板中心</button>
+                          <button class="nav-item" data-route="#/snapshots" data-snapshot-timeline-nav="true"><span class="nav-icon" data-icon="snapshot"></span>配置时间轴</button>
                           <button class="nav-item" data-route="#/help" data-help-example-center-nav="true"><span class="nav-icon" data-icon="help-center"></span>帮助中心 / 示例中心</button>
                         </div>
                         <div class="nav-section">

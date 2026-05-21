@@ -11,10 +11,13 @@ import com.zcpu.tzzmod.signal.device.VirtualBlockDeviceSupport;
 import com.zcpu.tzzmod.util.NullSafety;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminDeviceMetadataStore;
+import com.zcpu.tzzmod.webadmin.WebAdminRole;
+import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.service.WebAdminDeviceMetadataService;
+import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
@@ -266,6 +269,20 @@ public final class WebAdminSelectionSessions {
         String channel = SignalChannel.normalize(session.draft.channel());
         if (!SignalChannel.isValid(channel)) {
             failAndClose(session, player, "server_validation", SignalChannel.validationError(channel).getString(), Map.of("channel", channel));
+            return;
+        }
+
+        WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = WebAdminSnapshotService.createAutoBeforeTrustedWrite(
+                server,
+                snapshotActor(session),
+                WebAdminOperationType.START_OBJECT_SELECTION,
+                "Virtual Block Device",
+                "virtual_block_device",
+                world.getRegistryKey().getValue() + "@" + pos.getX() + "," + pos.getY() + "," + pos.getZ(),
+                "创建虚拟方块设备前自动保存"
+        );
+        if (!autoSnapshot.created() && !autoSnapshot.skipped()) {
+            failAndClose(session, player, "auto_snapshot_failed", "写入前自动保存点创建失败，已停止创建虚拟方块设备。请检查快照存储或损坏配置文件。", Map.of("pos", posSummary(world, pos)));
             return;
         }
 
@@ -577,6 +594,14 @@ public final class WebAdminSelectionSessions {
 
     private static WebAdminWriteTarget selectionTarget(String selectionId) {
         return new WebAdminWriteTarget("OBJECT_SELECTION", safe(selectionId), "新建虚拟方块设备选择");
+    }
+
+    private static WebAdminUser snapshotActor(WebAdminSelectionSession session) {
+        WebAdminUser user = new WebAdminUser();
+        user.username = session == null ? "" : session.actorUsername;
+        user.displayName = user.username;
+        user.role = session == null || session.actorRole == null ? WebAdminRole.VIEWER.id() : session.actorRole.id();
+        return user.normalized();
     }
 
     private static WebAdminWriteResult activeConflict(WebAdminWriteContext context, WebAdminSelectionSession previous) {
