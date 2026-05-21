@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logic Chain V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar"><div class="brand"><span class="icon-box action"><svg class="svg" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 11l6-4M9 13l6 4"/></svg></span><div><strong>Logic Chain</strong><small>Viewer / Editor V2</small></div></div><nav class="nav"><section class="nav-section"><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引</span></a><a class="nav-link" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link active" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav><button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button></aside>
+    <section class="main">
+      <header class="topbar"><div class="toolbar"><button class="btn primary">进入编辑模式</button><button class="btn">保存草稿</button><button class="btn ghost">退出</button></div><div class="legend-row"><span class="badge blue">channel</span><span class="badge green">join</span><span class="badge violet">draft</span><span class="badge readonly">reference</span></div></header>
+      <section class="page">
+        <div class="page-head"><div><h1>逻辑链：game.round.start</h1><p>画布、toolbar、legend、右侧详情不变；节点卡内部 title / id / status / badges 重新组织。</p></div><div class="toolbar"><label class="field">视图<select class="select"><option>双向</option></select></label><label class="field">节点<select class="select"><option>全部</option></select></label></div></div>
+        <div class="two-col">
+          <section class="canvas">
+            <div class="stage">
+              <svg class="edge-layer" viewBox="0 0 1100 620" preserveAspectRatio="none"><path class="edge primary" d="M230 130 C318 130 338 230 426 230"/><path class="edge" d="M230 340 C318 340 338 255 426 255"/><path class="edge ok" d="M656 242 C735 242 745 168 824 168"/><path class="edge draft" d="M656 266 C730 305 758 420 842 430"/><path class="edge" d="M232 492 C350 492 662 488 842 430"/></svg>
+              <article class="node-card" style="left:44px;top:76px;--accent:var(--module-signal)"><span class="port out"></span><div class="node-head"><div><h3>一号测试频道</h3><small class="mono">channel:game.round.start</small></div><span class="badge blue">focus</span></div><div class="chip-row"><span class="chip">producer 2</span><span class="chip">consumer 6</span></div></article>
+              <article class="node-card" style="left:44px;top:296px;--accent:var(--module-signal)"><span class="port out"></span><div class="node-head"><div><h3>准备完成频道</h3><small class="mono">channel:game.ready</small></div><span class="badge readonly">input</span></div><div class="chip-row"><span class="chip">related</span><span class="chip green">valid</span></div></article>
+              <article class="node-card" style="left:44px;top:450px;--accent:var(--text-muted);opacity:.78"><span class="port out"></span><div class="node-head"><div><h3>计时器引用</h3><small class="mono">timer:round.delay</small></div><span class="badge readonly">reference</span></div><p class="muted">只读引用卡降低权重。</p></article>
+              <article class="node-card" style="left:426px;top:198px;--accent:var(--module-join)"><span class="port in"></span><span class="port out"></span><div class="node-head"><div><h3>汇合：开局门</h3><small class="mono">join.round.ready</small></div><span class="badge green">ALL</span></div><div class="chip-row"><span class="chip green">GLOBAL</span><span class="chip">RESET_AFTER_EMIT</span></div></article>
+              <article class="node-card" style="left:824px;top:126px;--accent:var(--module-signal)"><span class="port in"></span><div class="node-head"><div><h3>输出频道 C</h3><small class="mono">channel:game.door.open</small></div><span class="badge blue">output</span></div><p class="muted">下游主频道，保留原 graph 关系。</p></article>
+              <article class="node-card" style="left:842px;top:388px;--accent:var(--draft);border-style:dashed"><span class="port in"></span><div class="node-head"><div><h3>草稿监听器</h3><small class="mono">draft:listener.message</small></div><span class="badge violet">draft</span></div><div class="chip-row"><span class="chip violet">unsaved</span><span class="chip green">connectable</span></div></article>
+            </div>
+          </section>
+          <aside class="rail">
+            <section class="rail-card"><h2>节点详情</h2><div class="field-list"><div class="field-card"><span>类型</span><span>Signal Join</span></div><div class="field-card"><span>模式</span><span><span class="badge green">ALL</span></span></div><div class="field-card"><span>输出</span><span class="mono">game.door.open</span></div><div class="field-card"><span>状态</span><span class="status-pill blue">readonly graph</span></div></div></section>
+            <section class="rail-card"><h2>组件级优化点</h2><p class="muted">右侧详情改为统一 field-value 组件；graph 节点内部固定 title、technical id、badge 和状态行位置。未改变 graph membership、layout algorithm、edge endpoint 或 connect mode。</p></section>
+          </aside>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

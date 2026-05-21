@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Help Template V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar"><div class="brand"><span class="icon-box action"><svg class="svg" viewBox="0 0 24 24"><path d="M6 5h9l3 3v11H6V5Z"/><path d="M9 12h6M9 15h4"/></svg></span><div><strong>帮助 / 模板</strong><small>Docs + Template V2</small></div></div><nav class="nav"><section class="nav-section"><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引</span></a><a class="nav-link" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link active" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav><button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button></aside>
+    <section class="main">
+      <header class="topbar"><div class="toolbar"><button class="btn primary">文档</button><button class="btn">示例</button><button class="btn">排错</button><button class="btn">术语</button></div><label class="field">搜索<input class="input" value="SignalBridge"></label></header>
+      <section class="page">
+        <div class="page-head"><div><h1>帮助中心 / 模板中心</h1><p>四主视图、左主题列表、中间正文、右侧导航不变；阅读组件和 template dry-run 组件重做。</p></div></div>
+        <div class="doc-layout">
+          <aside class="panel scroll-panel"><h2>主题</h2><div class="topic-card active"><span class="badge blue">docs</span><strong>SignalBridge 与频道</strong><small class="muted">事件总线、channel、消费者关系</small></div><div class="topic-card"><span class="badge violet">examples</span><strong>两个输入频道汇合后输出</strong><small class="muted">Join + Template starter</small></div><div class="topic-card"><span class="badge amber">troubleshooting</span><strong>为什么 Timer 没触发？</strong><small class="muted">runtime / scope / action bucket</small></div><div class="topic-card"><span class="badge green">glossary</span><strong>术语表</strong><small class="muted">SignalBridge / Join / Timer</small></div></aside>
+          <article class="panel scroll-panel"><h2>SignalBridge 与频道</h2><p class="muted">正文区域保持内部滚动和圆角裁切。inline term 使用低噪音下划线，不把阅读区染成彩色标签流。</p><section class="doc-section"><h3>基础说明</h3><p><span class="inline-term">SignalBridge</span> 是事件总线，不是状态数据库。频道负责连接发出方和消费者，实际动作仍由监听器、Timer、Join 或 ActionRelay 执行。</p><div class="modal-card"><div class="component-title"><span class="icon-box signal"><svg class="svg" viewBox="0 0 24 24"><path d="M4 12h16M8 6h8M8 18h8"/></svg></span><div><strong>SignalBridge</strong><small>inline term popover</small></div></div><p class="muted">打开页面动作才保存 return context；普通术语点击默认留在 Help Center。</p><div class="button-row"><button class="btn">打开页面</button><button class="btn ghost">相关文档</button></div></div></section><section class="doc-section"><h3>Template Center 组件片段</h3><div class="split"><div class="topic-card"><span class="badge violet">内置模板</span><strong>Join ALL 双输入</strong><small class="muted">resources: channels / signalJoin / listener</small><div class="chip-row"><span class="chip">dry-run</span><span class="chip green">safe apply</span></div></div><div class="topic-card"><span class="badge blue">JSON preview</span><strong>tzz_template_v1</strong><small class="mono">{ "schema": "tzz_template_v1" }</small><div class="button-row"><button class="btn">复制 JSON</button><button class="btn primary">预览应用</button></div></div></div></section></article>
+          <aside class="panel scroll-panel"><h2>右侧导航</h2><div class="topic-card active"><strong>基础</strong><small class="muted">短说明 / safe start</small></div><div class="topic-card"><strong>专业</strong><small class="muted">runtime semantics</small></div><div class="topic-card"><strong>相关模板</strong><small class="muted">join_all_two_inputs</small></div><div class="divider"></div><h2>组件级优化</h2><p class="muted">不是改变 Help 四主视图，而是让 topic、正文 section、popover、template preview、source badge 共享统一视觉系统。</p></aside>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

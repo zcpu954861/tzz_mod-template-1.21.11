@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deep Control Console V2</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="icon-box signal"><svg class="svg" viewBox="0 0 24 24"><path d="M5 7l7-4 7 4v10l-7 4-7-4V7Z"/><path d="M12 3v18M5 7l7 4 7-4"/></svg></span>
+        <div><strong>Deep Control Console V2</strong><small>组件级视觉重构样张</small></div>
+      </div>
+      <nav class="nav">
+        <section class="nav-section">
+          <div class="nav-section-title">V2 样张</div>
+          <a class="nav-link active" href="index.html"><span class="nav-icon signal"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg></span><span>索引 / Token</span></a>
+          <a class="nav-link" href="dashboard.html"><span class="nav-icon signal"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M4 13h7V4H4v9Zm9 7h7V4h-7v16ZM4 20h7v-5H4v5Z"/></svg></span><span>Dashboard</span></a>
+          <a class="nav-link" href="logic-chain.html"><span class="nav-icon action"><svg class="svg-sm" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 11l6-4M9 13l6 4"/></svg></span><span>Logic Chain</span></a>
+          <a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M7 5h9l3 3v11H7V5Z"/><circle cx="11" cy="12" r="1.5"/></svg></span><span>Snapshot</span></a>
+          <a class="nav-link" href="timer-join.html"><span class="nav-icon timer"><svg class="svg-sm" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2"/></svg></span><span>Timer + Join</span></a>
+          <a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M5 6h6M5 12h10M5 18h6"/><circle cx="18" cy="12" r="3"/></svg></span><span>Condition Groups</span></a>
+          <a class="nav-link" href="help-template.html"><span class="nav-icon action"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M6 5h9l3 3v11H6V5Z"/><path d="M9 12h6"/></svg></span><span>Help / Template</span></a>
+        </section>
+      </nav>
+      <button class="btn ghost" data-theme-toggle>切换到<span data-theme-label>深色</span>主题</button>
+    </aside>
+    <section class="main">
+      <header class="topbar">
+        <div class="topbar-left"><span class="status-pill blue">V2 theme tokens</span><span class="status-pill green">dark / light</span><span class="status-pill violet">component-level</span></div>
+        <div class="topbar-right"><button class="btn" data-theme-toggle>主题：<span data-theme-label>深色</span></button></div>
+      </header>
+      <section class="page">
+        <div class="page-head">
+          <div><h1>8.19 UIUX PRO MAX V2</h1><p>页面级结构不改，组件内部信息层级、状态样式、图标语义和深浅色主题重做。</p></div>
+          <div class="button-row"><a class="btn primary" href="dashboard.html">查看 Dashboard</a><a class="btn" href="../uiux-pro-max/index.html">返回 V1</a></div>
+        </div>
+        <div class="two-col">
+          <section class="panel">
+            <h2>为什么不是只换颜色</h2>
+            <div class="component-row" style="--accent:var(--accent-primary)"><span class="state-icon signal"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M4 12h16M8 6h8M8 18h8"/></svg></span><div class="row-title"><strong>组件内部层级</strong><small>title / technical id / status / actions 各自固定位置和权重</small></div><span class="badge blue">8.20 可落地</span></div>
+            <div class="component-row" style="--accent:var(--draft)"><span class="state-icon action"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M4 12h7M13 6h7M13 18h7"/></svg></span><div class="row-title"><strong>状态视觉系统</strong><small>selected / readonly / draft / danger / disabled 不再散落各页面</small></div><span class="badge violet">统一</span></div>
+            <div class="component-row" style="--accent:var(--ok)"><span class="state-icon green"><svg class="svg-sm" viewBox="0 0 24 24"><path d="M8 12l3 3 6-7"/><circle cx="12" cy="12" r="8"/></svg></span><div class="row-title"><strong>主题 token</strong><small>深色和浅色不是反色，而是同一语义映射</small></div><span class="badge green">dark/light</span></div>
+          </section>
+          <section class="panel">
+            <h2>Dark / Light Token Preview</h2>
+            <div class="token-grid">
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--bg-canvas)"></span><strong>background</strong><span class="mono">--bg-canvas</span></div>
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--bg-surface)"></span><strong>surface</strong><span class="mono">--bg-surface</span></div>
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--accent-primary)"></span><strong>accent</strong><span class="mono">--accent-primary</span></div>
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--ok)"></span><strong>ok/manual</strong><span class="mono">--ok</span></div>
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--warning)"></span><strong>warning/pre</strong><span class="mono">--warning</span></div>
+              <div class="token-cell"><span class="swatch" style="--swatch:var(--draft)"></span><strong>draft</strong><span class="mono">--draft</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
