@@ -19,6 +19,8 @@ import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.region.RegionControllerData;
 import com.zcpu.tzzmod.region.RegionControllerStore;
+import com.zcpu.tzzmod.scheduler.TimerDefinition;
+import com.zcpu.tzzmod.scheduler.TimerStore;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
@@ -290,6 +292,21 @@ public final class WebAdminConditionRuntimeDoctorService {
             addRegionStateActionBindings(stateActionBindings, controller, "exit", controller.exitActions(), ConditionRuntimeTargetType.REGION_EXIT_ACTION);
             addRegionStateActionBindings(stateActionBindings, controller, "stay", controller.stayActions(), ConditionRuntimeTargetType.REGION_STAY_ACTION);
         }
+
+        for (TimerDefinition raw : TimerStore.getSnapshot(server)) {
+            TimerDefinition timer = raw == null ? null : raw.normalized();
+            if (timer == null || timer.id.isBlank()) {
+                continue;
+            }
+            addTimerActionBindings(bindings, timer, "start", timer.onStartActions, ConditionRuntimeTargetType.TIMER_ON_START_ACTION);
+            addTimerActionBindings(bindings, timer, "tick", timer.onTickActions, ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION);
+            addTimerActionBindings(bindings, timer, "complete", timer.onCompleteActions, ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION);
+            addTimerActionBindings(bindings, timer, "cancel", timer.onCancelActions, ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION);
+            addTimerStateActionBindings(stateActionBindings, timer, "start", timer.onStartActions, ConditionRuntimeTargetType.TIMER_ON_START_ACTION);
+            addTimerStateActionBindings(stateActionBindings, timer, "tick", timer.onTickActions, ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION);
+            addTimerStateActionBindings(stateActionBindings, timer, "complete", timer.onCompleteActions, ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION);
+            addTimerStateActionBindings(stateActionBindings, timer, "cancel", timer.onCancelActions, ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION);
+        }
         return new RuntimeBindingSnapshot(List.copyOf(bindings), List.copyOf(stateActionBindings));
     }
 
@@ -333,6 +350,50 @@ public final class WebAdminConditionRuntimeDoctorService {
                     action,
                     targetType,
                     "region:" + controller.regionId()
+            ));
+        }
+    }
+
+    private static void addTimerActionBindings(
+            List<Binding> bindings,
+            TimerDefinition timer,
+            String bucket,
+            List<ActionConfig> actions,
+            ConditionRuntimeTargetType targetType
+    ) {
+        for (int index = 0; index < (actions == null ? List.<ActionConfig>of() : actions).size(); index++) {
+            ActionConfig action = actions.get(index);
+            if (action == null) {
+                continue;
+            }
+            bindings.add(new Binding(
+                    "TIMER_ACTION",
+                    ConditionActionGateService.actionTargetId("timer_" + bucket, timer.id, index),
+                    action.conditionGroupId(),
+                    targetType,
+                    "#/timers/" + timer.id
+            ));
+        }
+    }
+
+    private static void addTimerStateActionBindings(
+            List<StateActionBinding> bindings,
+            TimerDefinition timer,
+            String bucket,
+            List<ActionConfig> actions,
+            ConditionRuntimeTargetType targetType
+    ) {
+        for (int index = 0; index < (actions == null ? List.<ActionConfig>of() : actions).size(); index++) {
+            ActionConfig action = actions.get(index);
+            if (action == null) {
+                continue;
+            }
+            bindings.add(new StateActionBinding(
+                    "TIMER_ACTION",
+                    ConditionActionGateService.actionTargetId("timer_" + bucket, timer.id, index),
+                    action,
+                    targetType,
+                    "#/timers/" + timer.id
             ));
         }
     }
@@ -439,11 +500,7 @@ public final class WebAdminConditionRuntimeDoctorService {
     private static boolean providesPlayerContext(ConditionRuntimeTargetType targetType) {
         return targetType == ConditionRuntimeTargetType.REGION_ENTER_ACTION
                 || targetType == ConditionRuntimeTargetType.REGION_EXIT_ACTION
-                || targetType == ConditionRuntimeTargetType.REGION_STAY_ACTION
-                || targetType == ConditionRuntimeTargetType.TIMER_ON_START_ACTION
-                || targetType == ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION
-                || targetType == ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION
-                || targetType == ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION;
+                || targetType == ConditionRuntimeTargetType.REGION_STAY_ACTION;
     }
 
     private static boolean containsAlwaysFalse(ConditionNode node) {

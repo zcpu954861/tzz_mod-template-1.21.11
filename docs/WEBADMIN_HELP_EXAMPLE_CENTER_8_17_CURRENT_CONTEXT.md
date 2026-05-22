@@ -24,7 +24,7 @@ Implemented:
 - Topic detail with related pages, examples, troubleshooting and glossary.
 - Topic list active item highlighting and scroll preservation during topic changes.
 - Page-level help links through `data-page-help-link`.
-- Inline term links through curated `termId -> route/help topic` mapping. Supported terms include SignalBridge, SignalListener, Timer, ConditionGroup, StateVariable, Logic Chain, Templates, Debugger, Doctor, Signal Join, Action, ActionRelay, VBD, Region and SignalReceiver.
+- Inline term links through curated `termId -> route/help topic` mapping. Supported terms include SignalBridge, SignalListener, Timer, ConditionGroup, StateVariable, Logic Chain, Templates, Snapshot, Rollback, Debugger, Doctor, Signal Join, Action, ActionRelay, VBD, Region and SignalReceiver.
 - Inline term text clicks open the mapped help topic by default; they do not leave Help Center for the feature page.
 - Inline term hover/focus popovers show a short Chinese definition, an explicit open-page action and a related-help action when available.
 - Only the popover `打开页面` action stores return context in sessionStorage with a safe `helpReturn` id and restores view, topic, mode, filters, document scroll, topic list scroll and right panel scroll when returning.
@@ -78,6 +78,7 @@ Covered modules:
 - Logic Chain Viewer
 - Logic Chain Editor controlled draft/editing scope
 - Templates / Prefab / Import-Export
+- Snapshot / Rollback / 配置时间轴
 - Debugger / Doctor / Replay
 - VBD / ActionRelay / Region / SignalReceiver as world entity references
 
@@ -97,6 +98,7 @@ Initial examples:
 - Signal 发出但没有后续动作
 - Template import 与 apply 的区别
 - Logic Chain 里新增 Join / Timer 草稿
+- 用配置时间轴 dry-run 回滚前先确认变化
 
 Template links point to the existing Template Center. Real apply still uses the existing Template Center dry-run, lock, validation, fingerprint and audit flow.
 
@@ -117,6 +119,9 @@ Initial troubleshooting entries cover:
 - 为什么空 gate 没有调试记录？
 - 为什么状态变量动作失败？
 - 为什么 Signal 有事件但无后续动作？
+- 为什么配置时间轴显示 degraded？
+- 为什么回滚前保护点显示本次操作变化？
+- 超过 200 个自动快照会怎样？
 
 Troubleshooting reason/check/fix phrase lists are rendered without punctuation-before-slash formatting, for example `edit lock 丢失 / expectedFingerprint 冲突 / 草稿缺少连线`.
 
@@ -148,6 +153,10 @@ Initial glossary terms include, but are not limited to:
 - Debugger
 - Doctor
 - Replay
+- Snapshot
+- Rollback
+- pre_rollback
+- operationDiff
 
 ## Accuracy
 
@@ -176,7 +185,7 @@ The help catalog must keep these statements accurate:
 - ConditionGroup apply deferred
 - StateVariable definition apply deferred
 - external reference fail closed
-- version rollback / Git-like branch merge deferred
+- Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置
 - raw JSON editor deferred
 
 ## Future Direction

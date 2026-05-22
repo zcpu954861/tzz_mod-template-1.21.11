@@ -28,7 +28,8 @@
 | world entity copy | Not implemented | Placeholder binding apply deferred; no automatic block/region/device creation. |
 | external reference fail closed | Implemented | Join/Timer/Listener/Action channel and timer references must be declared in template resources or explicit rootChannel remap. |
 | overwrite/merge policy | Not implemented | conflict policy is fail closed. |
-| full multi-store rollback | Deferred | Apply validates first, then saves stores in a fixed order; a later save failure returns failure/audit context, but transactional rollback is a later snapshot/rollback stage. |
+| template apply recovery protection | Implemented | Since 8.18, template import/apply routes create write-before auto snapshots and annotate successful operation diff, so the protecting save point shows what import/apply changed. |
+| full multi-store transaction rollback | Deferred | Apply validates first, then saves stores in a fixed order; a later save failure returns failure/audit context. Snapshot/Rollback is configuration recovery, not an in-service transaction rollback. |
 | template marketplace | Not implemented | Local import/export only. |
 
 ## Apply Resource Matrix
@@ -91,4 +92,4 @@ The UI keeps WebAdmin dark admin styling, Chinese primary copy, top-center toast
 
 ## Non-Goals
 
-8.15 does not implement GameController, MissionSystem, PhaseController, full Logic Chain Editor, Scratch editor, if / else runtime, old node move/delete/reorder, old action move/delete/reorder, runtime semantic changes, new ActionType, new ConditionNodeType, automatic world entity creation, rollback, branch/merge system or marketplace sync.
+8.15 does not implement GameController, MissionSystem, PhaseController, full Logic Chain Editor, Scratch editor, if / else runtime, old node move/delete/reorder, old action move/delete/reorder, runtime semantic changes, new ActionType, new ConditionNodeType, automatic world entity creation, Git-like branch/merge/rebase system or marketplace sync.

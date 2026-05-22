@@ -11,7 +11,7 @@ public final class WebAdminHelpCatalogServiceTest {
 
     public static void run() {
         Map<String, Object> catalog = new WebAdminHelpCatalogService().catalog();
-        requireEquals("8.17", string(catalog.get("version")), "8.17 catalog version");
+        requireEquals("8.20-pre9-stabilization", string(catalog.get("version")), "8.20 stabilized catalog version");
         requireEquals(Boolean.TRUE, catalog.get("readOnly"), "8.17 help catalog is read-only");
         requireEquals(Boolean.TRUE, catalog.get("noWriteApi"), "8.17 help catalog exposes no write API");
         requireEquals(Boolean.TRUE, catalog.get("copyOnly"), "8.17 help examples are copy-only documentation");
@@ -30,8 +30,8 @@ public final class WebAdminHelpCatalogServiceTest {
 
         requireTrue(categories.size() >= 10, "8.17 category count");
         requireTrue(examples.size() >= 6, "8.17 example count");
-        requireTrue(troubleshooting.size() >= 9, "8.17 troubleshooting count");
-        requireTrue(glossary.size() >= 20, "8.17 glossary count");
+        requireTrue(troubleshooting.size() >= 12, "8.20 troubleshooting count includes Snapshot/Rollback");
+        requireTrue(glossary.size() >= 24, "8.20 glossary count includes Snapshot/Rollback");
 
         for (String id : List.of(
                 "getting-started.overview",
@@ -45,6 +45,7 @@ public final class WebAdminHelpCatalogServiceTest {
                 "logic-chain.viewer",
                 "logic-chain.editor-draft",
                 "templates.prefab",
+                "snapshot.rollback",
                 "debugger.doctor-replay",
                 "device-trigger.references",
                 "region.controller"
@@ -67,7 +68,8 @@ public final class WebAdminHelpCatalogServiceTest {
                 "example.template-join-timer-listener",
                 "example.signal-no-consumer",
                 "example.template-import-vs-apply",
-                "example.editor-draft-join-timer"
+                "example.editor-draft-join-timer",
+                "example.snapshot-dry-run-rollback"
         )) {
             Map<?, ?> example = find(examples, id);
             requireTrue(example != null, "required example exists: " + id);
@@ -88,7 +90,10 @@ public final class WebAdminHelpCatalogServiceTest {
                 "trouble.import-json-no-effect",
                 "trouble.blank-gate-no-history",
                 "trouble.state-variable-action-failed",
-                "trouble.signal-no-consumer"
+                "trouble.signal-no-consumer",
+                "trouble.snapshot-degraded",
+                "trouble.rollback-operation-diff",
+                "trouble.snapshot-retention"
         )) {
             Map<?, ?> item = find(troubleshooting, id);
             requireTrue(item != null, "required troubleshooting exists: " + id);
@@ -116,6 +121,10 @@ public final class WebAdminHelpCatalogServiceTest {
                 "scheduler",
                 "template",
                 "prefab",
+                "snapshot",
+                "rollback",
+                "pre-rollback",
+                "operation-diff",
                 "edit-lock",
                 "fingerprint",
                 "dry-run",
@@ -174,7 +183,12 @@ public final class WebAdminHelpCatalogServiceTest {
                 "component export deferred",
                 "ConditionGroup apply deferred",
                 "StateVariable definition apply deferred",
-                "external reference fail closed"
+                "external reference fail closed",
+                "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
+                "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。",
+                "bad manifest / bad package",
+                "pre_rollback",
+                "本次操作变化"
         )) {
             requireTrue(all.contains(marker), "8.17 content accuracy marker: " + marker);
         }

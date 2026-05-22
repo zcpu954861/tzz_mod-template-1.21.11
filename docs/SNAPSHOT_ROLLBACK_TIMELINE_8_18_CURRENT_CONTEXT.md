@@ -21,7 +21,7 @@ Implemented:
   - `POST /api/webadmin/snapshots/{id}/rollback/dry-run`
   - `POST /api/webadmin/snapshots/{id}/rollback/apply`
 - Git-graph-like timeline UI at `#/snapshots`.
-- Right-side detail rail with metadata, previous-snapshot diff and JSON advanced preview.
+- Right-side detail rail with metadata, previous-snapshot diff, operation diff warnings and JSON advanced preview.
 - Filters by kind, module, user, created time and search text.
 - Filters by resource type, so administrators can narrow the graph to Timer / Join / Condition / State and other changed resources.
 - Permission, CSRF, same-origin, edit lock, expectedFingerprint, audit and realtime integration.
@@ -35,6 +35,11 @@ Implemented:
   - `data-snapshot-node-kind-pre-rollback`
   - `data-snapshot-detail-rail`
   - `data-snapshot-detail-diff`
+  - `data-snapshot-degraded-warning`
+  - `data-snapshot-bad-package-warning`
+  - `data-snapshot-selected-hidden-by-filter`
+  - `data-snapshot-help-topic="snapshot.rollback"`
+  - `snapshotRollbackOperationLabel`
   - `data-snapshot-manual-modal`
   - `data-snapshot-rollback-dry-run-modal`
   - `data-snapshot-rollback-confirm-modal`
@@ -70,7 +75,7 @@ The 8.18 schema uses:
 
 Each record stores snapshot id, sequence, created time, actor, kind, title, note, tags, trigger operation/module/target, previous snapshot id, resource counts, changed resource counts, package fingerprint, storage path and warnings.
 
-Auto snapshot records can also store an `operationDiff`. This is separate from the snapshot-to-previous diff: because auto snapshots are intentionally captured before the write, `operationDiff` records the successful write's before/after resource changes after the write completes. Logic Chain Editor draft saves, Template import/apply, Timer, channel metadata, Signal Join, SignalListener and ConditionGroup writes now persist this operation diff after successful writes so a rename or config edit is shown immediately on the auto snapshot that protected the write. `pre_rollback operation diff` records the rollback operation direction from the current pre-rollback package to the selected rollback target package, so rollback detail shows what the rollback removed, created or updated instead of presenting the protection snapshot's own previous-snapshot diff as the primary change.
+Auto snapshot records can also store an `operationDiff`. This is separate from the snapshot-to-previous diff: because auto snapshots are intentionally captured before the write, `operationDiff` records the successful write's before/after resource changes after the write completes. Logic Chain Editor draft saves, Template import/apply, Timer, channel metadata, device metadata/basic/extended config, ActionRelay actions, interaction item matcher, logic-chain metadata, Signal Join, SignalListener, ConditionGroup, VBD delete/native trigger and RegionController writes now persist this operation diff after successful writes so a rename or config edit is shown immediately on the auto snapshot that protected the write. `pre_rollback operation diff` records the rollback operation direction from the current pre-rollback package to the selected rollback target package, so rollback detail shows what the rollback removed, created or updated instead of presenting the protection snapshot's own previous-snapshot diff as the primary change.
 
 ## Store Allowlist
 
@@ -136,6 +141,8 @@ Auto snapshots are created before these WebAdmin write operations:
 
 Route-level auto snapshots first pass permission, CSRF and same-origin checks. They still run before deeper service validation/fingerprint checks so the saved point represents the configuration immediately before an authorized write attempt. If the auto snapshot cannot be created because collection or storage is degraded, the covered write is stopped fail-closed instead of continuing without a recovery point. Successful and failed auto snapshot creation attempts write audit records; realtime events carry the audit id when a snapshot is created.
 
+8.20 stabilization additionally audits the post-write annotation path: covered route-level auto snapshots are captured into a `WebAdminSnapshotAutoResult` and successful writes call `annotateAutoSnapshotAfterWrite`, preventing a protected write from showing its operation change only on the next save point.
+
 Session callback auto snapshots are used only after their WebAdmin session was created through the protected route and after the callback-specific target, lock and fingerprint checks pass. They still run before the final `signal_devices.json` write and fail closed if the snapshot cannot be created.
 
 Known not covered in 8.18:
@@ -158,6 +165,8 @@ Snapshot detail shows diff against the previous snapshot:
 Diff entries are clickable and open a read-only `变更详情` modal. The modal shows resource type, id, change type, source store, before/after fingerprints, bounded JSON previews and a shallow JSON field diff for updated resources. Created resources show the new summary/JSON preview; deleted resources show the old summary/JSON preview. The modal has no save action and does not change filters, selection or timeline scroll.
 
 Snapshot package loading recomputes resource fingerprints and compares package fingerprints against manifest records. A mismatch blocks detail/dry-run/apply instead of trusting the package file. A degraded manifest also blocks creating new snapshots so a corrupt timeline is not overwritten.
+
+The UI exposes degraded or bad package state directly through generic Chinese warnings. A degraded timeline shows a page-level warning with a `snapshot.rollback` help link. A selected snapshot whose record is hidden by current filters shows an explicit clear-filter notice instead of silently selecting another node.
 
 For before-write auto snapshots and pre-rollback snapshots, the detail rail shows `本次操作变化` when an operation diff is available. For auto snapshots this is the successful write operation's before/after diff, including Timer rename and other metadata/config edits. For pre-rollback snapshots this is the rollback operation from current config to the selected target. The snapshot-to-previous diff remains available as advanced protection-point context so it does not make rollback-created protection points look like they introduced resources that the rollback is about to remove.
 
@@ -187,6 +196,9 @@ The `#/snapshots` page is not a normal list/table. It uses:
 - manual snapshot modal
 - rollback dry-run modal
 - rollback confirm modal
+- selected-hidden-by-filter notice
+- degraded / bad package warning
+- Snapshot help topic link
 
 Manual nodes use green accents, auto nodes use cyan accents, and `pre_rollback` nodes use yellow warning accents.
 

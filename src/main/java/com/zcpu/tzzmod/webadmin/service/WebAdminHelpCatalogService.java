@@ -12,7 +12,7 @@ public final class WebAdminHelpCatalogService {
         List<Map<String, Object>> troubleshooting = troubleshooting();
         List<Map<String, Object>> glossary = glossary();
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("version", "8.17");
+        data.put("version", "8.20-pre9-stabilization");
         data.put("title", "WebAdmin Help / Example Center");
         data.put("readOnly", true);
         data.put("noWriteApi", true);
@@ -29,6 +29,7 @@ public final class WebAdminHelpCatalogService {
                 "signalbridge.channel-basics",
                 "logic-chain.viewer",
                 "templates.prefab",
+                "snapshot.rollback",
                 "debugger.doctor-replay"
         ));
         data.put("deferredCapabilities", List.of(
@@ -44,7 +45,7 @@ public final class WebAdminHelpCatalogService {
                 "ConditionGroup apply deferred",
                 "StateVariable definition apply deferred",
                 "external reference fail closed",
-                "version rollback / Git-like branch merge deferred",
+                "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
                 "raw JSON editor deferred",
                 "new runtime integration deferred",
                 "new write API for notes / favorites deferred"
@@ -54,7 +55,8 @@ public final class WebAdminHelpCatalogService {
                 "SignalBridge 是事件总线，不是状态数据库。",
                 "StateVariable 保存状态。",
                 "Logic Chain Viewer 的顺序是可视化顺序，不是全局执行顺序。",
-                "Logic Chain Editor 保存 typed config，不保存假图。"
+                "Logic Chain Editor 保存 typed config，不保存假图。",
+                "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。"
         ));
         data.put("counts", map(
                 "topics", topics.size(),
@@ -76,6 +78,7 @@ public final class WebAdminHelpCatalogService {
                 category("join-timer", "Join / Timer", "多输入汇合、延迟、倒计时和重复计时。"),
                 category("logic-chain", "Logic Chain / 逻辑链", "逻辑链查看器和受控编辑入口。"),
                 category("template", "Templates / 模板", "模板中心、prefab、导入导出和安全 apply。"),
+                category("snapshot", "Snapshot / 配置时间轴", "保存点、自动快照、diff、dry-run 和配置回滚。"),
                 category("diagnostics", "Debugger / Doctor", "排错、诊断、历史和只读 replay。")
         );
     }
@@ -311,7 +314,29 @@ public final class WebAdminHelpCatalogService {
                 List.of("trouble.template-apply-conflict", "trouble.import-json-no-effect"),
                 List.of("template", "prefab", "dry-run", "placeholder"),
                 routes(link("模板中心", "#/templates"), link("逻辑链", "#/logic-chains")),
-                List.of("logic-chain.viewer", "signal-join.basics", "timer.delay")
+                List.of("logic-chain.viewer", "signal-join.basics", "timer.delay", "snapshot.rollback")
+        ));
+        topics.add(topic(
+                "snapshot.rollback",
+                "Snapshot / Rollback 配置时间轴",
+                "配置时间轴保存 WebAdmin allowlist 配置快照，支持手动保存点、写入前自动快照、只读 diff、dry-run 和确认后配置回滚。",
+                "snapshot",
+                List.of("Snapshot", "Rollback", "配置时间轴", "保存点", "pre_rollback", "operationDiff"),
+                sections(
+                        section("这是什么", "Snapshot 保存的是 WebAdmin 配置文件，不是世界备份。", "手动保存点用于明确标记；自动快照在关键写操作前创建。"),
+                        section("最简单怎么用", "打开配置时间轴。", "先查看“本次操作变化”和“与上一保存点变化”。", "需要回滚时先执行 dry-run，再确认写入。"),
+                        section("常见误区", "自动快照是写入前保护点；真正的本次写入变化通过 operationDiff 回填显示。", "筛选隐藏当前选中快照时，页面会提示你清空筛选。")
+                ),
+                sections(
+                        section("恢复语义", "Rollback 只恢复 allowlist 配置文件，并在 apply 前创建 pre_rollback 保护点。", "pre_rollback 的本次操作变化显示回滚本身创建、更新或删除了哪些资源。"),
+                        section("完整性与安全", "bad manifest / bad package 进入 degraded 状态并 fail closed；原始解析异常只写服务端日志。", "rollback 需要权限、CSRF / same-origin、edit lock、manifest fingerprint 和 dry-run fingerprint。"),
+                        section("边界", "自动快照保留最近 200 个，manual 和 pre_rollback 受保护。", "不备份 runtime history、Timer active state、Join pending state、玩家背包、世界实体，也不实现 Git branch / merge / rebase。")
+                ),
+                List.of("example.snapshot-dry-run-rollback"),
+                List.of("trouble.snapshot-degraded", "trouble.rollback-operation-diff", "trouble.snapshot-retention"),
+                List.of("snapshot", "rollback", "pre-rollback", "operation-diff"),
+                routes(link("配置时间轴", "#/snapshots"), link("Doctor", "#/doctor")),
+                List.of("templates.prefab", "debugger.doctor-replay")
         ));
         topics.add(topic(
                 "debugger.doctor-replay",
@@ -329,10 +354,10 @@ public final class WebAdminHelpCatalogService {
                         section("排错路径", "Signal 无下游看频道和 Doctor。", "Timer 不触发看 Timer Doctor。", "模板失败看 dry-run conflicts。")
                 ),
                 List.of("example.condition-controls-action", "example.signal-no-consumer"),
-                List.of("trouble.blank-gate-no-history", "trouble.timer-not-triggered", "trouble.template-apply-conflict"),
-                List.of("doctor", "debugger", "replay"),
-                routes(link("Doctor", "#/doctor"), link("条件调试", "#/condition-debugger"), link("History", "#/history")),
-                List.of("condition.group-basics", "logic-chain.viewer")
+                List.of("trouble.blank-gate-no-history", "trouble.timer-not-triggered", "trouble.template-apply-conflict", "trouble.snapshot-degraded"),
+                List.of("doctor", "debugger", "replay", "snapshot"),
+                routes(link("Doctor", "#/doctor"), link("条件调试", "#/condition-debugger"), link("History", "#/history"), link("配置时间轴", "#/snapshots")),
+                List.of("condition.group-basics", "logic-chain.viewer", "snapshot.rollback")
         ));
         topics.add(topic(
                 "device-trigger.references",
@@ -390,6 +415,7 @@ public final class WebAdminHelpCatalogService {
         examples.add(example("example.signal-no-consumer", "Signal 发出但没有后续动作", "确认 signal 已进 history，但没有消费者或 action。", List.of("SignalBridge", "Doctor", "History"), List.of("打开 History 确认频道触发。", "打开频道详情看消费者数量。", "打开 Doctor 看无消费者或 disabled 提示。"), List.of("频道事件存在不代表后续一定有 action。"), List.of("频道名拼写不同。", "消费者 disabled。"), routes(link("SignalBridge", "#/signals"), link("Doctor", "#/doctor"), link("History", "#/history")), "", List.of("signalbridge.channel-basics")));
         examples.add(example("example.template-import-vs-apply", "Template import 与 apply 的区别", "导入 JSON 后为什么世界配置没有变化。", List.of("Template Center", "dry-run", "apply"), List.of("导入 JSON 只进入用户模板库。", "选择模板，执行预览。", "确认 apply 后才写真实配置。"), List.of("导入和 apply 使用不同权限/锁流程。"), List.of("只导入未应用。", "apply dry-run 有冲突。"), routes(link("模板中心", "#/templates")), "", List.of("templates.prefab")));
         examples.add(example("example.editor-draft-join-timer", "Logic Chain 里新增 Join / Timer 草稿", "在当前图谱中放置新 Join 或 Timer 并保存到 typed config。", List.of("Logic Chain Editor", "Signal Join", "Timer"), List.of("进入逻辑链详情。", "进入编辑模式并获取锁。", "新增 Join 或 Timer，连接合法频道。", "保存并查看真实配置。"), List.of("草稿连线保存为 typed config，不保存假图结构。"), List.of("编辑锁丢失。", "fingerprint 冲突。", "旧节点移动/删除被拒绝。"), routes(link("逻辑链", "#/logic-chains")), "", List.of("logic-chain.editor-draft")));
+        examples.add(example("example.snapshot-dry-run-rollback", "用配置时间轴 dry-run 回滚前先确认变化", "需要撤回一次配置变更时，先看保护点、operation diff 和 rollback dry-run 计划。", List.of("Snapshot", "Rollback", "Doctor"), List.of("打开配置时间轴。", "选择目标保存点并查看本次操作变化。", "点击回滚 dry-run，确认将新增、覆盖或删除的配置文件。", "确认前先检查是否已有 pre_rollback 保护点和 Doctor degraded 警告。"), List.of("rollback apply 会先创建 pre_rollback 保护点；它不是 Git 分支或世界备份。"), List.of("manifest/package degraded。", "选择了被筛选隐藏的保存点。", "dry-run fingerprint 过期。"), routes(link("配置时间轴", "#/snapshots"), link("Doctor", "#/doctor")), "", List.of("snapshot.rollback")));
         for (Map<String, Object> example : examples) {
             example.put("kind", "example");
             example.put("readOnlyExample", true);
@@ -413,6 +439,9 @@ public final class WebAdminHelpCatalogService {
         items.add(trouble("trouble.blank-gate-no-history", "为什么空 gate 没有调试记录？", List.of("未配置 conditionGroupId。", "旧逻辑按原流程运行。"), List.of("确认目标字段是否为空。"), List.of("需要调试时明确绑定条件组。"), "未配置 conditionGroupId 时不读取 store、不 evaluate、不写 history。", routes(link("条件调试", "#/condition-debugger"))));
         items.add(trouble("trouble.state-variable-action-failed", "为什么状态变量动作失败？", List.of("变量 key 为空。", "类型转换失败。", "PLAYER scope 无目标。"), List.of("看 action 执行记录。", "看状态变量页面是否出现目标值。"), List.of("修正 key/type/targetMode。"), "StateVariable 写入通过受控 state_variable action，不是任意 JSON 写入。", routes(link("状态变量", "#/state-variables"), link("动作列表", "#/actions"))));
         items.add(trouble("trouble.signal-no-consumer", "为什么 Signal 有事件但无后续动作？", List.of("频道没有消费者。", "消费者 disabled。", "channel 拼写不一致。"), List.of("看频道详情消费者摘要。", "看 Doctor 无消费者提示。"), List.of("新增或修正监听器 / receiver / action relay。"), "SignalBridge 只负责派发事件；没有消费者时不会凭空执行动作。", routes(link("SignalBridge", "#/signals"), link("Doctor", "#/doctor"))));
+        items.add(trouble("trouble.snapshot-degraded", "为什么配置时间轴显示 degraded？", List.of("manifest 或 snapshot package 解析失败。", "快照包指纹与 manifest 不匹配。", "存储文件被外部手动改坏。"), List.of("看配置时间轴顶部和详情警告。", "manifest degraded 可打开 Doctor 查看 Snapshot 诊断。", "单个 package 警告以时间轴详情为准。", "检查服务端日志里的具体 JSON/IO 错误。"), List.of("先停止继续创建保存点或回滚。", "修复或移走损坏的 manifest/package 后再刷新。"), "Snapshot degraded 会 fail closed，避免把半可信数据写回配置。", routes(link("配置时间轴", "#/snapshots"), link("Doctor", "#/doctor"))));
+        items.add(trouble("trouble.rollback-operation-diff", "为什么回滚前保护点显示本次操作变化？", List.of("pre_rollback 是回滚 apply 前自动创建的保护点。", "它的 operationDiff 记录回滚本身会改什么。"), List.of("区分“本次操作变化”和“与上一保存点变化”。", "dry-run 中确认 create/update/delete 文件计划。"), List.of("需要理解回滚影响时优先看本次操作变化。", "需要理解保护点来源时再看与上一保存点变化。"), "回滚不是把 diff 方向倒置展示；pre_rollback operation diff 以当前配置到目标快照为方向。", routes(link("配置时间轴", "#/snapshots"))));
+        items.add(trouble("trouble.snapshot-retention", "超过 200 个自动快照会怎样？", List.of("自动快照默认只保留最新 200 个。", "manual 和 pre_rollback 不被自动 retention 删除。"), List.of("在配置时间轴里筛选自动快照。", "确认重要节点是否需要手动保存点。"), List.of("关键里程碑使用手动保存点。", "不要把自动快照当长期归档。"), "Retention 只清理旧 auto snapshot manifest 记录和对应 package，不清理 manual / pre_rollback。", routes(link("配置时间轴", "#/snapshots"))));
         for (Map<String, Object> item : items) {
             item.put("kind", "troubleshooting");
             item.put("searchText", searchText(item));
@@ -442,6 +471,10 @@ public final class WebAdminHelpCatalogService {
         addTerm(terms, "scheduler", "Scheduler", List.of("调度器"), "Timer 背后的时间调度语义。", "配置保存和运行态实例不同。");
         addTerm(terms, "template", "Template", List.of("模板"), "可导入、导出和 apply 的配置包。", "import 不等于 apply。");
         addTerm(terms, "prefab", "Prefab", List.of("预制组合"), "面向常见组合的模板化配置。", "不会自动复制世界实体。");
+        addTerm(terms, "snapshot", "Snapshot", List.of("配置时间轴", "保存点"), "WebAdmin allowlist 配置的保存点。", "不包含 runtime history、玩家背包或世界实体。");
+        addTerm(terms, "rollback", "Rollback", List.of("配置回滚", "回滚"), "把 allowlist 配置恢复到选定保存点的受控写入。", "必须先 dry-run，apply 前创建 pre_rollback。");
+        addTerm(terms, "pre-rollback", "pre_rollback", List.of("回滚前保护点"), "回滚 apply 前自动创建的保护点。", "其 operation diff 显示本次回滚实际变化。");
+        addTerm(terms, "operation-diff", "operationDiff", List.of("本次操作变化"), "写入前自动快照回填的本次写入资源变化。", "不同于与上一保存点的普通 diff。");
         addTerm(terms, "edit-lock", "Edit Lock", List.of("编辑锁"), "写入前保护同一目标的锁。", "丢失后不能继续保存。");
         addTerm(terms, "fingerprint", "Fingerprint", List.of("expectedFingerprint"), "配置快照指纹，用于冲突检测。", "过期会要求刷新。");
         addTerm(terms, "dry-run", "Dry-run", List.of("预览"), "只读计划和校验，不实际写入。", "模板 apply 前必须看预览。");

@@ -73,6 +73,7 @@ public final class WebAdminLogicChainEditorServiceTest {
         testExistingNodeEditRejectsTargetOutsideCurrentGraph();
         testExistingNodeEditAllowsReferencedChannelMetadataDrafts();
         testExistingTypedEditsRejectDraftEdgesAndAllowMultipleTargets();
+        testMultiEditValidationFieldsUseActualIndexes();
         testMultiDraftSessionSavesNewNodeExistingEditAndMetadata();
         testMultiActionEditsSaveAcrossOwners();
         testTimerExistingNodeEditCannotMutateActionList();
@@ -1224,6 +1225,57 @@ public final class WebAdminLogicChainEditorServiceTest {
         requireEquals("Multiple Output Channel", multiSaveFixture.channelMetadataService.metadataFor(null, multiSaveFixture.editor, multiSaveFixture.session, "editor.join.out", "signal").displayName(), "second existing channel metadata edit saved");
     }
 
+    private static void testMultiEditValidationFieldsUseActualIndexes() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult entered = enter(fixture, "editor.multi.index");
+
+        WebAdminLogicChainEditorRequest nodeEdit = rootRequest("editor.multi.index");
+        nodeEdit.lockId = lockId(entered);
+        nodeEdit.baseGraphFingerprint = fingerprint(entered);
+        nodeEdit.nodes = List.of();
+        nodeEdit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft firstNode = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        firstNode.nodeType = "vbd";
+        firstNode.targetId = "vbd.one";
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft secondNode = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        secondNode.nodeType = "receiver";
+        secondNode.targetId = "receiver.two";
+        nodeEdit.existingNodeEdits = List.of(firstNode, secondNode);
+
+        WebAdminWriteResult nodeResult = fixture.service.validateDraft(null, fixture.editor, fixture.session, nodeEdit, fixture.csrf, true);
+        requireFalse(nodeResult.success(), "unsupported multi existing-node edits fail validation");
+        requireValidationField(nodeResult, "logic_chain_existing_node_type_deferred", "existingNodeEdits[0].nodeType");
+        requireValidationField(nodeResult, "logic_chain_existing_node_type_deferred", "existingNodeEdits[1].nodeType");
+
+        WebAdminLogicChainEditorRequest actionEdit = rootRequest("editor.multi.index");
+        actionEdit.lockId = lockId(entered);
+        actionEdit.baseGraphFingerprint = fingerprint(entered);
+        actionEdit.nodes = List.of();
+        actionEdit.edges = List.of();
+        WebAdminLogicChainEditorRequest.ActionEditDraft firstAction = new WebAdminLogicChainEditorRequest.ActionEditDraft();
+        firstAction.ownerType = "relay";
+        firstAction.ownerId = "relay.one";
+        firstAction.actionIndex = 0;
+        firstAction.operation = "replace";
+        firstAction.action = messageAction("first");
+        firstAction.expectedFingerprint = "typed-owner-fingerprint";
+        firstAction.lockId = "typed-owner-lock";
+        WebAdminLogicChainEditorRequest.ActionEditDraft secondAction = new WebAdminLogicChainEditorRequest.ActionEditDraft();
+        secondAction.ownerType = "region";
+        secondAction.ownerId = "region.two";
+        secondAction.actionIndex = 0;
+        secondAction.operation = "replace";
+        secondAction.action = messageAction("second");
+        secondAction.expectedFingerprint = "typed-owner-fingerprint";
+        secondAction.lockId = "typed-owner-lock";
+        actionEdit.actionEdits = List.of(firstAction, secondAction);
+
+        WebAdminWriteResult actionResult = fixture.service.validateDraft(null, fixture.editor, fixture.session, actionEdit, fixture.csrf, true);
+        requireFalse(actionResult.success(), "unsupported multi action edits fail validation");
+        requireValidationField(actionResult, "logic_chain_action_edit_owner_type_deferred", "actionEdits[0].ownerType");
+        requireValidationField(actionResult, "logic_chain_action_edit_owner_type_deferred", "actionEdits[1].ownerType");
+    }
+
     private static void testMultiDraftSessionSavesNewNodeExistingEditAndMetadata() throws Exception {
         Fixture fixture = fixture();
         WebAdminWriteResult entered = enter(fixture, "editor.join.in.a");
@@ -1930,6 +1982,16 @@ public final class WebAdminLogicChainEditorServiceTest {
             }
         }
         throw new AssertionError("missing validation code " + code + " errors=" + errors);
+    }
+
+    private static void requireValidationField(WebAdminWriteResult result, String code, String field) {
+        for (var error : result.validationErrors()) {
+            if (code.equals(error.code()) && field.equals(error.field())) {
+                requireTrue(containsChinese(error.message()), "validation field " + field + " has Chinese message");
+                return;
+            }
+        }
+        throw new AssertionError("missing validation field " + field + " for code " + code + " errors=" + result.validationErrors());
     }
 
     private static WebAdminValidationError findValidationError(WebAdminWriteResult result, String code) {

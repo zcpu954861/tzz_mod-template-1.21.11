@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.63.0-webadmin-help-example-center`
-- 当前开发基线：`8.18 Snapshot Timeline / Rollback Graph`；本阶段给 WebAdmin 加入配置时间轴、手动保存点、关键写操作前自动快照、与上一保存点的资源级 diff、rollback dry-run 和确认后回滚。它是 WebAdmin 配置恢复能力，不是 Git branch / merge / rebase，也不是世界实体 / 玩家背包 / runtime history 备份；不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、full Logic Chain Editor、Scratch editor 或 if / else runtime。发布后建议版本为 `v1.64.0-snapshot-rollback-timeline`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.65.0-webadmin-visual-system-design-reference`
+- 当前开发基线：`8.20 Pre-9 Stabilization / Hardening`；本阶段只做 8.x 收口：补 Snapshot / Rollback operationDiff 覆盖、degraded/筛选提示、Help / Doctor 链接、Timer/State 小 UI、Logic Chain 多草稿校验路径、README / capability matrix 和 guard。用户已放弃 8.20 WebAdmin visual system implementation，本阶段不落地深浅色主题、theme toggle 或大规模视觉重构。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、full Logic Chain Editor、Scratch editor、if / else runtime 或 Git branch / merge / rebase。发布后建议版本为 `v1.66.0-pre-9-stabilization-hardening`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -71,13 +71,28 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [WebAdmin Help Capability Matrix 8.17](docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md)
 - [8.18 Snapshot Timeline / Rollback Graph Current Context](docs/SNAPSHOT_ROLLBACK_TIMELINE_8_18_CURRENT_CONTEXT.md)
 - [Snapshot Rollback Capability Matrix 8.18](docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md)
+- [8.20 Pre-9 Stabilization Current Context](docs/PRE_9_STABILIZATION_8_20_CURRENT_CONTEXT.md)
+- [Pre-9 Stabilization Capability Matrix 8.20](docs/PRE_9_STABILIZATION_CAPABILITY_MATRIX_8_20.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
-- 8.x：ConditionEngine / 条件判断系统已进入 8.18；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连，8.17 加入只读 Help / Example / Troubleshooting / Glossary Center，8.18 加入 Snapshot Timeline / Rollback Graph 配置恢复能力。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；8.18 不做 Git branch / merge / rebase，不备份 runtime history / Timer active state / Join pending state / 玩家实时背包 / 世界实体，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
-- 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred。
-- 后续：GameController / MissionSystem / PhaseController。
+- 8.x：ConditionEngine / 条件判断系统已进入 8.20 稳定收口；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连，8.17 加入只读 Help / Example / Troubleshooting / Glossary Center，8.18 加入 Snapshot Timeline / Rollback Graph 配置恢复能力，8.19 只保留 WebAdmin visual system design reference，8.20 补 Help / Doctor / Snapshot / Template / Logic Chain / Timer / State 小型硬化和 guard。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；不做 Git branch / merge / rebase，不备份 runtime history / Timer active state / Join pending state / 玩家实时背包 / 世界实体，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
+- 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred；8.18 之后 Template import/apply 已受写入前自动快照保护，但模板服务自身不做多 store 事务回滚。
+- 8.19 visual system design reference 文档保留为未来视觉重构参考；8.20 不实现 WebAdmin visual system、dark/light theme 或 theme toggle。
+- 后续：9.0 GameController / Game Program Foundation，9.x MissionSystem / PhaseController，if/else branching，visual logic/program editor，direct typed module calls，vanilla command-like effects as typed visual blocks。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
+
+## 8.20 Pre-9 Stabilization / Hardening
+
+8.20 是进入 9.x 前的 8.x 收口阶段，不是视觉系统落地阶段，也不是 9.0。它在不改变 runtime 语义的前提下补齐跨模块小缺口：
+
+- Snapshot / Rollback：补齐更多 WebAdmin 写入口的 `operationDiff` 回填，新增 degraded / bad package 警告、选中保存点被筛选隐藏提示、rollback dry-run 操作标签兼容。
+- Help / Doctor：新增 Snapshot / Rollback 帮助主题、术语、排错和示例；Doctor 可提示 Snapshot manifest degraded、Template store degraded，并补 Signal Join / Timer action bucket 导航和标签。
+- Timer / State：`timer_cancel` 显示缺失目标策略，`clear_variable` 不再显示“变量不存在时自动创建”。
+- Logic Chain：多已有节点 / 多 action 编辑校验错误会指向真实 `existingNodeEdits[index]` / `actionEdits[index]`。
+- Guard：新增 8.20 pre-9 稳定护栏，确保没有 abandoned visual implementation、没有 dark/light theme implementation、没有 GameController / MissionSystem / PhaseController、没有 full editor / Scratch / if-else runtime、没有新增 ActionType / ConditionNodeType。
+
+8.19 的 visual system design reference 仍作为文档参考保留；8.20 不实现 theme storage、theme toggle、tokenized component hierarchy 或正式视觉重构。
 
 ## 8.18 Snapshot Timeline / Rollback Graph
 
@@ -91,7 +106,8 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 自动快照通过 WebAdmin 写入口在真实配置写入前创建，覆盖 Channel metadata、Logic Chain Editor save、Template import/apply、Signal Join、Timer、ConditionGroup、SignalListener、RegionController、`signal_devices.json` 中的 VBD config / ActionRelay action list / interaction matcher / device config 等核心配置写入；route-level hook 先通过权限、CSRF 和同源预检，再创建写入前快照。VBD object-selection 创建、容器模板保存、单物品提交模板保存这类游戏端 session callback 写入会在 session 校验、锁和 fingerprint 校验后、最终写入 `signal_devices.json` 前创建自动快照。自动快照创建失败时，本次覆盖写入会 fail-closed 停止。
 - `SUPPRESS_AUTO_CAPTURE` 防止 snapshot store 自身写入递归触发自动快照。
 - `pre_rollback` 快照在 rollback apply 前自动创建，并回填从当前配置到目标保存点的 `pre_rollback operation diff`，详情里的“本次操作变化”显示本次回滚实际新增、更新或删除了什么。
-- 自动快照仍是写入前保存点；Logic Chain Editor 草稿保存、模板导入 / 应用、Timer、频道 metadata、Signal Join、SignalListener 和 ConditionGroup 写入成功后会把本次写入的资源级 `operationDiff` 回填到该自动快照记录。这样改名、备注或配置字段变更会在该自动保存点详情里的“本次操作变化”中显示为 updated，不会等到下一次快照才显示上一次改动。
+- 自动快照仍是写入前保存点；Logic Chain Editor 草稿保存、模板导入 / 应用、Timer、频道 metadata、设备 metadata/basic/extended config、ActionRelay actions、interaction matcher、逻辑链 metadata、Signal Join、SignalListener、ConditionGroup、VBD delete/native trigger 和 RegionController 写入成功后会把本次写入的资源级 `operationDiff` 回填到该自动快照记录。这样改名、备注或配置字段变更会在该自动保存点详情里的“本次操作变化”中显示为 updated，不会等到下一次快照才显示上一次改动。
+- 时间轴 degraded / bad package 状态会在页面和详情中显示泛化中文警告；当前路由选中的保存点被筛选隐藏时会提示清空筛选，而不是静默切换节点。
 - “与上一保存点的变化”和“本次操作变化”里的资源条目可点击打开只读“变更详情”弹窗，查看资源类型 / ID / source、变更前后指纹、浅层字段变化和截断 JSON 预览；该弹窗没有保存按钮，不改变筛选、选中快照或时间轴滚动。
 - rollback apply 只恢复 allowlist 中的配置文件，并使用权限、CSRF / same-origin、全局 `TARGET_SNAPSHOT_ROLLBACK` edit lock、expected manifest fingerprint、dry-run fingerprint、audit 和 realtime；写入前会先 staging 并校验目标 JSON，快照包指纹必须与 manifest 匹配，写入后刷新 SignalDevice / Listener / Region / StateVariable / Timer 等相关缓存。
 - 时间轴支持按类型、模块、资源类型、用户、时间和搜索文本筛选。
@@ -534,7 +550,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不新增 ActionType。
 - 不新增 ConditionNodeType。
 - 不修改 SignalBridge / ActionEngine / Timer / Join / StateAction / Condition runtime 语义。
-- 不做 version rollback / Git-like branch merge。
+- Git-like branch / merge / rebase deferred；Snapshot 配置回滚已在 8.18 实现且仅限 allowlist 配置，不是世界备份。
 - 不启动 Minecraft，不跑 MCP scenario，不生成截图矩阵。
 - 本阶段不 commit / push / merge / tag。
 

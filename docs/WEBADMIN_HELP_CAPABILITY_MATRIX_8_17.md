@@ -23,6 +23,7 @@
 | Examples | Implemented | Documentation-only, copy-only examples. |
 | Example template footer | Implemented | Template CTA and `无模板关联` render in a fixed footer area. |
 | Troubleshooting | Implemented | Common failure reasons, checks, recommended actions and professional explanation. |
+| Snapshot / Rollback help | Implemented | 8.20 stabilization adds `snapshot.rollback`, Snapshot/Rollback glossary terms and troubleshooting for degraded packages, operation diff direction and retention. |
 | Clean slash formatting | Implemented | Short phrase lists render as `A / B / C` without punctuation before slash. |
 | Glossary | Implemented | Chinese-first terms with technical aliases. |
 | Template link | Implemented as navigation | Links to Template Center; apply still uses existing template flow. |
@@ -47,6 +48,7 @@ Covered topics:
 - Logic Chain Viewer
 - Logic Chain Editor
 - Templates / Prefab
+- Snapshot / Rollback / 配置时间轴
 - Debugger / Doctor
 - Device / VBD / ActionRelay / Region / SignalReceiver reference boundaries
 
@@ -61,6 +63,7 @@ Covered examples:
 - Signal 发出但没有后续动作
 - Template import 与 apply 的区别
 - Logic Chain 里新增 Join / Timer 草稿
+- 用配置时间轴 dry-run 回滚前先确认变化
 
 Covered troubleshooting:
 
@@ -77,6 +80,9 @@ Covered troubleshooting:
 - 空 gate 没有调试记录
 - 状态变量动作失败
 - Signal 有事件但无后续动作
+- 配置时间轴 degraded / bad package
+- 回滚前保护点 operation diff
+- 自动快照 retention 200
 
 ## Safety Boundaries
 
@@ -94,7 +100,7 @@ Covered troubleshooting:
 - ConditionGroup apply deferred
 - StateVariable definition apply deferred
 - external reference fail closed
-- version rollback / Git-like branch merge deferred
+- Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置
 - raw JSON editor deferred
 
 ## Guard Markers
@@ -167,6 +173,10 @@ Frontend and docs include these stability markers:
 - `data-page-help-topic`
 - `data-page-help-return-to`
 - `data-page-help-return-action`
+- `snapshot.rollback`
+- `trouble.snapshot-degraded`
+- `trouble.rollback-operation-diff`
+- `trouble.snapshot-retention`
 
 ## Non-Goals
 
@@ -180,4 +190,4 @@ Frontend and docs include these stability markers:
 - full editor workflows
 - if/else runtime
 - new gameplay controller systems
-- rollback/version history
+- Git-like branch / merge / rebase
