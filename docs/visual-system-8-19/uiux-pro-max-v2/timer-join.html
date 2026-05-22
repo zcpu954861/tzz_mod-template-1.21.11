@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timer Join V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar"><div class="brand"><span class="icon-box timer"><svg class="svg" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2"/></svg></span><div><strong>Timer + Join</strong><small>配置组件样张</small></div></div><nav class="nav"><section class="nav-section"><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引</span></a><a class="nav-link" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link active" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav><button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button></aside>
+    <section class="main">
+      <header class="topbar"><div class="toolbar"><span class="status-pill blue">Timer mode badge</span><span class="status-pill green">Join passive observer</span></div><div class="button-row"><button class="btn">新建 Timer</button><button class="btn">新建 Join</button></div></header>
+      <section class="page">
+        <div class="page-head"><div><h1>调度器 / 信号汇合</h1><p>列表/详情结构不变；row、mode badge、channel chip、runtime strip、action bucket 做统一组件。</p></div></div>
+        <div class="split">
+          <section class="panel">
+            <h2>Timer 列表与详情</h2>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>名称</th><th>模式</th><th>Scope</th><th>运行态</th><th>输出</th></tr></thead><tbody><tr><td><strong>开局延迟</strong><br><span class="mono">timer.round.start</span></td><td><span class="badge blue">DELAY</span></td><td>GLOBAL</td><td><span class="status-pill green">active 1</span></td><td><span class="chip blue">game.round.start</span></td></tr><tr><td><strong>倒计时提示</strong><br><span class="mono">timer.countdown.notice</span></td><td><span class="badge">COUNTDOWN</span></td><td>PLAYER</td><td><span class="status-pill">idle</span></td><td><span class="chip">onTickActions</span></td></tr><tr><td><strong>循环检查</strong><br><span class="mono">timer.loop.scan</span></td><td><span class="badge amber">REPEAT</span></td><td>GLOBAL</td><td><span class="status-pill amber">high frequency</span></td><td><span class="chip">onComplete</span></td></tr></tbody></table></div>
+            <div class="divider"></div>
+            <div class="status-strip"><div class="field-card"><span>remaining</span><strong>72 ticks</strong></div><div class="field-card"><span>interval</span><strong>20 ticks</strong></div><div class="field-card"><span>maxRuns</span><strong>5</strong></div><div class="field-card"><span>policy</span><strong>RESTART</strong></div></div>
+            <div class="divider"></div>
+            <div class="bucket-grid"><div class="bucket-card"><span class="badge blue">onStart</span><strong>1 action</strong><small class="muted">message</small></div><div class="bucket-card"><span class="badge">onTick</span><strong>2 actions</strong><small class="muted">title + sound</small></div><div class="bucket-card"><span class="badge green">onComplete</span><strong>emit channel</strong><small class="muted">game.round.start</small></div><div class="bucket-card"><span class="badge red">onCancel</span><strong>0 actions</strong><small class="muted">只读提示</small></div></div>
+          </section>
+          <section class="panel">
+            <h2>Signal Join 配置摘要</h2>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>名称</th><th>模式</th><th>输入</th><th>输出</th><th>状态</th></tr></thead><tbody><tr><td><strong>双频道汇合</strong><br><span class="mono">join.round.ready</span></td><td><span class="badge green">ALL</span></td><td><span class="chip">A</span> <span class="chip">B</span></td><td><span class="chip blue">C</span></td><td><span class="status-pill green">pending 1/2</span></td></tr><tr><td><strong>任意两队完成</strong><br><span class="mono">join.team.any2</span></td><td><span class="badge blue">ANY_N</span></td><td><span class="chip">4 channels</span></td><td><span class="chip blue">game.unlock</span></td><td><span class="status-pill">idle</span></td></tr><tr><td><strong>累计点击</strong><br><span class="mono">join.button.count</span></td><td><span class="badge amber">COUNT</span></td><td><span class="chip">button.hit</span></td><td><span class="chip blue">button.done</span></td><td><span class="status-pill amber">cooldown</span></td></tr></tbody></table></div>
+            <div class="divider"></div>
+            <section class="rail-card"><h2>汇合详情组件</h2><div class="field-list"><div class="field-card"><span>输入频道</span><span><span class="chip">game.a.ready</span> <span class="chip green">game.b.ready</span></span></div><div class="field-card"><span>输出频道</span><span class="chip blue">game.ready</span></div><div class="field-card"><span>语义</span><span>passive observer，不阻断原始 signal。</span></div></div></section>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

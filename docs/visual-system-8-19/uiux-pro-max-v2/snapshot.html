@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Snapshot V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar"><div class="brand"><span class="icon-box snapshot"><svg class="svg" viewBox="0 0 24 24"><path d="M7 5h9l3 3v11H7V5Z"/><circle cx="11" cy="12" r="1.5"/></svg></span><div><strong>配置时间轴</strong><small>Snapshot / Rollback</small></div></div><nav class="nav"><section class="nav-section"><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引</span></a><a class="nav-link" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link active" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav><button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button></aside>
+    <section class="main">
+      <header class="topbar"><div class="toolbar"><span class="status-pill green">manual 8</span><span class="status-pill blue">auto 34</span><span class="status-pill amber">pre_rollback 1</span></div><button class="btn primary">创建手动保存点</button></header>
+      <section class="page">
+        <div class="page-head"><div><h1>配置时间轴</h1><p>Git graph timeline 不变；节点卡、diff item、详情 rail 和只读 modal 做组件级重构。</p></div><div class="toolbar"><label class="field">搜索<input class="input" value="timer rename"></label><label class="field">类型<select class="select"><option>全部</option></select></label><label class="field">资源<select class="select"><option>Timer</option></select></label></div></div>
+        <div class="timeline">
+          <section class="timeline-list">
+            <div class="timeline-node" style="--node-color:var(--ok)"><span class="timeline-dot"></span><article class="timeline-card" style="--node-color:var(--ok)"><h3>手动保存点：模板应用前</h3><p>2026/05/21 22:18:04 · admin · 资源 114</p><div class="meta-strip"><span class="badge green">manual</span><span class="chip">protected</span><span class="chip">tags: stable</span></div></article></div>
+            <div class="timeline-node" style="--node-color:var(--info)"><span class="timeline-dot"></span><article class="timeline-card" style="--node-color:var(--info)"><h3>自动保存：Timer 配置更新</h3><p>2026/05/21 22:20:17 · editor · 本次操作变化 1</p><div class="meta-strip"><span class="badge blue">auto</span><span class="chip blue">updated timer.round.start</span></div></article></div>
+            <div class="timeline-node" style="--node-color:var(--warning)"><span class="timeline-dot"></span><article class="timeline-card" style="--node-color:var(--warning)"><h3>回滚前保护点</h3><p>2026/05/21 22:26:49 · admin · rollback dry-run 后创建</p><div class="meta-strip"><span class="badge amber">pre_rollback</span><span class="chip red">apply guarded</span></div></article></div>
+          </section>
+          <aside class="rail">
+            <section class="rail-card"><h2>保存点详情</h2><div class="field-list"><div class="field-card"><span>Kind</span><span class="badge green">manual</span></div><div class="field-card"><span>Snapshot ID</span><span class="mono">snap_20260521_221804</span></div><div class="field-card"><span>Package</span><span class="mono">sha256:9c8e...</span></div></div></section>
+            <section class="rail-card"><h2>本次操作变化</h2><div class="diff-card"><span class="badge blue">updated</span><div><strong>Timer</strong><br><span class="mono">timer.round.start</span></div><button class="btn ghost">详情</button></div><div class="diff-card"><span class="badge green">created</span><div><strong>Channel metadata</strong><br><span class="mono">game.round.ready</span></div><button class="btn ghost">详情</button></div></section>
+            <section class="modal-card"><h2>只读变更详情</h2><div class="modal-grid"><div class="muted">字段</div><div class="badge">旧</div><div class="badge blue">新</div><div>displayName</div><div class="mono">1</div><div class="mono">01</div><div>note</div><div class="mono">-</div><div class="mono">模板应用前自动保存</div></div><div class="divider"></div><div class="button-row"><button class="btn">关闭</button><button class="btn danger">回滚到此保存点</button></div></section>
+          </aside>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Condition Groups V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar"><div class="brand"><span class="icon-box condition"><svg class="svg" viewBox="0 0 24 24"><path d="M5 6h6M5 12h10M5 18h6"/><circle cx="18" cy="12" r="3"/></svg></span><div><strong>条件组</strong><small>Condition Editor V2</small></div></div><nav class="nav"><section class="nav-section"><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引</span></a><a class="nav-link" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link active" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav><button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button></aside>
+    <section class="main">
+      <header class="topbar"><div class="toolbar"><span class="status-pill amber">validation visible</span><span class="status-pill violet">node modal</span><span class="status-pill">readonly catalog</span></div><button class="btn primary">新建条件组</button></header>
+      <section class="page">
+        <div class="page-head"><div><h1>条件组</h1><p>条件树逻辑不变；AND/OR/NOT、leaf condition、validation、catalog 都改成统一组件层级。</p></div><div class="toolbar"><label class="field">搜索<input class="input" value="玩家"></label><label class="field">分类<select class="select"><option>玩家 / 状态</option></select></label></div></div>
+        <div class="three-col">
+          <section class="panel scroll-panel"><h2>条件组列表</h2><div class="topic-card active"><span class="badge green">enabled</span><strong>开局条件</strong><small class="mono">group.round.start</small></div><div class="topic-card"><span class="badge">disabled</span><strong>测试条件</strong><small class="mono">group.debug.only</small></div><div class="topic-card"><span class="badge amber">warning</span><strong>缺少字段</strong><small class="mono">group.missing.player</small></div></section>
+          <section class="panel scroll-panel"><h2>结构化条件树</h2><div class="condition-tree"><div class="condition-node"><div><span class="badge blue">AND</span><strong> 全部满足</strong><br><small class="muted">2 个子节点，容器节点不使用大色块。</small></div><button class="btn ghost">编辑</button></div><div class="condition-node child"><div><span class="badge green">玩家在线</span><strong> 触发玩家存在</strong><br><small class="mono">player_exists</small></div><button class="btn ghost">编辑</button></div><div class="condition-node child"><div><span class="badge amber">状态变量</span><strong> mission.started = true</strong><br><small class="mono">state_variable_bool_equals</small></div><button class="btn ghost">编辑</button></div></div><div class="divider"></div><section class="modal-card"><h2>节点编辑 modal 片段</h2><label class="field">Condition type<input class="input" value="状态变量布尔值等于"></label><label class="field">变量 key<input class="input" value="mission.started"></label><div class="status-pill red">validation：PLAYER scope 缺少 targetMode</div><div class="button-row"><button class="btn">取消</button><button class="btn primary">保存节点</button></div></section></section>
+          <aside class="panel scroll-panel"><h2>条件类型目录</h2><div class="chip-row"><span class="chip blue">玩家</span><span class="chip">物品</span><span class="chip">区域</span><span class="chip violet">逻辑链</span></div><div class="divider"></div><div class="topic-card"><strong>玩家拥有 tag</strong><small class="mono">player_tag_contains</small><small class="muted">中文名称优先，type id 为技术副文本。</small></div><div class="topic-card"><strong>状态变量比较</strong><small class="mono">state_variable_int_compare</small><small class="muted">字段提示、operator、scope 用同一表单组件。</small></div></aside>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

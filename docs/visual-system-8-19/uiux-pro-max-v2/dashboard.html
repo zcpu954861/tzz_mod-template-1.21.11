@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard V2 - Deep Control Console</title>
+  <link rel="stylesheet" href="visual-system.css">
+  <script src="theme-toggle.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="icon-box signal"><svg class="svg" viewBox="0 0 24 24"><path d="M5 7l7-4 7 4v10l-7 4-7-4V7Z"/></svg></span><div><strong>游戏开发编辑平台</strong><small>TZZ Mod WebAdmin</small></div></div>
+      <nav class="nav"><section class="nav-section"><div class="nav-section-title">样张</div><a class="nav-link" href="index.html"><span class="nav-icon signal"></span><span>索引 / Token</span></a><a class="nav-link active" href="dashboard.html"><span class="nav-icon signal"></span><span>Dashboard</span></a><a class="nav-link" href="logic-chain.html"><span class="nav-icon action"></span><span>Logic Chain</span></a><a class="nav-link" href="snapshot.html"><span class="nav-icon snapshot"></span><span>Snapshot</span></a><a class="nav-link" href="timer-join.html"><span class="nav-icon timer"></span><span>Timer + Join</span></a><a class="nav-link" href="condition-groups.html"><span class="nav-icon condition"></span><span>Condition Groups</span></a><a class="nav-link" href="help-template.html"><span class="nav-icon action"></span><span>Help / Template</span></a></section></nav>
+      <button class="btn ghost" data-theme-toggle>主题：<span data-theme-label>深色</span></button>
+    </aside>
+    <section class="main">
+      <header class="topbar"><div class="topbar-left"><span class="status-pill green">服务器在线</span><span class="status-pill blue">实时同步已连接</span><span class="status-pill">最后事件 12 秒前</span></div><div class="topbar-right"><button class="btn" data-theme-toggle>切换主题</button><button class="btn ghost">退出登录</button></div></header>
+      <section class="page">
+        <div class="page-head"><div><h1>总览</h1><p>保留总览页结构；metric card 和模块卡内部信息重排为专业产品组件。</p></div><div class="button-row"><button class="btn">刷新</button><button class="btn primary">配置时间轴</button></div></div>
+        <div class="metric-grid">
+          <article class="metric-card"><span class="icon-box signal"><svg class="svg" viewBox="0 0 24 24"><path d="M4 12h16M8 6h8M8 18h8"/></svg></span><div class="metric-copy"><div class="metric-label"><span>已知频道</span><span class="badge blue">+8</span></div><div class="metric-value">128 <small>channels</small></div><small class="muted">活跃 36 / 孤立 7</small></div></article>
+          <article class="metric-card"><span class="icon-box green"><svg class="svg" viewBox="0 0 24 24"><path d="M8 12l3 3 6-7"/><circle cx="12" cy="12" r="8"/></svg></span><div class="metric-copy"><div class="metric-label"><span>受控写入</span><span class="badge green">safe</span></div><div class="metric-value">24 <small>locks</small></div><small class="muted">全部通过 edit lock</small></div></article>
+          <article class="metric-card"><span class="icon-box condition"><svg class="svg" viewBox="0 0 24 24"><path d="M12 4l9 16H3L12 4Z"/><path d="M12 9v5M12 17h.01"/></svg></span><div class="metric-copy"><div class="metric-label"><span>诊断风险</span><span class="badge amber">review</span></div><div class="metric-value">5 <small>issues</small></div><small class="muted">2 条需要管理员确认</small></div></article>
+          <article class="metric-card"><span class="icon-box snapshot"><svg class="svg" viewBox="0 0 24 24"><path d="M7 5h9l3 3v11H7V5Z"/><circle cx="11" cy="12" r="1.4"/></svg></span><div class="metric-copy"><div class="metric-label"><span>保存点</span><span class="badge blue">timeline</span></div><div class="metric-value">43 <small>snapshots</small></div><small class="muted">manual 8 / auto 34 / pre 1</small></div></article>
+        </div>
+        <div class="component-grid">
+          <article class="module-card selected" style="--accent:var(--module-signal)" tabindex="0"><div class="component-title"><span class="icon-box signal"><svg class="svg" viewBox="0 0 24 24"><path d="M4 12h16M8 6h8M8 18h8"/></svg></span><div><strong>SignalBridge</strong><small>事件总线 / channel 联动</small></div></div><div class="meta-strip"><span class="badge blue">active</span><span class="chip">128 channels</span><span class="chip green">36 live</span></div><div class="component-body"><div class="component-row"><span class="state-icon signal"></span><div class="row-title"><strong>最近触发</strong><small class="mono">game.round.start</small></div><span class="badge blue">12s</span></div><div class="component-row"><span class="state-icon green"></span><div class="row-title"><strong>消费者</strong><small>listener / relay / join / timer</small></div><span>42</span></div></div><button class="btn ghost">查看详情</button></article>
+          <article class="module-card" style="--accent:var(--module-action)"><div class="component-title"><span class="icon-box action"><svg class="svg" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 11l6-4M9 13l6 4"/></svg></span><div><strong>逻辑链</strong><small>Viewer / Editor / draft overlay</small></div></div><div class="meta-strip"><span class="badge violet">draft 4</span><span class="chip">reference 12</span></div><div class="component-row"><span class="state-icon action"></span><div class="row-title"><strong>当前焦点</strong><small class="mono">game.round.start</small></div><span class="badge violet">selected</span></div><button class="btn ghost">打开逻辑链</button></article>
+          <article class="module-card" style="--accent:var(--warning)"><div class="component-title"><span class="icon-box condition"><svg class="svg" viewBox="0 0 24 24"><path d="M12 4l9 16H3L12 4Z"/></svg></span><div><strong>风险与诊断</strong><small>Doctor / Debugger / validation</small></div></div><div class="meta-strip"><span class="badge amber">warning</span><span class="chip red">2 blockers</span></div><div class="component-row"><span class="state-icon doctor"></span><div class="row-title"><strong>Timer 高频</strong><small>REPEAT intervalTicks &lt; 20</small></div><span class="badge amber">review</span></div><button class="btn danger">查看风险</button></article>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
