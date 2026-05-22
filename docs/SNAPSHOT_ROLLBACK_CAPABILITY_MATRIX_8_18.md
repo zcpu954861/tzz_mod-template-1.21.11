@@ -16,7 +16,7 @@
 | Retention | Implemented | Auto snapshots keep newest 200; manual and `pre_rollback` are protected. |
 | Snapshot detail | Implemented | Shows record metadata, trigger metadata, resources and diff. |
 | Previous snapshot diff | Implemented | Resource-level created/updated/deleted/unchanged counts. |
-| Before-write operation diff | Implemented | Logic Chain Editor draft saves, Template import/apply, Timer, channel metadata, Signal Join, SignalListener and ConditionGroup auto snapshots are annotated after successful write with the operation's resource-level diff, so rename/config changes show as updated on the protecting auto snapshot. |
+| Before-write operation diff | Implemented | Logic Chain Editor draft saves, Template import/apply, Timer, channel metadata, device metadata/basic/extended config, ActionRelay actions, interaction item matcher, logic-chain metadata, Signal Join, SignalListener, ConditionGroup, VBD delete/native trigger and RegionController auto snapshots are annotated after successful write with the operation's resource-level diff, so rename/config changes show as updated on the protecting auto snapshot. |
 | Clickable diff detail | Implemented | Previous-snapshot diff and operation diff entries open a read-only `变更详情` modal with resource metadata, before/after fingerprints, shallow field diff and bounded JSON previews. |
 | JSON advanced preview | Implemented | `data-snapshot-json-preview` exposes a bounded resource preview. |
 | Rollback dry-run | Implemented | Generates `RollbackPlan` with operations, blockers, warnings and dry-run fingerprint. |
@@ -24,6 +24,9 @@
 | Pre-rollback protection | Implemented | Applies create `pre_rollback` before restoring files and annotate a `pre_rollback operation diff` from current config to the selected rollback target. |
 | Timeline route | Implemented | `#/snapshots`. |
 | Timeline graph UI | Implemented | `data-snapshot-timeline-graph`, not ordinary table/list layout. |
+| Degraded warning UI | Implemented | Manifest/package degraded states show generic Chinese warnings via `data-snapshot-degraded-warning` / `data-snapshot-bad-package-warning`; raw parser details stay server-side. |
+| Selected hidden by filter | Implemented | Directly opened snapshots hidden by the active filter show `data-snapshot-selected-hidden-by-filter` and a clear-filter action. |
+| Help link | Implemented | Snapshot warnings and page help map to `snapshot.rollback`. |
 | Manual node styling | Implemented | `data-snapshot-node-kind-manual`, green visual accent. |
 | Auto node styling | Implemented | `data-snapshot-node-kind-auto`, cyan visual accent. |
 | Pre-rollback node styling | Implemented | `data-snapshot-node-kind-pre-rollback`, yellow warning accent. |
@@ -100,6 +103,10 @@ Required markers:
 - `data-snapshot-node-kind-pre-rollback`
 - `data-snapshot-detail-rail`
 - `data-snapshot-detail-diff`
+- `data-snapshot-degraded-warning`
+- `data-snapshot-bad-package-warning`
+- `data-snapshot-selected-hidden-by-filter`
+- `data-snapshot-help-topic="snapshot.rollback"`
 - `data-snapshot-before-write-explained`
 - `data-snapshot-operation-diff`
 - `data-snapshot-operation-timer-updated`
@@ -120,6 +127,7 @@ Required markers:
 - `data-snapshot-rollback-dry-run-modal`
 - `data-snapshot-rollback-confirm-modal`
 - `data-snapshot-json-preview`
+- `snapshotRollbackOperationLabel`
 - `VIEW_SNAPSHOTS`
 - `CREATE_SNAPSHOT`
 - `ROLLBACK_SNAPSHOT`

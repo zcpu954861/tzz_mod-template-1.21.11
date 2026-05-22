@@ -86,7 +86,7 @@ Logic Chain metadata conflict policy: safe apply also plans the WebAdmin logic-c
 
 Expected fingerprint policy: dry-run returns the apply plan fingerprint. Apply recomputes the plan, including conflicts and planned real-store creates, and rejects stale fingerprints before writing.
 
-Write failure policy: 8.15 validates all planned resources before writing and then saves the existing stores in a fixed order. If a later store save fails, the backend returns a failure result and audit context, but full multi-store transaction rollback is deferred to a later snapshot/rollback stage.
+Write failure policy: 8.15 validates all planned resources before writing and then saves the existing stores in a fixed order. If a later store save fails, the backend returns a failure result and audit context. Since 8.18, template import/apply routes are protected by write-before auto snapshots and successful operations annotate `operationDiff`; this is configuration recovery support, not a transactional apply rollback inside the template service.
 
 ## Boundaries
 
@@ -103,7 +103,7 @@ This stage does not implement:
 - 不做 GameController
 - 不做 MissionSystem
 - 不做 PhaseController
-- version rollback
+- Git-like branch / merge / rebase
 - external template marketplace
 - automatic world entity copy or block placement
 
@@ -114,4 +114,4 @@ Future direction:
 - batch rename / remap policy
 - richer placeholder binding UI
 - template marketplace after local safety is stable
-- simple snapshot / rollback integration with template apply
+- richer template-specific recovery view on top of 8.18 Snapshot / Rollback

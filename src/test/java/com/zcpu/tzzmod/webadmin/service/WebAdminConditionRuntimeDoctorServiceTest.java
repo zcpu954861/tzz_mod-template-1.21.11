@@ -28,6 +28,7 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
         testContainerOpenCloseDynamicProfileDiagnostics();
         testAlwaysFalseWarningAndBlankGateNoIssue();
         testControlledStateActionDiagnostics();
+        testTimerActionBindingDiagnostics();
     }
 
     private static void testMissingDisabledInvalidAndIncompatibleBindings() {
@@ -192,6 +193,48 @@ public final class WebAdminConditionRuntimeDoctorServiceTest {
                 "valid global state action and Region context_player action produce no Doctor issue");
         requireTrue(issues.stream().allMatch(issue -> containsChinese(issue.title()) && containsChinese(issue.message()) && containsChinese(issue.suggestion())),
                 "state action doctor diagnostics use Chinese");
+    }
+
+    private static void testTimerActionBindingDiagnostics() {
+        WebAdminConditionRuntimeDoctorService service = new WebAdminConditionRuntimeDoctorService();
+        Map<String, WebAdminConditionGroupStore.ConditionGroupEntry> groups = Map.of(
+                "player", entry("player", definition("player", leaf(
+                        ConditionNodeType.STATE_VARIABLE_BOOL_EQUALS,
+                        config("scope", "PLAYER", "key", "player.timer.ready", "targetMode", "context_player", "expected", "true")
+                )), true)
+        );
+
+        List<WebAdminDtos.DoctorIssueDto> gateIssues = service.diagnoseBindings(groups, List.of(
+                binding("TIMER_ACTION", "timer_start:timer.one:action:0", "player", ConditionRuntimeTargetType.TIMER_ON_START_ACTION),
+                binding("TIMER_ACTION", "timer_tick:timer.one:action:0", "missing", ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION),
+                binding("TIMER_ACTION", "timer_complete:timer.one:action:0", "player", ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION),
+                binding("TIMER_ACTION", "timer_cancel:timer.one:action:0", "player", ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION)
+        ));
+
+        requireTrue(gateIssues.stream().anyMatch(issue -> issue.relatedObjectType().equals("TIMER_ACTION")
+                        && issue.relatedObjectId().contains("timer_tick")
+                        && issue.navigationTarget().contains("target:timer_tick")),
+                "doctor reports Timer action bucket condition gate bindings");
+        requireTrue(gateIssues.stream().anyMatch(issue -> issue.id().contains("condition-runtime-incompatible-group")
+                        && issue.relatedObjectType().equals("TIMER_ACTION")
+                        && issue.message().contains("context_player")),
+                "Timer action buckets conservatively reject context_player condition groups");
+
+        List<WebAdminDtos.DoctorIssueDto> stateIssues = service.diagnoseStateActions(List.of(
+                stateBinding("TIMER_ACTION", "timer:start:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.PLAYER, StateVariableTargetMode.CONTEXT_PLAYER, "", "player.timer.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.TIMER_ON_START_ACTION),
+                stateBinding("TIMER_ACTION", "timer:cancel:action:0",
+                        ActionConfig.stateVariable(StateVariableMutationOperation.SET_VARIABLE, StateVariableScope.PLAYER, StateVariableTargetMode.EXPLICIT_TARGET, "", "player.timer.ready", StateVariableType.BOOLEAN, "true", 0, true, "", ""),
+                        ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION)
+        ));
+
+        requireTrue(stateIssues.stream().anyMatch(issue -> issue.id().contains("state-action-context-player-without-player")
+                        && issue.relatedObjectId().contains("timer:start")),
+                "Timer context_player state action is reported because Timer action buckets do not provide player context");
+        requireIssue(stateIssues, "state-action-explicit-target-missing", "ERROR", "显式目标", "结构化字段");
+        requireTrue(stateIssues.stream().anyMatch(issue -> issue.relatedObjectType().equals("TIMER_ACTION")),
+                "Timer state action diagnostics keep TIMER_ACTION related object type");
     }
 
     private static WebAdminConditionRuntimeDoctorService.Binding binding(

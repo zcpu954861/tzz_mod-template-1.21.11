@@ -215,6 +215,7 @@ public final class StabilizationGuardTest {
         testLogicChainEditorExistingNodeEditing816();
         testWebAdminHelpExampleCenter817();
         testSnapshotRollbackTimeline818();
+        testPre9StabilizationHardening820();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -1885,6 +1886,8 @@ public final class StabilizationGuardTest {
                   ['#/regions','region.controller'],
                   ['#/region-controllers','region.controller'],
                   ['#/templates','templates.prefab'],
+                  ['#/snapshots','snapshot.rollback'],
+                  ['#/snapshots/snap-1','snapshot.rollback'],
                   ['#/timers','timer.delay'],
                   ['#/logic-chains','logic-chain.viewer'],
                   ['#/state-variables','state-variable.basics'],
@@ -9881,8 +9884,8 @@ public final class StabilizationGuardTest {
         requireContains(newNodeModal, "FAIL_IF_RUNNING", "8.14 Logic Chain Timer modal exposes supported FAIL_IF_RUNNING start policy");
         requireContains(newNodeModal, "labelTimerMode(v)", "8.14 Logic Chain Timer modal uses Chinese mode labels");
         requireContains(newNodeModal, "labelTimerStartPolicy(v)", "8.14 Logic Chain Timer modal uses Chinese start policy labels");
-        requireContains(newNodeModal, "输入 / 输出将在连线阶段确定", "8.14 Logic Chain Join topology is explained as connection-derived");
-        requireContains(newNodeModal, "完成后的输出将在连线阶段确定", "8.14 Logic Chain Timer output is explained as connection-derived");
+        requireContains(newNodeModal, "输入 / 输出由画布绿色连线决定", "8.14 Logic Chain Join topology is explained as connection-derived");
+        requireContains(newNodeModal, "完成后的输出由画布绿色连线确定", "8.14 Logic Chain Timer output is explained as connection-derived");
         requireFalse(newNodeModal.contains("logic-chain-new-node-output"), "8.14 Logic Chain modal must not expose manual output channel input");
         requireFalse(newNodeModal.contains("logic-chain-new-node-inputs"), "8.14 Logic Chain modal must not expose manual Join input channel input");
         requireFalse(newNodeModal.contains("option value=\"STACK\""), "8.14 Logic Chain Timer modal must not expose unsupported STACK start policy");
@@ -9909,7 +9912,7 @@ public final class StabilizationGuardTest {
                 "8.14 action append must not expose old action move/delete/reorder");
         requireFalse(scripts.contains("draggable=\"true\"") || scripts.contains("ondragover=\"logicChainHandleDraftDragOver"), "8.14 draft placement must use pointer drag as primary path");
         requireFalse(scripts.contains("<button type=\"button\" class=\"logic-chain-node-card"), "8.14 node card must not nest connection buttons inside a button card");
-        String nodeCard = extractBetween(scripts, "function logicChainNodeCard", "function logicChainMinimap");
+        String nodeCard = extractBetween(scripts, "function logicChainNodeCard", "function logicChainExistingConnectionHandles");
         requireContains(nodeCard, "data-logic-chain-node-action", "8.14 node card uses delegated action data attribute");
         requireContains(nodeCard, "data-logic-chain-node-id", "8.14 node card exposes safe node id dataset");
         requireContains(nodeCard, "data-logic-chain-primary-node-id", "8.14 reference card exposes safe primary id dataset");
@@ -10722,7 +10725,7 @@ public final class StabilizationGuardTest {
                 "8.17 inline term click must not default to opening the feature page");
 
         for (String marker : List.of(
-                "version\", \"8.17\"",
+                "version\", \"8.20-pre9-stabilization\"",
                 "readOnly\", true",
                 "noWriteApi\", true",
                 "copyOnly\", true",
@@ -11235,6 +11238,284 @@ public final class StabilizationGuardTest {
         )) {
             requireFalse(actionType.contains(forbidden), "8.18 must not add ActionType marker: " + forbidden);
         }
+        requireActionTypeSetUnchangedFor812();
+        requireConditionNodeTypeSetUnchangedFor813();
+    }
+
+    private static void testPre9StabilizationHardening820() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        Path contextPath = root.resolve("docs/PRE_9_STABILIZATION_8_20_CURRENT_CONTEXT.md");
+        Path matrixPath = root.resolve("docs/PRE_9_STABILIZATION_CAPABILITY_MATRIX_8_20.md");
+        String context = Files.readString(contextPath, StandardCharsets.UTF_8);
+        String matrix = Files.readString(matrixPath, StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String doctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDoctorService.java"), StandardCharsets.UTF_8);
+        String runtimeDoctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java"), StandardCharsets.UTF_8);
+        String help = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java"), StandardCharsets.UTF_8);
+        String helpTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogServiceTest.java"), StandardCharsets.UTF_8);
+        String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String editorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"), StandardCharsets.UTF_8);
+        String runtimeDoctorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorServiceTest.java"), StandardCharsets.UTF_8);
+        String snapshotContext = Files.readString(root.resolve("docs/SNAPSHOT_ROLLBACK_TIMELINE_8_18_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String snapshotMatrix = Files.readString(root.resolve("docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md"), StandardCharsets.UTF_8);
+        String helpContext = Files.readString(root.resolve("docs/WEBADMIN_HELP_EXAMPLE_CENTER_8_17_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String helpMatrix = Files.readString(root.resolve("docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md"), StandardCharsets.UTF_8);
+        String templateContext = Files.readString(root.resolve("docs/TEMPLATES_PREFAB_IMPORT_EXPORT_8_15_CURRENT_CONTEXT.md"), StandardCharsets.UTF_8);
+        String templateMatrix = Files.readString(root.resolve("docs/TEMPLATES_PREFAB_CAPABILITY_MATRIX_8_15.md"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+        String conditionNodeType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/ConditionNodeType.java"), StandardCharsets.UTF_8);
+
+        for (String file : List.of(
+                "docs/PRE_9_STABILIZATION_8_20_CURRENT_CONTEXT.md",
+                "docs/PRE_9_STABILIZATION_CAPABILITY_MATRIX_8_20.md",
+                "docs/WEBADMIN_VISUAL_SYSTEM_8_19_SELECTED_DIRECTION.md",
+                "docs/WEBADMIN_VISUAL_SYSTEM_UIUX_PRO_MAX_8_19.md",
+                "docs/WEBADMIN_VISUAL_SYSTEM_UIUX_PRO_MAX_SAMPLES_V2_8_19.md",
+                "docs/visual-system-8-19/uiux-pro-max-v2/index.html"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "8.20 required doc/reference exists: " + file);
+        }
+        for (String removed : List.of(
+                "docs/WEBADMIN_VISUAL_SYSTEM_CAPABILITY_MATRIX_8_20.md",
+                "docs/WEBADMIN_VISUAL_SYSTEM_IMPLEMENTATION_8_20_CURRENT_CONTEXT.md"
+        )) {
+            requireFalse(Files.exists(root.resolve(removed)), "8.20 abandoned visual implementation doc must not exist: " + removed);
+        }
+
+        String stabilizationDocs = context + "\n" + matrix + "\n" + readme;
+        for (String marker : List.of(
+                "8.20",
+                "Pre-9",
+                "v1.65.0-webadmin-visual-system-design-reference",
+                "daea0557",
+                "feature/pre-9-stabilization-hardening",
+                "Abandoned visual implementation",
+                "WebAdmin visual system implementation",
+                "dark/light theme",
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "full Logic Chain Editor",
+                "Scratch editor",
+                "if / else runtime",
+                "Git branch / merge / rebase",
+                "new `ActionType`",
+                "new `ConditionNodeType`",
+                "9.0 GameController / Game Program Foundation",
+                "visual logic/program editor",
+                "vanilla command-like effects as typed visual blocks"
+        )) {
+            requireContains(stabilizationDocs, marker, "8.20 context/matrix/README marker: " + marker);
+        }
+
+        String productionFrontend = scripts + "\n" + styles + "\n" + shell;
+        for (String forbidden : List.of(
+                "TZZ_WEBADMIN_THEME_STORAGE_KEY",
+                "data-theme-toggle",
+                "data-theme-label",
+                "data-theme=",
+                "id=\"theme-toggle\"",
+                "applyWebAdminTheme",
+                "initWebAdminTheme",
+                "bindThemeToggle",
+                "data-tokenized-component",
+                "data-visual-system",
+                "8.20-webadmin-visual-system-implementation"
+        )) {
+            requireFalse(productionFrontend.contains(forbidden), "8.20 must not reintroduce WebAdmin visual implementation marker: " + forbidden);
+        }
+
+        String mainJava = readJavaDirectory(root.resolve("src/main/java"));
+        requireNoControllerSystemImplementations(mainJava, "8.20 must not implement 9.x controller systems");
+        for (String forbidden : List.of(
+                "class FullLogicChainEditor",
+                "class ScratchEditor",
+                "class IfElseRuntime",
+                "record SnapshotBranch",
+                "record SnapshotMerge",
+                "record SnapshotRebase",
+                "class SnapshotBranch",
+                "class SnapshotMerge",
+                "class SnapshotRebase"
+        )) {
+            requireFalse(mainJava.contains(forbidden), "8.20 must not add out-of-scope source marker: " + forbidden);
+        }
+        for (String forbidden : List.of(
+                "GAME_CONTROLLER",
+                "MISSION_SYSTEM",
+                "PHASE_CONTROLLER",
+                "LOGIC_CHAIN_BRANCH",
+                "IF_ELSE",
+                "SCRATCH_BLOCK"
+        )) {
+            requireFalse(actionType.contains(forbidden) || conditionNodeType.contains(forbidden),
+                    "8.20 must not add enum/type marker: " + forbidden);
+        }
+
+        for (String marker : List.of(
+                "data-snapshot-degraded-warning",
+                "data-snapshot-bad-package-warning",
+                "data-snapshot-selected-hidden-by-filter",
+                "data-snapshot-help-topic=\"snapshot.rollback\"",
+                "snapshotRollbackOperationLabel",
+                "create:'新增'",
+                "update:'覆盖 / 更新'",
+                "delete:'删除'",
+                "TIMER_START",
+                "TIMER_CANCEL",
+                "data-timer-cancel-missing-behavior-field",
+                "data-state-action-clear-no-create-if-missing",
+                "stateCreateIfMissing:clear?false",
+                "EDIT_DEVICE_METADATA:'编辑设备显示信息'",
+                "EDIT_ACTION_RELAY_ACTIONS:'编辑动作继电器动作'",
+                "EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS:'编辑 VBD 原生触发'",
+                "SIGNAL_JOIN",
+                "TIMER_ACTION",
+                "SNAPSHOT",
+                "TEMPLATE"
+        )) {
+            requireContains(scripts, marker, "8.20 frontend hardening marker: " + marker);
+        }
+        for (String functionName : List.of(
+                "logicChainRenderedGraphWithDraftOverlay",
+                "logicChainCandidateConnectionHandle",
+                "startLogicChainExistingNodeEdit",
+                "confirmLogicChainExistingEditDraft",
+                "startLogicChainExistingActionEdit",
+                "confirmLogicChainActionEditDraft",
+                "cancelLogicChainExistingEditDraft",
+                "logicChainExistingEditCard",
+                "logicChainActionAppendCard",
+                "logicChainNodeCard",
+                "connectLogicChainDraftCandidate",
+                "showLogicChainNewNodeModal",
+                "syncLogicChainEditorDraft",
+                "makeLogicChainEditorDraft",
+                "startLogicChainConnectionMode",
+                "stopLogicChainConnectionMode",
+                "addLogicChainDraftChannelEndpoint",
+                "handleLogicChainEditorDelegatedClick",
+                "activateLogicChainNodeCard",
+                "logicChainEditorDraftEdgeForCandidate",
+                "logicChainPlaceDraftChannelEndpointNearConnection"
+        )) {
+            requireEquals(1, countOccurrences(scripts, "function " + functionName + "("),
+                    "8.20 Logic Chain frontend helper must be unique after stabilization cleanup: " + functionName);
+        }
+        int newNodeModalFunction = scripts.indexOf("function showLogicChainNewNodeModal(");
+        int newNodeModalCall = scripts.indexOf("openWebAdminModal('新增逻辑链节点'");
+        requireTrue(newNodeModalFunction >= 0 && newNodeModalCall > newNodeModalFunction,
+                "8.20 Logic Chain new-node modal body must not leave orphaned old modal fragments before the final helper");
+
+        for (String marker : List.of(
+                "WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite",
+                "annotateAutoSnapshotAfterWrite(autoSnapshot, result)",
+                "updateAutoSnapshotOperationDiff",
+                "EDIT_DEVICE_METADATA",
+                "EDIT_DEVICE_BASIC_CONFIG",
+                "EDIT_DEVICE_EXTENDED_CONFIG",
+                "EDIT_ACTION_RELAY_ACTIONS",
+                "EDIT_ITEM_MATCHER",
+                "EDIT_LOGIC_CHAIN_METADATA",
+                "DELETE_VIRTUAL_BLOCK_DEVICE",
+                "EDIT_VIRTUAL_BLOCK_DEVICE_TRIGGERS",
+                "EDIT_REGION"
+        )) {
+            requireContains(server, marker, "8.20 auto snapshot annotation marker: " + marker);
+        }
+        requireFalse(Pattern.compile("(?m)^\\s*autoSnapshotBeforeWrite\\(").matcher(server).find(),
+                "8.20 route-level autoSnapshotBeforeWrite calls must not discard created snapshot records");
+        int autoCalls = countOccurrences(server, "autoSnapshotBeforeWrite(exchange");
+        int annotations = countOccurrences(server, "annotateAutoSnapshotAfterWrite(autoSnapshot, result)");
+        requireTrue(autoCalls >= 35, "8.20 expects broad route-level auto snapshot coverage");
+        requireEquals(autoCalls, annotations, "8.20 route-level auto snapshots are annotated after successful writes");
+
+        for (String marker : List.of(
+                "snapshotDiagnostics(server)",
+                "templateDiagnostics(server)",
+                "WebAdminSnapshotStore.loadManifest",
+                "WebAdminTemplateStore.loadWithStatus",
+                "\"SNAPSHOT\"",
+                "\"TEMPLATE\"",
+                "\"#/snapshots\"",
+                "\"#/templates\"",
+                "extractSignalJoinId",
+                "\"SIGNAL_JOIN\"",
+                "\"#/signal-joins/\""
+        )) {
+            requireContains(doctor, marker, "8.20 Doctor diagnostic marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "TimerStore.getSnapshot(server)",
+                "TIMER_ON_START_ACTION",
+                "TIMER_ON_TICK_ACTION",
+                "TIMER_ON_COMPLETE_ACTION",
+                "TIMER_ON_CANCEL_ACTION",
+                "\"TIMER_ACTION\"",
+                "addTimerActionBindings",
+                "addTimerStateActionBindings",
+                "ConditionActionGateService.actionTargetId(\"timer_\" + bucket"
+        )) {
+            requireContains(runtimeDoctor + "\n" + runtimeDoctorTest, marker, "8.20 Timer action Doctor marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "snapshot.rollback",
+                "trouble.snapshot-degraded",
+                "trouble.rollback-operation-diff",
+                "trouble.snapshot-retention",
+                "example.snapshot-dry-run-rollback",
+                "operation-diff",
+                "pre-rollback",
+                "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
+                "配置时间轴",
+                "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。"
+        )) {
+            requireContains(help + "\n" + helpTest + "\n" + helpContext + "\n" + helpMatrix,
+                    marker, "8.20 Help Snapshot marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "existingNodeEdits[\" + Math.max(0, index) + \"]",
+                "actionEdits[\" + Math.max(0, index) + \"]",
+                "testMultiEditValidationFieldsUseActualIndexes",
+                "existingNodeEdits[1].nodeType",
+                "actionEdits[1].ownerType"
+        )) {
+            requireContains(editorService + "\n" + editorTest, marker, "8.20 Logic Chain multi-edit validation marker: " + marker);
+        }
+        requireFalse(editorService.contains("existingNodeEdits[0].targetId")
+                        || editorService.contains("existingNodeEdits[0].signalJoin")
+                        || editorService.contains("existingNodeEdits[0].timer")
+                        || editorService.contains("actionEdits[0].ownerId")
+                        || editorService.contains("actionEdits[0].action."),
+                "8.20 Logic Chain validation must not hardcode index 0 for active multi-edit validation paths");
+
+        for (String marker : List.of(
+                "device metadata/basic/extended config",
+                "ActionRelay actions",
+                "interaction item matcher",
+                "logic-chain metadata",
+                "VBD delete/native trigger",
+                "RegionController",
+                "data-snapshot-selected-hidden-by-filter",
+                "snapshotRollbackOperationLabel"
+        )) {
+            requireContains(snapshotContext + "\n" + snapshotMatrix, marker, "8.20 Snapshot doc backfill marker: " + marker);
+        }
+        for (String marker : List.of(
+                "template import/apply routes are protected by write-before auto snapshots",
+                "template apply recovery protection",
+                "Snapshot/Rollback is configuration recovery"
+        )) {
+            requireContains(templateContext + "\n" + templateMatrix, marker, "8.20 Template recovery docs marker: " + marker);
+        }
+
         requireActionTypeSetUnchangedFor812();
         requireConditionNodeTypeSetUnchangedFor813();
     }
