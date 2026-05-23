@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.65.0-webadmin-visual-system-design-reference`
-- 当前开发基线：`8.20 Pre-9 Stabilization / Hardening`；本阶段只做 8.x 收口：补 Snapshot / Rollback operationDiff 覆盖、degraded/筛选提示、Help / Doctor 链接、Timer/State 小 UI、Logic Chain 多草稿校验路径、README / capability matrix 和 guard。用户已放弃 8.20 WebAdmin visual system implementation，本阶段不落地深浅色主题、theme toggle 或大规模视觉重构。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、full Logic Chain Editor、Scratch editor、if / else runtime 或 Git branch / merge / rebase。发布后建议版本为 `v1.66.0-pre-9-stabilization-hardening`（最终以 tag 和 `gradle.properties` 的 `mod_version` 为准）
+- 当前稳定版本：`v1.66.0-pre-9-stabilization-hardening`
+- 当前开发基线：`9.0 Legacy Datapack / Old Systems Audit`；本阶段只做旧数据包和旧系统替代能力审计，新增 9.0 文档输入，不做功能实现。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、typed actions、Rich Text Builder、full Logic Chain Editor、Scratch editor、if / else runtime、旧物品接入或旧数据包迁移。
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -73,13 +73,19 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [Snapshot Rollback Capability Matrix 8.18](docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md)
 - [8.20 Pre-9 Stabilization Current Context](docs/PRE_9_STABILIZATION_8_20_CURRENT_CONTEXT.md)
 - [Pre-9 Stabilization Capability Matrix 8.20](docs/PRE_9_STABILIZATION_CAPABILITY_MATRIX_8_20.md)
+- [9.0 Legacy Datapack Audit](docs/LEGACY_DATAPACK_AUDIT_9_0.md)
+- [9.0 Legacy Datapack Parity Matrix](docs/LEGACY_DATAPACK_PARITY_MATRIX_9_0.md)
+- [9.0 Logic Chain / Global Editor Gap Audit](docs/LOGIC_CHAIN_GLOBAL_EDITOR_GAP_AUDIT_9_0.md)
+- [9.0 Typed Actions / Rich Text Audit](docs/TYPED_ACTIONS_RICH_TEXT_AUDIT_9_0.md)
+- [9.0 Legacy Items / Systems Integration Audit](docs/LEGACY_ITEMS_SYSTEMS_INTEGRATION_AUDIT_9_0.md)
+- [9.x Roadmap Input After 9.0 Audit](docs/NINE_X_ROADMAP_INPUT_AFTER_AUDIT_9_0.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
 - 8.x：ConditionEngine / 条件判断系统已进入 8.20 稳定收口；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连，8.17 加入只读 Help / Example / Troubleshooting / Glossary Center，8.18 加入 Snapshot Timeline / Rollback Graph 配置恢复能力，8.19 只保留 WebAdmin visual system design reference，8.20 补 Help / Doctor / Snapshot / Template / Logic Chain / Timer / State 小型硬化和 guard。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；不做 Git branch / merge / rebase，不备份 runtime history / Timer active state / Join pending state / 玩家实时背包 / 世界实体，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
 - 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred；8.18 之后 Template import/apply 已受写入前自动快照保护，但模板服务自身不做多 store 事务回滚。
 - 8.19 visual system design reference 文档保留为未来视觉重构参考；8.20 不实现 WebAdmin visual system、dark/light theme 或 theme toggle。
-- 后续：9.0 GameController / Game Program Foundation，9.x MissionSystem / PhaseController，if/else branching，visual logic/program editor，direct typed module calls，vanilla command-like effects as typed visual blocks。
+- 后续 9.x 候选：从 9.0 旧数据包 / 旧系统审计结果出发，再由用户确认 GameController / Game Program Foundation、MissionSystem / PhaseController、if/else branching、visual logic/program editor、direct typed module calls、vanilla command-like effects as typed visual blocks 的具体顺序；9.0 本身只做审计输入。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
 
 ## 8.20 Pre-9 Stabilization / Hardening
