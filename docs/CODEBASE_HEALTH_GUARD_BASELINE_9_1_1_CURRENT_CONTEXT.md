@@ -4,8 +4,8 @@
 
 - Stable version: `v1.68.1-codebase-health-audit`
 - Stable commit: `57212e5bb40777620742dbdd8ee65a867a993b23`
-- Phase branch: `feature/codebase-health-guard-baseline-9-1-1`
-- Scope: Phase 1 behavior freeze and guard baseline only.
+- Phase 1 branch: `feature/codebase-health-guard-baseline-9-1-1`
+- Phase 1 scope: behavior freeze and guard baseline only.
 
 This phase does not change features, WebAdmin UI behavior, runtime semantics, API behavior, data model semantics, Logic Chain render/layout, VBD editor behavior, selection sessions, protected draft behavior or capture writeback behavior.
 
@@ -94,6 +94,35 @@ Deferred to Phase 2:
 - Splitting `WebAdminFrontendScripts.java`.
 - Splitting CSS modules.
 - Turning app.js/app.css byte budgets into tighter ratchets after split.
+
+## Phase 2 Frontend Bundle Split Context
+
+Phase 2 mechanically splits the generated WebAdmin JavaScript bundle while preserving the `/assets/app.js` facade and generated output contract.
+
+- Phase 2 branch: `feature/webadmin-frontend-bundle-split-9-1-1`.
+- Phase 2 base: `origin/feature/codebase-health-guard-baseline-9-1-1` at `ede575b25be55424a060ae749c2b36922ff599e1`.
+- `WebAdminFrontendScripts.java` is now the bundle entry only and concatenates ordered script modules.
+- `WebAdminFrontendAssets.appJs()` still delegates to `WebAdminFrontendScripts.appJs()`.
+- `WebAdminServer` is unchanged and still serves `/assets/app.js` through `WebAdminFrontendAssets`.
+- `WebAdminFrontendStyles.java` and `/assets/app.css` are unchanged; CSS split remains deferred.
+- Generated `app.js` is byte-identical to the Phase 1 guard baseline: `1,838,292` bytes, SHA-256 `1992d2e7634e14ac9611d893cf8439725bbc0fe4ee65f672cc90910b64238b74`.
+- Guard scans that previously read only `WebAdminFrontendScripts.java` now use generated `WebAdminFrontendAssets.appJs()` or marker-based generated slices so the split modules remain covered.
+- The guard now hard-ratchets `WebAdminFrontendScripts.java` as a facade and asserts the expected module concat order.
+
+Phase 2 frontend script modules:
+
+- `WebAdminFrontendIconScripts`: flat icon registry and SVG geometry bootstrap.
+- `WebAdminFrontendCoreScripts`: app state, API, route, realtime, shared formatting and early core helpers.
+- `WebAdminFrontendCoreEventScripts`: global delegated handlers and early dashboard bootstrap boundary.
+- `WebAdminFrontendPageScripts`: non-Logic-Chain page bundle facade.
+- `WebAdminFrontendDashboardScripts`: dashboard and selection entry helpers.
+- `WebAdminFrontendDeviceScripts`, `WebAdminFrontendDeviceSessionScripts`, `WebAdminFrontendDeviceEditorScripts`: device detail, VBD/native trigger, itemSubmit/container capture and device write modal helpers.
+- `WebAdminFrontendSignalScripts`, `WebAdminFrontendActionTimerScripts`: signal/listener/action/timer pages and editors.
+- `WebAdminFrontendHelpScripts`, `WebAdminFrontendModalScripts`, `WebAdminFrontendSnapshotScripts`, `WebAdminFrontendTemplateConfigScripts`, `WebAdminFrontendRegionConditionScripts`: help center, modal infrastructure, snapshots/templates/config, region and condition pages.
+- `WebAdminLogicChainViewerScripts`, `WebAdminLogicChainEditorScripts`, `WebAdminLogicChainVbdScripts`: Logic Chain viewer/layout, editor/draft/save helpers and VBD trigger/capture overlays.
+- `WebAdminFrontendBootstrapScripts`: final metadata helpers and `initLogin();initApp();`.
+
+Phase 2 deliberately does not change UI behavior, event routing semantics, Logic Chain render/layout algorithms, VBD/runtime behavior, backend APIs, WebAdmin write paths, React/Vite architecture or performance caching.
 
 Deferred to Phase 3:
 

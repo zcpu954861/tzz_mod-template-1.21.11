@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map;
 
 public final class WebAdminFrontendBundleGuardTest {
     private static final int APP_JS_WARNING_BASELINE_BYTES = 1_838_292;
+    private static final String APP_JS_PHASE2_BASELINE_SHA256 = "1992d2e7634e14ac9611d893cf8439725bbc0fe4ee65f672cc90910b64238b74";
     private static final int APP_CSS_WARNING_BASELINE_BYTES = 123_251;
 
     private static final Map<String, Integer> SOURCE_COUNT_BASELINES = new LinkedHashMap<>();
@@ -69,14 +71,20 @@ public final class WebAdminFrontendBundleGuardTest {
         int appJsBytes = appJs.getBytes(StandardCharsets.UTF_8).length;
         int appCssBytes = appCss.getBytes(StandardCharsets.UTF_8).length;
         report.metric("webadmin.app_js.bytes", appJsBytes);
+        String appJsSha256 = sha256Hex(appJs);
+        report.metric("webadmin.app_js.sha256", appJsSha256);
         report.metric("webadmin.app_css.bytes", appCssBytes);
+        if (appJsBytes != APP_JS_WARNING_BASELINE_BYTES || !APP_JS_PHASE2_BASELINE_SHA256.equals(appJsSha256)) {
+            report.fail("Phase 2 generated app.js must stay byte-identical to the Phase 1 baseline: actualBytes="
+                    + appJsBytes + " actualSha256=" + appJsSha256);
+        }
         warnIfBeyondFivePercent(report, "app.js", appJsBytes, APP_JS_WARNING_BASELINE_BYTES);
         warnIfBeyondFivePercent(report, "app.css", appCssBytes, APP_CSS_WARNING_BASELINE_BYTES);
 
         checkFacadeBoundary(report);
-        checkSourceCounts(report);
-        checkInlineEventAttributes(report);
-        checkHotSlices(report);
+        checkSourceCounts(report, appJs);
+        checkInlineEventAttributes(report, appJs);
+        checkHotSlices(report, appJs);
         checkPointerEvents(report, appCss);
         checkRawJsonSummary(report, appJs);
         runNodeCheck(report, appJs);
@@ -102,8 +110,7 @@ public final class WebAdminFrontendBundleGuardTest {
         report.requireContains(server, "WebAdminFrontendAssets.appJs()", "WebAdminServer app.js facade use");
     }
 
-    private static void checkSourceCounts(CodeQualityGuardSupport.GuardReport report) throws IOException {
-        String scripts = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java");
+    private static void checkSourceCounts(CodeQualityGuardSupport.GuardReport report, String scripts) {
         for (Map.Entry<String, Integer> entry : SOURCE_COUNT_BASELINES.entrySet()) {
             int actual = CodeQualityGuardSupport.count(scripts, entry.getKey());
             report.metric("webadmin.source.count." + metricKey(entry.getKey()), actual + " baseline=" + entry.getValue());
@@ -115,8 +122,7 @@ public final class WebAdminFrontendBundleGuardTest {
                 "VBD native trigger raw JSON not-primary-summary marker must remain present");
     }
 
-    private static void checkInlineEventAttributes(CodeQualityGuardSupport.GuardReport report) throws IOException {
-        String scripts = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java");
+    private static void checkInlineEventAttributes(CodeQualityGuardSupport.GuardReport report, String scripts) {
         int total = 0;
         for (Map.Entry<String, Integer> entry : INLINE_EVENT_ATTRIBUTE_BASELINES.entrySet()) {
             int actual = CodeQualityGuardSupport.countRegex(scripts, "\\b" + entry.getKey() + "\\s*=");
@@ -138,19 +144,31 @@ public final class WebAdminFrontendBundleGuardTest {
         }
     }
 
-    private static void checkHotSlices(CodeQualityGuardSupport.GuardReport report) throws IOException {
+    private static void checkHotSlices(CodeQualityGuardSupport.GuardReport report, String appJs) {
         reportSlice(report, "global_handlers_1260_1339",
-                CodeQualityGuardSupport.lineSlice("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java", 1260, 1339),
+                generatedSlice(report, appJs, "document.addEventListener('pointerup'", "window.addEventListener('beforeunload'"),
                 54, 35, 4);
         reportSlice(report, "esc_router_5294",
-                CodeQualityGuardSupport.lineSlice("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java", 5294, 5294),
+                generatedSlice(report, appJs, "document.addEventListener('keydown',event=>{if(event.key==='Escape')", "function unavailableFeature"),
                 8, 0, 1);
         reportSlice(report, "logic_chain_handlers_8103_8123",
-                CodeQualityGuardSupport.lineSlice("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java", 8103, 8123),
+                generatedSlice(report, appJs, "function handleLogicChainEditorDelegatedClick", "const LOGIC_CHAIN_NODE_DELETE_CONFIRM_TEXT"),
                 46, 13, 1);
         reportSlice(report, "vbd_overlay_stack_8128_8397",
-                CodeQualityGuardSupport.lineSlice("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java", 8128, 8397),
+                generatedSlice(report, appJs, "const logicChainV16VbdTriggerGraphSummaryMarkers", "function confirmLogicChainDraftActionDeleteFromPanel"),
                 362, 1, 3);
+    }
+
+    private static String generatedSlice(CodeQualityGuardSupport.GuardReport report, String appJs,
+                                         String startNeedle, String endNeedle) {
+        int start = appJs.indexOf(startNeedle);
+        int end = start >= 0 ? appJs.indexOf(endNeedle, start) : -1;
+        report.require(start >= 0, "Generated app.js hot-slice start marker missing `" + startNeedle + "`");
+        report.require(end > start, "Generated app.js hot-slice end marker missing `" + endNeedle + "`");
+        if (start < 0 || end <= start) {
+            return "";
+        }
+        return appJs.substring(start, end);
     }
 
     private static void reportSlice(CodeQualityGuardSupport.GuardReport report, String name, String slice,
@@ -239,5 +257,15 @@ public final class WebAdminFrontendBundleGuardTest {
 
     private static String metricKey(String key) {
         return key.replace("(", "").replace("=", "").replace(".", "dot").replace(" ", "_").replace("-", "_");
+    }
+
+    private static String sha256Hex(String value) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+        StringBuilder hex = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            hex.append(String.format("%02x", b & 0xff));
+        }
+        return hex.toString();
     }
 }

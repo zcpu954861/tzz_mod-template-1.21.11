@@ -9,8 +9,13 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public final class CodeQualityGuardTest {
+    private static final String WEBADMIN_FRONTEND_SCRIPTS =
+            "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java";
+    private static final int WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_LINES = 300;
+    private static final int WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_BYTES = 20_000;
+
     private static final Map<String, FileBaseline> KNOWN_FILE_BASELINES = Map.of(
-            "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java", new FileBaseline(8433, 1_984_343),
+            WEBADMIN_FRONTEND_SCRIPTS, new FileBaseline(8433, 1_984_343),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java", new FileBaseline(75, 123_798),
             "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java", new FileBaseline(5205, 318_695),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java", new FileBaseline(3102, 164_014),
@@ -62,8 +67,9 @@ public final class CodeQualityGuardTest {
 
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
-        report.metric("branch.scope", "phase1-code-quality-guard-baseline");
+        report.metric("branch.scope", "phase2-frontend-bundle-split");
         checkKnownFileBaselines(report);
+        checkFrontendScriptsFacade(report);
         checkBeforeVxx(report);
         checkHotspotRedefinitions(report);
         checkModuleBudgets(report, root);
@@ -87,8 +93,48 @@ public final class CodeQualityGuardTest {
         }
     }
 
+    private static void checkFrontendScriptsFacade(CodeQualityGuardSupport.GuardReport report) throws IOException {
+        String facade = CodeQualityGuardSupport.read(WEBADMIN_FRONTEND_SCRIPTS);
+        long lines = CodeQualityGuardSupport.lineCount(WEBADMIN_FRONTEND_SCRIPTS);
+        long bytes = CodeQualityGuardSupport.bytes(WEBADMIN_FRONTEND_SCRIPTS);
+        report.metric("frontend.facade.WebAdminFrontendScripts.lines", lines
+                + " max=" + WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_LINES);
+        report.metric("frontend.facade.WebAdminFrontendScripts.bytes", bytes
+                + " max=" + WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_BYTES);
+        if (lines > WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_LINES) {
+            report.fail("WebAdminFrontendScripts.java must remain a Phase 2 bundle facade; lines=" + lines);
+        }
+        if (bytes > WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_BYTES) {
+            report.fail("WebAdminFrontendScripts.java must remain a Phase 2 bundle facade; bytes=" + bytes);
+        }
+        if (facade.contains(".append(\"\"\"") || facade.contains("class ApiError") || facade.contains("const appState=")) {
+            report.fail("WebAdminFrontendScripts.java contains generated JS business text instead of facade-only concat logic");
+        }
+        requireOrdered(report, facade,
+                "WebAdminFrontendIconScripts.appJs()",
+                "WebAdminFrontendCoreScripts.appJs()",
+                "WebAdminFrontendCoreEventScripts.appJs()",
+                "WebAdminFrontendPageScripts.appJs()",
+                "WebAdminLogicChainViewerScripts.appJs()",
+                "WebAdminLogicChainEditorScripts.appJs()",
+                "WebAdminLogicChainVbdScripts.appJs()",
+                "WebAdminFrontendBootstrapScripts.appJs()");
+    }
+
+    private static void requireOrdered(CodeQualityGuardSupport.GuardReport report, String text, String... needles) {
+        int previous = -1;
+        for (String needle : needles) {
+            int current = text.indexOf(needle);
+            report.require(current >= 0, "WebAdminFrontendScripts facade missing ordered module call `" + needle + "`");
+            if (current >= 0 && previous >= 0 && current <= previous) {
+                report.fail("WebAdminFrontendScripts facade module order changed near `" + needle + "`");
+            }
+            previous = current;
+        }
+    }
+
     private static void checkBeforeVxx(CodeQualityGuardSupport.GuardReport report) throws IOException {
-        String scripts = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java");
+        String scripts = WebAdminFrontendAssets.appJs();
         int v13ToV17 = 0;
         for (Map.Entry<String, Integer> entry : BEFORE_V_BASELINES.entrySet()) {
             int actual = CodeQualityGuardSupport.count(scripts, entry.getKey());
@@ -117,7 +163,7 @@ public final class CodeQualityGuardTest {
     }
 
     private static void checkHotspotRedefinitions(CodeQualityGuardSupport.GuardReport report) throws IOException {
-        String scripts = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java");
+        String scripts = WebAdminFrontendAssets.appJs();
         for (Map.Entry<String, Integer> entry : HOTSPOT_REDEFINITION_BASELINES.entrySet()) {
             String name = entry.getKey();
             String quoted = Pattern.quote(name);
@@ -138,8 +184,13 @@ public final class CodeQualityGuardTest {
             String fileName = file.getFileName().toString();
             String relative = root.relativize(file).toString().replace('\\', '/');
             long lines = CodeQualityGuardSupport.lineCount(relative);
+            long bytes = CodeQualityGuardSupport.bytes(relative);
             if (fileName.endsWith("Scripts.java") && !fileName.equals("WebAdminFrontendScripts.java") && lines > 800) {
                 report.fail("Frontend script module exceeds 800-line Phase 1 budget: " + relative + " lines=" + lines);
+            }
+            if (fileName.endsWith("Scripts.java") && !fileName.equals("WebAdminFrontendScripts.java")) {
+                report.metric("frontend.script_module.bytes." + fileName, bytes);
+                report.metric("frontend.script_module.lines." + fileName, lines);
             }
             if (fileName.contains("Styles") && !fileName.equals("WebAdminFrontendStyles.java") && lines > 800) {
                 report.fail("Frontend style module exceeds 800-line Phase 1 budget: " + relative + " lines=" + lines);

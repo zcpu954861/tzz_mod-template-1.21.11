@@ -126,6 +126,13 @@ Rule:
 - New WebAdmin business logic cannot be added to this file after Phase 2.
 - Before Phase 2, additions require explicit justification in the current phase prompt.
 
+Phase 2 implementation note:
+
+- `WebAdminFrontendScripts.java` has been reduced to an ordered concat facade.
+- Existing frontend count, inline handler, BeforeVxx and hotspot checks must scan generated `WebAdminFrontendAssets.appJs()` or all script modules, not the facade source file.
+- Hot slice checks should use stable generated markers/function boundaries instead of fixed line numbers from the pre-split source file.
+- New `*Scripts.java` modules remain under the Phase 2 800-line budget; large `appJs()` text-block methods are report-only until later semantic extraction phases.
+
 Guard checks:
 
 - line count must not increase unless the commit also creates module files and net appJs behavior is split.
@@ -400,6 +407,7 @@ For guard implementation:
 
 ```powershell
 .\gradlew.bat testClasses
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
@@ -409,6 +417,7 @@ For full checkpoint after code changes:
 
 ```powershell
 .\gradlew.bat clean build
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check

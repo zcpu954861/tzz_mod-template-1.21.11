@@ -1,5 +1,7 @@
 package com.zcpu.tzzmod.stabilization;
 
+import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -700,7 +702,7 @@ public final class LocalTestMcpFoundationGuardTest {
         requireContains(shell, "id=\"change-password\"", "change password button id marker");
         requireContains(shell, "修改密码", "change password button text marker");
 
-        String frontendScripts = read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java");
+        String frontendScripts = WebAdminFrontendAssets.appJs();
         requireContains(frontendScripts, "showChangeOwnPasswordModal", "change password modal function marker");
         requireContains(frontendScripts, "data-change-password-modal=\"true\"", "change password modal marker");
         requireContains(frontendScripts, "change-password-current", "current password field marker");
