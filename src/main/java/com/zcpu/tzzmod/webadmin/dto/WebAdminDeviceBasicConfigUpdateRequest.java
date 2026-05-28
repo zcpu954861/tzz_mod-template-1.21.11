@@ -6,4 +6,5 @@ public final class WebAdminDeviceBasicConfigUpdateRequest {
     public String channel = "";
     public String expectedFingerprint = "";
     public String lockId = "";
+    public Boolean strictPhysicalPresence = Boolean.FALSE;
 }

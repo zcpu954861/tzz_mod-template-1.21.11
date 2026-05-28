@@ -139,6 +139,7 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
             request = new WebAdminContainerTemplateSessionStartRequest();
         }
         request.deviceId = device.id();
+        boolean logicChainDraftOnly = Boolean.TRUE.equals(request.logicChainDraftOnly);
         if (isBlank(request.expectedFingerprint)) {
             return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
                     "expectedFingerprint",
@@ -180,6 +181,18 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
                 return lockValidation.result();
             }
         }
+        if (logicChainDraftOnly && editLockService != null) {
+            WebAdminEditLockService.LockValidation logicChainLock = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR,
+                    logicChainTargetId(request.logicChainRootType, request.logicChainRootRef),
+                    request.logicChainEditLockId,
+                    user,
+                    session
+            );
+            if (!logicChainLock.success()) {
+                return logicChainLock.result();
+            }
+        }
         ServerPlayerEntity targetPlayer = findPlayer(server, request.targetPlayerUuid, request.targetPlayerName);
         if (targetPlayer == null) {
             return WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
@@ -212,7 +225,15 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
                 user,
                 session,
                 context,
-                itemConditionDtos(device.itemConditions(), device.containerChangeChannel())
+                itemConditionDtos(device.itemConditions(), device.containerChangeChannel()),
+                logicChainDraftOnly,
+                safe(request.logicChainCaptureDraftId),
+                safe(request.logicChainEditLockId),
+                normalizeLogicChainRootType(request.logicChainRootType),
+                safe(request.logicChainRootRef),
+                safe(request.logicChainDraftNodeId),
+                safe(request.logicChainTriggerKey),
+                intValue(request.logicChainRequirementIndex)
         );
         return WebAdminContainerTemplateSessions.startSession(server, targetPlayer, editLockService, templateSession);
     }
@@ -550,6 +571,18 @@ public final class WebAdminVirtualBlockDeviceContainerTemplateSessionService {
 
     private static WebAdminWriteTarget target(String deviceId, String displayName) {
         return new WebAdminWriteTarget("VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE", safe(deviceId), safe(displayName));
+    }
+
+    private static String logicChainTargetId(String rootType, String rootRef) {
+        return (normalizeLogicChainRootType(rootType) + ":" + safe(rootRef)).replaceAll("[\\r\\n\\t]", "_");
+    }
+
+    private static String normalizeLogicChainRootType(String rootType) {
+        String value = safe(rootType).toLowerCase();
+        return switch (value) {
+            case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join", "timer" -> value;
+            default -> "channel";
+        };
     }
 
     private static WebAdminWriteResultCode resultCode(String code) {

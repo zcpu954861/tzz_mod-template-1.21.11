@@ -18,6 +18,7 @@ import com.zcpu.tzzmod.signal.join.SignalJoinRuntimeService;
 import com.zcpu.tzzmod.task.TaskDataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminLifecycle;
 import com.zcpu.tzzmod.webadmin.container.WebAdminContainerTemplateSessions;
+import com.zcpu.tzzmod.webadmin.draft.WebAdminProtectedDraftRegistry;
 import com.zcpu.tzzmod.webadmin.itemsubmit.WebAdminSingleItemSubmitTemplateSessions;
 import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionSessions;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -49,10 +50,13 @@ public final class TzzLifecycleBootstrap {
             SignalDeviceStore.flushDirty(server);
             WebAdminContainerTemplateSessions.expireOld(server);
             WebAdminSingleItemSubmitTemplateSessions.expireOld(server);
+            WebAdminSelectionSessions.expireOld(server);
+            WebAdminProtectedDraftRegistry.expireOld();
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             WebAdminSelectionSessions.clearAll(server, "server_stopping");
+            WebAdminProtectedDraftRegistry.cancelAll("server_stopping");
             WebAdminContainerTemplateSessions.clearAll(server, "server_stopping");
             WebAdminSingleItemSubmitTemplateSessions.clearAll(server, "server_stopping");
             MapDataStore.flushDirty(server);
@@ -67,6 +71,7 @@ public final class TzzLifecycleBootstrap {
 
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             WebAdminSelectionSessions.clearAll(server, "server_stopped");
+            WebAdminProtectedDraftRegistry.cancelAll("server_stopped");
             WebAdminContainerTemplateSessions.clearAll(server, "server_stopped");
             WebAdminSingleItemSubmitTemplateSessions.clearAll(server, "server_stopped");
             WebAdminLifecycle.stop();

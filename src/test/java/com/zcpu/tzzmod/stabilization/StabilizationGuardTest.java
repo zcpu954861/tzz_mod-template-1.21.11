@@ -11,6 +11,7 @@ import com.zcpu.tzzmod.condition.ConditionItemInventoryContainerTest;
 import com.zcpu.tzzmod.condition.ConditionNodeType;
 import com.zcpu.tzzmod.condition.ConditionRegionSignalLogicChainTest;
 import com.zcpu.tzzmod.condition.ConditionStateVariableTest;
+import com.zcpu.tzzmod.condition.state.StateVariableScope;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateServiceTest;
 import com.zcpu.tzzmod.condition.runtime.ConditionGateHistoryServiceTest;
@@ -216,6 +217,7 @@ public final class StabilizationGuardTest {
         testWebAdminHelpExampleCenter817();
         testSnapshotRollbackTimeline818();
         testPre9StabilizationHardening820();
+        testLogicChainGlobalEditorCompletion91();
         ResourceIntegrityTest.run();
         System.out.println("Stabilization guard checks passed.");
     }
@@ -2470,7 +2472,9 @@ public final class StabilizationGuardTest {
                 "ClientPlayNetworking.registerGlobalReceiver",
                 "handleKey",
                 "input.isEscape()",
-                "cancelFromClient(\"esc\")",
+                "requestCancelFromClient(client, \"esc\")",
+                "cancelConfirmArmed",
+                "confirmed",
                 "completeFromCrosshair",
                 "shouldConsumeMouseClick",
                 "shouldConsumeMouseScroll",
@@ -2521,7 +2525,9 @@ public final class StabilizationGuardTest {
                 "sameOrigin",
                 "WebAdminWriteResult",
                 "WebAdminAuditLogger.writeEvent",
-                "validateStartRequest"
+                "validateStartRequest",
+                "validateLogicChainSelectionLock",
+                "WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR"
         )) {
             requireContains(service, marker, "selection service security marker present: " + marker);
         }
@@ -2534,7 +2540,7 @@ public final class StabilizationGuardTest {
             requireContains(webServer, route, "selection API route present: " + route);
         }
         requireContains(mouseMixin, "WebAdminSelectionClient.shouldConsumeMouseClick(click)", "selection mouse click mixin marker present");
-        requireContains(mouseMixin, "WebAdminSelectionClient.shouldConsumeMouseScroll()", "selection mouse scroll mixin marker present");
+        requireContains(mouseMixin, "WebAdminSelectionClient.handleMouseScroll(vertical)", "selection mouse scroll mixin routes world-device wheel selection");
         requireContains(mouseMixin, "ci.cancel()", "selection mouse mixin cancels vanilla input");
         requireContains(network, "webadmin_selection_c2s", "selection C2S payload registered");
         requireContains(network, "webadmin_selection_s2c", "selection S2C payload registered");
@@ -2619,7 +2625,11 @@ public final class StabilizationGuardTest {
                 "requireValidCsrf",
                 "sameOrigin",
                 "DANGEROUS_OPERATION_REQUIRES_CONFIRMATION",
-                "SignalListenerStore.createListener",
+                "SignalListenerStore.addListenerExactForWebAdmin",
+                "CREATE_LOCK_TARGET_ID",
+                "CREATE_EXPECTED_FINGERPRINT",
+                "validateLock",
+                "testStorePath",
                 "SignalListenerStore.deleteListener",
                 "SignalBridgeServer.clearListenerRuntime",
                 "actionsCreated",
@@ -5885,9 +5895,9 @@ public final class StabilizationGuardTest {
                 "startLogicChainPan",
                 "思维导图模式",
                 "展开下游",
-                "下游频道表示由上游动作触发的新频道",
-                "7.15 仅提供只读跨频道逻辑链查看器",
-                "8.x ConditionEngine"
+                "9.1 仍复用当前查看画布",
+                "不保存自由图文档",
+                "虚拟方块设备、世界设备和区域控制器必须来自受保护的游戏内辅助流程"
         )) {
             requireContains(js, marker, "7.15 frontend marker present: " + marker);
         }
@@ -5913,7 +5923,7 @@ public final class StabilizationGuardTest {
         requireContains(service, "HARD_MAX_DEPTH", "7.15 service clamps hard max depth");
         requireContains(service, "超出最大展开深度", "7.15 service reports max-depth truncation");
         requireContains(service, "includeNode", "7.15 service applies includeDisabled setting");
-        requireContains(service, "未加载，无法展开其动作列表", "7.15 service warns when action relay actions are unavailable");
+        requireContains(service, "ActionRelay actions API 再次检查", "7.15/9.1 service warns when action relay actions require safe loaded-object recheck");
         requireContains(service, "deviceMatchesRootType", "7.15 service validates non-channel root type matches");
         requireContains(service, "resolveActionRootChannel", "7.15 service can resolve action detail entries without runtime editing");
         requireContains(service, "emits_downstream", "7.15 service models downstream channel cards");
@@ -8423,10 +8433,18 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(server + "\n" + stateVariableWebAdminService, marker, "8.11 StateVariable WebAdmin API marker: " + marker);
         }
-        requireFalse(stateVariableWebAdminService.contains("set(")
-                        || stateVariableWebAdminService.contains("remove(")
+        requireFalse(stateVariableWebAdminService.contains("remove(")
                         || stateVariableWebAdminService.contains("mutate("),
-                "8.11 StateVariable visibility service must remain read-only");
+                "8.11/9.1 StateVariable WebAdmin service must not bypass controlled definition writes with remove/mutate");
+        for (String marker : List.of(
+                "WebAdminStateVariableWriteRequest",
+                "EDIT_STATE_VARIABLE",
+                "expectedFingerprint",
+                "editLockService",
+                "StateVariableWriteResult"
+        )) {
+            requireContains(stateVariableWebAdminService, marker, "9.1 controlled StateVariable definition write marker: " + marker);
+        }
 
         for (String marker : List.of(
                 "state_variable",
@@ -8475,7 +8493,7 @@ public final class StabilizationGuardTest {
                 "data-state-variable-detail-loader=\"true\"",
                 "data-state-variable-row-click-detail=\"true\"",
                 "data-state-variable-value-truncated=\"true\"",
-                "data-state-variable-readonly=\"true\"",
+                "data-state-variable-definition-edit=\"true\"",
                 "data-state-variable-no-raw-json-primary=\"true\"",
                 "data-state-variable-silent-refresh-preserves-filters=\"true\"",
                 "stateVariableFilters:{search:'',scope:'ALL',type:'ALL',target:''}",
@@ -9042,8 +9060,10 @@ public final class StabilizationGuardTest {
         )) {
             requireContains(logicChain, marker, "8.13 logic chain graph marker: " + marker);
         }
-        requireFalse(logicChain.contains("getLoadedActionRelay") || logicChain.contains("loadedActionRelay") || logicChain.contains("ActionRelayBlockEntity"),
-                "8.13 Logic Chain graph builder must not read live ActionRelay block entities");
+        requireContains(logicChain, "actionRelayExactObjectReadOnlyNoForceLoad",
+                "9.1 repair allows exact loaded ActionRelay read without chunk force-load");
+        requireFalse(logicChain.contains("forceLoadChunk") || logicChain.contains("setChunkForced"),
+                "Logic Chain graph builder must not force-load ActionRelay chunks");
         requireFalse(logicChain.contains("SignalJoinRuntimeService.status(build.snapshot.server"),
                 "8.13 Logic Chain graph must use read-only SignalJoin status and not trigger lazy timeout mutation");
 
@@ -9359,7 +9379,7 @@ public final class StabilizationGuardTest {
                 "fixHint",
                 "necessary",
                 "placed draft card re-drag",
-                "游戏内草稿创建 + 取消回滚",
+                "游戏内 pending selection + 草稿 + 取消回滚",
                 "保存落地到现有配置",
                 "SignalJoinDefinition",
                 "TimerDefinition",
@@ -9646,8 +9666,8 @@ public final class StabilizationGuardTest {
                 "data-logic-chain-no-fake-graph-save",
                 "data-logic-chain-save-uses-real-channel-id",
                 "data-logic-chain-world-entity-not-directly-creatable",
-                "data-logic-chain-world-entity-future-game-draft-deferred",
-                "data-logic-chain-virtual-listener-disabled-reason",
+                "data-logic-chain-world-backed-objects-require-client-assisted-draft",
+                "data-logic-chain-virtual-listener-create",
                 "data-logic-chain-signal-listener-pure-config",
                 "data-logic-chain-no-world-entity-required",
                 "data-logic-chain-timer-action-detail-card",
@@ -9757,8 +9777,8 @@ public final class StabilizationGuardTest {
                 "testSaveTimerDraftAllowsOnCompleteOnlyOutput",
                 "testTimerActionAppendThroughLogicChainEditor",
                 "logic_chain_draft_node_required",
-                "logic_chain_node_type_deferred",
-                "virtual SignalListener canvas creation is deferred",
+                "logic_chain_protected_draft_required",
+                "virtual SignalListener draft saves through lifecycle service",
                 "logic_chain_join_column_invalid",
                 "logic_chain_timer_column_deferred",
                 "logic_chain_join_input_edge_required",
@@ -9851,11 +9871,11 @@ public final class StabilizationGuardTest {
         requireFalse(legalSlotFunction.contains("Array.from({length:maxSlot+1}"), "8.14 legal slot overlay must not render an entire far-empty column");
         requireFalse(scripts.contains("function logicChainLegalSlotsForColumn(layout,col,type){const anchor=logicChainDraftAnchorSlot"), "8.14 Signal Join legal slots must not fall back to generic selected/root anchor only");
         requireFalse(scripts.contains("||[0,1,2]"), "8.14 drag snapping must not fall back to far empty slot list when legalSlots are missing");
-        requireContains(scripts, "option value=\"signal_listener\" disabled", "8.14 virtual SignalListener canvas creation must remain disabled until safe editor create path exists");
+        requireContains(scripts, "option value=\"signal_listener\" ${isListener?'selected':''} data-logic-chain-virtual-listener-create=\"true\"", "9.1 virtual SignalListener canvas creation must use the safe pure-config editor path");
         requireContains(scripts, "if(!logicChainSupportedNewNodeType(type))", "8.14 frontend must reject tampered unsupported canvas draft node types");
-        requireContains(editorService, "SUPPORTED_NODE_TYPES = Set.of(\"signal_join\", \"timer\")", "8.14 backend must not accept signal_listener canvas create before safe edit-lock path exists");
-        requireFalse(editorService.contains("WebAdminSignalListenerLifecycleService"), "8.14 Logic Chain canvas editor must not wire SignalListener lifecycle create service");
-        requireFalse(editorService.contains("WebAdminSignalListenerCreateRequest"), "8.14 Logic Chain canvas editor must not wire SignalListener create request");
+        requireContains(editorService, "SUPPORTED_NODE_TYPES = Set.of(\"signal_join\", \"timer\", \"signal_listener\", \"world_device\", \"virtual_block_device\", \"region_controller\")", "9.1 backend accepts pure config and protected world-backed node types through the safe edit-lock path");
+        requireContains(editorService, "WebAdminSignalListenerLifecycleService", "9.1 Logic Chain canvas editor wires SignalListener lifecycle create service");
+        requireContains(editorService, "WebAdminSignalListenerCreateRequest", "9.1 Logic Chain canvas editor uses the typed SignalListener create request");
         requireContains(editorService, "channelMetadataDraftReferencedChannels", "8.14 backend validates channel metadata drafts against connected draft endpoints");
         requireContains(editorService, "if (actionAppend && nodes.isEmpty() && !edges.isEmpty())", "8.16 mixed draft payload rejects standalone action append edges while preserving new-node draft edges");
         String metadataRefFunction = extractBetween(editorService, "private static Set<String> channelMetadataDraftReferencedChannels", "private static RegionTriggerType parseRegionTrigger");
@@ -9892,7 +9912,7 @@ public final class StabilizationGuardTest {
         requireFalse(scripts.contains("layout.flat.length%5"), "8.14 draft endpoint layout must not use layout.flat.length%5");
         requireFalse(scripts.contains("if(byId[id])return byId[id];if(!isChannelNodeId(id))return null;"), "8.14 draft channel endpoints must not reuse primary channel card when a side-specific reference card is needed");
         requireFalse(scripts.contains("function logicChainFindPrimaryChannelItem"), "8.14 reference direct-connect must scan same-side primary/reference endpoints instead of a single primary");
-        requireTrue(scripts.indexOf("logicChainFindReusableChannelEndpoint") < scripts.indexOf("return channelReferenceItem(id,edgeType,side,preferredCol,anchorSlot)"),
+        requireTrue(scripts.indexOf("logicChainFindReusableChannelEndpoint") < scripts.indexOf("return channelReferenceItem(id,edgeType,side,preferredCol,anchorSlot,draftContextNode)"),
                 "8.14 resolver must search same-side reusable endpoint before creating a reference card");
         requireContains(scripts, "placed:false", "8.14 new draft node starts unplaced until pointer drop");
         requireContains(scripts, "e.previewColumn='';e.previewSlot=-1", "8.14 new draft node does not show an initial slot preview");
@@ -9919,7 +9939,8 @@ public final class StabilizationGuardTest {
         requireFalse(nodeCard.contains("onclick=") || nodeCard.contains("onkeydown=") || nodeCard.contains("onmouseenter=") || nodeCard.contains("onmouseleave=") || nodeCard.contains("onpointerdown="),
                 "8.14 node card must not contain unsafe inline handlers");
         requireContains(scripts, "document.addEventListener('pointerdown',event=>{if(handleLogicChainEditorDelegatedPointerDown(event))return;},true)", "8.14 draft drag pointerdown uses event delegation");
-        requireContains(scripts, "document.addEventListener('click',event=>{if(handleLogicChainEditorDelegatedClick(event))return;},true)", "8.14 connection handles must be captured before card click handlers");
+        requireContains(scripts, "document.addEventListener('pointerup',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;},true)", "v17 capture retry uses pointerup fallback before click delegation");
+        requireContains(scripts, "document.addEventListener('click',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;if(handleLogicChainEditorDelegatedClick(event))return;},true)", "8.14 connection handles must be captured before card click handlers and v17 capture retry buttons");
         String editorRouteGuard = extractBetween(scripts, "function maybeReleaseLogicChainEditorForRoute", "function logicChainRootChannel");
         requireContains(editorRouteGuard, "logicChainEditorRouteMatches(e,h)", "8.14 route guard only bypasses the original editor route");
         requireFalse(editorRouteGuard.contains("h==='#/logic-chains'||h.startsWith('#/logic-chains/')||isLogicChainResolveRoute(h)"), "8.14 route guard must not broadly bypass Logic Chain route changes");
@@ -10434,9 +10455,10 @@ public final class StabilizationGuardTest {
                 "data-logic-chain-existing-node-not-draggable",
                 "data-logic-chain-action-edit",
                 "data-logic-chain-action-replace-same-index",
-                "data-logic-chain-no-old-action-delete",
-                "data-logic-chain-no-old-action-reorder",
-                "data-logic-chain-no-old-node-delete",
+                "data-logic-chain-action-delete-draft",
+                "data-logic-chain-action-reorder-draft",
+                "data-logic-chain-node-delete-draft",
+                "data-logic-chain-existing-node-delete-typed-owned-only",
                 "data-logic-chain-no-old-node-reorder",
                 "data-logic-chain-world-entity-readonly-reference",
                 "logicChainExistingNodeEditSavePayload",
@@ -10491,15 +10513,16 @@ public final class StabilizationGuardTest {
         requireFalse(scripts.contains("lostpointercapture"), "8.16 draft drag must not cancel on lost pointer capture after rerender");
         requireContains(scripts, "logicChainDefaultDraftChannelAnchor", "8.16 unconnected draft channel endpoints must default under the focus channel");
         requireContains(scripts, "logicChainPlaceDraftChannelEndpointNearConnection", "8.16 downstream draft channel endpoint must compact next to Join / Timer output");
-        requireContains(scripts, "to=logicChainResolveDraftVisualEndpoint(edge.to,type,'downstream',draftCol+1)", "8.16 Join output draft endpoint must use adjacent downstream column");
+        requireContains(scripts, "to=logicChainResolveDraftVisualEndpoint(edge.to,type,'downstream',edgeDraftCol+1,edgeDraftNode,edgeDraftItem)", "8.16/v9 Join output draft endpoint must use the edge draft's adjacent downstream column");
         requireContains(scripts, "logicChainMoveTimerDraftLeftOfChannel", "8.16 Timer downstream selection must move the Timer left of the target channel");
-        requireContains(scripts, "if(candidate.type==='timer_outputs_channel')logicChainMoveTimerDraftLeftOfChannel", "8.16 Timer output must move before rendering the downstream connection");
+        requireContains(scripts, "logicChainMoveProducerDraftLeftOfChannel", "v9 producer outputs move left of the target channel before rendering the downstream connection");
+        requireContains(scripts, "['timer_outputs_channel','vbd_outputs_channel','world_device_outputs_channel'].includes(candidate.type)", "v9 Timer / VBD / world-device outputs share target-channel-adjacent placement");
         requireContains(scripts, "logicChainExistingConnectionHandles", "8.16 existing connectable nodes must expose canvas green-plus reconnect handles");
         requireContains(scripts, "logicChainMarkRemovedPreviewEdge", "8.16 removed reconnect preview edges must stay layout-only during connection mode");
         requireContains(scripts, "hideDuringConnection===true", "8.16 removed reconnect preview edges must not render while connection mode stays active");
         requireContains(scripts, "logicChainPruneOverlayDisconnectedNodes", "8.16 disconnected overlay nodes must be pruned after connection mode exits");
         requireContains(scripts, "prunedDisconnectedAfterConnectionExit", "8.16 overlay metadata must record post-exit disconnected pruning");
-        requireContains(scripts, "function logicChainNodeDetailCards(node,graph,nodes,incoming,outgoing){return [logicChainNewDraftNodeEditCard(node),logicChainExistingEditCard(node),logicChainReferenceCard", "8.16 right detail cards must not keep the action append entry");
+        requireContains(scripts, "function logicChainNodeDetailCards(node,graph,nodes,incoming,outgoing){return [logicChainNewDraftNodeEditCard(node),logicChainDraftActionPanelCard(node),logicChainExistingEditCard(node),logicChainReadonlyDeferredCard(node),logicChainReferenceCard", "8.16/9.1/v10 right detail cards include draft action panel and readonly detail without restoring the action append entry");
         requireContains(scripts, "logicChainActionAppendSectionForNode(node)", "8.16 action append entry must live inside the existing-node modal");
         requireContains(scripts, "existing=byId[canonical]||null", "8.16 channel endpoint draft card must reuse existing canonical layout item");
         requireContains(scripts, "layout.draftChannelEndpointSingleCard=true", "8.16 channel endpoint draft card must record single-card layout behavior");
@@ -10725,7 +10748,7 @@ public final class StabilizationGuardTest {
                 "8.17 inline term click must not default to opening the feature page");
 
         for (String marker : List.of(
-                "version\", \"8.20-pre9-stabilization\"",
+                "version\", \"9.1-logic-chain-global-editor-completion\"",
                 "readOnly\", true",
                 "noWriteApi\", true",
                 "copyOnly\", true",
@@ -11520,6 +11543,671 @@ public final class StabilizationGuardTest {
         requireConditionNodeTypeSetUnchangedFor813();
     }
 
+    private static void testLogicChainGlobalEditorCompletion91() throws Exception {
+        Path root = Path.of("").toAbsolutePath().normalize();
+        Path contextPath = root.resolve("docs/LOGIC_CHAIN_GLOBAL_EDITOR_COMPLETION_9_1_CURRENT_CONTEXT.md");
+        Path matrixPath = root.resolve("docs/LOGIC_CHAIN_GLOBAL_EDITOR_CAPABILITY_MATRIX_9_1.md");
+        String context = Files.readString(contextPath, StandardCharsets.UTF_8);
+        String matrix = Files.readString(matrixPath, StandardCharsets.UTF_8);
+        String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
+        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
+        String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
+        String logicChainService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
+        String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String editorRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java"), StandardCharsets.UTF_8);
+        String editorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"), StandardCharsets.UTF_8);
+        String stateService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableService.java"), StandardCharsets.UTF_8);
+        String stateTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableServiceTest.java"), StandardCharsets.UTF_8);
+        String actionRelayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
+        String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
+        String help = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java"), StandardCharsets.UTF_8);
+        String helpTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogServiceTest.java"), StandardCharsets.UTF_8);
+        String editLock = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
+        String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
+        String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
+        String selectionPurpose = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/selection/WebAdminSelectionPurpose.java"), StandardCharsets.UTF_8);
+        String selectionSessions = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/selection/WebAdminSelectionSessions.java"), StandardCharsets.UTF_8);
+        String selectionServer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/selection/WebAdminSelectionServer.java"), StandardCharsets.UTF_8);
+        String selectionClient = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/webadmin/WebAdminSelectionClient.java"), StandardCharsets.UTF_8);
+        String regionPreviewRenderer = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/client/map/RegionPlannerPreviewRenderer.java"), StandardCharsets.UTF_8);
+        String hotbarMixin = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/mixin/WebAdminHotbarMixin.java"), StandardCharsets.UTF_8);
+        String signalDeviceCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalDeviceCommand.java"), StandardCharsets.UTF_8);
+        String actionRelayCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/ActionRelayCommand.java"), StandardCharsets.UTF_8);
+        String signalReceiverCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/SignalReceiverCommand.java"), StandardCharsets.UTF_8);
+        String selectionCancelRequest = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminSelectionCancelRequest.java"), StandardCharsets.UTF_8);
+        String protectedDraftRegistry = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/draft/WebAdminProtectedDraftRegistry.java"), StandardCharsets.UTF_8);
+        String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
+        String mainJava = readJavaDirectory(root.resolve("src/main/java"));
+
+        for (String file : List.of(
+                "docs/LOGIC_CHAIN_GLOBAL_EDITOR_COMPLETION_9_1_CURRENT_CONTEXT.md",
+                "docs/LOGIC_CHAIN_GLOBAL_EDITOR_CAPABILITY_MATRIX_9_1.md",
+                "src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminStateVariableWriteRequest.java",
+                "src/main/java/com/zcpu/tzzmod/client/map/RegionPlannerPreviewRenderer.java",
+                "src/main/java/com/zcpu/tzzmod/mixin/WebAdminHotbarMixin.java",
+                "src/main/java/com/zcpu/tzzmod/webadmin/draft/WebAdminProtectedDraftRegistry.java"
+        )) {
+            requireTrue(Files.isRegularFile(root.resolve(file)), "9.1 required file exists: " + file);
+        }
+
+        String docs = context + "\n" + matrix + "\n" + readme + "\n" + help + "\n" + helpTest;
+        for (String marker : List.of(
+                "9.1 Logic Chain / Global Editor Capability Completion",
+                "controlled editor",
+                "StateVariable definition",
+                "ConditionGroup reference",
+                "Gate reference semantics",
+                "Virtual SignalListener",
+                "display label / note",
+                "ActionRelay same-index action edit",
+                "ActionRelay loaded exact object",
+                "Region enter/exit/stay same-index action edit",
+                "Region owner -> action -> downstream channel",
+                "StateVariable action-first visual",
+                "freeform graph document save",
+                "Game Program AST",
+                "GameController",
+                "MissionSystem",
+                "PhaseController",
+                "if / else runtime",
+                "new ActionType",
+                "new ConditionNodeType",
+                "StateVariable definition template apply deferred",
+                "ConditionGroup template apply deferred"
+        )) {
+            requireContains(docs, marker, "9.1 docs/help marker: " + marker);
+        }
+        for (String marker : List.of(
+                "三格 hotbar",
+                "极端窗口 HUD safe area",
+                "ESC / WebUI 取消二次确认",
+                "取消后可在 modal 内重新发起",
+                "RegionPlanner 粒子点线预览",
+                "draft-created Action 面板",
+                "enter / exit / stay action bucket",
+                "对象名称和频道名称分开显示"
+        )) {
+            requireContains(docs, marker, "v10 docs/help marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "data-logic-chain-global-editor-completion-9-1",
+                "data-logic-chain-action-relay-same-index-edit",
+                "data-logic-chain-region-action-same-index-edit",
+                "data-logic-chain-state-variable-definition-edit",
+                "data-logic-chain-condition-group-reference-edit",
+                "data-logic-chain-gate-reference-not-branch",
+                "data-logic-chain-virtual-listener-create",
+                "data-logic-chain-placed-signal-listener-draft-edit",
+                "data-logic-chain-signal-listener-note-deferred",
+                "data-logic-chain-action-reference-editable",
+                "data-logic-chain-action-relay-same-index-edit-reachable",
+                "data-logic-chain-action-relay-existing-action-entry",
+                "data-logic-chain-action-relay-loaded-exact-object",
+                "data-logic-chain-action-relay-actions-readable-when-loaded",
+                "data-logic-chain-action-relay-no-force-load",
+                "data-logic-chain-region-action-owned-node",
+                "data-logic-chain-region-action-owned-alias",
+                "data-logic-chain-region-action-owner-bucket-index",
+                "data-logic-chain-region-action-owner-edge",
+                "data-logic-chain-region-action-no-independent-system-column",
+                "data-logic-chain-region-action-same-index-edit-reachable",
+                "data-region-controller-no-primary-signal-channel-field",
+                "data-region-controller-actions-own-signal-channels",
+                "data-logic-chain-state-action-action-first",
+                "data-logic-chain-state-action-state-target-accent",
+                "data-logic-chain-state-action-not-definition",
+                "data-logic-chain-action-semantic-node",
+                "data-logic-chain-readonly-node-detail",
+                "data-logic-chain-readonly-node-selects-detail",
+                "data-logic-chain-state-variable-resource-jump",
+                "data-logic-chain-world-entity-deferred-detail",
+                "data-logic-chain-region-action-edit-no-inline-signal-channel",
+                "data-region-action-signal-output-channel-field",
+                "data-region-action-signal-channel-owned-by-action",
+                "data-logic-chain-add-node-world-device-reference",
+                "data-logic-chain-add-node-region-controller-selection",
+                "data-logic-chain-add-node-vbd-draft-selection",
+                "data-logic-chain-add-node-action-relay-standalone-removed",
+                "data-logic-chain-world-backed-objects-require-client-assisted-draft",
+                "data-logic-chain-protected-draft-registry-required",
+                "data-logic-chain-new-node-cancel-no-dirty-confirm-when-unchanged",
+                "data-logic-chain-placed-draft-cancel-discards",
+                "data-logic-chain-placed-draft-update-only-on-confirm",
+                "data-logic-chain-save-prevalidated-sequential",
+                "data-logic-chain-action-relay-unloaded-deferred-detail",
+                "focusLogicChainNodeDetail",
+                "logicChainVirtualListenerGateOptionsLoaded",
+                "data-state-variable-dirty-route-guard",
+                "data-state-variable-lock-lost-disables-save",
+                "data-state-variable-save-lock-guard",
+                "data-logic-chain-no-freeform-graph-save",
+                "data-logic-chain-existing-node-not-draggable",
+                "data-logic-chain-node-delete-draft",
+                "data-logic-chain-existing-node-delete-typed-owned-only",
+                "data-logic-chain-no-old-node-reorder",
+                "data-logic-chain-action-delete-draft",
+                "data-logic-chain-action-reorder-draft",
+                "data-logic-chain-add-node-world-device-selectable",
+                "data-logic-chain-add-node-region-controller-selectable",
+                "data-logic-chain-add-node-vbd-selectable",
+                "data-logic-chain-vbd-editor-not-globally-deferred",
+                "data-logic-chain-vbd-item-submit-entry",
+                "data-logic-chain-vbd-container-entry",
+                "data-logic-chain-multiple-draft-operations-allowed",
+                "data-logic-chain-single-delete-reorder-limitation-removed",
+                "data-logic-chain-action-list-level-delete",
+                "data-logic-chain-action-list-level-reorder",
+                "data-logic-chain-existing-action-list-maintenance",
+                "data-logic-chain-action-editor-content-only",
+                "data-logic-chain-modal-persistent-client-assisted",
+                "data-logic-chain-cancelled-failed-no-draft-card",
+                "data-logic-chain-online-player-picker",
+                "data-logic-chain-client-assisted-online-player-required",
+                "data-logic-chain-selection-success-create-card-only",
+                "data-logic-chain-world-device-hotbar-protection",
+                "data-logic-chain-region-controller-no-vbd-handler",
+                "data-logic-chain-webui-cancel-confirm-modal",
+                "data-logic-chain-webui-cancel-requires-confirmation",
+                "data-logic-chain-region-controller-separate-region-name",
+                "data-logic-chain-region-controller-name-boundary",
+                "data-logic-chain-producer-target-channel-adjacent",
+                "data-logic-chain-saved-producer-target-channel-adjacent",
+                "data-logic-chain-draft-saved-target-channel-adjacent",
+                "data-logic-chain-draft-node-action-panel",
+                "data-logic-chain-draft-action-add-delete-reorder-detail",
+                "data-logic-chain-draft-created-action-panel",
+                "data-logic-chain-draft-action-detail-editor",
+                "data-logic-chain-draft-action-condition-gate",
+                "data-logic-chain-draft-action-add-disabled",
+                "data-logic-chain-draft-action-bucket-disabled",
+                "data-logic-chain-owner-type-action-filtering",
+                "data-logic-chain-saved-world-device-edit-panel",
+                "data-logic-chain-vbd-in-place-editor",
+                "data-logic-chain-physical-device-missing-refresh",
+                "data-logic-chain-signal-receiver-consumer-sink",
+                "data-logic-chain-action-relay-consumer-executor",
+                "data-logic-chain-single-action-panel-entry",
+                "data-logic-chain-action-panel-second-page",
+                "data-logic-chain-signal-action-channel-combobox",
+                "data-logic-chain-node-delete-confirm-phrase",
+                "data-logic-chain-reference-node-delete-rejected",
+                "data-logic-chain-vbd-delete-keeps-world-block",
+                "data-logic-chain-physical-device-delete-removes-world-block-warning",
+                "data-logic-chain-existing-vbd-item-submit-container-draft-only",
+                "data-logic-chain-graph-owned-channel-summary",
+                "data-logic-chain-no-editable-device-channel-field",
+                "data-logic-chain-vbd-trigger-card-editor",
+                "data-logic-chain-vbd-trigger-second-page",
+                "data-logic-chain-vbd-itemsubmit-under-right-click-trigger",
+                "data-logic-chain-vbd-container-under-container-change-trigger",
+                "data-logic-chain-vbd-no-standalone-detail-navigation",
+                "data-logic-chain-vbd-trigger-in-place-config",
+                "data-logic-chain-vbd-trigger-enabled-draft",
+                "data-logic-chain-vbd-native-trigger-draft-payload",
+                "data-logic-chain-vbd-trigger-scroll-preservation",
+                "data-logic-chain-vbd-trigger-local-page-stack",
+                "data-logic-chain-vbd-itemsubmit-in-place-capture-entry",
+                "data-logic-chain-vbd-container-in-place-capture-entry",
+                "data-logic-chain-vbd-trigger-readable-draft-summary",
+                "data-logic-chain-vbd-native-json-not-primary-summary",
+                "data-logic-chain-vbd-trigger-channel-draft-edge",
+                "data-logic-chain-vbd-trigger-graph-render-before-save",
+                "data-logic-chain-vbd-capture-modal-captured-state",
+                "data-logic-chain-vbd-capture-modal-applied-state",
+                "data-logic-chain-vbd-capture-button-state",
+                "data-logic-chain-vbd-itemsubmit-capture-button-state",
+                "data-logic-chain-vbd-container-capture-button-state",
+                "data-logic-chain-vbd-trigger-stable-identity",
+                "data-logic-chain-vbd-trigger-no-duplicate-card",
+                "data-logic-chain-vbd-trigger-target-channel-only",
+                "data-logic-chain-vbd-trigger-source-card-draft",
+                "data-logic-chain-vbd-capture-cancelled-restart-button",
+                "data-logic-chain-vbd-capture-failed-restart-button",
+                "data-logic-chain-vbd-capture-retry-click-capture",
+                "data-logic-chain-vbd-capture-retry-pointerup",
+                "data-logic-chain-vbd-capture-retry-not-disabled-by-precheck",
+                "data-logic-chain-vbd-itemsubmit-draft-writeback",
+                "data-logic-chain-vbd-container-draft-writeback",
+                "data-logic-chain-vbd-capture-realtime-draft-writeback",
+                "data-logic-chain-vbd-capture-fail-closed-writeback",
+                "logicChainVbdTemplateSessionContextPayload",
+                "data-logic-chain-card-click-exits-connection-mode",
+                "data-logic-chain-connect-success-clears-connection-mode",
+                "data-logic-chain-draft-action-graph-render",
+                "data-logic-chain-draft-action-non-signal-card",
+                "dataLogicChainDraftActionTargetEdge",
+                "dataLogicChainActionAppendTargetSemanticEdge",
+                "data-logic-chain-action-delete-from-right-panel",
+                "data-logic-chain-action-append-right-panel-cancel",
+                "data-logic-chain-pending-delete-grey",
+                "data-logic-chain-selection-terminal-retry",
+                "function logicChainDraftActionSummary",
+                "data-logic-chain-no-inline-js-syntax-break",
+                "data-logic-chain-draft-diff-expand-all",
+                "data-logic-chain-world-device-consumer-right-of-channel",
+                "data-logic-chain-world-device-consumer-non-source-style",
+                "data-logic-chain-action-relay-upstream-render-precondition",
+                "data-logic-chain-render-fail-soft",
+                "data-logic-chain-clickability-fail-soft",
+                "data-logic-chain-draft-nested-action-diff",
+                "data-logic-chain-draft-action-pending-delete-diff",
+                "data-logic-chain-draft-diff-fail-soft",
+                "logicChainWorldDeviceConsumerType",
+                "logicChainDraftChannelExistsForUpstream",
+                "logicChainDraftActionRelayUpstreamChannel",
+                "Timer 启动动作",
+                "Timer 取消动作",
+                "TIMER_ON_START_ACTION",
+                "TIMER_ON_CANCEL_ACTION",
+                "draftUsesOwnAnchorSlot"
+        )) {
+            requireContains(scripts, marker, "9.1 frontend/guard marker: " + marker);
+        }
+        requireContains(editorRequest, "confirmationText", "v11 node delete request carries exact confirmation phrase");
+        requireContains(editorRequest, "impactAccepted", "v11 node delete request carries dry-run impact acceptance");
+        requireContains(editorService, "logic_chain_node_delete_confirm_phrase_required", "v11 backend rejects node delete without exact phrase");
+        requireContains(editorService, "logic_chain_node_delete_single_write_fail_closed", "v11 backend limits node delete to one per save until transactional delete exists");
+        requireContains(editorService, "logic_chain_physical_device_missing_or_broken", "v11 backend rejects missing physical device edits fail-closed");
+        requireContains(editorService, "dataLogicChainExistingVbdItemSubmitContainerDraftOnly", "v11 existing VBD itemSubmit/container changes save through Logic Chain draft");
+        requireContains(editorService, "world_device_consumes_channel", "v14 backend keeps consumer edge type marker");
+        requireContains(editorService, "logic_chain_world_device_input_channel_required", "v14 backend reports input/consumes channel for consumers");
+        requireContains(editorService, "channelRefsFromEdges(edges, \"\", nodeId, edgeType, true)", "v14 protected world-device consumers derive input from channel -> device edges");
+        requireContains(editorService, "channelRefsFromEdges(nodeEdges, \"\", nodeId, \"world_device_consumes_channel\", true)", "v14 existing world-device consumers derive input from channel -> device edges");
+        requireContains(editorService, "WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest nativeTriggers", "v14 backend receives VBD native trigger draft payload");
+        requireContains(editorService, "virtualBlockDeviceNativeTriggerService.update", "v14 backend writes VBD native triggers only through typed service");
+        requireContains(editorService, "TARGET_VIRTUAL_BLOCK_DEVICE_TRIGGERS", "v14 backend preflights VBD native trigger typed lock target");
+        requireContains(scripts, "logic_chain_region_controller_select", "v8 frontend uses distinct RegionController session purpose");
+        requireContains(scripts, "logicChainProtectedSelectedPlayer", "v8 frontend requires selecting an online player instead of accepting handwritten names");
+        requireContains(scripts, "pendingNode:null", "v8 cancelled/failed client-assisted flow must not leave a pending graph card");
+        requireContains(scripts, "confirmLogicChainProtectedSelectionDraft", "v8 graph card is created only after selection completion confirmation");
+        requireContains(scripts, "cleanupProtectedDraft:true", "v8 cancelling a completed protected flow must ask the backend to cleanup the protected draft");
+        requireContains(scripts, "logicChainCleanupCompletedProtectedSelectionDraft(current", "v8 modal close/backdrop/escape cleanup completed protected drafts before discard");
+        int draftSummaryDefinition = scripts.indexOf("function logicChainDraftActionSummary");
+        int draftSummaryLayoutUse = scripts.indexOf("logicChainDraftActionSummary(action)", scripts.indexOf("function logicChainLayoutWithDraft"));
+        requireTrue(draftSummaryDefinition >= 0 && draftSummaryLayoutUse > draftSummaryDefinition,
+                "v13 logicChainDraftActionSummary must be defined before layout/render uses it");
+        String firstNodeDeletePayload = extractBetween(scripts, "function logicChainNodeDeleteSavePayload", "function logicChainActionDeleteSavePayload");
+        String assignedNodeDeletePayload = extractBetween(scripts, "logicChainNodeDeleteSavePayload=function(e){", ";};");
+        String finalNodeDeletePayload = scripts.substring(scripts.lastIndexOf("function logicChainNodeDeleteSavePayload"));
+        requireContains(firstNodeDeletePayload, "impactAccepted", "v13 first node delete payload definition preserves dry-run impact acceptance");
+        requireContains(firstNodeDeletePayload, "confirmationText", "v13 first node delete payload definition preserves exact confirmation phrase");
+        requireContains(assignedNodeDeletePayload, "impactAccepted", "v13 assigned node delete payload override preserves dry-run impact acceptance");
+        requireContains(assignedNodeDeletePayload, "confirmationText", "v13 assigned node delete payload override preserves exact confirmation phrase");
+        requireContains(finalNodeDeletePayload, "impactAccepted", "v13 final node delete payload definition preserves dry-run impact acceptance");
+        requireContains(finalNodeDeletePayload, "confirmationText", "v13 final node delete payload definition preserves exact confirmation phrase");
+        requireContains(styles, ".logic-chain-minimap{pointer-events:none}", "v13 minimap overlay must not block graph card clicks");
+        requireContains(styles, ".logic-chain-edge-layer{position:absolute;inset:0;overflow:visible;pointer-events:none}", "v13 edge layer must not intercept graph card clicks");
+        requireContains(styles, ".logic-chain-draft-handles{position:absolute;inset:0;pointer-events:none}", "v13 draft handle container must not create a transparent hitbox");
+        requireContains(styles, ".logic-chain-connect-plus{position:absolute", "v13 connect plus remains the explicit interactive handle");
+        requireContains(styles, "pointer-events:auto", "v13 connect plus keeps explicit pointer-events auto");
+        requireContains(styles, ".logic-chain-node-card.draft.world-device-consumer", "v13 draft receiver/relay uses non-source card styling");
+        requireContains(scripts, "logicChainDraftDiffRowsForNestedActions", "v13 unsaved diff includes draft-created nested actions");
+        requireContains(scripts, "htmlHandler('toggleLogicChainDraftDiffExpanded()')", "v13 draft diff expand button uses escaped handler generation");
+        requireFalse(scripts.contains("onclick=\"toggleLogicChainDraftDiffExpanded()\""),
+                "v13 draft diff expand button must not use raw inline onclick");
+        requireContains(mainJava, "registryGone = registryRemoved || !SignalDeviceStore.resolveDevice", "v13 physical device delete treats registry disappearance during block removal as success but fails closed if still registered");
+        requireFalse(scripts.contains("onclick=\"toggleLogicChainExistingReconnectMenu(${jsString(fieldId)})"),
+                "v13 reconnect picker must not embed raw jsString inside double-quoted onclick");
+        requireFalse(scripts.contains("onclick=\"selectLogicChainExistingVbdTrigger(${jsString(item.type)})"),
+                "v13 VBD trigger cards must not embed raw jsString inside double-quoted onclick");
+        requireFalse(scripts.contains("if(appState.logicChainEditor?.connectionMode)return true"),
+                "v14 card click must not be swallowed while connection mode is active");
+        requireFalse(scripts.contains("connectionActive?'connection-mode'"),
+                "v14 card action must remain the real select/edit/focus action while connection mode is active");
+        requireContains(scripts, "data-logic-chain-connection-mode-active", "v14 card may mark connection mode without replacing its click action");
+        String vbdNativeTriggerEditorSlice = extractBetween(scripts, "function conditionGatePicker", "function syncVbdNativeTriggerDraftFromForm");
+        requireFalse(Pattern.compile("on(?:change|input|click|focus|keydown|submit)='[^`\\r\\n]*jsString").matcher(vbdNativeTriggerEditorSlice).find(),
+                "v14 VBD native trigger editor must use htmlEvent/htmlHandler instead of single-quoted jsString inline handlers");
+        String logicChainVbdTriggerSlice = extractBetween(scripts, "function logicChainExistingVbdTriggerFields", "const logicChainComparableExistingDraftBeforeV14");
+        requireFalse(Pattern.compile("on(?:change|input|click|focus|keydown|submit)='[^`\\r\\n]*jsString").matcher(logicChainVbdTriggerSlice).find(),
+                "v14 Logic Chain VBD trigger page must use escaped event attributes");
+        String logicChainVbdV15Slice = extractBetween(scripts, "function logicChainExistingVbdUiState", "const logicChainComparableExistingDraftBeforeV15");
+        for (String marker : List.of(
+                "showLogicChainExistingEditModalRestoringVbd",
+                "logicChainExistingVbdCapturePageScroll",
+                "backToLogicChainExistingVbdTriggerList",
+                "openLogicChainExistingVbdItemSubmitCapture",
+                "openLogicChainExistingVbdContainerCapture",
+                "applyLogicChainExistingVbdItemSubmitCapture",
+                "applyLogicChainExistingVbdContainerCapture"
+        )) {
+            requireContains(logicChainVbdV15Slice, marker, "v15 Logic Chain VBD in-modal flow marker: " + marker);
+        }
+        requireFalse(logicChainVbdV15Slice.contains("existing-item-${Date.now()}") || logicChainVbdV15Slice.contains("existing-container-${Date.now()}"),
+                "v15 final Logic Chain VBD capture entry must not create empty placeholder requirements");
+        for (String marker : List.of(
+                "logicChainDraftOnly",
+                "logicChainCaptureDraftId",
+                "logicChainEditLockId",
+                "logicChainTriggerKey",
+                "logicChainRequirementIndex",
+                "dataLogicChainVbdItemSubmitCaptureSessionPurpose",
+                "dataLogicChainVbdContainerCaptureSessionPurpose",
+                "saveLogicChainDraftOnlySession",
+                "result(session, true, false"
+        )) {
+            requireContains(mainJava, marker, "v15 Logic Chain VBD draft-only capture backend marker: " + marker);
+        }
+        String logicChainVbdV16Slice = extractBetween(scripts, "const logicChainV16VbdTriggerGraphSummaryMarkers", "function confirmLogicChainDraftActionDeleteFromPanel");
+        for (String marker : List.of(
+                "logicChainVbdNativeTriggerReadableDraftRows",
+                "logicChainVbdRequirementDraftReadableRows",
+                "logicChainApplyVbdNativeTriggerDraftGraphOverlay",
+                "logicChainScheduleVbdNativeTriggerDraftGraphRefresh",
+                "logicChainCaptureFooter",
+                "logicChainRenderedGraphWithDraftOverlay=function",
+                "logicChainOverlayHasConnectionChanges=function",
+                "dataLogicChainVbdTriggerChannelDraftEdge",
+                "dataLogicChainVbdTriggerGraphRenderBeforeSave"
+        )) {
+            requireContains(logicChainVbdV16Slice, marker, "v16 Logic Chain VBD trigger graph/summary marker: " + marker);
+        }
+        requireFalse(logicChainVbdV16Slice.contains("field:'nativeTriggerJson'") || logicChainVbdV16Slice.contains("field:\"nativeTriggerJson\""),
+                "v16 draft summary must not render nativeTriggerJson as a primary unsaved-diff field");
+        for (String marker : List.of(
+                "VBD native trigger draft summaries",
+                "Chinese readable rows",
+                "VBD native trigger output-channel draft changes",
+                "VBD -> Channel edges",
+                "captured / applied status",
+                "主按钮显示返回/已加入草稿",
+                "stable identity",
+                "configured target channel",
+                "draft writeback events",
+                "restart button"
+        )) {
+            requireContains(docs, marker, "v16 docs/help marker: " + marker);
+        }
+        String logicChainVbdV17Slice = extractBetween(scripts, "const logicChainV17VbdCaptureWritebackMarkers", "function confirmLogicChainDraftActionDeleteFromPanel");
+        for (String marker : List.of(
+                "logicChainVbdDedupTriggerOutputRows",
+                "logicChainVbdOutputRowsForSelectedTrigger",
+                "dataLogicChainVbdTriggerStableIdentity",
+                "dataLogicChainVbdTriggerNoDuplicateCard",
+                "dataLogicChainVbdTriggerTargetChannelOnly",
+                "dataLogicChainVbdTriggerSourceCardDraft",
+                "edges=edges.filter(edge=>{if(edge.from!==id||edge.type!=='vbd_outputs_channel')return true",
+                "logicChainCaptureRestartDisabledReason",
+                "logicChainCaptureRetryFooter",
+                "handleLogicChainVbdCaptureRetryDelegatedClick",
+                "logicChainRestartVbdCaptureFromRetryButton",
+                "logicChainCapturePayloadHasRequirements",
+                "logicChainResetSingleItemSubmitRetryDraft",
+                "startSingleItemSubmitSessionBeforeV17Retry",
+                "logicChainMergeCapturedRequirements",
+                "applyLogicChainExistingVbdItemSubmitCapture=function",
+                "applyLogicChainExistingVbdContainerCapture=function",
+                "logicChainApplyCaptureRealtimeWriteback",
+                "handleSingleItemSubmitSessionRealtimeEvent=function",
+                "handleContainerTemplateSessionRealtimeEvent=function"
+        )) {
+            requireContains(logicChainVbdV17Slice, marker, "v17 Logic Chain VBD capture writeback marker: " + marker);
+        }
+        requireContains(mainJava, "logicChainItemSubmitRequirements", "v17 itemSubmit draft-only status carries requirements for WebUI writeback");
+        requireContains(mainJava, "logicChainContainerRequirements", "v17 container draft-only status carries requirements for WebUI writeback");
+        requireFalse(editorService.contains("consumerDevice ? \"logic_chain_world_device_output_channel_required\""),
+                "v14 consumer world device validation must not reuse output_channel_required");
+        requireFalse(scripts.contains("onclick=\"logicChainMarkDraftActionPendingDelete(${jsString(nodeId)}"),
+                "v13 draft action delete confirm must use escaped htmlHandler event attributes");
+        requireFalse(scripts.contains("onclick=\"addLogicChainActionDeleteDraftFromRightPanel(${jsString(ownerType)}"),
+                "v13 existing action delete confirm must use escaped htmlHandler event attributes");
+        for (String marker : List.of(
+                "data-logic-chain-no-inline-js-syntax-break",
+                "data-logic-chain-world-device-consumer-right-of-channel",
+                "data-logic-chain-action-relay-upstream-render-precondition",
+                "data-logic-chain-draft-nested-action-diff",
+                "data-logic-chain-draft-diff-fail-soft",
+                "data-logic-chain-vbd-trigger-in-place-config",
+                "data-logic-chain-vbd-trigger-enabled-draft",
+                "data-logic-chain-vbd-native-trigger-draft-payload",
+                "data-logic-chain-vbd-trigger-scroll-preservation",
+                "data-logic-chain-vbd-trigger-local-page-stack",
+                "data-logic-chain-vbd-itemsubmit-in-place-capture-entry",
+                "data-logic-chain-vbd-container-in-place-capture-entry",
+                "data-logic-chain-vbd-trigger-readable-draft-summary",
+                "data-logic-chain-vbd-native-json-not-primary-summary",
+                "data-logic-chain-vbd-trigger-channel-draft-edge",
+                "data-logic-chain-vbd-trigger-graph-render-before-save",
+                "data-logic-chain-vbd-capture-modal-captured-state",
+                "data-logic-chain-vbd-capture-modal-applied-state",
+                "data-logic-chain-vbd-capture-button-state",
+                "data-logic-chain-vbd-itemsubmit-capture-button-state",
+                "data-logic-chain-vbd-container-capture-button-state",
+                "data-logic-chain-vbd-trigger-stable-identity",
+                "data-logic-chain-vbd-trigger-no-duplicate-card",
+                "data-logic-chain-vbd-trigger-target-channel-only",
+                "data-logic-chain-vbd-trigger-source-card-draft",
+                "data-logic-chain-vbd-capture-cancelled-restart-button",
+                "data-logic-chain-vbd-capture-failed-restart-button",
+                "data-logic-chain-vbd-itemsubmit-draft-writeback",
+                "data-logic-chain-vbd-container-draft-writeback",
+                "data-logic-chain-vbd-capture-realtime-draft-writeback",
+                "data-logic-chain-vbd-capture-fail-closed-writeback",
+                "logicChainVbdTemplateSessionContextPayload",
+                "logicChainDraftOnly",
+                "dataLogicChainVbdItemSubmitCaptureSessionPurpose",
+                "dataLogicChainVbdContainerCaptureSessionPurpose",
+                "logic_chain_world_device_input_channel_required",
+                "data-logic-chain-card-click-exits-connection-mode",
+                ".logic-chain-minimap{pointer-events:none}"
+        )) {
+            requireContains(matrix, marker, "v13 capability matrix marker: " + marker);
+        }
+        requireContains(readme, "freeform 世界写入", "9.1 docs clarify no freeform world write while allowing protected hotbar placement");
+        requireContains(selectionPurpose, "LOGIC_CHAIN_REGION_CONTROLLER_SELECT(\"logic_chain_region_controller_select\")", "v8 backend enum has distinct RegionController selection purpose");
+        requireContains(selectionPurpose, "\"logic_chain_region_select\"", "v8 backend keeps legacy region purpose as parse-only compatibility");
+        requireContains(selectionSessions, "completeWorldDevicePlacement", "v8 server routes world device placement outside the VBD single-block handler");
+        requireContains(selectionSessions, "applyWorldDeviceHotbarMode", "v8 server applies protected three-slot hotbar mode for world device placement");
+        requireContains(selectionSessions, "restoreWorldDeviceHotbarMode", "v8 server restores inventory after world device placement session ends");
+        requireContains(selectionSessions, "restorePendingWorldDeviceHotbarMode", "v8 server restores pending world-device hotbar snapshots on reconnect");
+        requireContains(selectionSessions, "restoreWorldDeviceHotbarSnapshot", "v8 server only removes world-device hotbar snapshots after restore succeeds");
+        requireContains(selectionSessions, "SignalDeviceStore.remove(server, world, placePos)", "v8 server rolls back device store if protected draft recording fails after world-device placement");
+        requireContains(selectionSessions, "cancelProtectedDraftFromWebAdmin", "v8 server can cancel a completed protected draft from the persistent modal");
+        requireContains(selectionSessions, "cleanupPlacedProtectedDraft", "v8 server cleans up placed world-device protected drafts when WebAdmin cancels before card creation");
+        requireContains(selectionSessions, "world_device_rollback", "v8 world-device protected draft cancel records rollback cleanup");
+        requireContains(selectionSessions, "cleanupExpiredWorldDeviceProtectedDrafts", "v9 timeout cleanup keeps world-device protected drafts on the explicit cleanup path");
+        requireContains(selectionSessions, "cleanupAllActiveWorldDeviceProtectedDrafts", "v9 server-stop cleanup keeps world-device protected drafts on the explicit cleanup path");
+        requireContains(selectionSessions, "handleRegionControllerCorner", "v8 server routes RegionController to RegionPlanner-like corner selection");
+        requireContains(selectionSessions, "completeRegionControllerSelection", "v8 server completes RegionController selection only after polygon closure");
+        requireContains(selectionSessions, "RegionGeometry.isSimplePolygon(points)", "v8 server rejects invalid RegionController corner polygons");
+        requireContains(selectionSessions, "regionPointsStructured", "v8 server keeps structured RegionController corner metadata");
+        requireContains(selectionSessions, "wrong_client_handler", "v8 server rejects world/region sessions that arrive through generic VBD completion");
+        requireContains(selectionServer, "UseBlockCallback.EVENT.register", "v8 server registers block-use interception for client-assisted flows");
+        requireContains(selectionServer, "AttackBlockCallback.EVENT.register", "v8 server blocks break/attack during protected world-backed selection flows");
+        requireContains(selectionServer, "ServerPlayConnectionEvents.JOIN.register", "v8 server restores pending world-device hotbar state when a player rejoins");
+        requireContains(selectionClient, "isServerUseBlockPurpose", "v8 client lets world/region right-click reach the server use-block handler");
+        requireContains(selectionClient, "matchesAllowedWorldDeviceHotbarKey", "v8 client permits only the first three hotbar keys during world-device placement");
+        requireContains(selectionClient, "handleMouseScroll(double vertical)", "v9 client handles mouse wheel selection during world-device placement");
+        requireContains(selectionClient, "setWorldDeviceSelectedSlot(client, next, true)", "v12 world-device mode routes mouse wheel to one of the three protected hotbar slots and syncs the server");
+        requireContains(selectionClient, "setWorldDeviceSelectedSlot(client, 0, true)", "v12 world-device mode normalizes external selected slots and syncs the server");
+        requireContains(selectionClient, "matchesAllowedWorldDeviceHotbarKey", "v9 client permits number keys 1-3 during world-device placement");
+        requireContains(selectionClient, "dataLogicChainWorldDeviceHudNoTargetText", "v12 world-device HUD omits aimed-block target text");
+        requireContains(selectionClient, "dataLogicChainWorldDeviceSelectedSlotSync", "v12 world-device client selected slot sync marker");
+        requireContains(selectionClient, "worldDeviceHudSelectionText", "v12 world-device HUD renders selected device text only");
+        String worldDeviceHudSelectionText = extractBetween(selectionClient, "private static String worldDeviceHudSelectionText", "private static void resetCancelConfirmation");
+        requireFalse(worldDeviceHudSelectionText.contains("targetText(client)"), "v12 world-device HUD helper must not render aimed-block target text");
+        requireContains(selectionClient, "normalizeWorldDeviceSelectedSlot", "v12 world-device selected slot normalization marker");
+        requireContains(selectionClient, "send(\"world_device_slot\"", "v12 client sends selected hotbar slot to server");
+        requireContains(selectionServer, "world_device_slot", "v12 server handles world-device selected slot sync");
+        requireContains(selectionSessions, "updateWorldDeviceSelectedSlotFromClient", "v12 server updates protected world-device selected slot from client");
+        requireContains(selectionSessions, "normalizeWorldDeviceSelectedSlot", "v12 server normalizes protected world-device selected slot");
+        requireContains(selectionClient, "selectionCancelConfirmSurvivesEscRelease", "v10 ESC release must not clear first-press cancel confirmation");
+        requireContains(hotbarMixin, "dataLogicChainWorldDeviceHotbarVanillaSuppressed", "v10 world-device placement suppresses vanilla nine-slot hotbar");
+        requireContains(hotbarMixin, "WebAdminSelectionClient.isWorldDevicePlacementMode()", "v10 hotbar suppression is scoped to world-device placement mode");
+        requireContains(selectionClient, "if (sh < slotSize + 2)", "v9 world-device hotbar skips drawing when the viewport cannot fit the protected slots");
+        requireContains(selectionClient, "scaledHeight - slotSize - 2", "v9 world-device hotbar clamps its top edge to the visible viewport");
+        requireContains(selectionClient, "regionPointPreview", "v10 client stores RegionPlanner-like point preview metadata for world particles");
+        requireContains(selectionClient, "renderRegionPlannerPreviewInWorld", "v10 client renders RegionController selection through world particle preview");
+        requireContains(selectionClient, "RegionPlannerPreviewRenderer.renderSelectionPreview", "v10 RegionController selection reuses RegionPlanner preview renderer");
+        requireContains(regionPreviewRenderer, "renderWireframe", "v10 shared RegionPlanner preview renderer exposes particle line rendering");
+        requireFalse(selectionClient.contains("drawRegionPointPreview"), "v10 WebUI/HUD must not draw the old 2D region geometry preview");
+        requireContains(selectionCancelRequest, "cleanupProtectedDraft", "v8 selection cancel request carries protected-draft cleanup intent");
+        requireContains(selectionCancelRequest, "confirmed", "v9 selection cancel request carries explicit confirmation");
+        requireContains(protectedDraftRegistry, "validateForLogicChainSave", "v9 protected draft registry is part of the required world-backed save path");
+        requireContains(protectedDraftRegistry, "actorName.isBlank", "v9 protected draft save validation rejects missing WebAdmin actor");
+        requireContains(selectionSessions, "shouldBlockProtectedDraftCommandMutation", "v10 protected world-device draft blocks ordinary command mutation bypasses");
+        requireContains(signalDeviceCommand, "shouldBlockProtectedDraftCommandMutation", "v10 SignalDeviceCommand consults protected draft command guard");
+        requireContains(signalDeviceCommand, "清空名称", "v10 SignalDeviceCommand clearName also consults protected draft command guard");
+        requireContains(actionRelayCommand, "shouldBlockProtectedDraftCommandMutation", "v10 ActionRelayCommand consults protected draft command guard");
+        requireContains(signalReceiverCommand, "shouldBlockProtectedDraftCommandMutation", "v10 SignalReceiverCommand consults protected draft command guard");
+        requireContains(editorTest, "testLogicChainClientAssistedSelectionPurposesAreDistinct", "v8 service tests cover distinct client-assisted session purposes");
+        requireContains(logicChainService, "metadata.put(\"ownerType\", \"region_controller\")", "9.1 Region signal action alias carries owner type for same-index edit");
+        requireContains(logicChainService, "metadata.put(\"ownerId\", region.id())", "9.1 Region signal action alias carries owner id for same-index edit");
+        requireContains(logicChainService, "metadata.put(\"regionBucket\", bucket)", "9.1 Region signal action alias carries normalized bucket for same-index edit");
+        requireContains(logicChainService, "addRegionActionOwnerNode", "9.1 repair adds visible RegionController owner node for signal action aliases");
+        requireContains(logicChainService, "regionActionOwnerEdge", "9.1 repair links RegionController owner to action alias");
+        requireContains(logicChainService, "regionActionNoIndependentSystemColumn", "9.1 repair prevents Region action alias from becoming an independent system column");
+        requireContains(scripts, "m.regionActionOwnedAlias===true||t==='action'", "9.1 Region owned action aliases remain visible in Action filter");
+        requireContains(scripts, "worldBacked=!actionEdit", "9.1 editable Region/ActionRelay action aliases must not be mislabeled as readonly world entities");
+        requireContains(scripts, "focusLogicChainNodeDetail(nodeId);", "9.1 edit-mode node click selects detail before edit/toast fallback");
+        requireContains(scripts, "d.lockId='';d.lock=null;stopStateVariableLockHeartbeat();", "9.1 StateVariable save lock failure disables the save button");
+        requireContains(scripts, "m.actionsEditable===false||m.actionRelayActionsSummaryOnly===true", "9.1 unloaded ActionRelay append entry is disabled instead of fake-saving");
+        requireContains(scripts, "function logicChainPlacedDraftSnapshot", "9.1 placed draft edit modal keeps a pre-edit snapshot");
+        requireContains(scripts, "function cancelLogicChainPlacedDraftNodeEdit", "9.1 placed draft edit cancel restores the pre-edit snapshot");
+        requireContains(scripts, "logicChainDraftNestedActions", "v10 nested draft actions are scanned for channel references and save payloads");
+        requireContains(scripts, "logicChainDraftActionPanelCard", "v10 draft-created nodes expose Action panels before save");
+        requireContains(scripts, "logicChainActionTypesForOwner", "v10 action type options are filtered by owner type");
+        requireContains(scripts, "dataLogicChainDraftWorldDeviceMetadataVisible", "v10 draft world-device cards use user/protected-draft metadata");
+        requireContains(scripts, "未命名世界设备引用", "v10 draft world-device cards show placeholders instead of generic titles");
+        requireContains(scripts, "worldDeviceDraftTargetChannelAdjacent", "v10 world-device draft anchors left-adjacent to target channel");
+        requireContains(scripts, "logicChainCenterBalanceAdjustedColumns", "v10 saved graph rebalances adjusted same-column cards around the visual center");
+        requireContains(scripts, "dataLogicChainCenterBalancePreservesVisualReferences", "v10 center-balanced layout preserves visual/reference card occupancy");
+        requireContains(scripts, "regionControllerOwnerFollowsActionGroup", "v10 saved RegionController owner follows its action/downstream group");
+        requireContains(scripts, "regionControllerGateFollowsActionGroup", "v10 saved RegionController gate path follows owner/action/downstream group");
+        requireContains(scripts, "regionControllerDraftOwnerFollowsActionGroup", "v10 draft RegionController owner follows its draft action/downstream group");
+        requireContains(scripts, "draftCreatedActionAlias", "v10 draft nested signal actions get semantic graph aliases");
+        requireContains(scripts, "newNodeDraftDirty", "9.1 add-node modal dirty state is explicit instead of set by opening");
+        requireContains(scripts, "newNodeDraftInitialSnapshot", "9.1 add-node modal compares against its initial snapshot");
+        requireContains(docs, "Existing typed-owned node delete is represented as `nodeDeletes`", "9.1 typed-owned node delete remains documented as a draft-only store-backed operation");
+        requireContains(editorRequest, "NodeDeleteDraft", "9.1 request exposes typed-owned node delete draft payloads");
+        requireContains(editorRequest, "ActionDeleteDraft", "9.1 request exposes action delete draft payloads");
+        requireContains(editorRequest, "ActionReorderDraft", "9.1 request exposes action reorder draft payloads");
+        requireContains(editorService, "logic_chain_action_target_multi_write_conflict", "9.1 same action-list multi-write conflicts are explicit instead of a blanket single destructive draft limit");
+        requireContains(editorService, "dataLogicChainVbdItemSubmitContainerCommitWired", "9.1 VBD itemSubmit/container Logic Chain payloads are wired into the VBD draft commit path");
+        requireContains(editorService, "logic_chain_target_lock_preflight_validation", "9.1 target locks are prevalidated before typed save");
+        requireFalse(editorService.contains("logic_chain_destructive_multi_write_fail_closed"), "9.1 must not keep the old destructive multi-write fail-closed code");
+        requireFalse(editorService.contains("logic_chain_world_backed_single_write_fail_closed"), "9.1 must not keep the old world-backed single-write fail-closed code");
+        requireFalse(editorService.contains("logic_chain_vbd_item_submit_container_commit_not_wired"), "9.1 must not keep the old VBD itemSubmit/container not-wired code");
+        requireContains(editorService, "logic_chain_item_submit_consume_count_follow_mismatch", "9.1 VBD itemSubmit count/consumeCount follow contract is validated");
+        requireContains(scripts, "logicChainConfirmedNodeDeleteDrafts", "9.1 frontend tracks confirmed node delete drafts");
+        requireContains(scripts, "logicChainNodeDeleteSavePayload", "9.1 frontend serializes node delete drafts");
+        requireContains(scripts, "logicChainActionDeleteSavePayload", "9.1 frontend serializes action delete drafts");
+        requireContains(scripts, "logicChainActionReorderSavePayload", "9.1 frontend serializes action reorder drafts");
+        requireFalse(scripts.contains("logicChainDestructiveDraftBlocked"), "9.1 frontend must not keep the old one destructive draft per save helper");
+        requireFalse(scripts.contains("<option value=\"action_relay\""),
+                "9.1 v5 add-node list must not expose standalone ActionRelay; it belongs under world device reference");
+        requireContains(editorService, "standaloneActionRelayAddNodeRemoved", "9.1 v5 backend capability records standalone ActionRelay removal");
+        requireContains(editorService, "WebAdminProtectedDraftRegistry.validateForLogicChainSave", "9.1 world-backed add-node types require protected draft registry validation");
+        requireContains(editorService, "logic_chain_protected_draft_required", "9.1 backend rejects fake world-backed draft nodes without protected draft ownership");
+        requireFalse(editorService.contains("logic_chain_world_backed_commit_not_wired"), "9.1 must not keep the old world-backed commit-adapter-not-wired failure");
+        requireContains(editorService, "dataLogicChainWorldBackedCommitRollbackAdapter", "v9 world-device and RegionController commit / rollback adapters are wired");
+        requireContains(editorService, "saveWorldDeviceProtectedDraft", "v9 world-device protected draft uses a typed commit adapter");
+        requireContains(editorService, "saveRegionControllerProtectedDraft", "v9 RegionController protected draft uses a typed commit adapter");
+        requireContains(editorService, "logic_chain_region_controller_requires_action_bucket", "v9 RegionController output must go through enter / exit / stay action bucket");
+        requireContains(editorService, "logic_chain_world_device_type_mismatch", "v12 world-device draft type mismatch fails closed");
+        requireContains(editorService, "authoritativeWorldDeviceDraftType", "v12 graph validation uses protected/store device type authority");
+        requireFalse(editorService.contains("WebAdminProtectedDraftRegistry.cancelByEditLock"),
+                "v9 Logic Chain cancel must not bypass protected world-device cleanup by cancelling registry entries directly");
+        requireContains(editorService, "publishVbdProtectedDraftWriteAudit", "9.1 VBD protected draft commit appends WebAdmin write audit realtime");
+        requireContains(editorService, "WebAdminRealtimeEventType.WRITE_AUDIT_APPENDED", "9.1 VBD protected draft commit publishes write audit event");
+        requireFalse(editorService.contains("setBlockState") || editorService.contains("breakBlock") || editorService.contains("removeBlock("),
+                "9.1 Logic Chain editor must not mutate world blocks while handling protected world-backed drafts");
+        requireContains(editorService + "\n" + scripts, "markCommitFailed", "9.1 recoverable protected-draft commit failures preserve the draft for retry");
+        requireContains(editorService + "\n" + scripts, "lastCommitFailure", "9.1 protected draft records the last commit failure reason");
+        requireContains(logicChainService, "loadedActionRelayActions", "9.1 repair expands loaded ActionRelay actions through exact loaded block entity");
+        requireContains(logicChainService, "SignalDeviceStore.getLoadedActionRelay(build.snapshot.server(), device)", "9.1 ActionRelay exact read uses existing no-force-load store helper");
+        requireContains(logicChainService, "metadata.put(\"actionsReadable\", loaded)", "9.1 ActionRelay graph metadata exposes readable loaded state");
+        requireContains(logicChainService, "metadata.put(\"actionRelayActionsSummaryOnly\", !loaded)", "9.1 ActionRelay graph metadata no longer hardcodes summary-only");
+        requireFalse(logicChainService.contains("metadata.put(\"loaded\", false)"), "9.1 repair must not hardcode ActionRelay graph node as unloaded");
+        requireFalse(logicChainService.contains("未加载，无法展开其动作列表"), "9.1 repair must not keep the old ActionRelay unloaded warning");
+        requireContains(styles, ".logic-chain-node-card.state_action{border-color:#14b8a6", "9.1 StateVariable action uses action-first visual override");
+        requireContains(styles, ".logic-chain-node-card.state_variable{border-color:#4f46e5", "9.1 StateVariable definition keeps state target visual");
+        requireContains(styles, ".logic-chain-node-card.pending-delete", "v12 pending-delete cards use grey/desaturated styling");
+        requireContains(styles, ".logic-chain-vbd-trigger-card", "v12 VBD trigger cards have dedicated in-node styling");
+        requireFalse(styles.contains(".logic-chain-node-card.state_action,.logic-chain-node-card.state_variable"),
+                "9.1 StateVariable action and definition must not share the same visual selector");
+        requireContains(scripts, "m.regionBucket||m.triggerType||m.timerBucket||m.bucket", "9.1 action draft overlay matches Region buckets as well as Timer buckets");
+
+        for (String marker : List.of(
+                "path.equals(\"/api/webadmin/state-variables\")",
+                "method.equalsIgnoreCase(\"POST\")",
+                "method.equalsIgnoreCase(\"PATCH\")",
+                "EDIT_STATE_VARIABLE",
+                "TARGET_STATE_VARIABLE",
+                "STATE_VARIABLE_CHANGED",
+                "autoSnapshotBeforeWrite",
+                "updateAutoSnapshotOperationDiff"
+        )) {
+            requireContains(server + "\n" + stateService + "\n" + editLock + "\n" + operationType + "\n" + realtime,
+                    marker, "9.1 StateVariable write marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "SUPPORTED_NODE_TYPES = Set.of(\"signal_join\", \"timer\", \"signal_listener\", \"world_device\", \"virtual_block_device\", \"region_controller\")",
+                "WebAdminSignalListenerLifecycleService",
+                "WebAdminSignalListenerCreateRequest",
+                "signal_listener",
+                "conditionGroupId",
+                "\"action_relay\"",
+                "\"region_controller\"",
+                "actionRelayActionsService.updateAction",
+                "regionControllerService.updateAction"
+        )) {
+            requireContains(editorService, marker, "9.1 Logic Chain editor backend marker: " + marker);
+        }
+
+        for (String marker : List.of(
+                "public WebAdminWriteResult updateAction",
+                "same-index 编辑不得改变 Action 数量",
+                "Action index 不存在，same-index 编辑不能新增、删除或重排旧 Action"
+        )) {
+            requireContains(actionRelayService, marker, "9.1 ActionRelay same-index marker: " + marker);
+        }
+        requireContains(regionService, "ActionUpdateRequest", "9.1 Region action same-index edit request exists");
+
+        for (String marker : List.of(
+                "testCreateAndUpdateDefinitionsUseWriteSafety",
+                "testDefinitionWriteValidationAndConflicts",
+                "testActionEditValidationCoversActionRelayAndRegionBuckets",
+                "testSaveSignalListenerDraftWritesUnderlyingConfig",
+                "testMultipleDraftOperationsValidateConflictsAndAllowNonConflictingDeletesReorders",
+                "testTargetLockPreflightReportsMissingTargetLockBeforeTypedSave",
+                "testVbdDraftAllowsCapturePayloadValidationAndMixedWrites",
+                "testSignalListenerNodeDeleteRequiresTypedIdentityAndDeletesWithLock",
+                "testSignalListenerActionDeleteAndReorderDraftsSaveWithLock"
+        )) {
+            requireContains(stateTest + "\n" + editorTest, marker, "9.1 test marker: " + marker);
+        }
+
+        String production = scripts + "\n" + server + "\n" + editorService + "\n" + stateService;
+        for (String forbidden : List.of(
+                "class FullLogicChainEditor",
+                "class ScratchEditor",
+                "IfElseRuntime",
+                "ElseBranch",
+                "FallbackAction",
+                "freeformGraphSave",
+                "graphDocumentSave",
+                "programAst",
+                "GAME_PLAYER",
+                "TEAM_STATE",
+                "WORLD_MUTATION",
+                "SETBLOCK",
+                "STRUCTURE_PLACEMENT"
+        )) {
+            requireFalse(production.contains(forbidden), "9.1 must not add out-of-scope production marker: " + forbidden);
+        }
+        requireNoControllerSystemImplementations(mainJava, "9.1 must not implement GameController/MissionSystem/PhaseController");
+        requireActionTypeSetUnchangedFor812();
+        requireConditionNodeTypeSetUnchangedFor813();
+        requireStateVariableScopeSetUnchangedFor91();
+        for (String forbidden : List.of("TITLE", "SUBTITLE", "ACTIONBAR", "TELEPORT", "EFFECT", "GAMEMODE", "GIVE_ITEM", "SETBLOCK", "CLONE")) {
+            requireFalse(actionType.contains(forbidden), "9.1 must not add typed action marker: " + forbidden);
+        }
+    }
+
     private static void requireActionTypeSetUnchangedFor812() {
         Set<String> actual = new LinkedHashSet<>();
         for (ActionType value : ActionType.values()) {
@@ -11535,6 +12223,18 @@ public final class StabilizationGuardTest {
                 "timer_cancel"
         ));
         requireEquals(expected, actual, "8.17 must not add or remove ActionType values");
+    }
+
+    private static void requireStateVariableScopeSetUnchangedFor91() {
+        Set<String> actual = new LinkedHashSet<>();
+        for (StateVariableScope value : StateVariableScope.values()) {
+            actual.add(value.name());
+        }
+        Set<String> expected = new LinkedHashSet<>(List.of(
+                "GLOBAL",
+                "PLAYER"
+        ));
+        requireEquals(expected, actual, "9.1 must not add or remove StateVariableScope values");
     }
 
     private static void requireConditionNodeTypeSetUnchangedFor813() {

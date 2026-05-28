@@ -6,12 +6,14 @@ import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminDeviceMetadataStore;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
+import com.zcpu.tzzmod.webadmin.draft.WebAdminProtectedDraftRegistry;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminVirtualBlockDeviceDeleteRequest;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionDecision;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
@@ -32,13 +34,23 @@ import net.minecraft.server.MinecraftServer;
 public final class WebAdminVirtualBlockDeviceLifecycleService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
+    private final WebAdminEditLockService editLockService;
 
     public WebAdminVirtualBlockDeviceLifecycleService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService
     ) {
+        this(permissionService, securityService, null);
+    }
+
+    public WebAdminVirtualBlockDeviceLifecycleService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
+        this.editLockService = editLockService;
     }
 
     public WebAdminWriteResult delete(
@@ -94,6 +106,51 @@ public final class WebAdminVirtualBlockDeviceLifecycleService {
             audit(context, result, deviceSummary(device), Map.of("attempt", "non_virtual_block_device"));
             return result;
         }
+        if (!WebAdminProtectedDraftRegistry.canMutateProtectedObject(
+                WebAdminProtectedDraftRegistry.OBJECT_TYPE_VIRTUAL_BLOCK_DEVICE,
+                device.id(),
+                request == null ? "" : request.lockId,
+                request == null ? "" : request.draftSessionId,
+                user
+        )) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "draftSessionId",
+                    "protected_draft_locked",
+                    "该 VBD 正在 Logic Chain protected draft 会话中，非持有该 draft/edit lock 的写入会被拒绝。",
+                    safe(request == null ? "" : request.draftSessionId)
+            )));
+            audit(context, result, deviceSummary(device), Map.of("attempt", "protected_draft_locked"));
+            return result;
+        }
+        if (editLockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG,
+                    device.id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session
+            );
+            if (!lockValidation.success()) {
+                WebAdminWriteResult result = lockValidation.result();
+                audit(context, result, deviceSummary(device), Map.of("attempt", "edit_lock_failed"));
+                return result;
+            }
+        }
+        if (request == null || safe(request.expectedFingerprint).isBlank()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "expectedFingerprint",
+                    "required",
+                    "删除 / 解绑 VBD 需要 expectedFingerprint，用于防止覆盖其它操作的修改。",
+                    ""
+            )));
+            audit(context, result, deviceSummary(device), Map.of("attempt", "expected_fingerprint_missing"));
+            return result;
+        }
+        if (!WebAdminDeviceBasicConfigService.fingerprintMatches(device, request.expectedFingerprint)) {
+            WebAdminWriteResult result = conflictDetected(target, device, request.expectedFingerprint);
+            audit(context, result, deviceSummary(device), Map.of("attempt", "fingerprint_conflict"));
+            return result;
+        }
         WebAdminWriteResult confirmation = requireDangerConfirmation(request, target, device);
         if (!confirmation.success()) {
             audit(context, confirmation, deviceSummary(device), Map.of("attempt", "confirmation_required"));
@@ -131,6 +188,16 @@ public final class WebAdminVirtualBlockDeviceLifecycleService {
         );
         WebAdminAuditEvent auditEvent = audit(context, result, deviceSummary(device), Map.of("removed", true, "reason", safe(request == null ? "" : request.reason)));
         publishRealtime(device, auditEvent, user);
+        if (editLockService != null) {
+            editLockService.releaseAfterWrite(
+                    WebAdminEditLockService.TARGET_DEVICE_BASIC_CONFIG,
+                    device.id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session,
+                    remoteAddress
+            );
+        }
         return result;
     }
 
@@ -167,17 +234,17 @@ public final class WebAdminVirtualBlockDeviceLifecycleService {
         String confirmation = safe(request == null ? "" : request.confirmationText).trim();
         boolean confirmed = request != null && Boolean.TRUE.equals(request.confirmed);
         String displayName = WebAdminReadonlySupport.deviceDisplayName(device);
-        if (confirmed && (confirmation.equals(device.id()) || (!displayName.isBlank() && confirmation.equals(displayName)))) {
+        if (confirmed && (confirmation.equals("我确认删除该节点") || confirmation.equals(device.id()) || (!displayName.isBlank() && confirmation.equals(displayName)))) {
             return WebAdminWriteResult.ok(target, false, "危险操作确认通过。");
         }
         return new WebAdminWriteResult(
                 false,
                 WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION.id(),
-                "删除 / 解绑虚拟方块设备前，需要勾选确认并输入设备 ID 或显示名称。",
+                "删除 / 解绑虚拟方块设备前，需要勾选确认并输入固定文本“我确认删除该节点”、设备 ID 或显示名称。",
                 target.targetType(),
                 target.targetId(),
                 false,
-                List.of(new WebAdminValidationError("confirmationText", "required", "请输入设备 ID 或显示名称以确认删除 / 解绑。", confirmation)),
+                List.of(new WebAdminValidationError("confirmationText", "required", "请输入固定文本“我确认删除该节点”、设备 ID 或显示名称以确认删除 / 解绑。", confirmation)),
                 "",
                 "",
                 true,
@@ -192,6 +259,27 @@ public final class WebAdminVirtualBlockDeviceLifecycleService {
         }
         SignalDeviceStore.ResolveResult resolved = SignalDeviceStore.resolveDevice(server, deviceId);
         return resolved.foundUnique() ? resolved.device().normalized() : null;
+    }
+
+    private static WebAdminWriteResult conflictDetected(WebAdminWriteTarget target, SignalDeviceData current, String expectedFingerprint) {
+        Map<String, Object> conflict = new LinkedHashMap<>();
+        conflict.put("expectedFingerprint", expectedFingerprint);
+        conflict.put("currentFingerprint", WebAdminDeviceBasicConfigService.fingerprintFor(current));
+        conflict.put("deviceId", current == null ? "" : current.id());
+        return new WebAdminWriteResult(
+                false,
+                WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
+                "虚拟方块设备已被其它操作修改，请刷新后重新确认删除 / 解绑。",
+                target.targetType(),
+                target.targetId(),
+                false,
+                List.of(),
+                "",
+                "",
+                false,
+                conflict,
+                Map.of()
+        );
     }
 
     private WebAdminAuditEvent audit(WebAdminWriteContext context, WebAdminWriteResult result, Map<String, ?> before, Map<String, ?> after) {

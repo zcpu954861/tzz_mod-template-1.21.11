@@ -261,7 +261,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         if (before == null || !SignalDeviceData.TYPE_VIRTUAL_BLOCK_DEVICE.equals(before.type())) {
             return failSession(session, "device_missing", "目标 virtual_block_device 不存在，单物品提交模板保存失败。", true);
         }
-        if (!before.interactionEnabled()) {
+        if (!before.interactionEnabled() && !session.logicChainDraftOnly) {
             return failSession(session, "interaction_disabled", "右键交互未启用，itemSubmit requirement 当前不能保存。", true);
         }
         if (lockService != null) {
@@ -287,6 +287,9 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
             draft = parseTemplate(body);
         } catch (IllegalArgumentException exception) {
             return failSession(session, "invalid_item_submit_template", exception.getMessage(), true);
+        }
+        if (session.logicChainDraftOnly) {
+            return saveLogicChainDraftOnlySession(player, session, draft);
         }
         List<ItemSubmitRequirementData> nextRequirements = requirementsFromDraft(before, draft);
         boolean nextItemSubmitEnabled = draft.itemSubmitEnabled() && !nextRequirements.isEmpty();
@@ -333,6 +336,75 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         WebAdminAuditEvent auditEvent = audit(contextFor(session, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT), result, beforeSummary, afterSummary);
         publishConfigChangedAfterSave(session, after, auditEvent);
         return result;
+    }
+
+    private static WebAdminWriteResult saveLogicChainDraftOnlySession(ServerPlayerEntity player, WebAdminSingleItemSubmitTemplateSession session, ItemSubmitSaveDraft draft) {
+        removeActive(session);
+        String message = draft.requirements().isEmpty()
+                ? "Logic Chain itemSubmit 捕获未产生 requirement，未修改正式 VBD。"
+                : "Logic Chain itemSubmit 捕获已回填草稿（" + draft.requirements().size() + " 个 requirement）。";
+        if (player != null) {
+            notifyPlayer(player, message, Formatting.GREEN);
+            sendEnd(player, "saved", session, message, Map.of("source", "logic_chain_draft_only"));
+        }
+        releaseLock(session, "Logic Chain itemSubmit draft-only 捕获完成，编辑锁已释放。");
+        Map<String, Object> status = baseStatus(session, "saved");
+        status.put("message", message);
+        status.put("logicChainDraftOnly", true);
+        status.put("dataLogicChainVbdItemSubmitCaptureSessionPurpose", true);
+        status.put("logicChainCaptureDraftId", session.logicChainCaptureDraftId);
+        status.put("logicChainEditLockId", session.logicChainEditLockId);
+        status.put("logicChainRootType", session.logicChainRootType);
+        status.put("logicChainRootRef", session.logicChainRootRef);
+        status.put("logicChainDraftNodeId", session.logicChainDraftNodeId);
+        status.put("logicChainTriggerKey", session.logicChainTriggerKey);
+        status.put("logicChainRequirementIndex", session.logicChainRequirementIndex);
+        status.put("logicChainItemSubmitEnabled", draft.itemSubmitEnabled() && !draft.requirements().isEmpty());
+        status.put("logicChainItemSubmitConsumeEnabled", draft.consumeEnabled());
+        status.put("logicChainItemSubmitConsumeOrder", draft.consumeOrder());
+        status.put("logicChainItemSubmitRequirements", logicChainItemSubmitRequirements(draft, session.logicChainCaptureDraftId));
+        WebAdminRealtimeEvent event = publishEvent(WebAdminRealtimeEventType.SINGLE_ITEM_SUBMIT_TEMPLATE_SESSION_SAVED, session, message, status);
+        rememberTerminal(session, "saved", status);
+        WebAdminWriteResult result = result(session, true, false, message, status, event);
+        audit(contextFor(session, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_SINGLE_ITEM_SUBMIT), result, Map.of("status", "active"), status);
+        return result;
+    }
+
+    private static List<Map<String, Object>> logicChainItemSubmitRequirements(ItemSubmitSaveDraft draft, String captureDraftId) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int index = 0;
+        for (ItemSubmitRequirementDraft requirement : draft.requirements()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            int count = requirement.requiredCount() <= 0 ? Math.max(1, requirement.templateCount()) : requirement.requiredCount();
+            row.put("requirementId", requirement.id().isBlank() ? "logic-chain-item-" + (index + 1) : requirement.id());
+            row.put("displayName", requirement.name().isBlank() ? "itemSubmit 捕获 " + (index + 1) : requirement.name());
+            row.put("count", count);
+            row.put("consumeCount", Math.max(1, requirement.consumeCount()));
+            row.put("consumeCountFollowsCount", requirement.consumeCount() == count);
+            row.put("captureDraftId", safe(captureDraftId));
+            row.put("templateSummary", requirement.summary().isBlank() ? requirement.itemId() + " x" + count : requirement.summary());
+            row.put("requirementEnabled", requirement.requirementEnabled());
+            row.put("itemId", requirement.itemId());
+            row.put("templateItemId", requirement.itemId());
+            row.put("countMode", requirement.countMode());
+            row.put("templateCount", requirement.templateCount());
+            row.put("requiredCount", requirement.requiredCount());
+            row.put("matchItemId", requirement.matchItemId());
+            row.put("matchDamage", requirement.matchDamage());
+            row.put("matchCustomName", requirement.matchCustomName());
+            row.put("matchLore", requirement.matchLore());
+            row.put("matchCustomData", requirement.matchCustomData());
+            row.put("matchComponents", requirement.matchComponents());
+            row.put("templateDamage", requirement.templateDamage());
+            row.put("templateCustomName", requirement.templateCustomName());
+            row.put("templateLore", requirement.templateLore());
+            row.put("templateCustomData", requirement.templateCustomData());
+            row.put("templateComponents", requirement.templateComponents());
+            row.put("templateDisplayStack", requirement.templateDisplayStack());
+            rows.add(row);
+            index++;
+        }
+        return List.copyOf(rows);
     }
 
     private record ItemSubmitSaveDraft(
@@ -736,6 +808,9 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         data.put("singleItemSubmitTemplate", true);
         data.put("unifiedItemSubmitEditor", true);
         data.put("requirementListEditable", true);
+        data.put("logicChainDraftOnly", session.logicChainDraftOnly);
+        data.put("logicChainCaptureDraftId", session.logicChainCaptureDraftId);
+        data.put("logicChainTriggerKey", session.logicChainTriggerKey);
         return data;
     }
 

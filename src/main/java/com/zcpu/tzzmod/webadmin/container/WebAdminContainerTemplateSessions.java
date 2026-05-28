@@ -7,11 +7,13 @@ import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.network.WebAdminContainerTemplateS2CPayload;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionData;
+import com.zcpu.tzzmod.signal.device.ContainerItemConditionSupport;
 import com.zcpu.tzzmod.signal.device.ContainerItemConditionType;
 import com.zcpu.tzzmod.signal.device.ContainerItemCountMode;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
+import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
 import com.zcpu.tzzmod.util.NullSafety;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
@@ -285,6 +287,9 @@ public final class WebAdminContainerTemplateSessions {
         } catch (IllegalArgumentException exception) {
             return failSession(session, "invalid_item_conditions", exception.getMessage(), true);
         }
+        if (session.logicChainDraftOnly) {
+            return saveLogicChainDraftOnlySession(player, session, nextConditions);
+        }
         WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = WebAdminSnapshotService.createAutoBeforeTrustedWrite(
                 activeServer,
                 session.actorUser,
@@ -320,6 +325,80 @@ public final class WebAdminContainerTemplateSessions {
         WebAdminAuditEvent auditEvent = audit(contextFor(session, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE), result, beforeSummary, afterSummary);
         publishConfigChangedAfterSave(session, after, auditEvent);
         return result;
+    }
+
+    private static WebAdminWriteResult saveLogicChainDraftOnlySession(ServerPlayerEntity player, WebAdminContainerTemplateSession session, List<ContainerItemConditionData> conditions) {
+        removeActive(session);
+        String message = conditions.isEmpty()
+                ? "Logic Chain container 捕获未产生 requirement，未修改正式 VBD。"
+                : "Logic Chain container 捕获已回填草稿（" + conditions.size() + " 个 requirement）。";
+        if (player != null) {
+            notifyPlayer(player, message, Formatting.GREEN);
+            sendEnd(player, "saved", session, message, Map.of("source", "logic_chain_draft_only"));
+        }
+        releaseLock(session, "Logic Chain container draft-only 捕获完成，编辑锁已释放。");
+        Map<String, Object> status = baseStatus(session, "saved");
+        status.put("message", message);
+        status.put("logicChainDraftOnly", true);
+        status.put("dataLogicChainVbdContainerCaptureSessionPurpose", true);
+        status.put("logicChainCaptureDraftId", session.logicChainCaptureDraftId);
+        status.put("logicChainEditLockId", session.logicChainEditLockId);
+        status.put("logicChainRootType", session.logicChainRootType);
+        status.put("logicChainRootRef", session.logicChainRootRef);
+        status.put("logicChainDraftNodeId", session.logicChainDraftNodeId);
+        status.put("logicChainTriggerKey", session.logicChainTriggerKey);
+        status.put("logicChainRequirementIndex", session.logicChainRequirementIndex);
+        status.put("logicChainContainerRequirements", logicChainContainerRequirements(conditions, session.logicChainCaptureDraftId));
+        WebAdminRealtimeEvent event = publishEvent(WebAdminRealtimeEventType.CONTAINER_TEMPLATE_SESSION_SAVED, session, message, status);
+        rememberTerminal(session, "saved", status);
+        WebAdminWriteResult result = result(session, true, false, message, status, event);
+        audit(contextFor(session, WebAdminOperationType.SAVE_VIRTUAL_BLOCK_DEVICE_CONTAINER_TEMPLATE), result, Map.of("status", "active"), status);
+        return result;
+    }
+
+    private static List<Map<String, Object>> logicChainContainerRequirements(List<ContainerItemConditionData> conditions, String captureDraftId) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int index = 0;
+        for (ContainerItemConditionData raw : conditions) {
+            ContainerItemConditionData condition = raw == null ? null : raw.normalized();
+            if (condition == null) {
+                continue;
+            }
+            ItemStackMatcherData matcher = condition.matcher().normalized();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("requirementId", condition.id().isBlank() ? "logic-chain-container-" + (index + 1) : condition.id());
+            row.put("displayName", condition.name().isBlank() ? "container 捕获 " + (index + 1) : condition.name());
+            row.put("slot", condition.slot());
+            row.put("count", condition.count());
+            row.put("captureDraftId", safe(captureDraftId));
+            row.put("templateSummary", ContainerItemConditionSupport.summary(condition));
+            row.put("enabled", condition.enabled());
+            row.put("type", condition.type());
+            row.put("itemId", condition.itemId());
+            row.put("countMode", condition.countMode());
+            row.put("channel", condition.channel());
+            row.put("offChannel", condition.offChannel());
+            row.put("mode", condition.mode());
+            row.put("matcherTemplateItemId", matcher.templateItemId());
+            row.put("matcherCountMode", matcher.countMode());
+            row.put("matcherRequiredCount", matcher.requiredCount());
+            row.put("matcherTemplateCount", matcher.templateCount());
+            row.put("matcherMatchItemId", matcher.matchItemId());
+            row.put("matcherMatchDamage", matcher.matchDamage());
+            row.put("matcherMatchCustomName", matcher.matchCustomName());
+            row.put("matcherMatchLore", matcher.matchLore());
+            row.put("matcherMatchCustomData", matcher.matchCustomData());
+            row.put("matcherMatchComponents", matcher.matchComponents());
+            row.put("matcherTemplateDamage", matcher.templateDamage());
+            row.put("matcherTemplateCustomName", matcher.templateCustomName());
+            row.put("matcherTemplateLore", matcher.templateLore());
+            row.put("matcherTemplateCustomData", matcher.templateCustomData());
+            row.put("matcherTemplateComponents", matcher.templateComponents());
+            row.put("matcherSummary", matcher.templateSummary().isBlank() ? ItemStackMatcherSupport.summary(matcher) : matcher.templateSummary());
+            rows.add(row);
+            index++;
+        }
+        return List.copyOf(rows);
     }
 
     private static WebAdminWriteResult failSession(WebAdminContainerTemplateSession session, String code, String message, boolean notifyPlayer) {
@@ -477,6 +556,9 @@ public final class WebAdminContainerTemplateSessions {
         data.put("opened", session.opened);
         data.put("itemConditionCount", session.itemConditions.size());
         data.put("p3bSavesItemConditions", true);
+        data.put("logicChainDraftOnly", session.logicChainDraftOnly);
+        data.put("logicChainCaptureDraftId", session.logicChainCaptureDraftId);
+        data.put("logicChainTriggerKey", session.logicChainTriggerKey);
         return data;
     }
 

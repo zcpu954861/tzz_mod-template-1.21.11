@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.condition.state.StateVariableKey;
@@ -641,7 +642,7 @@ public final class WebAdminLogicChainService {
         stats.put("componentWeakEdgeCount", build.associationEdgeCount("weak"));
         stats.put("componentSummary", componentSummary);
         stats.put("displayNameResolver", true);
-        stats.put("displayNamePriority", "webadmin_metadata,runtime_name,channel_metadata,channel,position_or_short_id,fallback");
+        stats.put("displayNamePriority", "webadmin_metadata,runtime_name,position_or_short_id,fallback;channel_metadata_only_for_channel_cards");
         stats.put("graphModelVersion", "v2-join-layout");
         stats.put("edgeDedupeEnabled", true);
         stats.put("pathColorGroups", List.of("signal", "join", "gate", "timer", "state", "reference"));
@@ -1058,6 +1059,7 @@ public final class WebAdminLogicChainService {
                     metadata.put("displayNameSource", display.source());
                     metadata.put("fallbackReason", display.fallbackReason());
                     metadata.put("technicalSubtitle", display.subtitle());
+                    putPhysicalRuntimeMetadata(build, device, metadata);
                     result.add(addNode(build, id, "producer", "device", device.id(), display.title(), ref.label() + " · " + display.subtitle(), channel, enabled, "#/devices/" + encode(device.id()), metadata));
                     addEdge(build, id, "channel:" + channel, "emits", ref.label(), "solid");
                 }
@@ -1330,21 +1332,29 @@ public final class WebAdminLogicChainService {
             if (!includeNode(build, enabled)) {
                 continue;
             }
+            String bucket = trigger.name().toLowerCase(Locale.ROOT);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("triggerType", trigger.name());
+            metadata.put("regionBucket", bucket);
+            metadata.put("bucket", bucket);
+            metadata.put("ownerType", "region_controller");
+            metadata.put("ownerId", region.id());
             metadata.put("regionId", region.regionId());
             metadata.put("actionIndex", i);
             metadata.put("actionType", "signal");
             metadata.put("downstreamChannel", channel);
-            metadata.put("nodeKind", "reference");
             metadata.put("primaryNodeId", "action:region_controller:" + safeNodeId(region.id()) + ":" + trigger.name().toLowerCase(Locale.ROOT) + ":" + i);
             metadata.put("canonicalNodeId", "action:region_controller:" + safeNodeId(region.id()) + ":" + trigger.name().toLowerCase(Locale.ROOT) + ":" + i);
             metadata.put("aliasKind", "signal_action_producer");
             metadata.put("referenceReason", "region_signal_action_producer_alias");
+            metadata.put("regionActionOwnedAlias", true);
+            metadata.put("regionActionNoIndependentSystemColumn", true);
             String detailRoute = "#/region-controllers/" + encode(region.id());
+            String ownerNode = addRegionActionOwnerNode(build, region, channel, detailRoute);
+            metadata.put("regionActionOwnerNodeId", ownerNode);
             String visibleNode = addNode(build, id, "producer", "region_controller", region.id(), region.name().isBlank() ? region.id() : region.name(), triggerLabel(trigger) + " signal action #" + (i + 1), channel, enabled, detailRoute, metadata);
+            String pathEntryNode = id;
             boolean gatePathLinked = false;
-            String bucket = trigger.name().toLowerCase(Locale.ROOT);
             String listGate = WebAdminConditionGroupStore.normalizeId(regionConditionGroupId(region, trigger));
             if (!listGate.isBlank()) {
                 String gateNode = addGateNode(
@@ -1363,6 +1373,7 @@ public final class WebAdminLogicChainService {
                         channel,
                         detailRoute
                 );
+                pathEntryNode = gateNode;
                 visibleNode = gateNode;
             }
             String actionGate = WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
@@ -1386,6 +1397,8 @@ public final class WebAdminLogicChainService {
                 );
                 if (!visibleNode.equals(id)) {
                     addEdge(build, visibleNode, gateNode, "gate_guards", "通过后进入单条 gate", "solid");
+                } else {
+                    pathEntryNode = gateNode;
                 }
                 addEdge(build, gateNode, id, "gate_guards", "通过后发出频道", "solid");
                 gatePathLinked = true;
@@ -1394,9 +1407,33 @@ public final class WebAdminLogicChainService {
             if (!visibleNode.equals(id) && !gatePathLinked) {
                 addEdge(build, visibleNode, id, "gate_guards", "通过后执行区域 signal action", "solid");
             }
+            addEdge(build, ownerNode, pathEntryNode, "executes", triggerLabel(trigger) + " #" + (i + 1), "solid", Map.of(
+                    "regionActionOwnerEdge", true,
+                    "data-logic-chain-region-action-owner-edge", true,
+                    "ownerType", "region_controller",
+                    "ownerId", region.id(),
+                    "regionBucket", bucket,
+                    "actionIndex", i
+            ));
             result.add(visibleNode);
             addEdge(build, id, "channel:" + channel, "emits", triggerLabel(trigger), "solid");
         }
+    }
+
+    private String addRegionActionOwnerNode(GraphBuild build, RegionControllerData region, String channel, String detailRoute) {
+        String id = "producer:region_controller_owner:" + safeNodeId(region.id());
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("kind", "region_controller");
+        metadata.put("regionControllerId", region.id());
+        metadata.put("regionId", region.regionId());
+        metadata.put("regionActionOwnerNode", true);
+        metadata.put("data-logic-chain-region-action-owned-node", true);
+        metadata.put("data-logic-chain-region-action-owner-bucket-index", true);
+        metadata.put("data-logic-chain-region-action-no-independent-system-column", true);
+        metadata.put("readOnly", true);
+        String title = region.name().isBlank() ? region.id() : region.name();
+        String subtitle = "RegionController owner · " + (region.regionId().isBlank() ? "未绑定区域" : region.regionId());
+        return addNode(build, id, "producer", "region_controller", region.id(), title, subtitle, channel, region.enabled(), detailRoute, metadata);
     }
 
     private List<String> consumersFor(GraphBuild build, String channel) {
@@ -1439,10 +1476,15 @@ public final class WebAdminLogicChainService {
                 metadata.put("pos", posMap(device));
                 metadata.put("displayNameSource", display.source());
                 metadata.put("fallbackReason", display.fallbackReason());
+                metadata.put("consumerRole", "signal_receiver_sink");
+                metadata.put("signalReceiverConsumerSink", true);
+                putPhysicalRuntimeMetadata(build, device, metadata);
                 result.add(addNode(build, id, "consumer", "signal_receiver", device.id(), display.title(), "红石脉冲接收器 · " + display.subtitle(), channel, device.enabled(), "#/devices/" + encode(device.id()), metadata));
                 addEdge(build, "channel:" + channel, id, "consumes", "接收器", "solid");
             } else if (SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
-                int actionCount = device.actionCount();
+                List<ActionConfig> loadedActions = loadedActionRelayActions(build, device);
+                boolean loaded = loadedActions != null;
+                int actionCount = loaded ? loadedActions.size() : device.actionCount();
                 String id = "consumer:action_relay:" + safeNodeId(device.id());
                 if (!includeNode(build, device.enabled())) {
                     continue;
@@ -1451,13 +1493,22 @@ public final class WebAdminLogicChainService {
                 LogicNodeDisplayName display = deviceDisplayName(build, device, channel);
                 Map<String, Object> metadata = new LinkedHashMap<>();
                 metadata.put("actionCount", actionCount);
-                metadata.put("loaded", false);
-                metadata.put("actionRelayActionsSummaryOnly", true);
-                metadata.put("gateVisibility", "snapshot_summary_only");
-                metadata.put("readOnlySnapshotOnly", true);
+                metadata.put("snapshotActionCount", device.actionCount());
+                metadata.put("loaded", loaded);
+                metadata.put("actionsReadable", loaded);
+                metadata.put("actionsEditable", loaded);
+                metadata.put("actionRelayLoadedExactObject", loaded);
+                metadata.put("actionRelayExactObjectReadOnlyNoForceLoad", true);
+                metadata.put("actionRelayActionsSummaryOnly", !loaded);
+                metadata.put("gateVisibility", loaded ? "loaded_exact_object" : "snapshot_summary_only");
+                metadata.put("readOnlySnapshotOnly", !loaded);
+                metadata.put("loadedState", loaded ? "ready" : "summary_only_unloaded");
                 metadata.put("pos", posMap(device));
                 metadata.put("displayNameSource", display.source());
                 metadata.put("fallbackReason", display.fallbackReason());
+                metadata.put("consumerRole", "action_relay_executor");
+                metadata.put("actionRelayConsumerExecutor", true);
+                putPhysicalRuntimeMetadata(build, device, metadata);
                 addNode(build, id, "consumer", "action_relay", device.id(), display.title(), actionCount + " 个动作 · " + display.subtitle(), channel, device.enabled(), detailRoute, metadata);
                 result.add(id);
                 addEdge(build, "channel:" + channel, id, "consumes", "动作继电器", "solid");
@@ -1521,11 +1572,47 @@ public final class WebAdminLogicChainService {
             if (!SignalChannel.normalize(device.channel()).equals(channel) || !SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type())) {
                 continue;
             }
-            if (device.actionCount() > 0) {
-                build.warnings.add("动作继电器 " + deviceDisplayName(build, device, channel).title() + " 未加载，无法展开其动作列表；动作详情存放在方块实体中，8.13 只读图谱不直接读取 live world，已保留摘要节点。");
+            List<ActionConfig> loadedActions = loadedActionRelayActions(build, device);
+            if (loadedActions != null) {
+                addConsumerActions(build, result, "consumer:action_relay:" + safeNodeId(device.id()), loadedActions, "action_relay", device.id(), deviceDisplayName(build, device, channel).title(), device.channel(), device.enabled(), "#/devices/" + encode(device.id()));
+            } else if (device.actionCount() > 0) {
+                build.warnings.add("动作继电器 " + deviceDisplayName(build, device, channel).title() + " 当前没有可读取的已加载方块实体；图谱保留 store 摘要，Action 列表详情会通过安全的 ActionRelay actions API 再次检查 world / chunk / block entity。");
             }
         }
         return List.copyOf(result);
+    }
+
+    private static List<ActionConfig> loadedActionRelayActions(GraphBuild build, SignalDeviceData device) {
+        ActionRelayBlockEntity relay = build == null || build.snapshot == null
+                ? null
+                : SignalDeviceStore.getLoadedActionRelay(build.snapshot.server(), device);
+        if (relay == null) {
+            return null;
+        }
+        return relay.actions() == null ? List.of() : List.copyOf(relay.actions());
+    }
+
+    private static void putPhysicalRuntimeMetadata(GraphBuild build, SignalDeviceData device, Map<String, Object> metadata) {
+        if (build == null || build.snapshot == null || device == null || metadata == null) {
+            return;
+        }
+        boolean present = switch (device.type()) {
+            case SignalDeviceData.TYPE_SIGNAL_EMITTER -> SignalDeviceStore.getLoadedEmitter(build.snapshot.server(), device) != null;
+            case SignalDeviceData.TYPE_SIGNAL_RECEIVER -> SignalDeviceStore.getLoadedReceiver(build.snapshot.server(), device) != null;
+            case SignalDeviceData.TYPE_ACTION_RELAY -> SignalDeviceStore.getLoadedActionRelay(build.snapshot.server(), device) != null;
+            default -> true;
+        };
+        metadata.put("physicalDeviceRefreshChecked", true);
+        metadata.put("physicalDeviceMissingRefresh", !present);
+        if (!present) {
+            metadata.put("runtimeState", "missing_or_broken");
+            metadata.put("runtimeStatus", "MISSING");
+            metadata.put("runtimeDoctorStatus", "ERROR");
+            metadata.put("missingBroken", true);
+            metadata.put("stale", true);
+            metadata.put("saveBlockedWhenMissing", true);
+            metadata.put("logicChainPhysicalDeviceMissingRefresh", true);
+        }
     }
 
     private void addConsumerActions(
@@ -1724,14 +1811,6 @@ public final class WebAdminLogicChainService {
         }
         if (!safe(safeDevice.name()).isBlank()) {
             return new LogicNodeDisplayName(safeDevice.name(), deviceTechnicalSubtitle(safeDevice, channel), "device.name", "");
-        }
-        LogicNodeDisplayName channelName = channelDisplayName(build, channel, "");
-        if (!SignalChannel.normalize(channel).isBlank() && !"channel".equals(channelName.source())) {
-            return new LogicNodeDisplayName(channelName.title(), deviceTechnicalSubtitle(safeDevice, channel), "channel_metadata.displayName", "device_name_blank");
-        }
-        String safeChannel = SignalChannel.normalize(channel);
-        if (!safeChannel.isBlank()) {
-            return new LogicNodeDisplayName(safeChannel, deviceTechnicalSubtitle(safeDevice, channel), "channel", "device_name_blank");
         }
         String pos = devicePositionLabel(safeDevice);
         if (!pos.isBlank()) {
@@ -2362,6 +2441,8 @@ public final class WebAdminLogicChainService {
         }
         WebAdminDtos.LogicChainNodeDto existing = build.nodes.get(id);
         if (existing == null) {
+            String runtimeStatus = enrichedMetadata.get("runtimeStatus") == null ? "" : String.valueOf(enrichedMetadata.get("runtimeStatus")).trim();
+            String runtimeDoctorStatus = enrichedMetadata.get("runtimeDoctorStatus") == null ? "" : String.valueOf(enrichedMetadata.get("runtimeDoctorStatus")).trim();
             build.nodes.put(id, new WebAdminDtos.LogicChainNodeDto(
                     id,
                     type,
@@ -2371,8 +2452,8 @@ public final class WebAdminLogicChainService {
                     safe(subtitle),
                     SignalChannel.normalize(channel),
                     enabled,
-                    enabled ? "OK" : "DISABLED",
-                    enabled ? "OK" : "WARNING",
+                    runtimeStatus.isBlank() ? (enabled ? "OK" : "DISABLED") : runtimeStatus,
+                    runtimeDoctorStatus.isBlank() ? (enabled ? "OK" : "WARNING") : runtimeDoctorStatus,
                     latestTime(channel),
                     safe(detailRoute),
                     Map.copyOf(enrichedMetadata)
@@ -3468,7 +3549,7 @@ public final class WebAdminLogicChainService {
             case MESSAGE -> "消息";
             case SOUND -> "音效";
             case SIGNAL -> "发出频道";
-            case STATE_VARIABLE -> "状态变量";
+            case STATE_VARIABLE -> "状态变量动作";
             case TIMER_START -> "启动 Timer";
             case TIMER_CANCEL -> "取消 Timer";
         };

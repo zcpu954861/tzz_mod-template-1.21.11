@@ -8,6 +8,8 @@ import com.zcpu.tzzmod.condition.state.StateVariableSnapshot;
 import com.zcpu.tzzmod.condition.state.StateVariableStore.StateVariableLoadResult;
 import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
 import com.zcpu.tzzmod.condition.state.StateVariableType;
+import com.zcpu.tzzmod.region.RegionControllerData;
+import com.zcpu.tzzmod.region.RegionTargetFilter;
 import com.zcpu.tzzmod.scheduler.TimerDefinition;
 import com.zcpu.tzzmod.scheduler.TimerStartPolicy;
 import com.zcpu.tzzmod.scheduler.TimerTargetMode;
@@ -135,6 +137,8 @@ public final class WebAdminLogicChainServiceTest {
         requireLogicChainMetadataRootChannelRoundtripContract();
         requireComponentAwareJoinTraversalFromAnyRoot();
         requireSignalActionOutputPlacement();
+        requireWorldDeviceConsumersStayOnChannelRightSide();
+        requireRegionSignalActionOwnerGraph();
         requireLargeComponentTruncation();
         requireGraphModelV2Dedupe();
         requireComponentListEntryGrouping();
@@ -333,8 +337,8 @@ public final class WebAdminLogicChainServiceTest {
                 3
         );
         WebAdminDtos.LogicChainNodeDto fallbackProducer = requireNodeId(fallbackGraph, "producer:device:device.alpha:channel", "fallback device producer visible");
-        requireEquals("display.channel", fallbackProducer.label(), "raw channel is used before position or short id fallback");
-        requireEquals("channel", fallbackProducer.metadata().get("displayNameSource"), "fallback metadata records raw channel source");
+        requireEquals("minecraft:overworld 12 64 -7", fallbackProducer.label(), "producer fallback uses object identity instead of downstream channel display name");
+        requireEquals("device.position", fallbackProducer.metadata().get("displayNameSource"), "fallback metadata records object-position display source");
     }
 
     private static SignalListenerData listener() {
@@ -427,6 +431,41 @@ public final class WebAdminLogicChainServiceTest {
         requireEquals("v2-join-layout", graph.stats().get("graphModelVersion"), "graph stats expose V2 Join layout model");
         requireEquals(Boolean.TRUE, graph.stats().get("edgeDedupeEnabled"), "graph stats expose edge dedupe");
         requireGraphModelV2DedupeFromSharedInput();
+    }
+
+    private static void requireRegionSignalActionOwnerGraph() {
+        WebAdminDtos.LogicChainGraphDto graph = WebAdminLogicChainService.graphForSnapshotForTest(
+                "region.out",
+                List.of(),
+                List.of(),
+                List.of(regionController()),
+                List.of(),
+                List.of(),
+                new StateVariableLoadResult(StateVariableSnapshot.empty(), false, "", false),
+                true,
+                3
+        );
+        WebAdminDtos.LogicChainNodeDto owner = requireNodeId(graph, "producer:region_controller_owner:region.ctrl", "RegionController owner node is visible upstream");
+        requireEquals("region_controller", owner.refType(), "owner node keeps RegionController ref type");
+        requireEquals(Boolean.TRUE, owner.metadata().get("regionActionOwnerNode"), "owner node has repair marker");
+        WebAdminDtos.LogicChainNodeDto action = requireNodeId(graph, "producer:region_controller:region.ctrl:enter:0", "Region signal action alias is visible");
+        requireEquals("primary", action.metadata().get("nodeKind"), "Region signal action alias is a traversable owned action card, not a visual-only reference card");
+        requireEquals("region_signal_action_producer_alias", action.metadata().get("referenceReason"), "Region signal action keeps alias reason for same-index matching");
+        requireEquals("region_controller", action.metadata().get("ownerType"), "Region signal action carries owner type");
+        requireEquals("region.ctrl", action.metadata().get("ownerId"), "Region signal action carries owner id");
+        requireEquals("enter", action.metadata().get("regionBucket"), "Region signal action carries normalized bucket");
+        requireEquals(0, action.metadata().get("actionIndex"), "Region signal action carries same-index action index");
+        requireEquals(Boolean.TRUE, action.metadata().get("regionActionOwnedAlias"), "Region signal action has owned alias marker");
+        requireEdge(graph, owner.id(), action.id(), "executes", "Region owner executes the signal action");
+        requireEdge(graph, action.id(), "channel:region.out", "emits", "Region action emits to downstream channel");
+        for (WebAdminDtos.LogicChainEdgeDto edge : graph.edges()) {
+            if (owner.id().equals(edge.from()) && action.id().equals(edge.to())) {
+                requireEquals(Boolean.TRUE, edge.metadata().get("regionActionOwnerEdge"), "owner edge carries repair marker");
+                requireEquals(false, edge.referenceEdge(), "owner edge is not a weak reference edge");
+                return;
+            }
+        }
+        throw new AssertionError("Region owner edge metadata missing");
     }
 
     private static void requireGraphModelV2DedupeFromSharedInput() {
@@ -576,9 +615,85 @@ public final class WebAdminLogicChainServiceTest {
         requireEquals(0, countNodeIdsContaining(consumerGraph, "producer:listener:producer-terminal"), "signal action with consumers does not create far-left listener producer alias");
     }
 
+    private static void requireWorldDeviceConsumersStayOnChannelRightSide() {
+        SignalDeviceData receiver = signalDevice("receiver.alpha", SignalDeviceData.TYPE_SIGNAL_RECEIVER, "device.in", 0);
+        SignalDeviceData relay = signalDevice("relay.alpha", SignalDeviceData.TYPE_ACTION_RELAY, "device.in", 2);
+        WebAdminDtos.LogicChainGraphDto graph = WebAdminLogicChainService.graphForSnapshotForTest(
+                "device.in",
+                List.of(receiver, relay),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                new StateVariableLoadResult(StateVariableSnapshot.empty(), false, "", false),
+                true,
+                3
+        );
+
+        WebAdminDtos.LogicChainNodeDto receiverNode = requireNodeId(graph, "consumer:receiver:receiver.alpha", "SignalReceiver is a channel-side consumer node");
+        requireEquals("consumer", receiverNode.type(), "SignalReceiver must not render as a producer/source card");
+        requireEquals("signal_receiver", receiverNode.refType(), "SignalReceiver keeps typed world-device identity");
+        requireEquals("signal_receiver_sink", receiverNode.metadata().get("consumerRole"), "SignalReceiver exposes sink semantics");
+        requireEquals(Boolean.TRUE, receiverNode.metadata().get("signalReceiverConsumerSink"), "SignalReceiver exposes consumer sink marker");
+        requireEdge(graph, "channel:device.in", receiverNode.id(), "consumes", "SignalReceiver edge direction is channel -> receiver");
+
+        WebAdminDtos.LogicChainNodeDto relayNode = requireNodeId(graph, "consumer:action_relay:relay.alpha", "ActionRelay is a channel-side consumer node");
+        requireEquals("consumer", relayNode.type(), "ActionRelay must not render as a producer/source card");
+        requireEquals("action_relay", relayNode.refType(), "ActionRelay keeps typed world-device identity");
+        requireEquals("action_relay_executor", relayNode.metadata().get("consumerRole"), "ActionRelay exposes executor semantics");
+        requireEquals(Boolean.TRUE, relayNode.metadata().get("actionRelayConsumerExecutor"), "ActionRelay exposes consumer executor marker");
+        requireEdge(graph, "channel:device.in", relayNode.id(), "consumes", "ActionRelay edge direction is channel -> relay");
+
+        requireEquals(0, countNodeIdsContaining(graph, "producer:device:receiver.alpha"), "SignalReceiver must not also create a producer alias");
+        requireEquals(0, countNodeIdsContaining(graph, "producer:device:relay.alpha"), "ActionRelay must not also create a producer alias");
+    }
+
+    private static SignalDeviceData signalDevice(String id, String type, String channel, int actionCount) {
+        return new SignalDeviceData(
+                id,
+                type,
+                id,
+                "minecraft:overworld",
+                1,
+                64,
+                1,
+                channel,
+                true,
+                SignalDeviceData.DEFAULT_RECEIVER_PULSE_TICKS,
+                0,
+                0,
+                actionCount,
+                0L,
+                0L,
+                0L,
+                0L,
+                "",
+                "",
+                "",
+                "",
+                false,
+                0
+        ).normalized();
+    }
+
     private static SignalListenerData downstreamListener() {
         ActionConfig signal = new ActionConfig(ActionType.SIGNAL, "after.c", true, false, 0, false, "");
         return new SignalListenerData("listener.out", "输出监听器", "out.c", true, 0, "", List.of(signal)).normalized();
+    }
+
+    private static RegionControllerData regionController() {
+        ActionConfig signal = new ActionConfig(ActionType.SIGNAL, "region.out", true, false, 0, false, "");
+        return new RegionControllerData(
+                "region.ctrl",
+                "区域控制器",
+                "arena.region",
+                true,
+                RegionTargetFilter.all(),
+                100,
+                List.of(signal),
+                List.of(),
+                List.of()
+        ).normalized();
     }
 
     private static SignalListenerData upstreamSignalProducer(String id, String ownerChannel, String outputChannel) {

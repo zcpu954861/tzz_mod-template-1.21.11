@@ -27,6 +27,14 @@ public final class WebAdminContainerTemplateSession {
     public final WebAdminSession actorSession;
     public final WebAdminWriteContext context;
     public final List<Map<String, Object>> itemConditions;
+    public final boolean logicChainDraftOnly;
+    public final String logicChainCaptureDraftId;
+    public final String logicChainEditLockId;
+    public final String logicChainRootType;
+    public final String logicChainRootRef;
+    public final String logicChainDraftNodeId;
+    public final String logicChainTriggerKey;
+    public final int logicChainRequirementIndex;
     public boolean opened;
     public boolean terminal;
 
@@ -49,7 +57,15 @@ public final class WebAdminContainerTemplateSession {
             WebAdminUser actorUser,
             WebAdminSession actorSession,
             WebAdminWriteContext context,
-            List<Map<String, Object>> itemConditions
+            List<Map<String, Object>> itemConditions,
+            boolean logicChainDraftOnly,
+            String logicChainCaptureDraftId,
+            String logicChainEditLockId,
+            String logicChainRootType,
+            String logicChainRootRef,
+            String logicChainDraftNodeId,
+            String logicChainTriggerKey,
+            int logicChainRequirementIndex
     ) {
         this.sessionId = sessionId == null ? "" : sessionId;
         this.nonce = nonce == null ? "" : nonce;
@@ -70,5 +86,13 @@ public final class WebAdminContainerTemplateSession {
         this.actorSession = actorSession;
         this.context = context;
         this.itemConditions = itemConditions == null ? List.of() : List.copyOf(itemConditions);
+        this.logicChainDraftOnly = logicChainDraftOnly;
+        this.logicChainCaptureDraftId = logicChainCaptureDraftId == null ? "" : logicChainCaptureDraftId;
+        this.logicChainEditLockId = logicChainEditLockId == null ? "" : logicChainEditLockId;
+        this.logicChainRootType = logicChainRootType == null ? "" : logicChainRootType;
+        this.logicChainRootRef = logicChainRootRef == null ? "" : logicChainRootRef;
+        this.logicChainDraftNodeId = logicChainDraftNodeId == null ? "" : logicChainDraftNodeId;
+        this.logicChainTriggerKey = logicChainTriggerKey == null ? "" : logicChainTriggerKey;
+        this.logicChainRequirementIndex = logicChainRequirementIndex;
     }
 }

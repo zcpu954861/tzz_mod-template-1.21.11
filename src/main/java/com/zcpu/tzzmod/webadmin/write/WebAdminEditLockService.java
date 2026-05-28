@@ -32,6 +32,7 @@ public final class WebAdminEditLockService {
     public static final String TARGET_TEMPLATE_STORE = "template_store";
     public static final String TARGET_TEMPLATE_APPLY = "template_apply";
     public static final String TARGET_CONDITION_GROUP = "condition_group";
+    public static final String TARGET_STATE_VARIABLE = "state_variable";
     public static final String TARGET_SIGNAL_LISTENER_BASIC_CONFIG = "signal_listener_basic_config";
     public static final String TARGET_SIGNAL_LISTENER_ACTIONS = "signal_listener_actions";
     public static final String TARGET_SIGNAL_JOIN_CONFIG = "signal_join_config";
@@ -565,6 +566,9 @@ public final class WebAdminEditLockService {
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return "条件组";
         }
+        if (TARGET_STATE_VARIABLE.equals(safeTargetType)) {
+            return "状态变量定义";
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return "Signal Listener 基础配置";
         }
@@ -650,6 +654,9 @@ public final class WebAdminEditLockService {
         if (TARGET_CONDITION_GROUP.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_CONDITION_GROUP;
         }
+        if (TARGET_STATE_VARIABLE.equals(safeTargetType)) {
+            return WebAdminOperationType.EDIT_STATE_VARIABLE;
+        }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(safeTargetType)) {
             return WebAdminOperationType.EDIT_SIGNAL_LISTENER_BASIC_CONFIG;
         }
@@ -689,6 +696,9 @@ public final class WebAdminEditLockService {
         }
         if (TARGET_CONDITION_GROUP.equals(lock.targetType())) {
             return "#/condition-groups/" + encode(lock.targetId());
+        }
+        if (TARGET_STATE_VARIABLE.equals(lock.targetType())) {
+            return "#/state-variables/" + encode(lock.targetId());
         }
         if (TARGET_SIGNAL_LISTENER_BASIC_CONFIG.equals(lock.targetType())) {
             return "#/signals";

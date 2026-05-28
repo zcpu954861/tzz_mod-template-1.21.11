@@ -30,6 +30,7 @@ import com.zcpu.tzzmod.signal.device.item.InteractionItemVanillaPolicy;
 import com.zcpu.tzzmod.signal.device.item.InventoryConsumeOrder;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherData;
 import com.zcpu.tzzmod.signal.device.item.ItemStackMatcherSupport;
+import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionSessions;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -206,6 +207,9 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeBind(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "绑定频道")) {
+            return 0;
+        }
         LoadedDevice loadedDevice = getDeviceAt(source, pos);
         if (loadedDevice == null) {
             return 0;
@@ -237,6 +241,9 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeName(ServerCommandSource source, BlockPos pos, String rawName) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "命名")) {
+            return 0;
+        }
         String name = SignalDeviceStore.cleanUserText(rawName);
         if (name.isBlank()) {
             sendError(source, Text.literal("设备名称不能为空。"));
@@ -272,6 +279,13 @@ public final class SignalDeviceCommand {
     private static int executeClearName(ServerCommandSource source, String deviceRef) {
         SignalDeviceStore.ResolveResult resolved = resolveDevice(source, deviceRef);
         if (!resolved.foundUnique()) {
+            return 0;
+        }
+
+        SignalDeviceData resolvedDevice = resolved.device();
+        ServerWorld deviceWorld = SignalDeviceStore.getDeviceWorld(source.getServer(), resolvedDevice);
+        BlockPos devicePos = new BlockPos(resolvedDevice.x(), resolvedDevice.y(), resolvedDevice.z());
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, deviceWorld, devicePos, "清空名称")) {
             return 0;
         }
 
@@ -459,6 +473,9 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeTest(ServerCommandSource source, BlockPos pos) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "测试或触发")) {
+            return 0;
+        }
         LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
         if (loadedDevice == null) {
             SignalDeviceData virtualDevice = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);
@@ -505,6 +522,9 @@ public final class SignalDeviceCommand {
     }
 
     private static int executeSetEnabled(ServerCommandSource source, BlockPos pos, boolean enabled) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, enabled ? "启用" : "禁用")) {
+            return 0;
+        }
         LoadedDevice loadedDevice = findLoadedDeviceAt(source, pos);
         if (loadedDevice == null) {
             SignalDeviceData virtualDevice = SignalDeviceStore.findVirtualBlockDevice(source.getServer(), source.getWorld(), pos);

@@ -175,6 +175,31 @@ public final class SignalDeviceStore {
         return updated;
     }
 
+    public static synchronized SignalDeviceData createVirtualBlockIfAbsent(ServerWorld world, BlockPos pos, String channel) {
+        State state = getState(world.getServer());
+        SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));
+        if (existing != null) {
+            return null;
+        }
+        VirtualBlockPowerState powerState = VirtualBlockDeviceSupport.powerState(world, pos);
+        SignalDeviceData created = fromVirtualBlock(
+                world,
+                pos,
+                null,
+                SignalChannel.normalize(channel),
+                "",
+                VirtualBlockDeviceMode.REDSTONE_RISING.id(),
+                true,
+                powerState,
+                false,
+                ""
+        );
+        replaceOrAdd(state, created);
+        state.markDirty();
+        publishDeviceChange(WebAdminRealtimeEventType.DEVICE_REGISTERED, created);
+        return created;
+    }
+
     public static synchronized SignalDeviceData updateVirtualOffChannel(ServerWorld world, BlockPos pos, String offChannel) {
         State state = getState(world.getServer());
         SignalDeviceData existing = findById(state, VirtualBlockDeviceSupport.id(world, pos));

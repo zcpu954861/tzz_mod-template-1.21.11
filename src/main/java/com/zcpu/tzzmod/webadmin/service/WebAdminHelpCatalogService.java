@@ -12,7 +12,7 @@ public final class WebAdminHelpCatalogService {
         List<Map<String, Object>> troubleshooting = troubleshooting();
         List<Map<String, Object>> glossary = glossary();
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("version", "8.20-pre9-stabilization");
+        data.put("version", "9.1-logic-chain-global-editor-completion");
         data.put("title", "WebAdmin Help / Example Center");
         data.put("readOnly", true);
         data.put("noWriteApi", true);
@@ -37,13 +37,13 @@ public final class WebAdminHelpCatalogService {
                 "full Logic Chain Editor deferred",
                 "Scratch editor deferred",
                 "if / else runtime deferred",
-                "old node move / delete / reorder deferred",
-                "old action delete / reorder deferred",
-                "world entity in-editor draft create and binding deferred",
+                "old node arbitrary move / reorder deferred；typed-owned node delete is Logic Chain draft-only",
+                "old action arbitrary cross-bucket move deferred；delete / same-bucket reorder are Logic Chain draft-only",
+                "world entity freeform create deferred；client-assisted protected draft binding required",
                 "placeholder binding apply deferred",
                 "component export deferred",
-                "ConditionGroup apply deferred",
-                "StateVariable definition apply deferred",
+                "ConditionGroup template apply deferred",
+                "StateVariable definition template apply deferred",
                 "external reference fail closed",
                 "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
                 "raw JSON editor deferred",
@@ -56,6 +56,7 @@ public final class WebAdminHelpCatalogService {
                 "StateVariable 保存状态。",
                 "Logic Chain Viewer 的顺序是可视化顺序，不是全局执行顺序。",
                 "Logic Chain Editor 保存 typed config，不保存假图。",
+                "9.1 补齐受控配置入口，不是 freeform graph document save 或 Game Program AST。",
                 "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。"
         ));
         data.put("counts", map(
@@ -140,7 +141,7 @@ public final class WebAdminHelpCatalogService {
                 ),
                 sections(
                         section("Gate", "监听器级 conditionGroupId 是列表级 runtime gate。", "单条 Action 也可以有 action gate；gate false 只跳过对应层级，不改其它 runtime。"),
-                        section("受控编辑", "已有 SignalListener 的基础配置可受控编辑；同 index Action 替换仅限 SignalListener / Timer action bucket。", "ActionRelay / Region 旧 Action 仍只读或只支持追加；旧 action 删除 / 重排仍 deferred。")
+                        section("受控编辑", "已有 SignalListener 的基础配置可受控编辑；同 index Action 替换覆盖 SignalListener、Timer bucket、ActionRelay 和 Region enter / exit / stay。", "已有节点维护页直接显示 Action 列表层的编辑、禁用、删除、上移和下移入口；单个 Action 编辑页只维护内容字段。", "新建未保存的虚拟监听器、ActionRelay 世界设备引用和 RegionController 也可以先维护 draft Action 面板，保存前不会写入真实 action list。", "ActionRelay draft action 只有在存在 channel -> ActionRelay 上游连接后才渲染和新增。", "ActionRelay loaded exact object 只读已加载方块实体，不强制加载区块。", "未加载 ActionRelay 只显示 readonly/deferred detail，不保存 fake action。", "Region owner -> action -> downstream channel 会显示 RegionController owner、动作和输出频道，owner 会跟随 action group。", "Action 删除和同 bucket 重排只作为 Logic Chain draft 提交，最终保存前不修改真实 action list。")
                 ),
                 List.of("example.listener-message", "example.listener-state-variable"),
                 List.of("trouble.listener-action-not-executed", "trouble.condition-not-selectable"),
@@ -160,7 +161,7 @@ public final class WebAdminHelpCatalogService {
                         section("常见误区", "Action 列表为空时，信号已经触发但不会有后续效果。")
                 ),
                 sections(
-                        section("边界", "帮助中心不新增 ActionType。", "旧 action 任意删除、移动、重排仍 deferred。"),
+                        section("边界", "帮助中心不新增 ActionType。", "Action 删除 / 重排仅限受控 owner/bucket/index 草稿，不允许跨 source/bucket 任意移动。"),
                         section("Gate", "单条 action gate false 时只跳过当前 action，不会改写其它 action 或父列表。")
                 ),
                 List.of("example.listener-message", "example.listener-state-variable", "example.condition-controls-action"),
@@ -198,8 +199,8 @@ public final class WebAdminHelpCatalogService {
                 List.of("StateVariable", "GLOBAL", "PLAYER", "state action"),
                 sections(
                         section("这是什么", "StateVariable 保存状态。", "条件可以读取它，state_variable action 可以受控写入它。"),
-                        section("最简单怎么用", "给监听器添加 state_variable 动作。", "触发后到状态变量页面确认当前值。", "再用条件组读取该变量。"),
-                        section("常见误区", "状态变量页面是只读结果页，不是变量定义管理器。")
+                        section("最简单怎么用", "在状态变量页面新建 GLOBAL 或 PLAYER 变量定义。", "给监听器添加 state_variable 动作。", "触发后到状态变量页面确认当前值，再用条件组读取该变量。"),
+                        section("常见误区", "状态变量定义编辑只支持现有 GLOBAL / PLAYER scope 和 BOOLEAN / INTEGER / STRING type；已有变量的 scope / targetId / key 是稳定 ID。")
                 ),
                 sections(
                         section("边界", "当前支持 GLOBAL / PLAYER scope，不支持 TEAM / REGION / DEVICE / GAME scope。", "变量变化不会自动 emit signal。"),
@@ -224,7 +225,7 @@ public final class WebAdminHelpCatalogService {
                 ),
                 sections(
                         section("运行语义", "Join 是 SignalBridge 的 passive observer。", "pending / latched state 保存在内存中，重启后清空。"),
-                        section("编辑边界", "当前可受控编辑输入 / 输出和基础字段。", "旧节点任意移动、删除、重排仍 deferred。")
+                        section("编辑边界", "当前可受控编辑输入 / 输出和基础字段。", "typed-owned 节点删除必须走 Logic Chain draft、确认、lock 和 fingerprint；引用节点不能直接删除。")
                 ),
                 List.of("example.join-two-inputs", "example.template-join-timer-listener"),
                 List.of("trouble.join-no-output"),
@@ -282,12 +283,12 @@ public final class WebAdminHelpCatalogService {
                 List.of("Logic Chain Editor", "draft", "edit lock"),
                 sections(
                         section("这是什么", "它是受控编辑入口，不是完整图编程器。"),
-                        section("当前能做", "新增 Join / Timer / channel endpoint。", "受控编辑已有 Channel metadata、Join、Timer、SignalListener 基础配置；同 index Action 仅限 SignalListener / Timer action bucket。"),
-                        section("常见误区", "旧节点不能任意移动、删除、重排。", "旧 action 不能任意删除、重排。")
+                        section("当前能做", "新增 Join / Timer / channel endpoint / virtual SignalListener。", "World Device Reference、RegionController 和 VBD 可选择并进入 protected draft 客户端辅助流程，缺目标玩家、session、权限或锁时会在启动时提示。", "受控编辑已有 Channel metadata、Join、Timer、SignalListener 基础配置、StateVariable definition。", "已有 VBD 节点会打开触发项卡片编辑面板，itemSubmit / container 位于对应触发项二级页。", "原生触发启用、频道、冷却 / 间隔和条件组字段会作为 Logic Chain draft 保存；未保存摘要显示中文触发项变更而不是主行 raw JSON，触发项输出频道会立即更新 VBD -> Channel draft 连线。", "同一个 VBD 触发项用稳定 triggerKey 更新原触发项表示，不新增重复卡，也只连接该触发项配置的目标频道。", "itemSubmit 放在右键交互触发页，container 放在容器内容变化触发页；捕获完成后回填当前 draft，取消 / 失败后可在上下文仍有效时从 modal 重新捕获。", "设备输入 / 输出频道由 Logic Chain 图连接接管：SignalEmitter 使用输出频道，SignalReceiver / ActionRelay 使用 channel -> device 的输入 consumes 频道；signal action 目标频道仍使用已有频道 combobox。", "同 index Action 覆盖、删除和同 bucket 重排覆盖 SignalListener、Timer bucket、ActionRelay 和 Region enter / exit / stay；选中 action card 也可从右侧加入删除草稿。", "Draft owner 新增 action 后会立即在图中渲染 action card；新增或连接卡片后可继续点击其它卡片，普通卡片点击会退出连接模式并切换详情。", "ActionRelay draft action 需要先建立 channel -> ActionRelay 上游连接，pending-delete 节点和 action 会变灰并显示待删除。", "StateVariable action-first visual 会把状态写入显示为动作卡，而不是 StateVariable definition。", "不可编辑的可见节点会显示 readonly detail、跳转、定位主节点或 deferred reason。"),
+                        section("常见误区", "旧节点不能任意移动或重排；typed-owned 删除需要确认和草稿保存。", "旧 action 不能跨 source/bucket 任意移动；删除和同 bucket 重排保存前都是草稿。", "同一个编辑会话可以累计多个草稿；只有互相冲突的 owner/bucket 写入会在保存前被列为 validation。")
                 ),
                 sections(
-                        section("保存语义", "保存写入真实配置服务：SignalJoin、Timer、SignalListener、Channel metadata、ActionConfig。", "后端 validation、edit lock、expectedFingerprint 都必须通过。"),
-                        section("Deferred", "full Logic Chain Editor、Scratch editor、if / else runtime、世界实体草稿创建和回滚都 deferred。")
+                        section("保存语义", "保存写入真实配置服务：SignalJoin、Timer、SignalListener、Channel metadata、StateVariable definition、ActionConfig、VBD protected draft、World Device Reference protected draft 和 RegionController protected draft。", "World Device Reference 与 RegionController 已接入 typed commit / rollback adapter；失败会保留可重试 protected draft 或回滚新建对象。", "后端 validation、edit lock、expectedFingerprint 都必须通过。", "Logic Chain 主锁只保护编辑会话；涉及具体 target 的草稿会在创建时获取 / 校验 target lock，并在保存前再次预检。"),
+                        section("Deferred", "full Logic Chain Editor、Scratch editor、if / else runtime、freeform graph document save、任意世界实体复制和自动结构放置都 deferred。", "World Device Reference / RegionController 只允许 protected draft 进入保存；正式 commit adapter 已接入真实 typed store，仍需真实 Minecraft 客户端人工验收三格 hotbar、取消清理和 Region 点线体验。")
                 ),
                 List.of("example.editor-draft-join-timer"),
                 List.of("trouble.editor-save-failed", "trouble.readonly-nodes"),
@@ -307,7 +308,7 @@ public final class WebAdminHelpCatalogService {
                         section("常见误区", "导入 JSON 不等于应用。", "模板不会自动复制世界方块、区域或设备。")
                 ),
                 sections(
-                        section("安全边界", "placeholder binding apply deferred。", "ConditionGroup apply deferred。", "StateVariable definition apply deferred。", "component export deferred。", "external reference fail closed。"),
+                        section("安全边界", "placeholder binding apply deferred。", "ConditionGroup template apply deferred。", "StateVariable definition template apply deferred。", "component export deferred。", "external reference fail closed。"),
                         section("写入顺序", "apply 走现有权限、CSRF、edit lock、expectedFingerprint、audit 和 realtime。")
                 ),
                 List.of("example.template-join-timer-listener", "example.template-import-vs-apply"),
@@ -362,16 +363,16 @@ public final class WebAdminHelpCatalogService {
         topics.add(topic(
                 "device-trigger.references",
                 "设备、VBD、ActionRelay、Region、SignalReceiver",
-                "这些模块连接世界触发和信号系统；帮助中心只做说明，不新增世界实体创建能力。",
+                "这些模块连接世界触发和信号系统；Logic Chain 只能通过受保护草稿和已有 typed 写入路径接入它们。",
                 "device",
                 List.of("VBD", "ActionRelay", "Region", "SignalReceiver", "world entity"),
                 sections(
-                        section("这是什么", "VBD 可以把虚拟方块交互、红石或容器事件转换成 signal。", "ActionRelay block 可保存动作列表。", "SignalReceiver 可输出红石脉冲。"),
-                        section("最简单怎么用", "先从设备页确认绑定和频道。", "再从频道详情看是否有消费者。"),
-                        section("常见误区", "世界实体在 Logic Chain Editor 内创建 / 绑定仍是后续能力。")
+                        section("这是什么", "VBD 可以把虚拟方块交互、红石或容器事件转换成 signal。", "SignalEmitter 是 producer/source；SignalReceiver 是 channel consumer / sink；ActionRelay 是 channel consumer / action executor。", "ActionRelay block 可保存动作列表；图中 downstream action 渲染以前置 channel -> ActionRelay 连接为准。"),
+                        section("最简单怎么用", "先从设备页确认绑定和频道。", "再从频道详情看是否有消费者。", "在 Logic Chain 编辑模式里选择 World Device Reference 或 VBD，并填写目标玩家启动 protected draft。", "保存后的 SignalEmitter / SignalReceiver / ActionRelay 卡片可在 Logic Chain 内编辑 displayName、note、enabled 和 icon 等安全字段；频道关系通过图连接重连。"),
+                        section("常见误区", "世界实体不能在 Logic Chain Editor 内手写坐标或 fake-create；必须通过 protected draft / 客户端辅助选择或放置。", "SignalReceiver / ActionRelay 在图上位于频道右侧，连接方向是 channel -> device，不是左侧触发源；缺少上游频道会报告接收频道缺失，不再要求 output channel。", "已有 VBD 节点会打开触发项卡片编辑面板，原生触发字段、itemSubmit 和 container 都在对应触发页内，保存 Logic Chain 前都只是 draft；触发项频道变化会先更新图中的草稿边，不会提前写正式 VBD。", "编辑已有 VBD 触发项不是新增触发项卡；图上只保留该触发项目标频道的草稿边，主频道 / 旧频道不会作为额外输出。", "itemSubmit / container 游戏内保存成功后，WebUI 必须通过 realtime/status payload 看到草稿 requirement；取消或失败可直接重试。", "连接模式不是锁屏状态；连接成功或点击普通卡片会退出连接模式。", "待删除节点或 action card 会变灰并显示待删除，取消 Logic Chain 编辑后恢复。", "实体设备被外部破坏后会标记 missing/broken，保存会 fail closed，不能只改 metadata 伪装成正常节点。")
                 ),
                 sections(
-                        section("边界", "VBD / Region / ActionRelay block / SignalReceiver 等世界实体节点在编辑器内仍为只读引用。", "帮助中心不启动 Minecraft、不跑 scenario。")
+                        section("边界", "VBD / Region / ActionRelay block / SignalReceiver 等世界实体只能通过受保护草稿和既有游戏内流程进入 Logic Chain。", "VBD 删除只解绑 VBD 状态，不破坏原方块；SignalEmitter / SignalReceiver / ActionRelay 删除会移除物理设备方块，并要求 dry-run 影响确认和固定文本“我确认删除该节点”。", "VBD / World Device Reference / RegionController protected draft 保存会写入真实 typed store；失败会回滚或保留可重试草稿。", "World Device 使用替换原版九格的三格 hotbar；WebUI 和游戏内取消都需要确认，取消后可在 modal 内重新发起。", "受保护 world device draft 会阻止普通 use / break 和 signal-device 命令绕过。", "RegionController 选择使用 RegionPlanner 粒子点线预览；输出必须通过 enter / exit / stay action bucket 中的 signal action，不保存 top-level 输出频道。", "Action 面板在节点信息中保持单入口，进入二级页面后才展示 enter / exit / stay 或其它 bucket；signal action 频道字段支持已有频道 combobox。", "对象名称和频道名称分开显示，保存后对象 displayName 不会被 downstream channel displayName 覆盖。", "帮助中心不启动 Minecraft、不跑 scenario。")
                 ),
                 List.of("example.signal-no-consumer"),
                 List.of("trouble.readonly-nodes"),
@@ -434,7 +435,7 @@ public final class WebAdminHelpCatalogService {
         items.add(trouble("trouble.logic-chain-one-entry-many-channels", "为什么逻辑链列表只有一个入口但有很多频道？", List.of("列表按 connected component 聚合。", "一个 component 可以包含多个 channel。"), List.of("打开详情页。", "切换焦点频道。"), List.of("用详情页 focus channel 查看不同入口。"), "Logic Chain 不等于单个 channel；Viewer 只做可视化组织。", routes(link("逻辑链", "#/logic-chains"))));
         items.add(trouble("trouble.editor-save-failed", "为什么编辑器保存失败？", List.of("edit lock 丢失。", "expectedFingerprint 冲突。", "草稿缺必要连线。", "旧节点/旧 action 越界操作。"), List.of("看保存错误列表。", "确认锁状态和草稿连线。"), List.of("刷新后重试。", "只保存支持的 typed config。"), "保存先统一 validation，再写真实服务；不会保存假图。", routes(link("逻辑链", "#/logic-chains"))));
         items.add(trouble("trouble.node-hidden-missing", "为什么看不到某个节点？", List.of("当前 focusChannel 只影响高亮和入口。", "节点被筛选或折叠。", "脱钩结构在退出连接模式后裁剪。"), List.of("清空节点类型筛选。", "切换 focus channel。", "看 Doctor。"), List.of("放宽筛选。", "从相关频道重新进入。"), "Viewer 按 component-aware traversal 展示，弱引用不会把不相关 component 合并。", routes(link("逻辑链", "#/logic-chains"), link("Doctor", "#/doctor"))));
-        items.add(trouble("trouble.readonly-nodes", "为什么某些节点在编辑器里只能查看不能创建？", List.of("VBD、Region、ActionRelay block、SignalReceiver 是世界实体引用。", "当前编辑器没有安全的世界实体草稿创建/绑定。"), List.of("看节点详情的 readonly 标记。"), List.of("通过已有页面或游戏内流程管理世界实体。"), "world entity in-editor draft create documented as deferred。", routes(link("设备", "#/devices"), link("逻辑链", "#/logic-chains"))));
+        items.add(trouble("trouble.readonly-nodes", "为什么世界节点需要目标玩家选择？", List.of("World Device Reference、RegionController 和 VBD 需要 protected draft，不能手写 world/pos fake-create。", "缺目标玩家、WebAdmin session、权限或 target lock 时，创建草稿会立即失败并给出原因。"), List.of("在新增节点弹窗确认目标玩家。", "查看是否已经生成 protected draft id。", "检查 Logic Chain 主锁和目标资源锁。"), List.of("从 Logic Chain 对应入口发起受保护选择/放置。", "已有 VBD 节点直接打开 VBD 节点编辑面板并使用 itemSubmit / container 入口。"), "world entity creation is client-assisted protected draft only；target locks are prevalidated before final save。", routes(link("设备", "#/devices"), link("逻辑链", "#/logic-chains"))));
         items.add(trouble("trouble.import-json-no-effect", "导入 JSON 后为什么没有生效？", List.of("import 只保存为用户模板。", "没有执行 apply。"), List.of("打开模板详情。", "检查是否有 apply 预览记录。"), List.of("执行 dry-run，然后确认 apply。"), "导入不发 signal、不执行 action、不写低层配置。", routes(link("模板中心", "#/templates"))));
         items.add(trouble("trouble.blank-gate-no-history", "为什么空 gate 没有调试记录？", List.of("未配置 conditionGroupId。", "旧逻辑按原流程运行。"), List.of("确认目标字段是否为空。"), List.of("需要调试时明确绑定条件组。"), "未配置 conditionGroupId 时不读取 store、不 evaluate、不写 history。", routes(link("条件调试", "#/condition-debugger"))));
         items.add(trouble("trouble.state-variable-action-failed", "为什么状态变量动作失败？", List.of("变量 key 为空。", "类型转换失败。", "PLAYER scope 无目标。"), List.of("看 action 执行记录。", "看状态变量页面是否出现目标值。"), List.of("修正 key/type/targetMode。"), "StateVariable 写入通过受控 state_variable action，不是任意 JSON 写入。", routes(link("状态变量", "#/state-variables"), link("动作列表", "#/actions"))));
@@ -462,7 +463,7 @@ public final class WebAdminHelpCatalogService {
         addTerm(terms, "action-engine", "ActionEngine", List.of("动作引擎"), "统一执行 ActionConfig 的 runtime 入口。", "帮助中心不改变执行顺序。");
         addTerm(terms, "condition-group", "ConditionGroup", List.of("条件组"), "可复用的条件树。", "ConditionEngine 只判断。");
         addTerm(terms, "condition-engine", "ConditionEngine", List.of("条件引擎"), "只读评估条件树的引擎。", "不写状态、不发 signal、不执行 action。");
-        addTerm(terms, "state-variable", "StateVariable", List.of("状态变量"), "保存 GLOBAL / PLAYER 状态的存储。", "由 state_variable action 受控写入。");
+        addTerm(terms, "state-variable", "StateVariable", List.of("状态变量"), "保存 GLOBAL / PLAYER 状态的存储。", "9.1 支持受控创建 / 编辑定义；运行值仍由 state_variable action 或系统写入。");
         addTerm(terms, "state-action", "State Action", List.of("state_variable action"), "通过受控 Action 写入 StateVariable。", "不是任意 JSON 写入。");
         addTerm(terms, "join", "Join", List.of("Signal Join"), "多个输入满足后输出 signal。", "passive observer。");
         addTerm(terms, "barrier", "Barrier", List.of("ALL Join"), "所有输入都到达才输出的 Join 模式。", "常用于 A+B 都完成。");
@@ -479,10 +480,10 @@ public final class WebAdminHelpCatalogService {
         addTerm(terms, "fingerprint", "Fingerprint", List.of("expectedFingerprint"), "配置快照指纹，用于冲突检测。", "过期会要求刷新。");
         addTerm(terms, "dry-run", "Dry-run", List.of("预览"), "只读计划和校验，不实际写入。", "模板 apply 前必须看预览。");
         addTerm(terms, "placeholder", "Placeholder", List.of("占位引用"), "模板里无法自动绑定的外部世界引用。", "placeholder binding apply deferred。");
-        addTerm(terms, "runtime-gate", "Runtime Gate", List.of("运行时条件门"), "绑定 conditionGroupId 后在运行路径外层判断。", "空 gate 不评估。");
-        addTerm(terms, "action-gate", "Action Gate", List.of("单条动作条件"), "单条 Action 上的条件组。", "false 只跳过当前 action。");
-        addTerm(terms, "vbd", "VBD", List.of("Virtual Block Device", "虚拟方块设备"), "把虚拟方块或容器等世界交互转换成 signal 的设备。", "编辑器内世界实体草稿创建 deferred。");
-        addTerm(terms, "action-relay", "ActionRelay", List.of("动作中继方块"), "世界方块上的动作列表引用。", "Logic Chain Editor 内旧 Action 通常只读或追加。");
+        addTerm(terms, "runtime-gate", "Runtime Gate", List.of("运行时条件门"), "绑定 conditionGroupId 后在运行路径外层判断。", "gate 是 allow / block / skip 引用，不是 if / else 分支。");
+        addTerm(terms, "action-gate", "Action Gate", List.of("单条动作条件"), "单条 Action 上的条件组。", "false 只跳过当前 action，不创建 fallback path。");
+        addTerm(terms, "vbd", "VBD", List.of("Virtual Block Device", "虚拟方块设备"), "把虚拟方块或容器等世界交互转换成 signal 的设备。", "Logic Chain 中的 VBD 草稿必须来自 protected draft selection，删除 VBD 只解绑状态不破坏原方块。");
+        addTerm(terms, "action-relay", "ActionRelay", List.of("动作中继方块"), "世界方块上的动作列表引用。", "9.1 支持同 index 替换 / 禁用 / 删除和同 bucket 重排；loaded exact object 路径只读取已加载方块实体。");
         addTerm(terms, "signal-receiver", "SignalReceiver", List.of("信号接收器"), "监听 signal 并输出世界效果的接收器引用。", "世界绑定仍走现有页面或游戏内流程。");
         addTerm(terms, "region", "Region", List.of("RegionController", "区域"), "区域 enter / exit / stay 触发和控制对象。", "区域运行时语义不在帮助中心改变。");
         addTerm(terms, "doctor", "Doctor", List.of("诊断"), "只读健康检查和建议入口。", "不自动修复。");

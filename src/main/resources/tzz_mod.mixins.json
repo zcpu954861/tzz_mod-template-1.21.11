@@ -11,7 +11,8 @@
 		"KeyBindingAccessor",
 		"CameraModeKeyboardMixin",
 		"CameraModeMouseMixin",
-		"CameraModeGameRendererMixin"
+		"CameraModeGameRendererMixin",
+		"WebAdminHotbarMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

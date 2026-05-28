@@ -28,6 +28,7 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerActionRequests;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerCreateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalListenerDeleteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminSignalJoinRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminStateVariableWriteRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminTemplateRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminTimerRequest;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminRegionControllerRequests;
@@ -115,7 +116,7 @@ public final class WebAdminServer {
     private final WebAdminConditionGroupService conditionGroupService = new WebAdminConditionGroupService(permissionService, writeSecurityService, editLockService);
     private final WebAdminHelpCatalogService helpCatalogService = new WebAdminHelpCatalogService();
     private final WebAdminLogicChainService logicChainService = new WebAdminLogicChainService(permissionService, writeSecurityService, editLockService);
-    private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService);
+    private final WebAdminSelectionService selectionService = new WebAdminSelectionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerBasicConfigService signalListenerBasicConfigService = new WebAdminSignalListenerBasicConfigService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalListenerActionsService signalListenerActionsService = new WebAdminSignalListenerActionsService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSignalJoinService signalJoinService = new WebAdminSignalJoinService(permissionService, writeSecurityService, editLockService);
@@ -123,13 +124,13 @@ public final class WebAdminServer {
     private final WebAdminTemplateService templateService = new WebAdminTemplateService(permissionService, writeSecurityService, editLockService);
     private final WebAdminSnapshotService snapshotService = new WebAdminSnapshotService(permissionService, writeSecurityService, editLockService);
     private final WebAdminRegionControllerService regionControllerService = new WebAdminRegionControllerService(permissionService, writeSecurityService, editLockService);
-    private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, channelMetadataService, signalListenerBasicConfigService, signalListenerActionsService, actionRelayActionsService, regionControllerService);
-    private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService);
-    private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService);
+    private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminLogicChainEditorService logicChainEditorService = new WebAdminLogicChainEditorService(permissionService, writeSecurityService, editLockService, logicChainService, signalJoinService, timerService, channelMetadataService, signalListenerBasicConfigService, signalListenerActionsService, signalListenerLifecycleService, actionRelayActionsService, regionControllerService);
+    private final WebAdminStateVariableService stateVariableService = new WebAdminStateVariableService(permissionService, writeSecurityService, editLockService);
+    private final WebAdminVirtualBlockDeviceLifecycleService virtualBlockDeviceLifecycleService = new WebAdminVirtualBlockDeviceLifecycleService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceContainerTemplateSessionService containerTemplateSessionService = new WebAdminVirtualBlockDeviceContainerTemplateSessionService(permissionService, writeSecurityService, editLockService);
     private final WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService singleItemSubmitTemplateSessionService = new WebAdminVirtualBlockDeviceSingleItemSubmitTemplateSessionService(permissionService, writeSecurityService, editLockService);
-    private final WebAdminSignalListenerLifecycleService signalListenerLifecycleService = new WebAdminSignalListenerLifecycleService(permissionService, writeSecurityService);
     private final WebAdminTestBridgeRoutes testBridgeRoutes = new WebAdminTestBridgeRoutes();
     private HttpServer httpServer;
     private ExecutorService executor;
@@ -990,9 +991,46 @@ public final class WebAdminServer {
 
     private void handleActionRelayActions(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
         String prefix = "/api/webadmin/action-relay-actions/";
-        String deviceId = decodePathSegment(path.substring(prefix.length()));
+        String tail = path.substring(prefix.length());
+        String actionSuffix = "/actions/";
+        boolean sameIndexActionPath = tail.contains(actionSuffix);
+        String deviceId = decodePathSegment(sameIndexActionPath ? tail.substring(0, tail.indexOf(actionSuffix)) : tail);
         if (deviceId.isBlank()) {
             WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Action Relay 设备 ID 不能为空。");
+            return;
+        }
+        if (sameIndexActionPath) {
+            if (!method.equalsIgnoreCase("PATCH")) {
+                WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 PATCH。");
+                return;
+            }
+            String rawIndex = tail.substring(tail.indexOf(actionSuffix) + actionSuffix.length());
+            int actionIndex;
+            try {
+                actionIndex = Integer.parseInt(decodePathSegment(rawIndex));
+            } catch (NumberFormatException ex) {
+                WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "Action index 必须是整数。");
+                return;
+            }
+            WebAdminActionRelayActionsUpdateRequest request = readJson(exchange, WebAdminActionRelayActionsUpdateRequest.class);
+            if (request == null) {
+                request = new WebAdminActionRelayActionsUpdateRequest();
+            }
+            request.deviceId = deviceId;
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_ACTION_RELAY_ACTIONS, "ActionRelay", WebAdminEditLockService.TARGET_ACTION_RELAY_ACTIONS, deviceId, "编辑 Action Relay 单条 Action 前自动保存");
+            WebAdminWriteResult result = actionRelayActionsService.updateAction(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    deviceId,
+                    actionIndex,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
+            WebAdminJsonResponse.ok(exchange, result);
             return;
         }
         if (method.equalsIgnoreCase("GET")) {
@@ -1952,18 +1990,61 @@ public final class WebAdminServer {
 
     private void handleStateVariables(HttpExchange exchange, AuthContext auth, String path, String method) throws IOException {
         String root = "/api/webadmin/state-variables";
-        if (!method.equalsIgnoreCase("GET")) {
-            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET。");
-            return;
-        }
         if (path.equals(root)) {
-            WebAdminJsonResponse.ok(exchange, stateVariableService.list(minecraftServer, auth.user, queryParams(exchange)));
+            if (method.equalsIgnoreCase("GET")) {
+                WebAdminJsonResponse.ok(exchange, stateVariableService.list(minecraftServer, auth.user, queryParams(exchange)));
+                return;
+            }
+            if (method.equalsIgnoreCase("POST")) {
+                WebAdminStateVariableWriteRequest request = readJson(exchange, WebAdminStateVariableWriteRequest.class);
+                if (request == null) {
+                    request = new WebAdminStateVariableWriteRequest();
+                }
+                WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_STATE_VARIABLE, "StateVariable", WebAdminEditLockService.TARGET_STATE_VARIABLE, WebAdminStateVariableService.CREATE_LOCK_TARGET_ID, "创建状态变量定义前自动保存");
+                WebAdminWriteResult result = stateVariableService.create(
+                        minecraftServer,
+                        auth.user,
+                        auth.session,
+                        sourceIp(exchange),
+                        request,
+                        header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                        isWriteSameOrigin(exchange)
+                );
+                annotateAutoSnapshotAfterWrite(autoSnapshot, result);
+                WebAdminJsonResponse.ok(exchange, result);
+                return;
+            }
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 POST。");
             return;
         }
         String prefix = root + "/";
         String id = path.startsWith(prefix) ? decodePathSegment(path.substring(prefix.length())) : "";
         if (id.isBlank()) {
             WebAdminJsonResponse.error(exchange, 400, "BAD_REQUEST", "状态变量 ID 不能为空。");
+            return;
+        }
+        if (method.equalsIgnoreCase("PATCH")) {
+            WebAdminStateVariableWriteRequest request = readJson(exchange, WebAdminStateVariableWriteRequest.class);
+            if (request == null) {
+                request = new WebAdminStateVariableWriteRequest();
+            }
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.EDIT_STATE_VARIABLE, "StateVariable", WebAdminEditLockService.TARGET_STATE_VARIABLE, id, "编辑状态变量定义前自动保存");
+            WebAdminWriteResult result = stateVariableService.update(
+                    minecraftServer,
+                    auth.user,
+                    auth.session,
+                    sourceIp(exchange),
+                    id,
+                    request,
+                    header(exchange, "X-TZZ-WebAdmin-CSRF"),
+                    isWriteSameOrigin(exchange)
+            );
+            annotateAutoSnapshotAfterWrite(autoSnapshot, result);
+            WebAdminJsonResponse.ok(exchange, result);
+            return;
+        }
+        if (!method.equalsIgnoreCase("GET")) {
+            WebAdminJsonResponse.error(exchange, 405, "METHOD_NOT_ALLOWED", "该接口只支持 GET 或 PATCH。");
             return;
         }
         WebAdminDtos.StateVariableDetailDto detail = stateVariableService.detail(minecraftServer, auth.user, id);
@@ -2015,6 +2096,7 @@ public final class WebAdminServer {
                 request = new WebAdminSelectionCancelRequest();
             }
             WebAdminWriteResult result = selectionService.cancel(
+                    minecraftServer,
                     auth.user,
                     auth.session,
                     sourceIp(exchange),
@@ -2321,7 +2403,7 @@ public final class WebAdminServer {
             if (request == null) {
                 request = new WebAdminSignalListenerCreateRequest();
             }
-            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.CREATE_SIGNAL_LISTENER, "Signal Listener", "signal_listener", safe(request.name), "创建 Signal Listener 前自动保存");
+            WebAdminSnapshotService.WebAdminSnapshotAutoResult autoSnapshot = autoSnapshotBeforeWrite(exchange, auth, WebAdminOperationType.CREATE_SIGNAL_LISTENER, "Signal Listener", WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG, WebAdminSignalListenerLifecycleService.CREATE_LOCK_TARGET_ID, "创建 Signal Listener 前自动保存");
             WebAdminWriteResult result = signalListenerLifecycleService.create(
                     minecraftServer,
                     auth.user,
