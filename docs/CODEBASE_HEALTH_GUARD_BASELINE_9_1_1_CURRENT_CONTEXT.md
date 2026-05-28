@@ -140,6 +140,28 @@ Deferred to Phase 6:
 - Unsaved diff memoization.
 - Browser performance markers, MCP scenario performance checks and screenshot matrix.
 
+## Phase 3 Event Router Split Context
+
+Phase 3 splits delegated WebAdmin event handling into explicit route tables and named handlers while preserving 9.1 behavior.
+
+- Phase 3 branch: `feature/webadmin-event-router-split-9-1-1`.
+- Phase 3 base: `origin/feature/webadmin-frontend-bundle-split-9-1-1` at `e77071b9d929053c45ffa17a25e5f1788975cd7e`.
+- Global document listener registration order and capture flags remain unchanged.
+- CoreEvent keydown and Modal ESC keydown remain separate document listeners to preserve same-target listener ordering.
+- VBD capture retry remains available through both `pointerup` capture and `click` capture.
+- Logic Chain capture click routes now preserve the existing order: connect handle, connect candidate, new draft channel, draft slot, node card.
+- Logic Chain hover / mouseout still only target read-only node cards and still use the existing highlight render path.
+- VBD trigger card selection moved from inline `htmlHandler` to a document bubble route so the old post-click outside-close side effects still run.
+- `/assets/app.js`, `WebAdminFrontendAssets`, `WebAdminServer`, `WebAdminFrontendStyles`, backend/runtime services and CSS remain unchanged.
+
+Phase 3 guard changes:
+
+- Phase 2 byte-identical SHA check is replaced by SHA reporting plus `app.js` baseline + 5% hard limit.
+- `document.addEventListener`, total `addEventListener(`, `.closest(`, `querySelector(`, known inline event attributes, `htmlEvent(`, `htmlHandler(` and `innerHTML` are hard no-growth checks.
+- Route-table markers are required for `dispatchDelegatedEvent`, global click/key routes, modal ESC routes and Logic Chain click/hover/pointer routes.
+- Route table entries must use named handlers rather than inline lambdas.
+- `node --check build/tmp/webadmin-app.js`, `BeforeV18+ = 0`, facade checks and pointer-events guards remain hard checks.
+
 ## README Update
 
 Phase 1 minimally updates README stable version to `v1.68.1-codebase-health-audit`. It does not expand README feature content.
@@ -166,4 +188,4 @@ This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screensho
 
 ## Next Phase
 
-Phase 2 should start from these guard baselines and split frontend source modules without changing generated asset behavior or WebAdmin runtime semantics.
+Phase 4 should start from the Phase 3 event-router baseline and address Logic Chain render/layout/draft module boundaries without changing runtime semantics.

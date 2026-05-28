@@ -14,6 +14,7 @@ import java.util.Map;
 
 public final class WebAdminFrontendBundleGuardTest {
     private static final int APP_JS_WARNING_BASELINE_BYTES = 1_838_292;
+    private static final int APP_JS_PHASE3_HARD_LIMIT_BYTES = 1_930_207;
     private static final String APP_JS_PHASE2_BASELINE_SHA256 = "1992d2e7634e14ac9611d893cf8439725bbc0fe4ee65f672cc90910b64238b74";
     private static final int APP_CSS_WARNING_BASELINE_BYTES = 123_251;
 
@@ -73,10 +74,12 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.bytes", appJsBytes);
         String appJsSha256 = sha256Hex(appJs);
         report.metric("webadmin.app_js.sha256", appJsSha256);
+        report.metric("webadmin.app_js.phase2_baseline_sha256", APP_JS_PHASE2_BASELINE_SHA256);
+        report.metric("webadmin.app_js.phase3_hard_limit", APP_JS_PHASE3_HARD_LIMIT_BYTES);
         report.metric("webadmin.app_css.bytes", appCssBytes);
-        if (appJsBytes != APP_JS_WARNING_BASELINE_BYTES || !APP_JS_PHASE2_BASELINE_SHA256.equals(appJsSha256)) {
-            report.fail("Phase 2 generated app.js must stay byte-identical to the Phase 1 baseline: actualBytes="
-                    + appJsBytes + " actualSha256=" + appJsSha256);
+        if (appJsBytes > APP_JS_PHASE3_HARD_LIMIT_BYTES) {
+            report.fail("Phase 3 generated app.js exceeded baseline + 5% hard limit: actualBytes="
+                    + appJsBytes + " limit=" + APP_JS_PHASE3_HARD_LIMIT_BYTES + " actualSha256=" + appJsSha256);
         }
         warnIfBeyondFivePercent(report, "app.js", appJsBytes, APP_JS_WARNING_BASELINE_BYTES);
         warnIfBeyondFivePercent(report, "app.css", appCssBytes, APP_CSS_WARNING_BASELINE_BYTES);
@@ -84,6 +87,7 @@ public final class WebAdminFrontendBundleGuardTest {
         checkFacadeBoundary(report);
         checkSourceCounts(report, appJs);
         checkInlineEventAttributes(report, appJs);
+        checkPhase3EventRouterMarkers(report, appJs);
         checkHotSlices(report, appJs);
         checkPointerEvents(report, appCss);
         checkRawJsonSummary(report, appJs);
@@ -115,7 +119,7 @@ public final class WebAdminFrontendBundleGuardTest {
             int actual = CodeQualityGuardSupport.count(scripts, entry.getKey());
             report.metric("webadmin.source.count." + metricKey(entry.getKey()), actual + " baseline=" + entry.getValue());
             if (actual > entry.getValue()) {
-                report.warning("WebAdmin frontend source count grew for `" + entry.getKey() + "`: actual=" + actual + " baseline=" + entry.getValue());
+                report.fail("Phase 3 WebAdmin frontend source count grew for `" + entry.getKey() + "`: actual=" + actual + " baseline=" + entry.getValue());
             }
         }
         report.require(scripts.contains("data-logic-chain-vbd-native-json-not-primary-summary"),
@@ -129,7 +133,7 @@ public final class WebAdminFrontendBundleGuardTest {
             total += actual;
             report.metric("webadmin.source.inline_event." + entry.getKey(), actual + " baseline=" + entry.getValue());
             if (actual > entry.getValue()) {
-                report.warning("Inline event attribute count grew for `" + entry.getKey() + "`: actual=" + actual
+                report.fail("Phase 3 inline event attribute count grew for `" + entry.getKey() + "`: actual=" + actual
                         + " baseline=" + entry.getValue());
             }
         }
@@ -138,21 +142,67 @@ public final class WebAdminFrontendBundleGuardTest {
             int actual = CodeQualityGuardSupport.countRegex(scripts, "\\b" + eventName + "\\s*=");
             report.metric("webadmin.source.inline_event.zero_baseline." + eventName, actual);
             if (actual > 0) {
-                report.warning("New zero-baseline inline event attribute detected in Phase 1: `" + eventName
+                report.fail("New zero-baseline inline event attribute detected after Phase 3 router split: `" + eventName
                         + "` count=" + actual);
             }
         }
     }
 
+    private static void checkPhase3EventRouterMarkers(CodeQualityGuardSupport.GuardReport report, String appJs) {
+        for (String marker : List.of(
+                "function dispatchDelegatedEvent",
+                "function dispatchDelegatedSideEffects",
+                "const globalClickCommandRoutes",
+                "const globalClickSideEffectRoutes",
+                "const globalClickLateRoutes",
+                "const globalPrimaryKeydownRoutes",
+                "const globalModalEscapeRoutes",
+                "const logicChainClickRoutes",
+                "const logicChainKeydownRoutes",
+                "const logicChainPointerDownRoutes",
+                "const logicChainHoverRoutes",
+                "const logicChainMouseOutRoutes",
+                "data-logic-chain-vbd-trigger-route-card"
+        )) {
+            report.requireContains(appJs, marker, "Phase 3 event router marker present: " + marker);
+        }
+        int inlineArrowRouteHandlers = CodeQualityGuardSupport.countRegex(appJs,
+                "handler\\s*:\\s*(?:async\\s*)?(?:\\([^)]*\\)|[A-Za-z_$][\\w$]*)\\s*=>");
+        int inlineFunctionRouteHandlers = CodeQualityGuardSupport.countRegex(appJs,
+                "handler\\s*:\\s*(?:async\\s+)?function\\b");
+        report.require(inlineArrowRouteHandlers == 0,
+                "Phase 3 route entries must use named handlers, not inline arrow handlers; count="
+                        + inlineArrowRouteHandlers);
+        report.require(inlineFunctionRouteHandlers == 0,
+                "Phase 3 route entries must use named handlers, not inline function handlers; count="
+                        + inlineFunctionRouteHandlers);
+        report.requireContains(appJs, "{selector:'[data-logic-chain-connect-handle]',handler:handleLogicChainConnectHandleClick},{selector:'[data-logic-chain-connect-candidate]',handler:handleLogicChainConnectCandidateClick},{selector:'[data-logic-chain-new-draft-channel]',handler:handleLogicChainNewDraftChannelClick},{selector:'[data-logic-chain-draft-slot-button]',handler:handleLogicChainDraftSlotClick},{selector:'[data-logic-chain-node-action]',handler:handleLogicChainNodeCardClick}",
+                "Phase 3 Logic Chain click route order must stay connect/candidate/new-channel/draft-slot/node-card");
+        report.requireContains(appJs, "{handler:handleGlobalLogicChainClickRoute},{selector:'[data-logic-chain-vbd-trigger-card]',handler:handleLogicChainVbdTriggerCardClick},{handler:handleSnapshotTimelineNodeClick}",
+                "Phase 3 VBD trigger card click must run in document bubble after Logic Chain capture route and before outside-close side effects");
+        report.require(!appJs.contains("htmlHandler(`selectLogicChainExistingVbdTrigger("),
+                "Phase 3 VBD trigger cards must use data-* delegated route instead of inline select handler");
+        int logicChainRoutesStart = appJs.indexOf("const logicChainClickRoutes=[");
+        int logicChainRoutesEnd = logicChainRoutesStart >= 0 ? appJs.indexOf("];", logicChainRoutesStart) : -1;
+        String logicChainRoutes = logicChainRoutesStart >= 0 && logicChainRoutesEnd > logicChainRoutesStart
+                ? appJs.substring(logicChainRoutesStart, logicChainRoutesEnd)
+                : "";
+        report.require(!logicChainRoutes.contains("data-logic-chain-vbd-trigger-card"),
+                "Phase 3 VBD trigger card route must stay out of Logic Chain capture routes");
+        report.requireContains(appJs,
+                "function handleLogicChainVbdTriggerCardClick(event,card){selectLogicChainExistingVbdTrigger(card.dataset.logicChainVbdTriggerCard||'');return false;}",
+                "Phase 3 VBD trigger bubble handler must return false so outside-close side effects still run");
+    }
+
     private static void checkHotSlices(CodeQualityGuardSupport.GuardReport report, String appJs) {
         reportSlice(report, "global_handlers_1260_1339",
-                generatedSlice(report, appJs, "document.addEventListener('pointerup'", "window.addEventListener('beforeunload'"),
+                generatedSlice(report, appJs, "function globalEventTargetOutside", "window.addEventListener('beforeunload'"),
                 54, 35, 4);
         reportSlice(report, "esc_router_5294",
-                generatedSlice(report, appJs, "document.addEventListener('keydown',event=>{if(event.key==='Escape')", "function unavailableFeature"),
+                generatedSlice(report, appJs, "const globalModalEscapeRoutes", "function unavailableFeature"),
                 8, 0, 1);
         reportSlice(report, "logic_chain_handlers_8103_8123",
-                generatedSlice(report, appJs, "function handleLogicChainEditorDelegatedClick", "const LOGIC_CHAIN_NODE_DELETE_CONFIRM_TEXT"),
+                generatedSlice(report, appJs, "function handleLogicChainConnectHandleClick", "const LOGIC_CHAIN_NODE_DELETE_CONFIRM_TEXT"),
                 46, 13, 1);
         reportSlice(report, "vbd_overlay_stack_8128_8397",
                 generatedSlice(report, appJs, "const logicChainV16VbdTriggerGraphSummaryMarkers", "function confirmLogicChainDraftActionDeleteFromPanel"),
@@ -179,14 +229,14 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.slice." + name + ".if", ifCount + " baseline=" + ifBaseline);
         report.metric("webadmin.slice." + name + ".closest", closestCount + " baseline=" + closestBaseline);
         report.metric("webadmin.slice." + name + ".querySelector", querySelectorCount + " baseline=" + querySelectorBaseline);
-        warnSliceGrowth(report, name, "if", ifCount, ifBaseline);
-        warnSliceGrowth(report, name, "closest", closestCount, closestBaseline);
-        warnSliceGrowth(report, name, "querySelector", querySelectorCount, querySelectorBaseline);
+        requireSliceNoGrowth(report, name, "if", ifCount, ifBaseline);
+        requireSliceNoGrowth(report, name, "closest", closestCount, closestBaseline);
+        requireSliceNoGrowth(report, name, "querySelector", querySelectorCount, querySelectorBaseline);
     }
 
-    private static void warnSliceGrowth(CodeQualityGuardSupport.GuardReport report, String name, String metric, int actual, int baseline) {
+    private static void requireSliceNoGrowth(CodeQualityGuardSupport.GuardReport report, String name, String metric, int actual, int baseline) {
         if (actual > baseline) {
-            report.warning("WebAdmin hot slice grew for " + name + " " + metric + ": actual=" + actual + " baseline=" + baseline);
+            report.fail("WebAdmin hot slice grew for " + name + " " + metric + ": actual=" + actual + " baseline=" + baseline);
         }
     }
 

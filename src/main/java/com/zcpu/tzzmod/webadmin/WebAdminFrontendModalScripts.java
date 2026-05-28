@@ -36,8 +36,18 @@ final class WebAdminFrontendModalScripts {
                 function editModalFooter(saving=false){
                   return `<button class="wa-btn ghost" type="button" onclick="closeWebAdminModal()">${icon('close')}<span>取消</span></button><button class="wa-btn primary" type="button" ${saving?'disabled':''} onclick="document.querySelector('#wa-modal-root form')?.requestSubmit()">${icon('check-pass')}<span>${saving?'保存中...':'保存'}</span></button>`;
                 }
-                const DIRTY_MODAL_ESCAPE_GUARD_MARKER="event.key==='Escape'){if(appState.modalDiscardConfirmOpen)";
-                document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(closeAllCustomComboboxes()){event.preventDefault();event.stopPropagation();return;}if(appState.logicChainEditor?.connectionMode&&!document.querySelector('#wa-modal-root .wa-modal')){event.preventDefault();event.stopPropagation();stopLogicChainConnectionMode('escape');return;}if(document.getElementById('condition-node-discard-confirm')){event.preventDefault();event.stopPropagation();cancelConditionNodeDiscardConfirm();return;}if(appState.conditionNodeEditor?.open){event.preventDefault();event.stopPropagation();closeConditionNodeEditor(false);return;}if(appState.containerTemplateCancelConfirm){event.preventDefault();cancelContainerTemplateCancelConfirm();return;}if(appState.modalDiscardConfirmOpen){event.preventDefault();cancelDiscardModalClose();return;}if(appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return;}closeWebAdminModal();}});
+                const DIRTY_MODAL_ESCAPE_GUARD_MARKER="globalModalEscapeRoutes";
+                function handleModalComboboxEscape(event){if(closeAllCustomComboboxes()){event.preventDefault();event.stopPropagation();return true;}return false;}
+                function handleModalLogicChainConnectionEscape(event){if(appState.logicChainEditor?.connectionMode&&!document.querySelector('#wa-modal-root .wa-modal')){event.preventDefault();event.stopPropagation();stopLogicChainConnectionMode('escape');return true;}return false;}
+                function handleModalConditionDiscardEscape(event){if(document.getElementById('condition-node-discard-confirm')){event.preventDefault();event.stopPropagation();cancelConditionNodeDiscardConfirm();return true;}return false;}
+                function handleModalConditionEditorEscape(event){if(appState.conditionNodeEditor?.open){event.preventDefault();event.stopPropagation();closeConditionNodeEditor(false);return true;}return false;}
+                function handleModalContainerCancelEscape(event){if(appState.containerTemplateCancelConfirm){event.preventDefault();cancelContainerTemplateCancelConfirm();return true;}return false;}
+                function handleModalDirtyDiscardEscape(event){if(appState.modalDiscardConfirmOpen){event.preventDefault();cancelDiscardModalClose();return true;}return false;}
+                function handleModalDeviceMoreEscape(event){if(appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return true;}return false;}
+                function handleModalCloseEscape(){closeWebAdminModal();return true;}
+                const globalModalEscapeRoutes=[{handler:handleModalComboboxEscape},{handler:handleModalLogicChainConnectionEscape},{handler:handleModalConditionDiscardEscape},{handler:handleModalConditionEditorEscape},{handler:handleModalContainerCancelEscape},{handler:handleModalDirtyDiscardEscape},{handler:handleModalDeviceMoreEscape},{handler:handleModalCloseEscape}];
+                function handleGlobalModalEscapeKeydown(event){if(event.key==='Escape')dispatchDelegatedEvent(event,globalModalEscapeRoutes);}
+                document.addEventListener('keydown',handleGlobalModalEscapeKeydown);
                 function unavailableFeature(title='功能暂未开放',message='当前版本没有完整后端支持，因此该操作保持不可用。'){
                   openWebAdminModal(title,`<p>${esc(message)}</p><div class="wa-disabled-note">本轮前端重构只接入只读展示和布局基础，不新增 API 或真实写能力。</div>`);
                 }

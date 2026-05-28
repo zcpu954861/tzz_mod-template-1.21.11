@@ -67,7 +67,7 @@ public final class CodeQualityGuardTest {
 
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
-        report.metric("branch.scope", "phase2-frontend-bundle-split");
+        report.metric("branch.scope", "phase3-event-router-split");
         checkKnownFileBaselines(report);
         checkFrontendScriptsFacade(report);
         checkBeforeVxx(report);

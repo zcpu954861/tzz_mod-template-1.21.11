@@ -3035,7 +3035,7 @@ public final class StabilizationGuardTest {
                 "dirtyCheck:()=>!!appState.actionRelayActionsEdit?.lockId&&modalDraftDirty('action_relay_actions'",
                 "dirtyCheck:()=>modalDraftDirty('signal_listener_create'",
                 "closeWebAdminModal(true,true)",
-                "event.key==='Escape'){if(appState.modalDiscardConfirmOpen)",
+                "const globalModalEscapeRoutes",
                 "normalizeActionRelayEditableAction",
                 "actionRelayActionsEditableJson",
                 "actionRelayActionsDirty(draft)"
@@ -8842,8 +8842,8 @@ public final class StabilizationGuardTest {
         requireContains(timerManualModal, "data-timer-manual-form=\"true\"", "8.12 Timer manual modal uses data marker form");
         requireContains(timerManualModal, "onsubmit=\"event.preventDefault();submitTimerManualForm(this)\"", "8.12 Timer manual modal submit path is safe");
         requireContains(timerManualModal, "timerManualModalFooter(op,d.saving)", "8.12 Timer manual modal uses Timer-specific footer");
-        requireContains(scripts, "target.closest('[data-timer-manual-submit]')", "8.12 Timer manual submit uses delegated click handler");
-        requireContains(scripts, "target.closest('[data-timer-action-submit]')", "8.12 Timer action save uses delegated click handler");
+        requireContains(scripts, "{selector:'[data-timer-manual-submit]',handler:handleGlobalTimerManualSubmitClick}", "8.12 Timer manual submit uses delegated click handler");
+        requireContains(scripts, "{selector:'[data-timer-action-submit]',handler:handleGlobalTimerActionSubmitClick}", "8.12 Timer action save uses delegated click handler");
         requireFalse(timerManualModal.contains("runTimerManual(${jsString(op)})") || timerManualModal.contains("requestSubmit()"),
                 "8.12 Timer manual modal must not use unsafe inline runTimerManual/requestSubmit");
         requireFalse(timerActionBucketModal.contains("requestSubmit()"),
@@ -9938,9 +9938,9 @@ public final class StabilizationGuardTest {
         requireContains(nodeCard, "data-logic-chain-primary-node-id", "8.14 reference card exposes safe primary id dataset");
         requireFalse(nodeCard.contains("onclick=") || nodeCard.contains("onkeydown=") || nodeCard.contains("onmouseenter=") || nodeCard.contains("onmouseleave=") || nodeCard.contains("onpointerdown="),
                 "8.14 node card must not contain unsafe inline handlers");
-        requireContains(scripts, "document.addEventListener('pointerdown',event=>{if(handleLogicChainEditorDelegatedPointerDown(event))return;},true)", "8.14 draft drag pointerdown uses event delegation");
-        requireContains(scripts, "document.addEventListener('pointerup',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;},true)", "v17 capture retry uses pointerup fallback before click delegation");
-        requireContains(scripts, "document.addEventListener('click',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;if(handleLogicChainEditorDelegatedClick(event))return;},true)", "8.14 connection handles must be captured before card click handlers and v17 capture retry buttons");
+        requireContains(scripts, "document.addEventListener('pointerdown',handleGlobalPointerDownCapture,true)", "8.14 draft drag pointerdown uses event delegation");
+        requireContains(scripts, "document.addEventListener('pointerup',handleGlobalPointerUpCapture,true)", "v17 capture retry uses pointerup fallback before click delegation");
+        requireContains(scripts, "handleGlobalVbdCaptureRetryRoute},{handler:handleGlobalLogicChainClickRoute", "8.14 capture route keeps v17 capture retry before Logic Chain card handlers");
         String editorRouteGuard = extractBetween(scripts, "function maybeReleaseLogicChainEditorForRoute", "function logicChainRootChannel");
         requireContains(editorRouteGuard, "logicChainEditorRouteMatches(e,h)", "8.14 route guard only bypasses the original editor route");
         requireFalse(editorRouteGuard.contains("h==='#/logic-chains'||h.startsWith('#/logic-chains/')||isLogicChainResolveRoute(h)"), "8.14 route guard must not broadly bypass Logic Chain route changes");
@@ -11040,8 +11040,8 @@ public final class StabilizationGuardTest {
         requireContains(snapshotSection, "snapshotRecordSearchHaystack", "8.18 snapshot search must match localized display labels");
         requireContains(service, "snapshotKindLabel(record.kind)", "8.18 snapshot server search must match localized kind labels");
         requireContains(service, "snapshotOperationLabel(record.trigger == null ? \"\" : record.trigger.operation)", "8.18 snapshot server search must match localized operation labels");
-        requireContains(scripts, "if(handleSnapshotTimelineNodeClick(event))return;", "8.18 snapshot timeline delegated click handler is registered");
-        requireContains(scripts, "if(handleSnapshotDiffDelegatedClick(event))return;", "8.18 snapshot diff delegated click handler is registered");
+        requireContains(scripts, "{handler:handleSnapshotTimelineNodeClick}", "8.18 snapshot timeline delegated click handler is registered");
+        requireContains(scripts, "{handler:handleSnapshotDiffDelegatedClick}", "8.18 snapshot diff delegated click handler is registered");
         requireContains(snapshotSection, "<button type=\"button\" class=\"snapshot-diff-row", "8.18 snapshot diff items are safe buttons");
         requireFalse(snapshotSection.contains("onclick=\"openSnapshotTimelineNode"),
                 "8.18 snapshot timeline nodes must not generate broken inline onclick with nested double quotes");

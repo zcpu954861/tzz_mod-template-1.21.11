@@ -196,14 +196,25 @@ Current hot slices:
 | Logic Chain delegated handlers | 8103-8123 | 48 `if`, 13 `.closest(` calls, 19 `closest` tokens, 1 `querySelector(` call, 6 listeners |
 | VBD overlay patch stack | 8128-8397 | 368 `if`, 1 `.closest(` call, 3 `closest` tokens, 3 `querySelector(` calls, 33 inline handlers |
 
+Phase 3 event-router baseline after split:
+
+| Slice | Guard marker | Phase 3 count |
+| --- | --- | --- |
+| Global route handlers | `function globalEventTargetOutside` -> `beforeunload` | 30 `if`, 4 `.closest(` calls, 4 `querySelector(` calls |
+| Modal ESC router | `const globalModalEscapeRoutes` -> `function unavailableFeature` | 1 `if`, 0 `.closest(` calls, 0 `querySelector(` calls |
+| Logic Chain route handlers | `function handleLogicChainConnectHandleClick` -> node delete confirm marker | 32 `if`, 4 `.closest(` calls, 1 `querySelector(` call |
+| VBD overlay stack | VBD trigger graph summary marker -> draft action delete panel | 114 `if`, 1 `.closest(` call, 0 `querySelector(` calls |
+
 Guard rules:
 
-- `document.addEventListener` count must not increase without explicit event-router plan.
-- `.closest(` count must not increase after Phase 3.
-- New inline handlers are hard fail after Phase 3.
+- `document.addEventListener` and total `addEventListener(` counts must not increase after Phase 3.
+- `.closest(` and `querySelector(` counts must not increase after Phase 3.
+- Known inline handlers, `htmlEvent(`, `htmlHandler(` and `innerHTML` are hard no-growth checks after Phase 3.
+- Zero-baseline inline event attributes are hard fail after Phase 3.
 - Event route table entries must be named handlers, not long inline lambdas.
-- `handleLogicChainEditorDelegatedClick` should ratchet below current score 18.
-- `WebAdminFrontendScripts.java:5294` keydown ESC router must be tracked alongside global click handlers.
+- Required markers include `dispatchDelegatedEvent`, `globalClickCommandRoutes`, `globalClickSideEffectRoutes`, `globalClickLateRoutes`, `globalPrimaryKeydownRoutes`, `globalModalEscapeRoutes`, `logicChainClickRoutes`, `logicChainHoverRoutes` and `logicChainMouseOutRoutes`.
+- VBD trigger card selection must stay in document bubble routing, after the Logic Chain capture route and before outside-close side effects, so it mirrors the old inline click plus document bubble sequence.
+- Phase 2 byte-identical `app.js` SHA is no longer a hard gate after event rewrite; guard still reports SHA and hard-fails if `app.js` exceeds baseline + 5%.
 
 Suggested thresholds after Phase 3:
 

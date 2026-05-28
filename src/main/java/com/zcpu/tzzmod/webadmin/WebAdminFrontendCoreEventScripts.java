@@ -304,6 +304,8 @@ final class WebAdminFrontendCoreEventScripts {
                 window.addEventListener('online',()=>{appState.realtime.offline=false;appState.realtime.wasDisconnected=true;connectRealtime(true);markRealtimeDirty(currentRouteHash(),{type:'online'});flushVisibleRealtimeRefresh('online');});
                 window.addEventListener('offline',()=>{appState.realtime.offline=true;appState.realtime.wasDisconnected=true;if(appState.realtime.source){appState.realtime.source.close();appState.realtime.source=null;}markRealtimeDirty(currentRouteHash(),{type:'offline'});setRealtimeStatus('DISCONNECTED');});
                 window.addEventListener('pagehide',()=>closeRealtime('DISCONNECTED'));
+                function dispatchDelegatedEvent(event,routes,options={}){const target=event?.target;if(!target)return false;for(const route of routes||[]){const selector=route.selector||'',match=selector?(target.closest?.(selector)||null):target;if(!match)continue;if(route.handler(event,match))return true;}return false;}
+                function dispatchDelegatedSideEffects(event,routes){const target=event?.target;if(!target)return false;let changed=false;for(const route of routes||[]){const selector=route.selector||'',match=selector?(target.closest?.(selector)||null):target;if(!match)continue;if(route.handler(event,match))changed=true;}return changed;}
                 function closeAllCustomComboboxes(){
                   let closed=false;
                   const basic=appState.deviceBasicConfigEdit;
@@ -335,87 +337,89 @@ final class WebAdminFrontendCoreEventScripts {
                   return closed;
                 }
                 const CUSTOM_COMBOBOX_GUARD_MARKERS='data-custom-combobox-arrow-toggle-close="true" data-custom-combobox-outside-click-close="true" data-custom-combobox-escape-close="true" data-custom-combobox-select-option-close="true" data-custom-combobox-single-open="true" data-custom-combobox-toggle-no-dirty="true"';
-                document.addEventListener('pointerup',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;},true);
-                document.addEventListener('click',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;if(handleLogicChainEditorDelegatedClick(event))return;},true);
-                document.addEventListener('pointerdown',event=>{if(handleLogicChainEditorDelegatedPointerDown(event))return;},true);
-                document.addEventListener('mouseover',event=>{if(handleLogicChainEditorDelegatedMouseOver(event))return;},true);
-                document.addEventListener('mouseout',event=>{if(handleLogicChainEditorDelegatedMouseOut(event))return;},true);
-                document.addEventListener('click',event=>{
+                function globalEventTargetOutside(target,selector){return !(target&&target.closest&&target.closest(selector));}
+                function handleGlobalVbdCaptureRetryRoute(event,button){return handleLogicChainVbdCaptureRetryDelegatedClick(event,button);}
+                function handleGlobalLogicChainClickRoute(event){return handleLogicChainEditorDelegatedClick(event);}
+                function handleGlobalLogicChainPointerDownRoute(event){return handleLogicChainEditorDelegatedPointerDown(event);}
+                function handleGlobalLogicChainMouseOverRoute(event){return handleLogicChainEditorDelegatedMouseOver(event);}
+                function handleGlobalLogicChainMouseOutRoute(event){return handleLogicChainEditorDelegatedMouseOut(event);}
+                const globalPointerUpCaptureRoutes=[{selector:'#wa-modal-root [data-logic-chain-vbd-capture-retry-click-capture="true"]',handler:handleGlobalVbdCaptureRetryRoute}];
+                const globalClickCaptureRoutes=[{selector:'#wa-modal-root [data-logic-chain-vbd-capture-retry-click-capture="true"]',handler:handleGlobalVbdCaptureRetryRoute},{handler:handleGlobalLogicChainClickRoute}];
+                const globalPointerDownCaptureRoutes=[{handler:handleGlobalLogicChainPointerDownRoute}];
+                const globalMouseOverCaptureRoutes=[{handler:handleGlobalLogicChainMouseOverRoute}];
+                const globalMouseOutCaptureRoutes=[{handler:handleGlobalLogicChainMouseOutRoute}];
+                function handleGlobalPointerUpCapture(event){dispatchDelegatedEvent(event,globalPointerUpCaptureRoutes);}
+                function handleGlobalClickCapture(event){dispatchDelegatedEvent(event,globalClickCaptureRoutes);}
+                function handleGlobalPointerDownCapture(event){dispatchDelegatedEvent(event,globalPointerDownCaptureRoutes);}
+                function handleGlobalMouseOverCapture(event){dispatchDelegatedEvent(event,globalMouseOverCaptureRoutes);}
+                function handleGlobalMouseOutCapture(event){dispatchDelegatedEvent(event,globalMouseOutCaptureRoutes);}
+                function handleGlobalTimerManualSubmitClick(event,button){event.preventDefault();event.stopPropagation();submitTimerManualForm(button.closest('#wa-modal-root')?.querySelector('[data-timer-manual-form]'));return true;}
+                function handleGlobalTimerActionSubmitClick(event){event.preventDefault();event.stopPropagation();syncTimerDraft();saveTimerEdit();return true;}
+                function handleGlobalConditionTypeSuiteClick(event,button){event.preventDefault();event.stopPropagation();changeConditionTypeSuiteFromElement(button);return true;}
+                function handleGlobalConditionTypeOptionClick(event,button){event.preventDefault();event.stopPropagation();changeConditionNodeTypeFromElement(button);return true;}
+                function handleGlobalConditionCardClick(event,card){const target=event.target;if(target.closest('[data-condition-node-quick-action],button,a,input,select,textarea'))return false;event.preventDefault();event.stopPropagation();openConditionNodeEditor(card.dataset.conditionEditPath||'');return true;}
+                const globalClickCommandRoutes=[{handler:handleContainerTemplateAction},{handler:handleSingleItemSubmitAction},{handler:handlePaginationAction},{handler:handleGlobalLogicChainClickRoute},{selector:'[data-logic-chain-vbd-trigger-card]',handler:handleLogicChainVbdTriggerCardClick},{handler:handleSnapshotTimelineNodeClick},{handler:handleSnapshotDiffDelegatedClick},{selector:'[data-timer-manual-submit]',handler:handleGlobalTimerManualSubmitClick},{selector:'[data-timer-action-submit]',handler:handleGlobalTimerActionSubmitClick},{selector:'[data-condition-type-suite]',handler:handleGlobalConditionTypeSuiteClick},{selector:'[data-condition-type-option]',handler:handleGlobalConditionTypeOptionClick},{selector:'[data-condition-node-card-click-opens-editor]',handler:handleGlobalConditionCardClick}];
+                function handleGlobalCustomComboboxOutsideClick(event){
                   const target=event.target;
-                  if(handleContainerTemplateAction(event))return;
-                  if(handleSingleItemSubmitAction(event))return;
-                  if(handlePaginationAction(event))return;
-                  if(handleLogicChainEditorDelegatedClick(event))return;
-                  if(handleSnapshotTimelineNodeClick(event))return;
-                  if(handleSnapshotDiffDelegatedClick(event))return;
-                  const timerManualSubmit=target&&target.closest?target.closest('[data-timer-manual-submit]'):null;
-                  if(timerManualSubmit){event.preventDefault();event.stopPropagation();submitTimerManualForm(timerManualSubmit.closest('#wa-modal-root')?.querySelector('[data-timer-manual-form]'));return;}
-                  const timerActionSubmit=target&&target.closest?target.closest('[data-timer-action-submit]'):null;
-                  if(timerActionSubmit){event.preventDefault();event.stopPropagation();syncTimerDraft();saveTimerEdit();return;}
-                """)
-.append("""
-                  const conditionTypeSuite=target&&target.closest?target.closest('[data-condition-type-suite]'):null;
-                  if(conditionTypeSuite){event.preventDefault();event.stopPropagation();changeConditionTypeSuiteFromElement(conditionTypeSuite);return;}
-                  const conditionTypeOption=target&&target.closest?target.closest('[data-condition-type-option]'):null;
-                  if(conditionTypeOption){event.preventDefault();event.stopPropagation();changeConditionNodeTypeFromElement(conditionTypeOption);return;}
-                  const conditionCard=target&&target.closest?target.closest('[data-condition-node-card-click-opens-editor]'):null;
-                  if(conditionCard&&!target.closest('[data-condition-node-quick-action],button,a,input,select,textarea')){event.preventDefault();event.stopPropagation();openConditionNodeEditor(conditionCard.dataset.conditionEditPath||'');return;}
-                  if(!(target&&target.closest&&target.closest('.channel-combo')))closeAllCustomComboboxes();
+                  if(globalEventTargetOutside(target,'.channel-combo'))closeAllCustomComboboxes();
                   const basic=appState.deviceBasicConfigEdit;
-                  if(basic&&!(target&&target.closest&&target.closest('#basic-channel-combo'))){basic.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(basic.deviceId);}
+                  if(basic&&globalEventTargetOutside(target,'#basic-channel-combo')){basic.channelComboOpen=false;syncDeviceBasicConfigChannelCombo(basic.deviceId);}
                   const extended=appState.deviceExtendedConfigEdit;
-                  if(extended&&!(target&&target.closest&&target.closest('.extended-channel-combo'))){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
+                  if(extended&&globalEventTargetOutside(target,'.extended-channel-combo')){Object.keys(extended.channelComboOpen||{}).forEach(field=>extended.channelComboOpen[field]=false);(extended.supportedFields||[]).filter(isExtendedChannelField).forEach(field=>syncDeviceExtendedConfigChannelCombo(extended.deviceId,field));}
                   const listener=appState.signalListenerBasicConfigEdit;
-                  if(listener&&!(target&&target.closest&&target.closest('.listener-channel-combo'))){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
+                  if(listener&&globalEventTargetOutside(target,'.listener-channel-combo')){listener.channelComboOpen=false;syncSignalListenerBasicConfigChannelCombo(listener.listenerRef);}
                   const listenerAction=appState.signalListenerActionsEdit?.draft;
-                  if(listenerAction&&!(target&&target.closest&&target.closest('.signal-listener-action-channel-combo'))){listenerAction.channelComboOpen=false;syncSignalListenerActionChannelCombo();}
+                  if(listenerAction&&globalEventTargetOutside(target,'.signal-listener-action-channel-combo')){listenerAction.channelComboOpen=false;syncSignalListenerActionChannelCombo();}
                   const createListener=appState.signalListenerCreate;
-                  if(createListener&&!(target&&target.closest&&target.closest('.listener-create-channel-combo'))){createListener.channelComboOpen=false;syncSignalListenerCreateChannelCombo();}
+                  if(createListener&&globalEventTargetOutside(target,'.listener-create-channel-combo')){createListener.channelComboOpen=false;syncSignalListenerCreateChannelCombo();}
                   const nativeDraft=appState.vbdNativeTriggerEdit;
-                  if(nativeDraft&&!(target&&target.closest&&target.closest('.vbd-native-channel-combo'))){Object.keys(nativeDraft.channelComboOpen||{}).forEach(key=>nativeDraft.channelComboOpen[key]=false);Object.keys(nativeDraft.channelComboOpen||{}).forEach(key=>syncVbdNativeTriggerChannelCombo(nativeDraft.deviceId,key));}
+                  if(nativeDraft&&globalEventTargetOutside(target,'.vbd-native-channel-combo')){Object.keys(nativeDraft.channelComboOpen||{}).forEach(key=>nativeDraft.channelComboOpen[key]=false);Object.keys(nativeDraft.channelComboOpen||{}).forEach(key=>syncVbdNativeTriggerChannelCombo(nativeDraft.deviceId,key));}
                   const actionRelay=appState.actionRelayActionsEdit;
-                  if(actionRelay&&!(target&&target.closest&&target.closest('.action-relay-channel-combo'))){Object.keys(actionRelay.channelComboOpen||{}).forEach(index=>actionRelay.channelComboOpen[index]=false);(actionRelay.actions||[]).forEach((_,index)=>syncActionRelayChannelCombo(actionRelay.deviceId,index));}
+                  if(actionRelay&&globalEventTargetOutside(target,'.action-relay-channel-combo')){Object.keys(actionRelay.channelComboOpen||{}).forEach(index=>actionRelay.channelComboOpen[index]=false);(actionRelay.actions||[]).forEach((_,index)=>syncActionRelayChannelCombo(actionRelay.deviceId,index));}
                   const logicChainChannel=appState.logicChainEditor?.newChannelDraft;
-                  if(logicChainChannel&&!(target&&target.closest&&target.closest('.logic-chain-channel-combo'))){logicChainChannel.channelComboOpen=false;syncLogicChainDraftChannelCombo();}
+                  if(logicChainChannel&&globalEventTargetOutside(target,'.logic-chain-channel-combo')){logicChainChannel.channelComboOpen=false;syncLogicChainDraftChannelCombo();}
                   const logicChainAppend=appState.logicChainEditor?.actionAppend;
-                  if(logicChainAppend&&!(target&&target.closest&&target.closest('.logic-chain-action-append-channel-combo'))){logicChainAppend.channelComboOpen=false;syncLogicChainActionAppendChannelCombo();}
+                  if(logicChainAppend&&globalEventTargetOutside(target,'.logic-chain-action-append-channel-combo')){logicChainAppend.channelComboOpen=false;syncLogicChainActionAppendChannelCombo();}
                   const regionDraft=appState.regionControllerEdit?.draft;
-                  if(regionDraft&&!(target&&target.closest&&target.closest('.region-controller-region-combo'))){regionDraft.regionComboOpen=false;syncRegionControllerRegionCombo(appState.regionControllerEdit.mode);}
-                  if(regionDraft&&!(target&&target.closest&&target.closest('.region-controller-action-channel-combo'))){regionDraft.channelComboOpen=false;syncRegionControllerActionChannelCombo();}
-                  if(!(target&&target.closest&&target.closest('.signal-join-channel-combo')))closeSignalJoinChannelOptions();
-                  if(!(target&&target.closest&&target.closest('.timer-channel-combo')))closeTimerChannelOptions();
-                  if(appState.openDeviceMoreMenuId&&!(target&&target.closest&&target.closest('.wa-device-more-popover,.wa-menu-wrap,[data-device-more-trigger]')))closeDeviceMoreMenu(false);
-                  const selection=appState.selectionCreateVirtualBlock;
-                  if(selection&&selection.step==='config'){
-                    if(!(target&&target.closest&&target.closest('.selection-player-combo'))){selection.playerComboOpen=false;}
-                    if(!(target&&target.closest&&target.closest('.selection-channel-combo'))){selection.channelComboOpen=false;}
-                    syncSelectionCombos();
-                  }
-                  if(handleHelpCenterDelegatedClick(event))return;
-                  if(document.querySelector('[data-help-term-popover]')&&!(target&&target.closest&&target.closest('[data-help-term-popover],[data-help-inline-term]')))hideHelpInlineTermPopover();
-                  const nav=target&&target.closest?target.closest('[data-nav-route]'):null;
-                  if(nav){
-                    const interactive=target.closest('button,a,input,select,textarea,[data-no-nav]');
-                    if(!interactive||interactive===nav){event.preventDefault();event.stopPropagation();activateNavRoute(nav);}
-                  }
-                });
-                document.addEventListener('keydown',event=>{
-                  if(event.key==='Escape'&&document.querySelector('[data-help-term-popover]')){event.preventDefault();event.stopPropagation();hideHelpInlineTermPopover();return;}
-                  if(event.key==='Escape'&&appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return;}
-                  if(event.key==='Escape'&&clearLogicChainHighlightByEscape(event))return;
-                  if(event.key!=='Enter'&&event.key!==' ')return;
-                  if(handleLogicChainEditorDelegatedKeydown(event))return;
-                  const conditionCard=event.target&&event.target.closest?event.target.closest('[data-condition-node-card-click-opens-editor]'):null;
-                  if(conditionCard&&event.target===conditionCard){event.preventDefault();openConditionNodeEditor(conditionCard.dataset.conditionEditPath||'');return;}
-                  const nav=event.target&&event.target.closest?event.target.closest('[data-nav-route]'):null;
-                  if(!nav||event.target!==nav||nav.tagName==='BUTTON'||nav.tagName==='A')return;
-                  event.preventDefault();activateNavRoute(nav);
-                });
-                document.addEventListener('mouseover',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)showHelpInlineTermPopover(term);const pop=event.target&&event.target.closest?event.target.closest('[data-help-term-popover]'):null;if(pop)helpClearInlineTermCloseTimer();});
-                document.addEventListener('focusin',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)showHelpInlineTermPopover(term);const pop=event.target&&event.target.closest?event.target.closest('[data-help-term-popover]'):null;if(pop)helpClearInlineTermCloseTimer();});
-                document.addEventListener('mouseout',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(!term)return;const next=event.relatedTarget;if(next?.closest?.(`[data-help-term-popover],[data-help-inline-term][data-term-id="${cssEscape(term.dataset.termId||'')}"]`))return;helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);});
-                document.addEventListener('focusout',event=>{const term=event.target&&event.target.closest?event.target.closest('[data-help-inline-term]'):null;if(term)helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);});
-                document.addEventListener('scroll',event=>{if(document.querySelector('[data-help-term-popover]')&&event.target?.closest?.('.help-document-scroll,.help-topic-list,.help-right-panel'))hideHelpInlineTermPopover();},true);
+                  if(regionDraft&&globalEventTargetOutside(target,'.region-controller-region-combo')){regionDraft.regionComboOpen=false;syncRegionControllerRegionCombo(appState.regionControllerEdit.mode);}
+                  if(regionDraft&&globalEventTargetOutside(target,'.region-controller-action-channel-combo')){regionDraft.channelComboOpen=false;syncRegionControllerActionChannelCombo();}
+                  if(globalEventTargetOutside(target,'.signal-join-channel-combo'))closeSignalJoinChannelOptions();
+                  if(globalEventTargetOutside(target,'.timer-channel-combo'))closeTimerChannelOptions();
+                  return false;
+                }
+                function handleGlobalDeviceMoreOutsideClick(event){if(appState.openDeviceMoreMenuId&&globalEventTargetOutside(event.target,'.wa-device-more-popover,.wa-menu-wrap,[data-device-more-trigger]'))closeDeviceMoreMenu(false);return false;}
+                function handleGlobalSelectionComboOutsideClick(event){const selection=appState.selectionCreateVirtualBlock;if(selection&&selection.step==='config'){if(globalEventTargetOutside(event.target,'.selection-player-combo'))selection.playerComboOpen=false;if(globalEventTargetOutside(event.target,'.selection-channel-combo'))selection.channelComboOpen=false;syncSelectionCombos();}return false;}
+                const globalClickSideEffectRoutes=[{handler:handleGlobalCustomComboboxOutsideClick},{handler:handleGlobalDeviceMoreOutsideClick},{handler:handleGlobalSelectionComboOutsideClick}];
+                function handleGlobalHelpPopoverOutsideClick(event){if(document.querySelector('[data-help-term-popover]')&&globalEventTargetOutside(event.target,'[data-help-term-popover],[data-help-inline-term]'))hideHelpInlineTermPopover();return false;}
+                function handleGlobalNavRouteClick(event,nav){const target=event.target, interactive=target.closest('button,a,input,select,textarea,[data-no-nav]');if(!interactive||interactive===nav){event.preventDefault();event.stopPropagation();activateNavRoute(nav);return true;}return false;}
+                const globalClickLateRoutes=[{handler:handleHelpCenterDelegatedClick},{handler:handleGlobalHelpPopoverOutsideClick},{selector:'[data-nav-route]',handler:handleGlobalNavRouteClick}];
+                function handleGlobalDocumentClick(event){if(dispatchDelegatedEvent(event,globalClickCommandRoutes))return;dispatchDelegatedSideEffects(event,globalClickSideEffectRoutes);dispatchDelegatedEvent(event,globalClickLateRoutes);}
+                function handleGlobalHelpPopoverEscape(event){if(event.key==='Escape'&&document.querySelector('[data-help-term-popover]')){event.preventDefault();event.stopPropagation();hideHelpInlineTermPopover();return true;}return false;}
+                function handleGlobalDeviceMoreEscape(event){if(event.key==='Escape'&&appState.openDeviceMoreMenuId){event.preventDefault();closeDeviceMoreMenu(false);return true;}return false;}
+                function handleGlobalLogicChainEscape(event){return event.key==='Escape'&&clearLogicChainHighlightByEscape(event);}
+                function handleGlobalConditionCardKeydown(event,card){if((event.key!=='Enter'&&event.key!==' ')||event.target!==card)return false;event.preventDefault();openConditionNodeEditor(card.dataset.conditionEditPath||'');return true;}
+                function handleGlobalNavRouteKeydown(event,nav){if((event.key!=='Enter'&&event.key!==' ')||event.target!==nav||nav.tagName==='BUTTON'||nav.tagName==='A')return false;event.preventDefault();activateNavRoute(nav);return true;}
+                const globalPrimaryKeydownRoutes=[{handler:handleGlobalHelpPopoverEscape},{handler:handleGlobalDeviceMoreEscape},{handler:handleGlobalLogicChainEscape},{handler:handleLogicChainEditorDelegatedKeydown},{selector:'[data-condition-node-card-click-opens-editor]',handler:handleGlobalConditionCardKeydown},{selector:'[data-nav-route]',handler:handleGlobalNavRouteKeydown}];
+                function handleGlobalPrimaryKeydown(event){dispatchDelegatedEvent(event,globalPrimaryKeydownRoutes);}
+                function handleHelpInlineTermOpen(event,term){showHelpInlineTermPopover(term);return true;}
+                function handleHelpInlineTermPopoverHover(){helpClearInlineTermCloseTimer();return true;}
+                const helpPopoverOpenRoutes=[{selector:'[data-help-inline-term]',handler:handleHelpInlineTermOpen},{selector:'[data-help-term-popover]',handler:handleHelpInlineTermPopoverHover}];
+                function handleHelpPopoverOpenEvent(event){dispatchDelegatedSideEffects(event,helpPopoverOpenRoutes);}
+                function handleHelpPopoverMouseOut(event){const term=event.target?.closest?.('[data-help-inline-term]');if(!term)return;const next=event.relatedTarget;if(next?.closest?.(`[data-help-term-popover],[data-help-inline-term][data-term-id="${cssEscape(term.dataset.termId||'')}"]`))return;helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);}
+                function handleHelpPopoverFocusOut(event){const term=event.target?.closest?.('[data-help-inline-term]');if(term)helpScheduleInlineTermPopoverClose(term.dataset.termId||'',140);}
+                function handleHelpPopoverScroll(event){if(document.querySelector('[data-help-term-popover]')&&event.target?.closest?.('.help-document-scroll,.help-topic-list,.help-right-panel'))hideHelpInlineTermPopover();}
+                document.addEventListener('pointerup',handleGlobalPointerUpCapture,true);
+                document.addEventListener('click',handleGlobalClickCapture,true);
+                document.addEventListener('pointerdown',handleGlobalPointerDownCapture,true);
+                document.addEventListener('mouseover',handleGlobalMouseOverCapture,true);
+                document.addEventListener('mouseout',handleGlobalMouseOutCapture,true);
+                document.addEventListener('click',handleGlobalDocumentClick);
+                document.addEventListener('keydown',handleGlobalPrimaryKeydown);
+                document.addEventListener('mouseover',handleHelpPopoverOpenEvent);
+                document.addEventListener('focusin',handleHelpPopoverOpenEvent);
+                document.addEventListener('mouseout',handleHelpPopoverMouseOut);
+                document.addEventListener('focusout',handleHelpPopoverFocusOut);
+                document.addEventListener('scroll',handleHelpPopoverScroll,true);
                 window.addEventListener('beforeunload',event=>{if(logicChainEditorHasUnsavedWork(appState.logicChainEditor)){event.preventDefault();event.returnValue='';}});
                 async function renderDashboard(options={}){
                   if(!options.silent)setView(loading('正在加载总览...'));
