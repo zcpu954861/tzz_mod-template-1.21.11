@@ -341,7 +341,7 @@ public final class WebAdminTimerService {
             boolean sameOrigin
     ) {
         String safeId = TimerStore.normalizeId(id);
-        String safeBucket = safe(bucket).toLowerCase(java.util.Locale.ROOT);
+        String safeBucket = normalizeActionBucket(bucket);
         WebAdminWriteTarget target = target(safeId);
         WebAdminWriteContext context = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_TIMER, target);
         WebAdminWriteResult preflight = writePreflight(user, session, csrfToken, sameOrigin, target, safe(lockId), safeId);
@@ -349,11 +349,11 @@ public final class WebAdminTimerService {
             audit(context, preflight, Map.of(), Map.of("attempt", "append_action_preflight_failed", "bucket", safeBucket));
             return preflight;
         }
-        if (!"tick".equals(safeBucket) && !"complete".equals(safeBucket)) {
+        if (!isEditableActionBucket(safeBucket)) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
                     "bucket",
                     "logic_chain_timer_action_bucket_invalid",
-                    "逻辑链编辑器当前只允许追加 Timer onTick / onComplete Action。",
+                    "逻辑链编辑器当前只允许追加 Timer onStart / onTick / onComplete / onCancel Action。",
                     safeBucket
             )));
             audit(context, result, Map.of(), Map.of("attempt", "append_action_invalid_bucket", "bucket", safeBucket));
@@ -390,12 +390,10 @@ public final class WebAdminTimerService {
             return result;
         }
 
-        List<ActionConfig> current = "tick".equals(safeBucket)
-                ? normalizedBefore.onTickActions
-                : normalizedBefore.onCompleteActions;
+        List<ActionConfig> current = timerActionsForBucket(normalizedBefore, safeBucket);
         if (current.size() >= MAX_ACTIONS_PER_LIST) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
-                    safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions",
+                    timerActionField(safeBucket),
                     "timer_too_many_actions",
                     "每个 Timer action list 最多支持 64 条动作。",
                     String.valueOf(current.size())
@@ -406,9 +404,9 @@ public final class WebAdminTimerService {
         List<WebAdminValidationError> errors = new ArrayList<>();
         validateActionEntries(
                 server,
-                safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions",
+                timerActionField(safeBucket),
                 List.of(action == null ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry() : action),
-                safeBucket.equals("tick") ? ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION : ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION,
+                timerActionTargetType(safeBucket),
                 errors
         );
         if (!errors.isEmpty()) {
@@ -420,11 +418,7 @@ public final class WebAdminTimerService {
         TimerDefinition afterDraft = normalizedBefore.normalized();
         List<ActionConfig> appended = new ArrayList<>(current);
         appended.add(WebAdminActionRelayActionsService.actionFromEntry(action).normalized());
-        if ("tick".equals(safeBucket)) {
-            afterDraft.onTickActions = List.copyOf(appended);
-        } else {
-            afterDraft.onCompleteActions = List.copyOf(appended);
-        }
+        setTimerActionsForBucket(afterDraft, safeBucket, appended);
         TimerDefinition after = afterDraft.withWriteMetadata(username(user), before.version + 1L, false);
         loaded.file().timers.put(after.id, after);
         if (!save(server, loaded.file())) {
@@ -433,10 +427,10 @@ public final class WebAdminTimerService {
             return result;
         }
         TimerRuntimeService.clearTimer(server, after.id);
-        WebAdminWriteResult result = okWithData(target, ("tick".equals(safeBucket) ? "Timer Tick Action" : "Timer 完成 Action") + " 已追加。", Map.of(
+        WebAdminWriteResult result = okWithData(target, timerActionBucketLabel(safeBucket) + " 已追加。", Map.of(
                 "timer", detailMap(server, after, user, session, true, currentGameTime(server)),
                 "routeTarget", routeTarget(after.id),
-                "changedFields", List.of(safeBucket.equals("tick") ? "onTickActions" : "onCompleteActions"),
+                "changedFields", List.of(timerActionField(safeBucket)),
                 "actionCountBefore", current.size(),
                 "actionCountAfter", appended.size()
         ));
@@ -556,6 +550,152 @@ public final class WebAdminTimerService {
         ));
         WebAdminAuditEvent auditEvent = audit(context, result, TimerStore.summary(before), TimerStore.summary(after));
         publishConfigRealtime(after, auditEvent, user, "Timer Action 已更新。");
+        releaseLockAfterWrite(lockId, user, session, remoteAddress, after.id);
+        return result;
+    }
+
+    public WebAdminWriteResult deleteActionInBucket(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String id,
+            String bucket,
+            Object actionIndex,
+            boolean confirmed,
+            String expectedFingerprint,
+            String lockId,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        if (!confirmed) {
+            return WebAdminWriteResult.failed(WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION, target(TimerStore.normalizeId(id)), "删除 Timer action 需要二次确认。");
+        }
+        return mutateActionOrderInBucket(server, user, session, remoteAddress, id, bucket, expectedFingerprint, lockId, csrfToken, sameOrigin, "delete", parseActionIndex(actionIndex), -1);
+    }
+
+    public WebAdminWriteResult reorderActionInBucket(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String id,
+            String bucket,
+            Object fromIndex,
+            Object toIndex,
+            boolean confirmed,
+            String expectedFingerprint,
+            String lockId,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        if (!confirmed) {
+            return WebAdminWriteResult.failed(WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION, target(TimerStore.normalizeId(id)), "重排 Timer action 需要二次确认。");
+        }
+        return mutateActionOrderInBucket(server, user, session, remoteAddress, id, bucket, expectedFingerprint, lockId, csrfToken, sameOrigin, "reorder", parseActionIndex(fromIndex), parseActionIndex(toIndex));
+    }
+
+    private WebAdminWriteResult mutateActionOrderInBucket(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String id,
+            String bucket,
+            String expectedFingerprint,
+            String lockId,
+            String csrfToken,
+            boolean sameOrigin,
+            String operation,
+            int fromIndex,
+            int toIndex
+    ) {
+        String safeId = TimerStore.normalizeId(id);
+        String safeBucket = normalizeActionBucket(bucket);
+        WebAdminWriteTarget target = target(safeId);
+        WebAdminWriteContext context = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_TIMER, target);
+        WebAdminWriteResult preflight = writePreflight(user, session, csrfToken, sameOrigin, target, safe(lockId), safeId);
+        if (!preflight.success()) {
+            audit(context, preflight, Map.of(), Map.of("attempt", operation + "_action_preflight_failed", "bucket", safeBucket));
+            return preflight;
+        }
+        if (!isEditableActionBucket(safeBucket)) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
+                    "bucket",
+                    "logic_chain_timer_action_bucket_invalid",
+                    "Timer action bucket 只支持 start / tick / complete / cancel。",
+                    safeBucket
+            )));
+            audit(context, result, Map.of(), Map.of("attempt", operation + "_action_invalid_bucket", "bucket", safeBucket));
+            return result;
+        }
+        TimerStore.TimerLoadResult loaded = loadResult(server);
+        if (loaded.degraded()) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, loaded.message());
+            audit(context, result, Map.of(), Map.of("attempt", operation + "_action_store_degraded", "bucket", safeBucket));
+            return result;
+        }
+        TimerDefinition before = loaded.file().timers.get(safeId);
+        if (before == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Timer 不存在或已删除。");
+            audit(context, result, Map.of(), Map.of("attempt", operation + "_action_missing", "bucket", safeBucket));
+            return result;
+        }
+        String expected = safe(expectedFingerprint);
+        String actual = TimerStore.fingerprintFor(before);
+        if (expected.isBlank() || !actual.equals(expected)) {
+            WebAdminWriteResult result = fingerprintConflict(target, before, expected);
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", operation + "_action_fingerprint_conflict", "bucket", safeBucket));
+            return result;
+        }
+
+        TimerDefinition normalizedBefore = before.normalized();
+        List<ActionConfig> current = timerActionsForBucket(normalizedBefore, safeBucket);
+        if (fromIndex < 0 || fromIndex >= current.size() || ("reorder".equals(operation) && (toIndex < 0 || toIndex >= current.size()))) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
+                    timerActionField(safeBucket),
+                    "logic_chain_timer_action_index_out_of_range",
+                    "要维护的 Timer Action 已不存在，请刷新后重试。",
+                    fromIndex + ("reorder".equals(operation) ? " -> " + toIndex : "")
+            )));
+            audit(context, result, TimerStore.summary(before), Map.of("attempt", operation + "_action_index_out_of_range", "bucket", safeBucket, "fromIndex", fromIndex, "toIndex", toIndex));
+            return result;
+        }
+        if ("reorder".equals(operation) && fromIndex == toIndex) {
+            WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "Timer Action 顺序没有变化。");
+            audit(context, result, TimerStore.summary(before), TimerStore.summary(before));
+            releaseLockAfterWrite(lockId, user, session, remoteAddress, normalizedBefore.id);
+            return result;
+        }
+
+        List<ActionConfig> changed = new ArrayList<>(current);
+        if ("delete".equals(operation)) {
+            changed.remove(fromIndex);
+        } else {
+            ActionConfig moving = changed.remove(fromIndex);
+            changed.add(toIndex, moving);
+        }
+        TimerDefinition afterDraft = normalizedBefore.normalized();
+        setTimerActionsForBucket(afterDraft, safeBucket, changed);
+        TimerDefinition after = afterDraft.withWriteMetadata(username(user), before.version + 1L, false);
+        loaded.file().timers.put(after.id, after);
+        if (!save(server, loaded.file())) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "Timer Action " + ("delete".equals(operation) ? "删除" : "重排") + "失败，请查看服务端日志。");
+            audit(context, result, TimerStore.summary(before), TimerStore.summary(after));
+            return result;
+        }
+        TimerRuntimeService.clearTimer(server, after.id);
+        WebAdminWriteResult result = okWithData(target, "Timer Action 已" + ("delete".equals(operation) ? "删除" : "重排") + "。", Map.of(
+                "timer", detailMap(server, after, user, session, true, currentGameTime(server)),
+                "routeTarget", routeTarget(after.id),
+                "changedFields", List.of(timerActionField(safeBucket)),
+                "fromIndex", fromIndex,
+                "toIndex", toIndex,
+                "actionCountBefore", current.size(),
+                "actionCountAfter", changed.size()
+        ));
+        WebAdminAuditEvent auditEvent = audit(context, result, TimerStore.summary(before), TimerStore.summary(after));
+        publishConfigRealtime(after, auditEvent, user, "Timer Action 已" + ("delete".equals(operation) ? "删除" : "重排") + "。");
         releaseLockAfterWrite(lockId, user, session, remoteAddress, after.id);
         return result;
     }
@@ -1190,6 +1330,16 @@ public final class WebAdminTimerService {
             case "complete" -> "onCompleteActions";
             case "cancel" -> "onCancelActions";
             default -> "actions";
+        };
+    }
+
+    private static String timerActionBucketLabel(String bucket) {
+        return switch (bucket) {
+            case "start" -> "Timer 启动 Action";
+            case "tick" -> "Timer Tick Action";
+            case "complete" -> "Timer 完成 Action";
+            case "cancel" -> "Timer 取消 Action";
+            default -> "Timer Action";
         };
     }
 

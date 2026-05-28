@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zcpu.tzzmod.ModBlock.entity.SignalReceiverBlockEntity;
 import com.zcpu.tzzmod.action.ActionExecutionResult;
+import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionSessions;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -44,6 +45,9 @@ public final class SignalReceiverCommand {
     }
 
     private static int executePulse(ServerCommandSource source, BlockPos pos, int ticks) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "修改脉冲")) {
+            return 0;
+        }
         SignalReceiverBlockEntity receiver = getReceiver(source, pos);
         if (receiver == null) {
             return 0;
@@ -58,6 +62,9 @@ public final class SignalReceiverCommand {
     }
 
     private static int executeTrigger(ServerCommandSource source, BlockPos pos) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "手动触发")) {
+            return 0;
+        }
         SignalReceiverBlockEntity receiver = getReceiver(source, pos);
         if (receiver == null) {
             return 0;

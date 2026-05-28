@@ -1,9 +1,12 @@
 package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.signal.SignalBridgeServer;
+import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.signal.SignalListenerData;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
@@ -14,6 +17,7 @@ import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventBus;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEventType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminOperationType;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionDecision;
 import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
@@ -30,22 +34,63 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.nio.file.Path;
 import net.minecraft.server.MinecraftServer;
 
 public final class WebAdminSignalListenerLifecycleService {
     public static final int MAX_LISTENER_NAME_LENGTH = 64;
     public static final int MAX_CHANNEL_LENGTH = 128;
     public static final int MAX_COOLDOWN_TICKS = WebAdminSignalListenerBasicConfigService.MAX_COOLDOWN_TICKS;
+    public static final String CREATE_LOCK_TARGET_ID = "new";
+    public static final String CREATE_EXPECTED_FINGERPRINT = "signal_listener_create_v1";
 
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
+    private final WebAdminEditLockService editLockService;
+    private final Path testStorePath;
+    private final WebAdminConditionGateBindingValidator gateBindingValidator;
 
     public WebAdminSignalListenerLifecycleService(
             WebAdminPermissionService permissionService,
             WebAdminWriteSecurityService securityService
     ) {
+        this(permissionService, securityService, null, null);
+    }
+
+    public WebAdminSignalListenerLifecycleService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService
+    ) {
+        this(permissionService, securityService, editLockService, null);
+    }
+
+    WebAdminSignalListenerLifecycleService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            Path testStorePath
+    ) {
+        this(permissionService, securityService, null, testStorePath);
+    }
+
+    WebAdminSignalListenerLifecycleService(
+            WebAdminPermissionService permissionService,
+            WebAdminWriteSecurityService securityService,
+            WebAdminEditLockService editLockService,
+            Path testStorePath
+    ) {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
+        this.editLockService = editLockService;
+        this.testStorePath = testStorePath;
+        this.gateBindingValidator = new WebAdminConditionGateBindingValidator(conditionGroupTestPath(testStorePath));
+    }
+
+    private static Path conditionGroupTestPath(Path signalListenerTestStorePath) {
+        return signalListenerTestStorePath == null || signalListenerTestStorePath.getParent() == null
+                ? null
+                : signalListenerTestStorePath.getParent().resolve(WebAdminConditionGroupStore.FILE_NAME);
     }
 
     public WebAdminWriteResult create(
@@ -57,7 +102,7 @@ public final class WebAdminSignalListenerLifecycleService {
             String csrfToken,
             boolean sameOrigin
     ) {
-        WebAdminWriteTarget target = new WebAdminWriteTarget("SIGNAL_LISTENER", "", "新建 Signal Listener");
+        WebAdminWriteTarget target = new WebAdminWriteTarget("SIGNAL_LISTENER", CREATE_LOCK_TARGET_ID, "新建 Signal Listener");
         WebAdminWriteContext context = WebAdminWriteContext.of(
                 user,
                 session,
@@ -70,7 +115,44 @@ public final class WebAdminSignalListenerLifecycleService {
             return gate;
         }
 
-        List<WebAdminValidationError> errors = validateCreateRequest(request);
+        if (editLockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG,
+                    CREATE_LOCK_TARGET_ID,
+                    request == null ? "" : request.lockId,
+                    user,
+                    session
+            );
+            if (!lockValidation.success()) {
+                WebAdminWriteResult result = lockValidation.result();
+                audit(context, result, Map.of(), Map.of("attempt", "create_edit_lock_failed"));
+                return result;
+            }
+        }
+        if (request == null || !CREATE_EXPECTED_FINGERPRINT.equals(safe(request.expectedFingerprint))) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "expectedFingerprint",
+                    "signal_listener_create_fingerprint_required",
+                    "创建 Signal Listener 需要 create fingerprint，用于保持 WebAdmin 写入边界一致。",
+                    safe(request == null ? "" : request.expectedFingerprint)
+            )));
+            audit(context, result, Map.of(), Map.of("attempt", "create_fingerprint_missing"));
+            return result;
+        }
+
+        List<WebAdminValidationError> errors = new ArrayList<>(validateCreateRequest(request));
+        var actionEntries = request == null || request.actions == null ? List.<com.zcpu.tzzmod.webadmin.dto.WebAdminActionRelayActionsUpdateRequest.ActionEntry>of() : request.actions;
+        errors.addAll(WebAdminActionRelayActionsService.validateActionEntries(actionEntries));
+        String conditionGroupId = request == null ? "" : WebAdminConditionGroupStore.normalizeId(request.conditionGroupId);
+        if (!conditionGroupId.isBlank()) {
+            gateBindingValidator.validate(
+                    server,
+                    errors,
+                    "conditionGroupId",
+                    conditionGroupId,
+                    ConditionRuntimeTargetType.SIGNAL_LISTENER
+            );
+        }
         if (!errors.isEmpty()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
             audit(context, result, Map.of(), createRequestSummary(request));
@@ -79,7 +161,7 @@ public final class WebAdminSignalListenerLifecycleService {
 
         String name = listenerName(request);
         String channel = SignalChannel.normalize(request.channel);
-        for (SignalListenerData listener : SignalListenerStore.getSnapshot(server)) {
+        for (SignalListenerData listener : listeners(server)) {
             if (!name.isBlank() && listener.name().equalsIgnoreCase(name)) {
                 WebAdminWriteResult result = new WebAdminWriteResult(
                         false,
@@ -102,8 +184,27 @@ public final class WebAdminSignalListenerLifecycleService {
 
         boolean enabled = request.enabled == null || (request.enabled instanceof Boolean bool && bool);
         int cooldownTicks = request.cooldownTicks == null ? SignalListenerData.DEFAULT_COOLDOWN_TICKS : ((Number) request.cooldownTicks).intValue();
-        SignalListenerData listener = SignalListenerStore.createListener(server, channel, name, enabled, cooldownTicks).normalized();
-        SignalListenerStore.flushDirty(server);
+        List<ActionConfig> actions = actionEntries.stream()
+                .map(WebAdminActionRelayActionsService::actionFromEntry)
+                .map(ActionConfig::normalized)
+                .toList();
+        SignalListenerData listener = new SignalListenerData(
+                UUID.randomUUID().toString(),
+                name,
+                channel,
+                enabled,
+                cooldownTicks,
+                WebAdminConditionGroupStore.normalizeId(request.conditionGroupId),
+                actions
+        ).normalized();
+        if (!addListener(server, listener)) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.INTERNAL_ERROR, target, "Signal Listener 创建失败，请检查监听器存储状态。");
+            audit(context, result, Map.of(), createRequestSummary(request));
+            return result;
+        }
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         WebAdminWriteTarget resultTarget = new WebAdminWriteTarget("SIGNAL_LISTENER", listener.id(), displayName(listener));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("listener", listenerSummary(listener));
@@ -112,7 +213,7 @@ public final class WebAdminSignalListenerLifecycleService {
         WebAdminWriteResult result = new WebAdminWriteResult(
                 true,
                 WebAdminWriteResultCode.OK.id(),
-                "Signal Listener 已创建。当前监听器没有动作，可在后续动作编辑阶段配置。",
+                actions.isEmpty() ? "Signal Listener 已创建。当前监听器没有动作，可在后续动作编辑阶段配置。" : "Signal Listener 已创建，并写入草稿 Action 列表。",
                 resultTarget.targetType(),
                 resultTarget.targetId(),
                 true,
@@ -130,6 +231,16 @@ public final class WebAdminSignalListenerLifecycleService {
                 listenerSummary(listener)
         );
         publishRealtime(listener, auditEvent, user, false);
+        if (editLockService != null) {
+            editLockService.releaseAfterWrite(
+                    WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG,
+                    CREATE_LOCK_TARGET_ID,
+                    request.lockId,
+                    user,
+                    session,
+                    remoteAddress
+            );
+        }
         return result;
     }
 
@@ -175,19 +286,50 @@ public final class WebAdminSignalListenerLifecycleService {
             audit(context, result, Map.of(), Map.of("attempt", "target_not_found"));
             return result;
         }
+        if (editLockService != null) {
+            WebAdminEditLockService.LockValidation lockValidation = editLockService.validateLock(
+                    WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG,
+                    listener.id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session
+            );
+            if (!lockValidation.success()) {
+                WebAdminWriteResult result = lockValidation.result();
+                audit(context, result, listenerSummary(listener), Map.of("attempt", "edit_lock_failed"));
+                return result;
+            }
+        }
+        if (request == null || safe(request.expectedFingerprint).isBlank()) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "expectedFingerprint",
+                    "required",
+                    "删除 Signal Listener 需要 expectedFingerprint，用于防止覆盖其它操作的修改。",
+                    ""
+            )));
+            audit(context, result, listenerSummary(listener), Map.of("attempt", "expected_fingerprint_missing"));
+            return result;
+        }
+        if (!WebAdminSignalListenerBasicConfigService.fingerprintFor(listener).equals(request.expectedFingerprint)) {
+            WebAdminWriteResult result = conflictDetected(target, listener, request.expectedFingerprint);
+            audit(context, result, listenerSummary(listener), Map.of("attempt", "fingerprint_conflict"));
+            return result;
+        }
         WebAdminWriteResult confirmation = requireDangerConfirmation(request, target, listener);
         if (!confirmation.success()) {
             audit(context, confirmation, listenerSummary(listener), Map.of("attempt", "confirmation_required"));
             return confirmation;
         }
 
-        boolean deleted = SignalListenerStore.deleteListener(server, listener.id());
+        boolean deleted = deleteListener(server, listener.id());
         if (!deleted) {
             WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
             audit(context, result, listenerSummary(listener), Map.of("attempt", "already_removed"));
             return result;
         }
-        SignalListenerStore.flushDirty(server);
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
         SignalBridgeServer.clearListenerRuntime(listener.id());
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -210,7 +352,82 @@ public final class WebAdminSignalListenerLifecycleService {
         );
         WebAdminAuditEvent auditEvent = audit(context, result, listenerSummary(listener), Map.of("removed", true, "reason", safe(request == null ? "" : request.reason)));
         publishRealtime(listener, auditEvent, user, true);
+        if (editLockService != null) {
+            editLockService.releaseAfterWrite(
+                    WebAdminEditLockService.TARGET_SIGNAL_LISTENER_BASIC_CONFIG,
+                    listener.id(),
+                    request == null ? "" : request.lockId,
+                    user,
+                    session,
+                    remoteAddress
+            );
+        }
         return result;
+    }
+
+    private List<SignalListenerData> listeners(MinecraftServer server) {
+        if (testStorePath == null) {
+            return SignalListenerStore.getSnapshot(server);
+        }
+        return List.copyOf(SignalListenerStore.loadWithStatus(testStorePath).file().listeners);
+    }
+
+    private boolean addListener(MinecraftServer server, SignalListenerData listener) {
+        if (testStorePath == null) {
+            return SignalListenerStore.addListenerExactForWebAdmin(server, listener);
+        }
+        SignalListenerStore.SignalListenerLoadResult loaded = SignalListenerStore.loadWithStatus(testStorePath);
+        if (loaded.degraded()) {
+            return false;
+        }
+        SignalListenerData normalized = listener == null ? null : listener.normalized();
+        if (normalized == null || normalized.id().isBlank() || !SignalChannel.isValid(normalized.channel())) {
+            return false;
+        }
+        for (SignalListenerData existing : loaded.file().listeners) {
+            if (existing.id().equals(normalized.id())) {
+                return false;
+            }
+        }
+        SignalListenerStore.DataFile file = loaded.file();
+        file.listeners.add(normalized);
+        boolean saved = SignalListenerStore.save(testStorePath, file);
+        if (saved) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                    normalized,
+                    "Signal Listener 已创建：" + displayName(normalized)
+            );
+        }
+        return saved;
+    }
+
+    private boolean deleteListener(MinecraftServer server, String listenerId) {
+        if (testStorePath == null) {
+            return SignalListenerStore.deleteListener(server, listenerId);
+        }
+        SignalListenerStore.SignalListenerLoadResult loaded = SignalListenerStore.loadWithStatus(testStorePath);
+        if (loaded.degraded()) {
+            return false;
+        }
+        SignalListenerStore.DataFile file = loaded.file();
+        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(testStorePath, listenerId);
+        if (!resolved.foundUnique()) {
+            return false;
+        }
+        boolean removed = file.listeners.removeIf(listener -> listener.id().equals(resolved.listener().id()));
+        if (!removed) {
+            return false;
+        }
+        boolean saved = SignalListenerStore.save(testStorePath, file);
+        if (saved) {
+            WebAdminRealtimeEventBus.publishSignalListenerEvent(
+                    WebAdminRealtimeEventType.SIGNAL_LISTENER_CHANGED,
+                    resolved.listener(),
+                    "Signal Listener 已删除：" + displayName(resolved.listener())
+            );
+        }
+        return saved;
     }
 
     public static List<WebAdminValidationError> validateCreateRequest(WebAdminSignalListenerCreateRequest request) {
@@ -304,11 +521,37 @@ public final class WebAdminSignalListenerLifecycleService {
     }
 
     private SignalListenerData findListener(MinecraftServer server, String listenerId) {
-        if (server == null || listenerId == null || listenerId.isBlank()) {
+        if (listenerId == null || listenerId.isBlank()) {
             return null;
         }
-        SignalListenerStore.ResolveResult resolved = SignalListenerStore.resolveListener(server, listenerId);
+        SignalListenerStore.ResolveResult resolved = testStorePath == null
+                ? (server == null ? null : SignalListenerStore.resolveListener(server, listenerId))
+                : SignalListenerStore.resolveListener(testStorePath, listenerId);
+        if (resolved == null) {
+            return null;
+        }
         return resolved.foundUnique() ? resolved.listener().normalized() : null;
+    }
+
+    private static WebAdminWriteResult conflictDetected(WebAdminWriteTarget target, SignalListenerData current, String expectedFingerprint) {
+        Map<String, Object> conflict = new LinkedHashMap<>();
+        conflict.put("expectedFingerprint", expectedFingerprint);
+        conflict.put("currentFingerprint", WebAdminSignalListenerBasicConfigService.fingerprintFor(current));
+        conflict.put("listenerId", current == null ? "" : current.id());
+        return new WebAdminWriteResult(
+                false,
+                WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
+                "Signal Listener 已被其它操作修改，请刷新后重新确认删除。",
+                target.targetType(),
+                target.targetId(),
+                false,
+                List.of(),
+                "",
+                "",
+                false,
+                conflict,
+                Map.of()
+        );
     }
 
     private WebAdminAuditEvent audit(WebAdminWriteContext context, WebAdminWriteResult result, Map<String, ?> before, Map<String, ?> after) {
@@ -349,7 +592,11 @@ public final class WebAdminSignalListenerLifecycleService {
         summary.put("channel", SignalChannel.normalize(request.channel));
         summary.put("enabled", request.enabled == null ? true : request.enabled);
         summary.put("cooldownTicks", request.cooldownTicks == null ? 0 : request.cooldownTicks);
+        summary.put("conditionGroupId", WebAdminConditionGroupStore.normalizeId(request.conditionGroupId));
+        summary.put("noteDeferred", !safe(request.note).isBlank());
         summary.put("actionsCreated", 0);
+        summary.put("expectedFingerprint", safe(request.expectedFingerprint));
+        summary.put("lockProvided", !safe(request.lockId).isBlank());
         return summary;
     }
 
@@ -363,6 +610,7 @@ public final class WebAdminSignalListenerLifecycleService {
         summary.put("channel", listener.channel());
         summary.put("enabled", listener.enabled());
         summary.put("cooldownTicks", listener.cooldownTicks());
+        summary.put("conditionGroupId", listener.conditionGroupId());
         summary.put("actionCount", listener.actions().size());
         return summary;
     }

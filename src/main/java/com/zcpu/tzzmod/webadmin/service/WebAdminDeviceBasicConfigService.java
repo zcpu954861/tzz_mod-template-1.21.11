@@ -203,6 +203,17 @@ public final class WebAdminDeviceBasicConfigService {
             return result;
         }
 
+        if (request != null && Boolean.TRUE.equals(request.strictPhysicalPresence) && isPhysicalDevice(device) && !loadedPhysicalDevicePresent(server, device)) {
+            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(new WebAdminValidationError(
+                    "device",
+                    "logic_chain_physical_device_missing_or_broken",
+                    "实体设备方块不存在、区块未加载或方块实体类型不匹配；Logic Chain 保存已 fail closed，避免把已损坏设备当成正常节点保存。",
+                    device.id()
+            )));
+            audit(writeContext, result, currentSummary(device), requestSummary(request));
+            return result;
+        }
+
         boolean enabled = (Boolean) request.enabled;
         String channel = SignalChannel.normalize(request.channel);
         if (device.enabled() == enabled && device.channel().equals(channel)) {
@@ -307,6 +318,27 @@ public final class WebAdminDeviceBasicConfigService {
                     SignalDeviceData.TYPE_SIGNAL_RECEIVER,
                     SignalDeviceData.TYPE_ACTION_RELAY -> new Support(true, "");
             default -> new Support(false, "该设备类型暂不支持 WebAdmin 基础配置编辑。");
+        };
+    }
+
+    private static boolean isPhysicalDevice(SignalDeviceData device) {
+        if (device == null) {
+            return false;
+        }
+        return SignalDeviceData.TYPE_SIGNAL_EMITTER.equals(device.type())
+                || SignalDeviceData.TYPE_SIGNAL_RECEIVER.equals(device.type())
+                || SignalDeviceData.TYPE_ACTION_RELAY.equals(device.type());
+    }
+
+    private static boolean loadedPhysicalDevicePresent(MinecraftServer server, SignalDeviceData device) {
+        if (device == null) {
+            return false;
+        }
+        return switch (device.type()) {
+            case SignalDeviceData.TYPE_SIGNAL_EMITTER -> SignalDeviceStore.getLoadedEmitter(server, device) != null;
+            case SignalDeviceData.TYPE_SIGNAL_RECEIVER -> SignalDeviceStore.getLoadedReceiver(server, device) != null;
+            case SignalDeviceData.TYPE_ACTION_RELAY -> SignalDeviceStore.getLoadedActionRelay(server, device) != null;
+            default -> true;
         };
     }
 

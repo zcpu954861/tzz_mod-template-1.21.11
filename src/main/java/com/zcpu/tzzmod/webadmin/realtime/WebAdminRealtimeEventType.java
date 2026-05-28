@@ -52,6 +52,7 @@ public enum WebAdminRealtimeEventType {
     SNAPSHOT_ROLLBACK_APPLIED("snapshot_rollback_applied", "配置快照回滚已应用"),
     SNAPSHOT_TIMELINE_CHANGED("snapshot_timeline_changed", "配置快照时间轴已变化"),
     CONDITION_GROUP_CHANGED("condition_group_changed", "条件组已变化"),
+    STATE_VARIABLE_CHANGED("state_variable_changed", "状态变量已变化"),
     CONDITION_GATE_HISTORY_APPENDED("condition_gate_history_appended", "条件 gate 历史已追加"),
     SIGNAL_LISTENER_CONFIG_CHANGED("signal_listener_config_changed", "Signal Listener 配置已变化"),
     SELECTION_STARTED("selection_started", "对象选择已开始"),

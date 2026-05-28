@@ -253,6 +253,78 @@ public final class WebAdminSignalListenerActionsService {
         }
     }
 
+    public WebAdminWriteResult reorderAction(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            String listenerRef,
+            Object fromIndexValue,
+            Object toIndexValue,
+            Boolean confirmed,
+            String expectedFingerprint,
+            String lockId,
+            String csrfToken,
+            boolean sameOrigin
+    ) {
+        synchronized (SignalListenerStore.class) {
+        SignalListenerData before = findListener(server, listenerRef);
+        WebAdminWriteTarget target = before == null ? target(safe(listenerRef), safe(listenerRef)) : target(before);
+        WebAdminWriteContext context = WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_SIGNAL_LISTENER_ACTIONS, target);
+        if (before == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 不存在或引用不唯一。");
+            audit(context, result, Map.of(), Map.of("attempt", "action_reorder_missing"));
+            return result;
+        }
+        WebAdminWriteResult common = validateWriteCommon(user, session, csrfToken, sameOrigin, target, before.id(), safe(lockId), safe(expectedFingerprint), before);
+        if (common != null) {
+            audit(context, common, auditSummary(before), Map.of("attempt", "action_reorder_denied"));
+            return common;
+        }
+        if (!Boolean.TRUE.equals(confirmed)) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.DANGEROUS_OPERATION_REQUIRES_CONFIRMATION, target, "重排虚拟监听器动作需要二次确认。");
+            audit(context, result, auditSummary(before), Map.of("attempt", "action_reorder_requires_confirmation"));
+            return result;
+        }
+        int fromIndex = parseInteger(fromIndexValue, -1);
+        int toIndex = parseInteger(toIndexValue, -1);
+        List<ActionConfig> actions = new ArrayList<>(before.actions());
+        if (fromIndex < 0 || fromIndex >= actions.size() || toIndex < 0 || toIndex >= actions.size()) {
+            WebAdminWriteResult result = validation(target, "fromIndex", "out_of_range", "要重排的 action 已不存在，请刷新后重试。", fromIndex + " -> " + toIndex);
+            audit(context, result, auditSummary(before), Map.of("attempt", "action_reorder_out_of_range", "fromIndex", fromIndex, "toIndex", toIndex));
+            return result;
+        }
+        if (fromIndex == toIndex) {
+            WebAdminWriteResult result = WebAdminWriteResult.noChange(target, "虚拟监听器动作顺序没有变化。");
+            audit(context, result, auditSummary(before), auditSummary(before));
+            releaseLockAfterWrite(before.id(), lockId, user, session, remoteAddress);
+            return result;
+        }
+        ActionConfig moving = actions.remove(fromIndex);
+        actions.add(toIndex, moving);
+        SignalListenerData after = replaceActions(server, before.id(), actions);
+        if (testStorePath == null) {
+            SignalListenerStore.flushDirty(server);
+        }
+        if (after == null) {
+            WebAdminWriteResult result = WebAdminWriteResult.failed(WebAdminWriteResultCode.TARGET_NOT_FOUND, target, "Signal Listener 已被删除。");
+            audit(context, result, auditSummary(before), Map.of("attempt", "action_reorder_removed"));
+            return result;
+        }
+        Map<String, Object> data = Map.of(
+                "actionList", actionData(after, user, session),
+                "changedFields", List.of("actions"),
+                "fromIndex", fromIndex,
+                "toIndex", toIndex
+        );
+        WebAdminWriteResult result = writeOk(target, true, "虚拟监听器动作已重排。", data);
+        WebAdminAuditEvent auditEvent = audit(context, result, auditSummary(before), auditSummary(after));
+        publishRealtime(after, "action_reordered", auditEvent, user);
+        releaseLockAfterWrite(before.id(), lockId, user, session, remoteAddress);
+        return result;
+        }
+    }
+
     public WebAdminWriteResult updateAction(
             MinecraftServer server,
             WebAdminUser user,

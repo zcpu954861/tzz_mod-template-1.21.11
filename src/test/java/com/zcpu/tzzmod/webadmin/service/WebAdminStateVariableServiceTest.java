@@ -9,10 +9,19 @@ import com.zcpu.tzzmod.condition.state.StateVariableTargetMode;
 import com.zcpu.tzzmod.condition.state.StateVariableType;
 import com.zcpu.tzzmod.condition.state.StateVariableUpdateRequest;
 import com.zcpu.tzzmod.webadmin.WebAdminRole;
+import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockRequest;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminEditLockStatusDto;
+import com.zcpu.tzzmod.webadmin.dto.WebAdminStateVariableWriteRequest;
+import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminPermissionService;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteResult;
+import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 
 public final class WebAdminStateVariableServiceTest {
@@ -24,6 +33,8 @@ public final class WebAdminStateVariableServiceTest {
         testListAndDetailFilters();
         testReadAfterWriteVisibility();
         testBadFileFallbackDoesNotWrite();
+        testCreateAndUpdateDefinitionsUseWriteSafety();
+        testDefinitionWriteValidationAndConflicts();
     }
 
     private static void testMissingStoreReadDoesNotCreateFile() throws Exception {
@@ -156,6 +167,70 @@ public final class WebAdminStateVariableServiceTest {
         requireEquals(sizeBefore, Files.size(path), "bad file fallback does not write or overwrite store");
     }
 
+    private static void testCreateAndUpdateDefinitionsUseWriteSafety() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminStateVariableWriteRequest request = writeRequest("GLOBAL", "", "game.phase", "STRING", "lobby");
+        request.displayName = "游戏阶段";
+        request.note = "9.1 create";
+        request.expectedFingerprint = WebAdminStateVariableService.CREATE_EXPECTED_FINGERPRINT;
+
+        WebAdminWriteResult viewer = fixture.service.create(null, viewer(), session(viewer()), "127.0.0.1", request, fixture.csrf, true);
+        requireFalse(viewer.success(), "VIEWER cannot create state variable definition");
+
+        WebAdminWriteResult badCsrf = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", request, "bad-token", true);
+        requireFalse(badCsrf.success(), "create requires valid CSRF");
+        requireEquals("csrf_invalid", badCsrf.code(), "invalid CSRF code");
+
+        request.lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_STATE_VARIABLE, WebAdminStateVariableService.CREATE_LOCK_TARGET_ID);
+        WebAdminWriteResult created = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", request, fixture.csrf, true);
+        requireTrue(created.success(), "EDITOR creates GLOBAL state variable definition");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "create releases state_variable:new lock after success");
+
+        WebAdminDtos.StateVariableListEntryDto entry = fixture.service.list(null, fixture.editor, Map.of("q", "game.phase")).variables().getFirst();
+        requireEquals("游戏阶段", entry.displayName(), "create persists displayName");
+        requireEquals("9.1 create", entry.note(), "create persists note");
+
+        WebAdminDtos.StateVariableDetailDto before = fixture.service.detail(null, fixture.editor, entry.id());
+        WebAdminStateVariableWriteRequest update = writeRequest("GLOBAL", "", "game.phase", "STRING", "running");
+        update.displayName = "游戏阶段";
+        update.note = "9.1 update";
+        update.expectedFingerprint = before.fingerprint();
+        update.lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_STATE_VARIABLE, before.id());
+
+        WebAdminWriteResult saved = fixture.service.update(null, fixture.editor, fixture.session, "127.0.0.1", before.id(), update, fixture.csrf, true);
+        requireTrue(saved.success(), "EDITOR updates existing state variable definition");
+        requireEquals(0, fixture.editLockService.activeLockCount(), "update releases existing state_variable lock after success");
+
+        WebAdminDtos.StateVariableDetailDto after = fixture.service.detail(null, fixture.editor, before.id());
+        requireEquals("running", after.valueText(), "update persists new value");
+        requireEquals("9.1 update", after.note(), "update persists note");
+    }
+
+    private static void testDefinitionWriteValidationAndConflicts() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminStateVariableWriteRequest create = writeRequest("PLAYER", "player-a", "score", "INTEGER", "1");
+        create.expectedFingerprint = WebAdminStateVariableService.CREATE_EXPECTED_FINGERPRINT;
+        create.lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_STATE_VARIABLE, WebAdminStateVariableService.CREATE_LOCK_TARGET_ID);
+        WebAdminWriteResult created = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", create, fixture.csrf, true);
+        requireTrue(created.success(), "fixture player state variable created");
+        String id = fixture.service.list(null, fixture.editor, Map.of("targetId", "player-a")).variables().getFirst().id();
+
+        WebAdminStateVariableWriteRequest duplicate = writeRequest("PLAYER", "player-a", "score", "INTEGER", "2");
+        duplicate.expectedFingerprint = WebAdminStateVariableService.CREATE_EXPECTED_FINGERPRINT;
+        duplicate.lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_STATE_VARIABLE, WebAdminStateVariableService.CREATE_LOCK_TARGET_ID);
+        WebAdminWriteResult duplicateResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", duplicate, fixture.csrf, true);
+        requireFalse(duplicateResult.success(), "duplicate state variable create is rejected");
+        requireValidationCode(duplicateResult, "state_variable_duplicate");
+
+        WebAdminDtos.StateVariableDetailDto before = fixture.service.detail(null, fixture.editor, id);
+        WebAdminStateVariableWriteRequest renamed = writeRequest("PLAYER", "player-a", "score_renamed", "INTEGER", "3");
+        renamed.expectedFingerprint = before.fingerprint();
+        renamed.lockId = acquireLock(fixture, WebAdminEditLockService.TARGET_STATE_VARIABLE, id);
+        WebAdminWriteResult renamedResult = fixture.service.update(null, fixture.editor, fixture.session, "127.0.0.1", id, renamed, fixture.csrf, true);
+        requireFalse(renamedResult.success(), "existing state variable identity is immutable");
+        requireValidationCode(renamedResult, "state_variable_identity_immutable");
+    }
+
     private static StateVariableUpdateRequest update(StateVariableScope scope, String targetId, String key, StateVariableType type, String value) {
         return new StateVariableUpdateRequest(scope, targetId, key, type, value, "", "", "");
     }
@@ -164,11 +239,71 @@ public final class WebAdminStateVariableServiceTest {
         return Files.createTempDirectory("tzz-state-variable-webadmin").resolve(StateVariableStore.FILE_NAME);
     }
 
+    private static Fixture fixture() throws Exception {
+        Path path = tempPath();
+        WebAdminWriteSecurityService security = new WebAdminWriteSecurityService();
+        WebAdminPermissionService permission = new WebAdminPermissionService();
+        WebAdminEditLockService editLockService = new WebAdminEditLockService(permission, security, 60_000L);
+        WebAdminStateVariableService service = new WebAdminStateVariableService(permission, security, editLockService, path);
+        WebAdminUser editor = user(WebAdminRole.EDITOR);
+        WebAdminSession session = session(editor);
+        return new Fixture(path, service, security, editLockService, editor, session, security.csrfTokenFor(session));
+    }
+
+    private static WebAdminStateVariableWriteRequest writeRequest(String scope, String targetId, String key, String type, String value) {
+        WebAdminStateVariableWriteRequest request = new WebAdminStateVariableWriteRequest();
+        request.scope = scope;
+        request.targetId = targetId;
+        request.key = key;
+        request.type = type;
+        request.value = value;
+        return request;
+    }
+
+    private static String acquireLock(Fixture fixture, String targetType, String targetId) {
+        WebAdminEditLockRequest request = new WebAdminEditLockRequest();
+        request.targetType = targetType;
+        request.targetId = targetId;
+        WebAdminWriteResult result = fixture.editLockService.acquire(fixture.editor, fixture.session, "127.0.0.1", request, fixture.csrf, true);
+        requireTrue(result.success(), "acquire lock " + targetType + ":" + targetId);
+        return lockId(result);
+    }
+
+    private static String lockId(WebAdminWriteResult result) {
+        Object lock = result == null || result.data() == null ? null : result.data().get("lock");
+        if (lock instanceof WebAdminEditLockStatusDto status) {
+            return status.lockId();
+        }
+        if (lock instanceof Map<?, ?> map) {
+            Object id = map.get("lockId");
+            return id == null ? "" : String.valueOf(id);
+        }
+        return "";
+    }
+
     private static WebAdminUser viewer() {
+        return user(WebAdminRole.VIEWER);
+    }
+
+    private static WebAdminUser user(WebAdminRole role) {
         WebAdminUser user = new WebAdminUser();
-        user.username = "viewer";
-        user.role = WebAdminRole.VIEWER.id();
-        return user;
+        user.username = role.id().toLowerCase(Locale.ROOT);
+        user.displayName = user.username;
+        user.role = role.id();
+        return user.normalized();
+    }
+
+    private static WebAdminSession session(WebAdminUser user) {
+        return new WebAdminSession("session-" + user.username, user.username, user.role, 1L, 100000L, "127.0.0.1", "test");
+    }
+
+    private static void requireValidationCode(WebAdminWriteResult result, String code) {
+        for (var error : result.validationErrors()) {
+            if (code.equals(error.code())) {
+                return;
+            }
+        }
+        throw new AssertionError("missing validation code " + code + " errors=" + result.validationErrors());
     }
 
     private static void requireTrue(boolean condition, String message) {
@@ -193,5 +328,16 @@ public final class WebAdminStateVariableServiceTest {
 
     private static void requireContains(String haystack, String needle, String message) {
         requireTrue(haystack != null && haystack.contains(needle), message + " needle=" + needle + " haystack=" + haystack);
+    }
+
+    private record Fixture(
+            Path path,
+            WebAdminStateVariableService service,
+            WebAdminWriteSecurityService security,
+            WebAdminEditLockService editLockService,
+            WebAdminUser editor,
+            WebAdminSession session,
+            String csrf
+    ) {
     }
 }

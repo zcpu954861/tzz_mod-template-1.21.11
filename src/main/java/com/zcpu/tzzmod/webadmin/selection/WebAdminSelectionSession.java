@@ -16,6 +16,7 @@ public final class WebAdminSelectionSession {
     public final WebAdminSelectionDraft draft;
     public final long createdAtMillis;
     public boolean completing;
+    public int worldDeviceSelectedSlot;
 
     public WebAdminSelectionSession(
             String selectionId,
@@ -38,7 +39,7 @@ public final class WebAdminSelectionSession {
         this.targetPlayerUuid = targetPlayerUuid;
         this.targetPlayerName = safe(targetPlayerName);
         this.purpose = purpose == null ? WebAdminSelectionPurpose.CREATE_VIRTUAL_BLOCK_DEVICE : purpose;
-        this.draft = draft == null ? new WebAdminSelectionDraft("", "", "", "auto", true) : draft;
+        this.draft = draft == null ? new WebAdminSelectionDraft("", "", "", "auto", true, "", "", "", "", "") : draft;
         this.createdAtMillis = System.currentTimeMillis();
     }
 

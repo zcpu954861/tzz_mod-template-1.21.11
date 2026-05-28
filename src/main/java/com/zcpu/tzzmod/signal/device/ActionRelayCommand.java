@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.action.ActionExecutionResult;
 import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.action.ActionValidator;
 import com.zcpu.tzzmod.signal.SignalChannel;
+import com.zcpu.tzzmod.webadmin.selection.WebAdminSelectionSessions;
 import net.minecraft.command.argument.BlockPosArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -108,6 +109,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeBind(ServerCommandSource source, BlockPos pos, String rawChannel) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "绑定频道")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;
@@ -137,6 +141,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeAddAction(ServerCommandSource source, BlockPos pos, ActionConfig action) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "新增 Action")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;
@@ -186,6 +193,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeRemoveAction(ServerCommandSource source, BlockPos pos, int oneBasedIndex) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "删除 Action")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;
@@ -205,6 +215,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeClearActions(ServerCommandSource source, BlockPos pos) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "清空 Action")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;
@@ -220,6 +233,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeCooldown(ServerCommandSource source, BlockPos pos, int ticks) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "修改冷却")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;
@@ -234,6 +250,9 @@ public final class ActionRelayCommand {
     }
 
     private static int executeTrigger(ServerCommandSource source, BlockPos pos) {
+        if (WebAdminSelectionSessions.shouldBlockProtectedDraftCommandMutation(source, pos, "手动触发")) {
+            return 0;
+        }
         ActionRelayBlockEntity relay = getRelay(source, pos);
         if (relay == null) {
             return 0;

@@ -4,5 +4,8 @@ public final class WebAdminVirtualBlockDeviceDeleteRequest {
     public String deviceId;
     public String confirmationText;
     public Boolean confirmed;
+    public String expectedFingerprint;
     public String reason;
+    public String lockId;
+    public String draftSessionId;
 }

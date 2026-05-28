@@ -11,7 +11,7 @@ public final class WebAdminHelpCatalogServiceTest {
 
     public static void run() {
         Map<String, Object> catalog = new WebAdminHelpCatalogService().catalog();
-        requireEquals("8.20-pre9-stabilization", string(catalog.get("version")), "8.20 stabilized catalog version");
+        requireEquals("9.1-logic-chain-global-editor-completion", string(catalog.get("version")), "9.1 help catalog version");
         requireEquals(Boolean.TRUE, catalog.get("readOnly"), "8.17 help catalog is read-only");
         requireEquals(Boolean.TRUE, catalog.get("noWriteApi"), "8.17 help catalog exposes no write API");
         requireEquals(Boolean.TRUE, catalog.get("copyOnly"), "8.17 help examples are copy-only documentation");
@@ -175,17 +175,31 @@ public final class WebAdminHelpCatalogServiceTest {
                 "full Logic Chain Editor deferred",
                 "Scratch editor deferred",
                 "if / else runtime deferred",
-                "world entity in-editor draft create and binding deferred",
-                "old node move / delete / reorder deferred",
-                "old action delete / reorder deferred",
+                "world entity freeform create deferred；client-assisted protected draft binding required",
+                "old node arbitrary move / reorder deferred；typed-owned node delete is Logic Chain draft-only",
+                "old action arbitrary cross-bucket move deferred；delete / same-bucket reorder are Logic Chain draft-only",
                 "new write API for notes / favorites deferred",
                 "placeholder binding apply deferred",
                 "component export deferred",
-                "ConditionGroup apply deferred",
-                "StateVariable definition apply deferred",
+                "ConditionGroup template apply deferred",
+                "StateVariable definition template apply deferred",
                 "external reference fail closed",
                 "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
                 "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。",
+                "9.1 补齐受控配置入口，不是 freeform graph document save 或 Game Program AST。",
+                "同 index Action 替换覆盖 SignalListener、Timer bucket、ActionRelay 和 Region enter / exit / stay。",
+                "World Device Reference、RegionController 和 VBD 可选择并进入 protected draft 客户端辅助流程",
+                "已有 VBD 节点会打开触发项卡片编辑面板，itemSubmit / container 位于对应触发项二级页。",
+                "设备输入 / 输出频道由 Logic Chain 图连接接管",
+                "选中 action card 也可从右侧加入删除草稿。",
+                "pending-delete 节点和 action 会变灰并显示待删除。",
+                "itemSubmit 放在右键交互触发页，container 放在容器内容变化触发页",
+                "SignalReceiver 是 channel consumer / sink；ActionRelay 是 channel consumer / action executor。",
+                "固定文本“我确认删除该节点”",
+                "signal action 频道字段支持已有频道 combobox",
+                "实体设备被外部破坏后会标记 missing/broken",
+                "同一个编辑会话可以累计多个草稿",
+                "涉及具体 target 的草稿会在创建时获取 / 校验 target lock",
                 "bad manifest / bad package",
                 "pre_rollback",
                 "本次操作变化"

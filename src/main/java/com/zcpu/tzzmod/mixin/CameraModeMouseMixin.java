@@ -30,7 +30,7 @@ public class CameraModeMouseMixin {
 
     @Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)
     private void tzz_blockCameraMouseScroll(long window, double horizontal, double vertical, CallbackInfo ci) {
-        if (WebAdminSelectionClient.shouldConsumeMouseScroll()) {
+        if (WebAdminSelectionClient.handleMouseScroll(vertical)) {
             ci.cancel();
             return;
         }

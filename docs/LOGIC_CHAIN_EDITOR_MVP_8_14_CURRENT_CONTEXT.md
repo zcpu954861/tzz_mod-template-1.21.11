@@ -78,7 +78,7 @@ The following remain deferred:
 
 World entity requirement: devices, receivers, ActionRelay blocks and regions must already exist in game or in their own WebAdmin pages. The Logic Chain editor can only reference existing world entities in later stages; 8.14 does not create world blocks or regions from the canvas.
 
-Deferred future direction: VBD / Region / ActionRelay block can later get an in-game draft create flow where WebAdmin opens a temporary creation session, the admin clicks or selects the world object in game, and cancelling the editor rolls back that temporary world binding. 8.14 records that direction only and keeps the UI explicit that world entities must already exist before they can be referenced.
+Deferred future direction: VBD / Region / ActionRelay block can later get an in-game draft create flow where WebAdmin opens a temporary creation session, the admin clicks or selects the world object in game, and cancelling the editor rolls back that temporary world binding. This is the future "游戏内 pending selection + 草稿 + 取消回滚" model. 8.14 records that direction only and keeps the UI explicit that world entities must already exist before they can be referenced: 世界实体必须先存在.
 
 ## Edit Lock
 

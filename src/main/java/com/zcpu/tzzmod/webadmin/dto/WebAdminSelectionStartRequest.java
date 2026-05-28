@@ -8,4 +8,9 @@ public final class WebAdminSelectionStartRequest {
     public String note = "";
     public String iconKey = "auto";
     public Object enabled = Boolean.TRUE;
+    public String draftSessionId = "";
+    public String editLockId = "";
+    public String logicChainRootType = "";
+    public String logicChainRootRef = "";
+    public String logicChainDraftNodeId = "";
 }

@@ -2,8 +2,8 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.66.0-pre-9-stabilization-hardening`
-- 当前开发基线：`9.0 Legacy Datapack / Old Systems Audit`；本阶段只做旧数据包和旧系统替代能力审计，新增 9.0 文档输入，不做功能实现。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、typed actions、Rich Text Builder、full Logic Chain Editor、Scratch editor、if / else runtime、旧物品接入或旧数据包迁移。
+- 当前稳定版本：`v1.67.0-legacy-datapack-parity-audit`
+- 当前开发基线：`9.1 Logic Chain / Global Editor Capability Completion`；本阶段补齐现有 Logic Chain / Global Editor 的受控配置创建、选择、编辑、引用和诊断能力。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、typed actions、Rich Text Builder、full Logic Chain Editor、Scratch editor、if / else runtime、freeform graph document save、画布手写坐标 / freeform 世界写入或旧数据包迁移；World Device Reference 只允许受保护客户端辅助 hotbar 放置并支持取消 cleanup。
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`
 - 依赖：Fabric Loader `>=0.18.4`，Fabric API `0.141.3+1.21.11`
@@ -79,14 +79,30 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - [9.0 Typed Actions / Rich Text Audit](docs/TYPED_ACTIONS_RICH_TEXT_AUDIT_9_0.md)
 - [9.0 Legacy Items / Systems Integration Audit](docs/LEGACY_ITEMS_SYSTEMS_INTEGRATION_AUDIT_9_0.md)
 - [9.x Roadmap Input After 9.0 Audit](docs/NINE_X_ROADMAP_INPUT_AFTER_AUDIT_9_0.md)
+- [9.1 Logic Chain / Global Editor Completion Current Context](docs/LOGIC_CHAIN_GLOBAL_EDITOR_COMPLETION_9_1_CURRENT_CONTEXT.md)
+- [9.1 Logic Chain / Global Editor Capability Matrix](docs/LOGIC_CHAIN_GLOBAL_EDITOR_CAPABILITY_MATRIX_9_1.md)
 
 当前仍未完成、不要误认为已完成的方向：
 
 - 8.x：ConditionEngine / 条件判断系统已进入 8.20 稳定收口；当前提供无副作用判断核心、基础玩家 / 上下文条件、类型化状态变量底座、物品 / 背包 / 容器 snapshot 条件、Region / Signal / Logic Chain snapshot 条件、WebAdmin Condition Group 编辑 / 校验 / 模拟评估 MVP，8.6 / 8.7 已将 VBD / itemSubmit / container / SignalListener / ActionRelay / RegionController 作为可选外层 runtime gate 接入，8.8 增加 runtime history / Doctor / replay / WebAdmin 条件调试器，8.9 增加单条 Action gate，8.10 增加 Signal Join / Barrier / Aggregator 多事件汇合能力，8.11 增加 Controlled State Actions 状态变量写入动作，8.12 增加 Scheduler / Delay / Timer 通用时间轴能力，8.13 增强只读 Logic Chain Viewer runtime graph，8.14 加入受控新增节点编辑 MVP，8.15 加入模板中心 / prefab import-export，8.16 加入已有节点受控编辑 / 同 index Action 编辑 / 局部重连，8.17 加入只读 Help / Example / Troubleshooting / Glossary Center，8.18 加入 Snapshot Timeline / Rollback Graph 配置恢复能力，8.19 只保留 WebAdmin visual system design reference，8.20 补 Help / Doctor / Snapshot / Template / Logic Chain / Timer / State 小型硬化和 guard。当前仍不做具体逃走中任务，不接入 SignalReceiver gate、GameController、MissionSystem、PhaseController、failure policy、stop-list policy、fallback action、full Logic Chain Editor、Scratch editor、if / else runtime 或 raw JSON editor；不做 Git branch / merge / rebase，不备份 runtime history / Timer active state / Join pending state / 玩家实时背包 / 世界实体，不做旧节点任意移动 / 删除 / 重排，不做旧 action 删除 / 重排，不做自动世界实体复制。
-- 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition apply deferred，ConditionGroup apply deferred，component export deferred；8.18 之后 Template import/apply 已受写入前自动快照保护，但模板服务自身不做多 store 事务回滚。
+- 9.1：Logic Chain / Global Editor 继续复用 8.14 / 8.16 画布内编辑，不保存自由图文档；新增或补齐 StateVariable definition 直接创建 / 编辑、ConditionGroup / gate 引用选择和入口、virtual SignalListener 画布创建、ActionRelay / Region enter/exit/stay 同 index Action 替换 / 禁用 / 删除 / 同 bucket 重排，以及 typed-owned 节点删除草稿。旧节点任意移动 / 重排、reference node 删除、旧 action 跨 source/bucket 任意移动仍禁止。
+- 8.15 模板中心安全边界仍保持：placeholder binding apply deferred，external reference fail closed，StateVariable definition template apply deferred，ConditionGroup template apply deferred，component export deferred；8.18 之后 Template import/apply 已受写入前自动快照保护，但模板服务自身不做多 store 事务回滚。
 - 8.19 visual system design reference 文档保留为未来视觉重构参考；8.20 不实现 WebAdmin visual system、dark/light theme 或 theme toggle。
 - 后续 9.x 候选：从 9.0 旧数据包 / 旧系统审计结果出发，再由用户确认 GameController / Game Program Foundation、MissionSystem / PhaseController、if/else branching、visual logic/program editor、direct typed module calls、vanilla command-like effects as typed visual blocks 的具体顺序；9.0 本身只做审计输入。
 - 未提供 raw JSON / NBT path 编辑器、Scratch-like editor、路径图编辑器或任意 shell。
+
+## 9.1 Logic Chain / Global Editor Capability Completion
+
+9.1 不是新的游戏程序系统，而是在现有 Logic Chain Viewer / Editor 上补齐受控配置能力：
+
+- StateVariable definition：状态变量页面和逻辑链引用支持创建 / 编辑 GLOBAL、PLAYER 范围下 BOOLEAN、INTEGER、STRING 变量定义；保存走权限、CSRF / same-origin、edit lock、expectedFingerprint、audit、realtime 和自动快照。
+- ConditionGroup / Gate：conditionGroupId 字段保持兼容条件组选择、清空和跳转编辑入口；gate 仍是 allow / block / skip 的 guard reference，不是 if / else branch，不产生 else / fallback path。
+- Virtual SignalListener：Logic Chain 画布新增节点支持创建纯配置 SignalListener，持久化技术 ID、enabled、channel、cooldownTicks、conditionGroupId；display label / note 仅作为草稿展示或 audit-only 信息，待后续 SignalListener metadata 字段补齐后再落盘。创建失败保留 draft / lock。
+- Action maintenance parity：SignalListener、Timer bucket、ActionRelay 和 Region enter / exit / stay 的旧 Action 支持同 index 替换 / 禁用 / 删除 / 同 bucket 重排；ActionRelay 摘要卡会先列出可读取的旧 action index，已加载 ActionRelay 只读取精确已加载方块实体且不强制加载区块；Region signal action 显示为 owner RegionController -> action -> downstream channel，并携带 owner / bucket / index metadata；不会跨 source/bucket 任意移动旧 Action。
+- RegionController / StateVariable repair：RegionController 编辑页不再把旧“信号频道”作为主字段，输出频道由 enter / exit / stay signal action 管理；StateVariable action 采用 action-first visual，和 StateVariable definition / target 节点区分。
+- Channel endpoint / metadata：频道端点继续是 metadata / reference，不是 runtime consumer；选择已有频道不重复创建消费者。
+- 节点点击反馈：图上可见节点至少提供 edit、readonly detail、定位主节点、跳转详情或 deferred reason；世界对象不会被保存成 fake graph node。
+- Guard / docs：新增 9.1 context、capability matrix 和 stabilization guard，明确禁止 GameController、MissionSystem、PhaseController、Game Program AST、Scratch editor、if / else runtime、freeform graph document save、new ActionType、new ConditionNodeType，以及画布手写坐标 / freeform 世界写入。World Device Reference 仅允许通过受保护客户端辅助 hotbar 放置，并在未确认创建 graph card 前支持后端 cleanup。
 
 ## 8.20 Pre-9 Stabilization / Hardening
 
@@ -416,7 +432,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - StateAction：`state_variable` action 显示为状态写入节点，能看到 operation、scope、targetMode、key 和静态可解析 StateVariable 链接。
 - Gate：list-level condition gate 与 single action gate 分别显示，包含 conditionGroupId、targetType / targetId、recent status、Condition Debugger 和 Doctor 入口。
 - UI：增加视图模式筛选、节点类型筛选、增强图例、可关闭节点详情面板、Join 输入摘要、上游展开卡片、引用卡跳转主节点、一阶关联高亮和 no cross-channel long-line mixing 标记；再次点击已选中节点可取消 pinned 高亮，graph card 使用固定高度和固定 title / subtitle / meta 行，长文本省略或 clamp，完整内容在详情面板展示。
-- ActionRelay：Logic Chain Viewer 不直接读取 live world / block entity；当前显示 snapshot actionCount 摘要和设备详情入口，后续若要展开 ActionRelay gate 需先进入安全快照。
+- ActionRelay：Logic Chain Viewer 默认显示 store 摘要，但 9.1 返修后会通过已登记的精确坐标只读取“已经加载”的 ActionRelay block entity；不扫描世界、不强制加载区块。已加载对象可展开同 index Action 编辑，未加载对象仍显示只读摘要、deferred reason 和设备详情入口。
 
 8.13 语义说明：
 
@@ -450,7 +466,7 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 8.14 已实现方向：
 
 - 编辑模式入口：当前 Logic Chain Viewer 页面显示“进入编辑模式”，获取 `logic_chain_editor` edit lock 后显示新增节点 / 保存 / 退出编辑工具栏；enter 返回的 canonical lock target 会贯穿 heartbeat / save / cancel，避免刷新后保存时报“编辑锁不存在”。保存 validation 失败、底层 typed 配置锁失败或 typed validation 失败都会保留主 Logic Chain 编辑锁和草稿；新增 Signal Join / Timer 保存时，临时 typed 配置锁使用和底层 typed service 一致的 normalized ID，避免带空格 / 大写的用户输入 ID 被 raw lock target 拦下；只有明确标记为主编辑锁失效的结果才会要求重新进入编辑。
-- 支持节点：新增 Signal Join 和 Timer；另支持对已有 SignalListener / ActionRelay / Region enter、exit、stay / Timer onTick、onComplete action list 追加一条 ActionConfig（仅新增一条）。Signal Join 可放在上游频道卡的右侧下游列，Timer 只作为 C0 来源节点创建；C5 Timer 引用 / 目标位仍 deferred。虚拟监听器 / SignalListener 是纯配置对象、不需要世界实体，但画布新增路径暂未接入安全 listener-create edit lock，本轮在 UI 中明确禁用，需先在虚拟监听器页面创建。
+- 支持节点：新增 Channel Endpoint、Signal Join、Timer 和 virtual SignalListener；另支持对已有 SignalListener / ActionRelay / Region enter、exit、stay / Timer action bucket 追加一条 ActionConfig、同 index 替换 / 禁用 / 删除 / 同 bucket 重排。Signal Join 可放在上游频道卡的右侧下游列，Timer 只作为 C0 来源节点创建；C5 Timer 引用 / 目标位仍 deferred。9.1 新增节点列表显示 World Device Reference、RegionController 和 VBD Virtual Block Device；三类 world-backed 入口可选择并进入 protected draft 客户端辅助选择/放置流程，缺目标玩家、WebAdmin session、权限或锁时在启动流程时提示；后端拒绝 fake world/pos draft。VBD、world device、RegionController protected draft commit 均已接入真实 typed store adapter；失败会回滚或保留可重试草稿。ActionRelay 不再作为独立新增节点选项，归入 World Device Reference。
 - 新节点配置：使用 modal 做节点类型选择和必要配置引导；Signal Join 只收集 mode、scope、resetPolicy 等自身配置，ALL 隐藏 threshold，ANY_N / COUNT 才显示 threshold，输入频道 / 输出频道由连线阶段推导；Timer 只收集中文化 mode、mode-specific timing、scope、startPolicy 等自身配置，完成后的输出由下游连线推导，或由已有 onCompleteActions 承担。
 - 拖动 / slot / snap：新草稿卡片初始未放置，使用 pointer drag 作为主流程，按住后跟随鼠标移动；靠近合法 slot 时白色虚线发光轮廓和 drop preview 才生效，松开后吸附到 canonical column / slot。Join slot 由当前画布上的频道卡推导：频道卡所在视觉列的右侧下游列可放 Join；目标列为空时只显示一个基于左侧频道 y 范围的中位 slot；目标列已有 listener / action / consumer 等内容时，每个已有卡间隔只显示一个中间插入位，并显示最下方追加位。Join 不再固定在 C2 / C3，也不再为了 Join 草稿把后续列整体右移制造空白 processing column。已放置草稿卡片保存前可重新拿起调整位置，slot 覆盖层不再挡住卡片；旧节点仍不可移动、删除或重排。
 - 连接阶段：草稿卡片显示绿色加号，支持上游 / 下游连接模式；再次点击当前激活的同侧加号会退出连接模式，切换另一侧加号会切换模式，Escape 或点击空白画布也会退出；候选连接通过 `data-*` event delegation 创建，新增连线保持高亮直到保存或取消，再次点击同一已连接候选会取消该 draft edge。
@@ -460,17 +476,18 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - Graph 渲染：`timer_start` / `timer_cancel` 以及 Timer 自身 onStart / onTick / onComplete / onCancel bucket 中的动作会显示为 action / timer action 节点，并连到目标 Timer 或下游频道。Signal action 输出不再在最左侧生成 listener producer duplicate；它显示为 action 右侧的 output channel，若有消费者则继续连接到 consumer，若无消费者则保留 terminal output channel。
 - Action append：已有 action list 可追加一个新 ActionConfig，并可携带 action conditionGroupId；保存需要同时持有 Logic Chain editor lock 和目标 action 容器 edit lock，子锁丢失时保留草稿但禁用保存；追加草稿使用唯一 draft id、保存后同款右侧 action lane resolver 和独立空 slot 展示，避免 SignalListener 新 action 在编辑态落到同列或覆盖已有 action 卡；不允许移动、删除、重排或复杂编辑旧 action。
 - 保存 validation：后端校验节点类型、列、slot、自身必要配置、由 draft edges 推导出的必要连线、重复边、edit lock、`baseGraphFingerprint` 和频道 metadata 是否被当前 draft edge / Signal action append 引用；Signal Join 至少 2 个上游且 1 个下游，Timer 需要 1 个下游输出，除非已有有效 onCompleteActions；Action append 需要 owner、bucket、expectedFingerprint 和对应 action 容器 edit lock。校验失败返回结构化中文错误，尽量带 code、相关节点、相关频道、相关连线、severity 和 fixHint；画布显示详细错误列表，toast 显示第一个具体原因摘要。失败后保留主编辑锁、草稿、滚动和焦点，用户修正后可用同一锁再次保存。
-- 保存落地到现有配置：Signal Join 草稿调用 `WebAdminSignalJoinService.create` 写入 `SignalJoinDefinition`；Timer 草稿调用 `WebAdminTimerService.create` 写入 `TimerDefinition`；Action append 调用现有 SignalListener / ActionRelay / Region / Timer action service；频道 metadata 草稿在 typed 写入成功后作为附属 metadata 保存。
+- 保存落地到现有配置：Signal Join 草稿调用 `WebAdminSignalJoinService.create` 写入 `SignalJoinDefinition`；Timer 草稿调用 `WebAdminTimerService.create` 写入 `TimerDefinition`；Action append 调用现有 SignalListener / ActionRelay / Region / Timer action service；频道 metadata 草稿作为独立 typed metadata 保存。完整跨 store 事务层完成前，typed store 写入和频道 metadata 混合保存会 fail-closed。
 - 错误 toast：所有编辑器报错使用顶部居中自定义 toast，自动消失，不使用浏览器 `alert` / `confirm` / `prompt`。
 - dirty exit：退出编辑模式只退出编辑，不离开页面；有草稿时使用自定义确认 dialog，确认后丢弃草稿并释放锁；切到列表、其它 Logic Chain 或不同 resolve route 时也必须先确认，当前路由 silent refresh 保持非扰动。
 
 8.14 约束：
 
 - 旧节点移动 deferred。
-- 旧节点删除 deferred。
+- 8.14 历史边界：旧节点删除 deferred；9.1 只开放下方 typed-owned 删除草稿，不开放 reference node 或任意旧节点删除。
+- typed-owned 旧节点删除：Signal Join、Timer、SignalListener 和 VBD unbind 可作为 Logic Chain `nodeDeletes` 草稿提交；reference node、无法证明 owner/store 的 projection 节点拒绝删除。
 - 旧节点重排 deferred。
-- 旧 action 移动 / 删除 / 重排 / 复杂编辑 deferred。
-- 世界实体必须先存在；VBD、SignalReceiver、ActionRelay block、Region 等不能由画布凭空创建。虚拟监听器虽然不是世界实体，但画布新增仍因 listener create 锁链路未完成而 deferred。未来可独立设计“游戏内草稿创建 + 取消回滚”和安全的纯配置 listener create，8.14 只记录 deferred 方向并在 UI 中说明。
+- 旧 action 跨 source/bucket 移动和复杂批量编辑 deferred；同一 action container 内删除 / 重排已作为 draft-only 受控操作接入。
+- 世界实体不能由画布凭空创建或手写坐标；VBD、SignalReceiver、ActionRelay block、Region 等必须通过 protected draft object registry、客户端辅助选择/放置会话、命令/API 写保护和 integrity fail-closed 进入 Logic Chain。world device 三格 hotbar 放置会在游戏侧临时放置受保护设备并替换/抑制原版九格 hotbar，若 WebAdmin 在创建 graph card 前取消，会通过后端 cleanup 删除 SignalDeviceStore 条目并清理已放置方块。世界设备放置模式会把 selected slot 规范化到三格范围，滚轮 / 数字键同步到服务器，HUD 只显示当前选中设备而不显示瞄准方块。VBD protected-draft、world device protected-draft、Region + RegionController protected-draft 后端路径均已接入真实 commit/rollback adapter；完整游戏侧 UX 仍需人工验证，重点包括三格 hotbar 滚轮/数字键、极端窗口 HUD safe area、ESC / WebUI 取消二次确认、RegionPlanner 粒子点线预览、draft-created Action 面板、RegionController owner/action/downstream 局部布局和保存后目标频道相邻的同列居中布局。
 - 不做 full Logic Chain Editor。
 - 不做 Scratch editor。
 - 不做 if / else runtime。
@@ -492,20 +509,23 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 
 - 已有节点编辑入口：进入编辑模式后点击已有可编辑节点，打开统一 modal；不可编辑的世界实体 / 引用节点显示 readonly reason，包含 `data-logic-chain-world-entity-readonly-reference`。旧节点仍带 `data-logic-chain-existing-node-not-draggable`，不允许移动、删除、重排。
 - 支持节点：Channel metadata 可改 displayName / note / iconKey；Signal Join 可改 displayName / note / enabled / mode / threshold / scope / resetPolicy / timeout / cooldown / inputChannels / outputChannel；Timer 可改 displayName / note / enabled / mode-specific timing / scope / startPolicy / outputChannel；SignalListener 可改 enabled / channel / cooldownTicks / conditionGroupId。
-- ActionConfig 编辑：SignalListener actions 和 Timer start / tick / complete / cancel bucket actions 支持同 index 替换；禁用通过现有 `enabled=false` 表达；action conditionGroupId、state_variable、timer_start / timer_cancel 结构化字段沿用现有 ActionConfig editor / payload。旧 action 删除、移动、重排仍禁止，UI 和 guard 使用 `data-logic-chain-action-replace-same-index`、`data-logic-chain-no-old-action-delete`、`data-logic-chain-no-old-action-reorder`。
+- ActionConfig 编辑：SignalListener actions 和 Timer start / tick / complete / cancel bucket actions 支持同 index 替换；禁用通过现有 `enabled=false` 表达；action conditionGroupId、state_variable、timer_start / timer_cancel 结构化字段沿用现有 ActionConfig editor / payload。旧 action 删除、同 bucket 重排使用 `data-logic-chain-action-delete-draft`、`data-logic-chain-action-reorder-draft`，保存前不改真实 action list。
 - 局部重连：Join input / output、Timer outputChannel、Listener channel、Signal action output channel 保存为真实配置字段，已保存卡片通过画布绿色加号重连，编辑弹窗只保留连接摘要和隐藏 typed 值，带 `data-logic-chain-local-reconnect`、`data-logic-chain-reconnect-cancel`、`data-logic-chain-existing-canvas-reconnect`、`data-logic-chain-existing-reconnect-no-modal-fields`、`data-logic-chain-green-plus-reconnect` marker；连接模式中拖动画布不退出，发起卡片保留自己的绿点用于再次点击退出，其他旧节点编辑点隐藏，仅合法频道候选显示绿点，包含 `data-logic-chain-connection-mode-pan-keeps-active`、`data-logic-chain-connection-target-keeps-own-handles`、`data-logic-chain-existing-reconnect-any-legal-channel`。已有节点 / Action 编辑 payload 不携带 draft `edges`，不会保存假图连线。
+- 图连接接管设备频道关系：Logic Chain 节点编辑面板不再显示会与连线冲突的世界设备输入/输出频道可编辑字段；SignalEmitter / VBD 显示只读输出摘要，SignalReceiver / ActionRelay 显示只读输入摘要，修改关系必须通过图上的连接操作。单条 `signal` action 的目标频道仍是 action payload，并继续使用已有频道 combobox。
+- VBD 节点内触发项：已有 VBD 在 Logic Chain 内显示触发项卡片，点击进入二级配置页；未保存摘要显示中文触发项变更而不是主行 raw JSON；触发项输出频道 draft 会立即更新编辑图中的 VBD -> Channel 连线和目标频道相邻布局；反复编辑同一个触发项使用稳定 `(VBD, triggerKey)` 身份更新被点击的原触发项卡，不新增重复卡，也不会额外连接主频道 / 旧频道；itemSubmit requirement 放在右键交互触发页，container requirement 放在容器内容变化触发页，捕获成功的 realtime/status payload 会先回填当前 Logic Chain draft，显式空 requirement list 也会写回为清空草稿；取消 / 失败后可在 modal 内通过专用 click / pointerup 分发清理旧 session / lock 状态并重新捕获，前端 precheck 不再把重试按钮置灰，真实有效性由后端重新校验；最终保存 Logic Chain 前都只是 draft，不跳转 standalone VBD 详情页。
+- Draft action 与删除状态：新建未保存的 virtual SignalListener、ActionRelay 世界设备引用和 RegionController 添加 action 后会立即在图中渲染 action card；右侧选中 action card 可加入删除草稿。待删除节点 / action card 立即变灰并显示待删除 badge，取消编辑后恢复。
 - 草稿预览：已有 Channel / Join / Timer / Listener / Action 的草稿字段会通过 `data-logic-chain-draft-overlay` / `data-logic-chain-rendered-graph-overlay` 叠加到当前画布，保存前不写 runtime，保存失败仍保留预览；旧节点连线草稿只把真正新增 / 替换的边渲染成绿色虚线，未变化的旧线保持原样，取消或替换的原始边会立即隐藏但以 layout-only 形式保留到退出连接模式，退出后再裁剪完全脱钩的卡片和重排结构，带 `data-logic-chain-only-changed-edge-draft-highlight`、`data-logic-chain-unchanged-existing-edge-keeps-style`、`data-logic-chain-connection-prune-deferred-until-exit`、`data-logic-chain-removed-edge-hidden-during-connection`、`data-logic-chain-prune-detached-after-connection-exit`。
 - 新增频道端点与草稿布局：`新增节点` 包含频道端点 / Channel Endpoint，创建 draft channel card；选择已有 channel 会尽量复用画布上已有频道卡，输入新 channel 或修改 display metadata 时保存为 referenced channel metadata，不保存假图节点。新增 Join / Timer 弹窗暴露 note / enabled 等完整创建字段，并按模式切换可配置项，Join ALL 隐藏 threshold。草稿连线和箭头保持绿色；草稿 Join / Timer 单击用于选中查看详情和编辑草稿配置，按住后拖动才移动，拖动过程中 rerender 不因 pointer capture 丢失而回弹；未连接的频道端点默认放在当前焦点/root 频道卡下方，新建下游频道端点在无其它连接时贴到 Join / Timer 右侧相邻列，不再制造强制空白列。Timer 下游连到已有频道时会移动到该频道卡左侧并直接连到频道卡，不创建额外输出引用卡，带 `data-logic-chain-timer-output-move-left-of-channel`、`data-logic-chain-timer-output-no-reference-card`。
-- 既有节点维护入口：点击单个可编辑旧节点打开维护弹窗；“新增 Action”入口从右侧详情栏移入该弹窗，使用 `data-logic-chain-action-append-in-existing-node-modal`，旧 action 删除、移动、重排仍禁止。
-- 草稿门控与多操作会话：打开已有节点 / Action 编辑 modal 不会直接变成可保存草稿；检测到字段变化并点击“加入草稿”后进入统一 draft session。一个保存请求可同时包含新增节点、频道端点、Action append、多个不同已有节点编辑、多个不同 Action 编辑和被引用的 channel metadata；重复同一目标会被拒绝，旧节点移动 / 删除 / 重排仍不可用。
+- 既有节点维护入口：点击单个可编辑旧节点打开维护弹窗；“新增 Action”入口从右侧详情栏移入该弹窗，使用 `data-logic-chain-action-append-in-existing-node-modal`；可读取的旧 Action 通过维护弹窗进入同 index 替换 / 禁用 / 删除 / 同 bucket 重排。
+- 草稿门控与多操作会话：打开已有节点 / Action 编辑 modal 不会直接变成可保存草稿；检测到字段变化并点击“加入草稿”后进入统一 draft session。一个保存请求可同时包含新增节点、频道端点、Action append、多个不同已有节点编辑、多个不同 Action 编辑、Action delete/reorder 或 typed-owned node delete；重复或互斥目标会被拒绝。被引用的 channel metadata 可通过独立 metadata 草稿保存；完整跨 store 事务层完成前，不和 typed store 写入混合保存。已放置新增草稿的配置弹窗中，“取消”会恢复打开弹窗前的草稿快照，只有“更新草稿”才写回预览；仅打开新增节点弹窗不再触发未保存确认。
 - Draft diff：编辑 modal 和画布 toolbar 显示 `data-logic-chain-draft-diff`，画布上方使用固定高度 compact banner，只显示最近一条和总数，可展开全部；并区分字段变更、连接变更和 Action 变更：`data-logic-chain-diff-field-change`、`data-logic-chain-diff-connection-change`、`data-logic-chain-diff-action-change`。
 - 保存链路：保存仍需要主 `logic_chain_editor` lock、目标 typed config lock、expectedFingerprint、permission、CSRF / same-origin、后端 validation、audit、realtime。保存失败保留主编辑锁和草稿；只有结果明确标记主编辑锁失效时才要求重新进入。
-- 保存落地：后端先统一 validation，然后按新增节点、Action append、已有节点编辑、Action 编辑、被引用 channel metadata 的顺序写入真实服务；`existingNodeEdits` 调用 Channel metadata / Signal Join / Timer / SignalListener basic config 的真实 update service；`actionEdits` 调用 SignalListener action update 或 Timer bucket same-index update；Action append 仍保留 8.14 末尾追加能力。
+- 保存落地：后端先统一 validation，然后按新增节点、Action append、已有节点编辑、Action 编辑、被引用 channel metadata 的顺序写入真实服务；`existingNodeEdits` 调用 Channel metadata / Signal Join / Timer / SignalListener basic config 的真实 update service；`actionEdits` 调用 SignalListener action update、Timer bucket same-index update，以及 9.1 的 ActionRelay / Region bucket same-index update；Action append 仍保留 8.14 末尾追加能力。
 
 8.16 约束：
 
-- 不做旧节点移动 / 删除 / 重排。
-- 不做旧 action 删除 / 重排 / 跨列表移动。
+- 不做旧节点任意移动 / 重排；reference node 不能直接删除。
+- 不做旧 action 跨列表 / 跨 source / 跨 bucket 移动；删除和同 bucket 重排必须是 Logic Chain draft。
 - 不做 VBD / Region / SignalReceiver / ActionRelay block 的画布内直接绑定或坐标编辑。
 - 不做 full Logic Chain Editor。
 - 不做 Scratch editor。
@@ -549,9 +569,9 @@ Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack
 - 不做 full Logic Chain Editor deferred。
 - 不做 Scratch editor deferred。
 - 不做 if / else runtime deferred。
-- 不做旧节点任意移动 / 删除 / 重排 deferred。
-- 不做旧 action 任意删除 / 重排 deferred。
-- 不做 world entity in-editor draft create documented as deferred。
+- 不做旧节点任意移动 / 重排；typed-owned 删除已接入 draft-only。
+- 不做旧 action 任意跨 bucket 移动；删除和同 bucket 重排已接入 draft-only。
+- 不做 world entity freeform create；世界对象必须通过 protected draft / client-assisted selection。
 - 继续记录模板安全边界：placeholder binding apply deferred，component export deferred，ConditionGroup apply deferred，StateVariable definition apply deferred，external reference fail closed。
 - 不新增 ActionType。
 - 不新增 ConditionNodeType。

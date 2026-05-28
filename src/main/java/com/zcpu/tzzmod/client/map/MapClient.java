@@ -655,7 +655,7 @@ public final class MapClient {
             if (!highlighted && !(showAll && visible)) {
                 continue;
             }
-            spawnWireframe(client, region.toGeometryPoints(), baseY, topY, region.color(), true, Set.of(), true, highlighted);
+            RegionPlannerPreviewRenderer.renderWireframe(client, region.toGeometryPoints(), baseY, topY, region.color(), true, Set.of(), true, highlighted);
         }
 
         if (!showAll) {
@@ -667,8 +667,8 @@ public final class MapClient {
                 continue;
             }
             boolean localDraft = localPlayerUuid.equals(draft.ownerUuid());
-            int draftColor = localDraft ? draft.color() : mixColor(draft.color(), 0xFFFFFF, 0.2F);
-            spawnWireframe(client, toGeometryPoints(draft.points()), baseY, topY, draftColor, false, draft.warningSegments(), localDraft, false);
+            int draftColor = localDraft ? draft.color() : RegionPlannerPreviewRenderer.mixColor(draft.color(), 0xFFFFFF, 0.2F);
+            RegionPlannerPreviewRenderer.renderWireframe(client, toGeometryPoints(draft.points()), baseY, topY, draftColor, false, draft.warningSegments(), localDraft, false);
         }
     }
 

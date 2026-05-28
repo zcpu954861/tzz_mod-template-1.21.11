@@ -28,6 +28,7 @@ public enum WebAdminOperationType {
     ROLLBACK_SNAPSHOT("ROLLBACK_SNAPSHOT", "回滚配置快照"),
     DELETE_SNAPSHOT("DELETE_SNAPSHOT", "删除配置快照"),
     EDIT_CONDITION_GROUP("EDIT_CONDITION_GROUP", "编辑 WebAdmin 条件组"),
+    EDIT_STATE_VARIABLE("EDIT_STATE_VARIABLE", "编辑状态变量定义"),
     EDIT_SIGNAL_LISTENER_BASIC_CONFIG("EDIT_SIGNAL_LISTENER_BASIC_CONFIG", "编辑 Signal Listener 基础配置"),
     EDIT_SIGNAL_LISTENER_ACTIONS("EDIT_SIGNAL_LISTENER_ACTIONS", "编辑 Signal Listener 动作列表"),
     EDIT_SIGNAL_JOIN("EDIT_SIGNAL_JOIN", "编辑 Signal Join / Barrier / Aggregator"),
