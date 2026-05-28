@@ -35,9 +35,12 @@
 | `onclick=` | 251 |
 | `oninput=` | 150 |
 | `onchange=` | 108 |
+| `onkeydown=` | 17 |
+| `htmlEvent(` | 45 |
 | `htmlHandler(` | 177 |
 | `innerHTML` | 61 |
 | `BeforeV13-17` total | 97 |
+| all `BeforeV\d+` tokens | 184 |
 
 ### Existing guard coverage / gaps
 
@@ -46,7 +49,7 @@
 | `StabilizationGuardTest` 9.1 markers | typed config editor markers, no freeform graph save, protected draft required, conflict markers | code size budget, JS function length, event complexity, app.js/app.css byte budget |
 | WebAdmin render smoke harness | basic generated JS/HTML smoke, marker presence | real browser performance, DOM equivalence for hover/click/zoom, modal scroll/focus retention after optimization |
 | local test MCP guard | MCP foundation and safety markers | WebAdmin code-health budgets when MCP is not touched |
-| Existing docs/current context checks | some phase markers are discoverable | README stable version mismatch and 9.1.1 docs-plan consistency |
+| Existing docs/current context checks | some phase markers are discoverable | README stable version and 9.1.1 docs-plan consistency need dedicated guard coverage |
 | Existing backend service tests | many Logic Chain save paths and protected draft paths | explicit planner/coordinator/executor boundaries, rollback-scope assertions, channel metadata mixed-write boundary |
 
 ## File size guard
@@ -318,7 +321,7 @@ Initial markers:
 
 Guard mode:
 
-- Phase 1: marker presence only.
+- Phase 1: doc/test registry or existing marker presence only; do not add new `src/main` performance markers just to satisfy this guard.
 - Phase 6: synthetic graph timing trend warning.
 - Later: hard fail only for extreme regressions after enough baseline data.
 
@@ -352,9 +355,11 @@ Docs consistency checks:
 - 9.1.1 implementation phases that change guard thresholds must update `CODE_QUALITY_GUARD_PLAN_9_1_1.md` or successor current context.
 - New WebAdmin write capability must update current context / capability matrix / help text.
 
-Initial inconsistency:
+Phase 1 consistency baseline:
 
-- README stable version says `v1.67.0-legacy-datapack-parity-audit` while current audit baseline is `v1.68.0-logic-chain-global-editor-capability-completion`.
+- README stable version should be `v1.68.1-codebase-health-audit`.
+- `docs/CODEBASE_HEALTH_GUARD_BASELINE_9_1_1_CURRENT_CONTEXT.md` records the Phase 1 guard baseline.
+- The older audit docs may still mention `v1.68.0` as the historical audit input baseline when clearly scoped as history.
 
 ## Acceptance criteria for 9.1.1 guard work
 
@@ -367,7 +372,7 @@ Initial inconsistency:
 - event handler complexity is tracked.
 - pointer-events invariants are tracked.
 - performance marker names are stable.
-- docs consistency warning exists for README/current context mismatch.
+- docs consistency guard enforces README/current context mismatch as a hard failure for Phase 1 baseline files.
 
 ## Overall 9.1.1 acceptance checklist
 
