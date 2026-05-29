@@ -12,6 +12,7 @@ import net.minecraft.util.math.BlockPos;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -185,13 +186,7 @@ public final class MapDataStore {
     }
 
     public static synchronized PlannerRegionData getPlannerRegion(MinecraftServer server, String regionId) {
-        MapState state = getState(server);
-        for (PlannerRegionData region : state.plannerRegions) {
-            if (region.id().equals(regionId)) {
-                return region;
-            }
-        }
-        return null;
+        return getState(server).plannerRegionById(regionId);
     }
 
     public static synchronized List<PlannerRegionData> getPlannerRegionsSnapshot(MinecraftServer server) {
@@ -205,6 +200,9 @@ public final class MapDataStore {
         int blockZ = (int) Math.floor(z);
         for (PlannerRegionData region : state.plannerRegions) {
             if (!cleanDimensionId.equals(region.dimensionId())) {
+                continue;
+            }
+            if (!boundsMayContain(region, blockX, blockZ)) {
                 continue;
             }
             if (region.containsBlock(blockX, blockZ)) {
@@ -375,6 +373,30 @@ public final class MapDataStore {
         return normalized;
     }
 
+    private static Map<String, PlannerRegionData> indexPlannerRegionsById(List<PlannerRegionData> plannerRegions) {
+        Map<String, PlannerRegionData> indexed = new LinkedHashMap<>();
+        if (plannerRegions != null) {
+            for (PlannerRegionData region : plannerRegions) {
+                if (region == null || region.id() == null || region.id().isBlank()) {
+                    continue;
+                }
+                indexed.putIfAbsent(region.id(), region);
+            }
+        }
+        return indexed;
+    }
+
+    private static boolean boundsMayContain(PlannerRegionData region, int blockX, int blockZ) {
+        if (region == null) {
+            return false;
+        }
+        RegionGeometry.Bounds bounds = region.bounds();
+        return blockX >= bounds.minX()
+                && blockX <= bounds.maxX()
+                && blockZ >= bounds.minZ()
+                && blockZ <= bounds.maxZ();
+    }
+
     public enum AddMarkerStatus {
         OK,
         NO_REGION,
@@ -442,6 +464,8 @@ public final class MapDataStore {
         private MapRegionData region;
         private final List<MapMarkerData> markers = new ArrayList<>();
         private final List<PlannerRegionData> plannerRegions = new ArrayList<>();
+        private Map<String, PlannerRegionData> plannerRegionsById = Map.of();
+        private boolean plannerRegionIndexDirty = true;
         private boolean showSelfPosition = true;
         private boolean showMarkers = true;
         private boolean showOtherPlayers = true;
@@ -565,6 +589,15 @@ public final class MapDataStore {
             }
         }
 
+        private PlannerRegionData plannerRegionById(String regionId) {
+            if (plannerRegionIndexDirty) {
+                // 区域控制器 tick 会按 regionId 高频查询；索引使用首个匹配项，等价于旧线性扫描的 first-match 语义。
+                plannerRegionsById = indexPlannerRegionsById(plannerRegions);
+                plannerRegionIndexDirty = false;
+            }
+            return plannerRegionsById.get(regionId);
+        }
+
         private boolean hasPlannerRegionName(String candidate, String ignoreRegionId) {
             for (PlannerRegionData region : plannerRegions) {
                 if (ignoreRegionId != null && ignoreRegionId.equals(region.id())) {
@@ -595,10 +628,12 @@ public final class MapDataStore {
         private void sortPlannerRegions() {
             plannerRegions.sort(Comparator.comparing(PlannerRegionData::name, String.CASE_INSENSITIVE_ORDER)
                     .thenComparing(PlannerRegionData::id));
+            plannerRegionIndexDirty = true;
         }
 
         private void markDirty() {
             dirty = true;
+            plannerRegionIndexDirty = true;
         }
 
         private void flushDirty() {

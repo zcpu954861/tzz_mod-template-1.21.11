@@ -7215,7 +7215,7 @@ public final class StabilizationGuardTest {
         String profile = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityProfile.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String groupService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java"), StandardCharsets.UTF_8);
-        String nativeService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
+        String nativeService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8), gateBindingValidator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateBindingValidator.java"), StandardCharsets.UTF_8);
         String requestDto = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
         String scripts = WebAdminFrontendAssets.appJs();
         String dispatcher = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceDispatcher.java"), StandardCharsets.UTF_8);
@@ -7232,7 +7232,7 @@ public final class StabilizationGuardTest {
                 "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateResult.java",
                 "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeContextBuilder.java",
                 "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityService.java",
-                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeGateStore.java",
+                "src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionRuntimeGateStore.java", "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateBindingValidator.java",
                 "src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateConfigTest.java",
                 "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGateServiceTest.java",
                 "src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"
@@ -7345,7 +7345,7 @@ public final class StabilizationGuardTest {
             requireContains(scripts, field, "8.6 frontend condition gate field: " + field);
         }
         requireContains(nativeService, "validateGateBinding", "8.6 backend rejects incompatible binding marker");
-        requireContains(nativeService, "compatibilityService.analyze", "8.6 backend compatibility validation marker");
+        requireTrue(nativeService.contains("WebAdminConditionGateBindingValidator") && nativeService.contains("conditionGateBindingValidator.validate") && gateBindingValidator.contains("compatibilityService.analyze"), "8.6 backend shared condition gate compatibility validation marker");
         requireContains(nativeService, "ConditionRuntimeGateStore.updateVirtualBlockDevice", "8.6 saves gate config through runtime gate store");
         requireContains(nativeService, "fingerprintFor(device, gates)", "8.6 gate fields participate in expectedFingerprint");
         requireContains(nativeService, "conditionGroupId", "8.6 audit/fingerprint includes condition group changed fields");

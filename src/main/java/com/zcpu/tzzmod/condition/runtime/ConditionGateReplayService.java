@@ -90,7 +90,7 @@ public final class ConditionGateReplayService {
         if (groupLoader != null) {
             return groupLoader.apply(groupId);
         }
-        WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = WebAdminConditionGroupStore.loadWithStatus(server);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = WebAdminConditionGroupStore.loadWithStatusCached(server);
         if (loaded.degraded()) {
             return null;
         }

@@ -17,13 +17,13 @@ public final class StateVariableService {
 
     public StateVariableSnapshot snapshot() {
         synchronized (lock()) {
-            return StateVariableStore.loadSnapshot(path);
+            return StateVariableStore.loadSnapshotCached(path);
         }
     }
 
     public StateVariableStore.StateVariableLoadResult snapshotWithStatus() {
         synchronized (lock()) {
-            return StateVariableStore.loadSnapshotWithStatus(path);
+            return StateVariableStore.loadSnapshotWithStatusCached(path);
         }
     }
 

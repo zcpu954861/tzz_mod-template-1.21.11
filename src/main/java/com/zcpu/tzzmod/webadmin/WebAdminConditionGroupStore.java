@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.condition.ConditionNodeType;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.core.storage.JsonLoadCacheSupport;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +29,13 @@ public final class WebAdminConditionGroupStore {
     public static final int DATA_VERSION = 1;
     public static final String FILE_NAME = "condition_groups.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int LOAD_CACHE_MAX_ENTRIES = 32;
+    private static final Map<Path, CachedLoadResult> LOAD_CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Path, CachedLoadResult> eldest) {
+            return size() > LOAD_CACHE_MAX_ENTRIES;
+        }
+    };
 
     private WebAdminConditionGroupStore() {
     }
@@ -56,6 +64,22 @@ public final class WebAdminConditionGroupStore {
         return loadWithStatus(path(server, false));
     }
 
+    public static synchronized ConditionGroupLoadResult loadWithStatusCached(MinecraftServer server) {
+        return loadWithStatusCached(path(server, false));
+    }
+
+    public static synchronized ConditionGroupLoadResult loadWithStatusCached(Path path) {
+        Path key = JsonLoadCacheSupport.cacheKey(path);
+        JsonLoadCacheSupport.FileFingerprint fingerprint = JsonLoadCacheSupport.fingerprint(path);
+        CachedLoadResult cached = LOAD_CACHE.get(key);
+        if (cached != null && cached.fingerprint.equals(fingerprint)) {
+            return cached.result;
+        }
+        ConditionGroupLoadResult loaded = loadWithStatus(path);
+        LOAD_CACHE.put(key, new CachedLoadResult(JsonLoadCacheSupport.fingerprint(path), loaded));
+        return loaded;
+    }
+
     public static synchronized ConditionGroupLoadResult loadWithStatus(Path path) {
         try {
             if (!Files.exists(path)) {
@@ -82,7 +106,19 @@ public final class WebAdminConditionGroupStore {
 
     public static synchronized boolean save(Path path, ConditionGroupFile file) {
         ConditionGroupFile safeFile = file == null ? new ConditionGroupFile() : file.normalized();
-        return JsonStoreSupport.write(path, safeFile, "web admin condition groups");
+        boolean saved = JsonStoreSupport.write(path, safeFile, "web admin condition groups");
+        if (saved) {
+            clearCachedLoad(path);
+        }
+        return saved;
+    }
+
+    public static synchronized void clearCachedLoad(MinecraftServer server) {
+        clearCachedLoad(path(server, false));
+    }
+
+    public static synchronized void clearCachedLoad(Path path) {
+        LOAD_CACHE.remove(JsonLoadCacheSupport.cacheKey(path));
     }
 
     public static String normalizeId(String value) {
@@ -264,5 +300,8 @@ public final class WebAdminConditionGroupStore {
         public ConditionGroupLoadResult(ConditionGroupFile file, boolean degraded, List<String> warnings) {
             this(file, degraded, warnings == null || warnings.isEmpty() ? "" : String.join("；", warnings));
         }
+    }
+
+    private record CachedLoadResult(JsonLoadCacheSupport.FileFingerprint fingerprint, ConditionGroupLoadResult result) {
     }
 }

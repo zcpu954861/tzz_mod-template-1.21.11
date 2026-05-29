@@ -45,9 +45,23 @@ public record StateVariableSnapshot(List<StateVariableRecord> records) {
 
     public Optional<StateVariableRecord> get(StateVariableScope scope, String targetId, String key) {
         StateVariableKey variableKey = new StateVariableKey(scope, targetId, key);
-        return records.stream()
-                .filter(record -> record.id().equals(variableKey.stableId()))
-                .findFirst();
+        String id = variableKey.stableId();
+        int low = 0;
+        int high = records.size() - 1;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            StateVariableRecord record = records.get(mid);
+            int compared = record.id().compareTo(id);
+            if (compared == 0) {
+                return Optional.of(record);
+            }
+            if (compared < 0) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return Optional.empty();
     }
 
     public StateVariableSnapshot with(StateVariableRecord record) {

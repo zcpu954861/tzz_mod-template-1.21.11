@@ -14,7 +14,9 @@ import com.zcpu.tzzmod.scheduler.TimerRuntimeService;
 import com.zcpu.tzzmod.scheduler.TimerStore;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
 import com.zcpu.tzzmod.signal.SignalListenerStore;
+import com.zcpu.tzzmod.signal.join.SignalJoinStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
+import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
@@ -907,6 +909,21 @@ public final class WebAdminSnapshotService {
             SignalListenerStore.clearCache(server);
         } catch (Exception exception) {
             Tzz_mod.LOGGER.warn("Failed to clear SignalListener cache after snapshot rollback: {}", exception.getMessage());
+        }
+        try {
+            SignalJoinStore.clearCachedLoad(server);
+        } catch (Exception exception) {
+            Tzz_mod.LOGGER.warn("Failed to clear SignalJoin cache after snapshot rollback: {}", exception.getMessage());
+        }
+        try {
+            WebAdminConditionGroupStore.clearCachedLoad(server);
+        } catch (Exception exception) {
+            Tzz_mod.LOGGER.warn("Failed to clear ConditionGroup cache after snapshot rollback: {}", exception.getMessage());
+        }
+        try {
+            StateVariableStore.clearCachedLoad(server);
+        } catch (Exception exception) {
+            Tzz_mod.LOGGER.warn("Failed to clear StateVariable cache after snapshot rollback: {}", exception.getMessage());
         }
         try {
             RegionControllerStore.clearCache(server);
