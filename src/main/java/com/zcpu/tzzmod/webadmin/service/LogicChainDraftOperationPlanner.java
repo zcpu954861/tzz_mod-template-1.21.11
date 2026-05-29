@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 
 // Logic Chain 保存计划只描述“这次草稿要按什么顺序写入”，不执行任何 store mutation。
+// Planner 只做草稿快照和存在性过滤：不做权限/锁校验、不写 store、不保存自由 graph document。
 // 这里保持 9.1 已验收的 typed resource 边界：nodes/action append/existing edit/action
 // edit/delete/reorder/node delete 是 typed 写入，channel metadata 仍是尾部独立边界。
 final class LogicChainDraftOperationPlanner {
@@ -177,6 +178,8 @@ final class LogicChainDraftOperationPlanner {
         return Collections.unmodifiableList(new ArrayList<>(source));
     }
 
+    // OperationPlan 前半段字段顺序就是 typed 写入顺序；channelMetadataDrafts 是尾部独立边界。
+    // 新增 operation kind 必须同步 executor 顺序、mixed-write fail-closed guard、service tests 和 current context。
     record OperationPlan(
             List<WebAdminLogicChainEditorRequest.DraftNode> draftNodes,
             WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,

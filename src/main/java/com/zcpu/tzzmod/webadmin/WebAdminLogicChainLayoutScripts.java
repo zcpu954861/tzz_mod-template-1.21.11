@@ -1,5 +1,9 @@
 package com.zcpu.tzzmod.webadmin;
 
+// Logic Chain layout V2 只计算可视节点、lane、slot、reference card 和边端口位置。
+// 基础布局输入来自当前 rendered graph；draft slot 辅助结果只供 overlay/render 路径消费。
+// 这里不得写 store/API/save payload，不得改变 Join lane、target-channel-adjacent、
+// RegionController owner/action 分组、reference-card visual-only 等已验收语义。
 final class WebAdminLogicChainLayoutScripts {
     private WebAdminLogicChainLayoutScripts() {
     }

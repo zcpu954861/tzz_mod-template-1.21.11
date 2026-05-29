@@ -13,14 +13,22 @@ public final class CodeQualityGuardTest {
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java";
     private static final int WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_LINES = 300;
     private static final int WEBADMIN_FRONTEND_SCRIPTS_FACADE_MAX_BYTES = 20_000;
+    private static final int FRONTEND_SCRIPT_MODULE_MAX_BYTES = 400_000;
+    private static final int FRONTEND_STYLE_MODULE_MAX_BYTES = 400_000;
+    private static final int NEW_BACKEND_SERVICE_MAX_BYTES = 160_000;
+    private static final int GUARD_CLASS_MAX_BYTES = 200_000;
+    private static final int WEBADMIN_LOGIC_CHAIN_EDITOR_SERVICE_PHASE7_LINE_BASELINE = 5_005;
+    private static final int STABILIZATION_GUARD_TEST_PHASE7_LINE_BASELINE = 12_430;
 
     private static final Map<String, FileBaseline> KNOWN_FILE_BASELINES = Map.of(
             WEBADMIN_FRONTEND_SCRIPTS, new FileBaseline(8433, 1_984_343),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java", new FileBaseline(75, 123_798),
-            "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java", new FileBaseline(5012, 305_815),
+            "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java",
+            new FileBaseline(WEBADMIN_LOGIC_CHAIN_EDITOR_SERVICE_PHASE7_LINE_BASELINE, 305_271),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java", new FileBaseline(3102, 164_014),
             "src/main/java/com/zcpu/tzzmod/webadmin/draft/WebAdminProtectedDraftRegistry.java", new FileBaseline(620, 26_369),
-            "src/test/java/com/zcpu/tzzmod/stabilization/StabilizationGuardTest.java", new FileBaseline(12_430, 838_347)
+            "src/test/java/com/zcpu/tzzmod/stabilization/StabilizationGuardTest.java",
+            new FileBaseline(STABILIZATION_GUARD_TEST_PHASE7_LINE_BASELINE, 838_347)
     );
 
     private static final Map<String, Integer> BEFORE_V_BASELINES = Map.of(
@@ -35,6 +43,17 @@ public final class CodeQualityGuardTest {
 
     private static final int BEFORE_V13_TO_V17_TOTAL = 97;
     private static final int ALL_BEFORE_VXX_TOTAL = 184;
+
+    private static final Map<String, FunctionBaseline> GIANT_JS_FUNCTION_BASELINES = Map.ofEntries(
+            Map.entry("logicChainExistingDeviceForm", new FunctionBaseline(16, 16_471)),
+            Map.entry("logicChainDefaultDraftChannelAnchor", new FunctionBaseline(59, 15_015)),
+            Map.entry("realtimeRouteKeysForEvent", new FunctionBaseline(127, 14_857)),
+            Map.entry("showLogicChainNewNodeModal", new FunctionBaseline(2, 12_387)),
+            Map.entry("showLogicChainPlacedDraftNodeEditModal", new FunctionBaseline(1, 10_319)),
+            Map.entry("renderDeviceDetail", new FunctionBaseline(85, 9_356)),
+            Map.entry("interactionItemMatcherForm", new FunctionBaseline(32, 9_081)),
+            Map.entry("startDeviceConfigEdit", new FunctionBaseline(81, 6_481))
+    );
 
     private static final Map<String, Integer> HOTSPOT_REDEFINITION_BASELINES = Map.of(
             "logicChainApplyVbdNativeTriggerDraftGraphOverlay", 3,
@@ -67,7 +86,7 @@ public final class CodeQualityGuardTest {
 
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
-        report.metric("branch.scope", "phase6-logic-chain-performance-baseline");
+        report.metric("branch.scope", "phase7-codebase-health-guard-ratchet");
         checkKnownFileBaselines(report);
         checkLogicChainBackendSplit(report, root);
         checkFrontendScriptsFacade(report);
@@ -75,6 +94,7 @@ public final class CodeQualityGuardTest {
         checkHotspotRedefinitions(report);
         checkModuleBudgets(report, root);
         reportLargeMethods(report, root);
+        reportPhase75ComplexityMetrics(report, root);
     }
 
     private static void checkKnownFileBaselines(CodeQualityGuardSupport.GuardReport report) throws IOException {
@@ -111,6 +131,8 @@ public final class CodeQualityGuardTest {
         if (facade.contains(".append(\"\"\"") || facade.contains("class ApiError") || facade.contains("const appState=")) {
             report.fail("WebAdminFrontendScripts.java contains generated JS business text instead of facade-only concat logic");
         }
+        report.requireContains(facade, "data-webadmin-frontend-bundle-entry-only",
+                "WebAdminFrontendScripts facade boundary marker");
         requireOrdered(report, facade,
                 "WebAdminFrontendIconScripts.appJs()",
                 "WebAdminFrontendCoreScripts.appJs()",
@@ -138,6 +160,8 @@ public final class CodeQualityGuardTest {
     }
 
     private static void checkLogicChainBackendSplit(CodeQualityGuardSupport.GuardReport report, Path root) throws IOException {
+        // Phase 7 这里守的是结构边界而不是业务行为：saveDraft 仍由 facade 委托到 coordinator，
+        // planner/executor 只冻结顺序和 mixed-write 边界，避免后续把跨 store 写入重新堆回巨型 service。
         String servicePath = "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java";
         String coordinatorPath = "src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftSaveCoordinator.java";
         String plannerPath = "src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftOperationPlanner.java";
@@ -160,8 +184,13 @@ public final class CodeQualityGuardTest {
                 "LogicChainDraftSaveCoordinator must document the frozen saveDraft order");
         report.require(coordinator.contains("不把") && coordinator.contains("完整原子事务"),
                 "LogicChainDraftSaveCoordinator must state that Phase 5 does not claim full cross-store atomicity");
+        report.require(coordinator.contains("Coordinator 只编排保存流程边界")
+                        && coordinator.contains("ServiceAdapter 是兼容旧 typed 写入口的桥"),
+                "LogicChainDraftSaveCoordinator must document Phase 7 orchestration and adapter boundaries");
         report.require(executor.contains("按旧顺序调用 typed 写入口"),
                 "LogicChainTypedWriteExecutor must document order-preserving typed execution");
+        report.require(executor.contains("不重试、不重排、不写 channel metadata"),
+                "LogicChainTypedWriteExecutor must document retry/reorder/channel metadata boundaries");
         requireOrdered(report, executor,
                 "for (WebAdminLogicChainEditorRequest.DraftNode node : plan.draftNodes())",
                 "if (plan.actionAppend() != null)",
@@ -172,6 +201,10 @@ public final class CodeQualityGuardTest {
                 "for (WebAdminLogicChainEditorRequest.NodeDeleteDraft delete : plan.nodeDeletes())");
         report.require(planner.contains("channel metadata 仍是尾部独立边界"),
                 "LogicChainDraftOperationPlanner must document the channel metadata tail boundary");
+        report.require(planner.contains("Planner 只做草稿快照和存在性过滤")
+                        && planner.contains("OperationPlan 前半段字段顺序就是 typed 写入顺序")
+                        && planner.contains("channelMetadataDrafts 是尾部独立边界"),
+                "LogicChainDraftOperationPlanner must document Phase 7 planner and OperationPlan boundaries");
         report.require(editorTest.contains("testDraftOperationPlannerPreservesTypedWriteOrderBoundaries"),
                 "WebAdminLogicChainEditorServiceTest must cover Phase 5 operation planner ordering");
         String phase5Backend = service + "\n" + coordinator + "\n" + planner + "\n" + executor;
@@ -200,7 +233,7 @@ public final class CodeQualityGuardTest {
             int actual = CodeQualityGuardSupport.count(scripts, entry.getKey());
             report.metric("beforev.count." + entry.getKey(), actual + " baseline=" + entry.getValue());
             if (actual > entry.getValue()) {
-                report.warning(entry.getKey() + " count grew from " + entry.getValue() + " to " + actual);
+                report.fail(entry.getKey() + " count grew from " + entry.getValue() + " to " + actual);
             }
             if (entry.getKey().compareTo("BeforeV13") >= 0) {
                 v13ToV17 += actual;
@@ -212,10 +245,10 @@ public final class CodeQualityGuardTest {
         report.metric("beforev.count.all", allBeforeVxx + " baseline=" + ALL_BEFORE_VXX_TOTAL);
         report.metric("beforev.count.v18_plus", beforeV18Plus);
         if (v13ToV17 > BEFORE_V13_TO_V17_TOTAL) {
-            report.warning("BeforeV13-17 count grew from " + BEFORE_V13_TO_V17_TOTAL + " to " + v13ToV17);
+            report.fail("BeforeV13-17 count grew from " + BEFORE_V13_TO_V17_TOTAL + " to " + v13ToV17);
         }
         if (allBeforeVxx > ALL_BEFORE_VXX_TOTAL) {
-            report.warning("All BeforeVxx token count grew from " + ALL_BEFORE_VXX_TOTAL + " to " + allBeforeVxx);
+            report.fail("All BeforeVxx token count grew from " + ALL_BEFORE_VXX_TOTAL + " to " + allBeforeVxx);
         }
         if (beforeV18Plus > 0) {
             report.fail("New BeforeV18+ patch stacking token detected");
@@ -251,23 +284,47 @@ public final class CodeQualityGuardTest {
             if (fileName.endsWith("Scripts.java") && !fileName.equals("WebAdminFrontendScripts.java")) {
                 report.metric("frontend.script_module.bytes." + fileName, bytes);
                 report.metric("frontend.script_module.lines." + fileName, lines);
+                if (bytes > FRONTEND_SCRIPT_MODULE_MAX_BYTES) {
+                    report.fail("Frontend script module exceeds Phase 7 byte budget: " + relative
+                            + " bytes=" + bytes + " max=" + FRONTEND_SCRIPT_MODULE_MAX_BYTES);
+                }
             }
             if (fileName.contains("Styles") && !fileName.equals("WebAdminFrontendStyles.java") && lines > 800) {
                 report.fail("Frontend style module exceeds 800-line Phase 1 budget: " + relative + " lines=" + lines);
             }
+            if (fileName.contains("Styles") && !fileName.equals("WebAdminFrontendStyles.java") && bytes > FRONTEND_STYLE_MODULE_MAX_BYTES) {
+                report.fail("Frontend style module exceeds Phase 7 byte budget: " + relative
+                        + " bytes=" + bytes + " max=" + FRONTEND_STYLE_MODULE_MAX_BYTES);
+            }
             if (relative.startsWith("src/main/java/com/zcpu/tzzmod/webadmin/service/")
-                    && fileName.endsWith("Service.java")
-                    && lines > 1000
+                    && fileName.endsWith(".java")
                     && !LEGACY_WEBADMIN_SERVICES_OVER_1000.contains(fileName)) {
-                report.fail("New backend service exceeds 1000-line Phase 1 budget: " + relative + " lines=" + lines);
+                report.metric("backend.module.lines." + fileName, lines);
+                report.metric("backend.module.bytes." + fileName, bytes);
+                if (lines > 1000) {
+                    report.fail("New backend module exceeds 1000-line Phase 7 budget: " + relative + " lines=" + lines);
+                }
+                if (bytes > NEW_BACKEND_SERVICE_MAX_BYTES) {
+                    report.fail("New backend module exceeds Phase 7 byte budget: " + relative
+                            + " bytes=" + bytes + " max=" + NEW_BACKEND_SERVICE_MAX_BYTES);
+                }
             }
         }
         for (Path file : CodeQualityGuardSupport.javaFiles(root.resolve("src/test/java/com/zcpu/tzzmod/stabilization"))) {
             String fileName = file.getFileName().toString();
             String relative = root.relativize(file).toString().replace('\\', '/');
             long lines = CodeQualityGuardSupport.lineCount(relative);
-            if (!fileName.equals("StabilizationGuardTest.java") && lines > 1000) {
-                report.fail("Guard class exceeds 1000-line Phase 1 budget: " + relative + " lines=" + lines);
+            long bytes = CodeQualityGuardSupport.bytes(relative);
+            if (!fileName.equals("StabilizationGuardTest.java")) {
+                report.metric("guard.class.lines." + fileName, lines);
+                report.metric("guard.class.bytes." + fileName, bytes);
+                if (lines > 1000) {
+                    report.fail("Guard class exceeds 1000-line Phase 1 budget: " + relative + " lines=" + lines);
+                }
+                if (bytes > GUARD_CLASS_MAX_BYTES) {
+                    report.fail("Guard class exceeds Phase 7 byte budget: " + relative
+                            + " bytes=" + bytes + " max=" + GUARD_CLASS_MAX_BYTES);
+                }
             }
         }
     }
@@ -283,7 +340,7 @@ public final class CodeQualityGuardTest {
             index++;
         }
         String appJs = WebAdminFrontendAssets.appJs();
-        List<CodeQualityGuardSupport.MethodMetric> jsFunctions = CodeQualityGuardSupport.collectLargeJsFunctions(appJs, 50);
+        List<CodeQualityGuardSupport.MethodMetric> jsFunctions = CodeQualityGuardSupport.collectLargeJsFunctions(appJs, 200);
         report.metric("js.function.top.count", jsFunctions.size());
         if (jsFunctions.isEmpty()) {
             report.fail("JS function-length detector found no functions in generated app.js");
@@ -293,10 +350,70 @@ public final class CodeQualityGuardTest {
             report.metric("js.function.top." + String.format("%03d", index),
                     function.lines + " lines " + function.chars + " chars " + function.name + " " + function.location);
             if (function.lines > 80 || function.chars > 8_000) {
-                report.warning("Large JS function report-only: " + function.name + " " + function.location
-                        + " lines=" + function.lines + " chars=" + function.chars);
+                if (GIANT_JS_FUNCTION_BASELINES.containsKey(function.name)) {
+                    report.warning("Grandfathered large JS function report-only: " + function.name + " "
+                            + function.location + " lines=" + function.lines + " chars=" + function.chars);
+                } else {
+                    report.fail("New giant JS function detected after Phase 7 ratchet: " + function.name + " "
+                            + function.location + " lines=" + function.lines + " chars=" + function.chars
+                            + ". Split the handler/function or add an explicit ratchet baseline in a dedicated phase.");
+                }
             }
             index++;
+        }
+        checkGiantJsFunctionNoGrowth(report, jsFunctions);
+    }
+
+    private static void reportPhase75ComplexityMetrics(CodeQualityGuardSupport.GuardReport report, Path root) throws IOException {
+        String appJs = WebAdminFrontendAssets.appJs();
+        reportMetricTable(report, "phase75.java.if_density.top",
+                CodeQualityGuardSupport.collectJavaIfDensityMethods(root, 50));
+        reportMetricTable(report, "phase75.js.if_density.top",
+                CodeQualityGuardSupport.collectJsIfDensityFunctions(appJs, 50));
+        reportMetricTable(report, "phase75.js.selector_density.top",
+                CodeQualityGuardSupport.collectJsSelectorDensityFunctions(appJs, 50));
+        reportMetricTable(report, "phase75.hotspot.interaction.top",
+                CodeQualityGuardSupport.collectJsInteractionHotspots(appJs, 30));
+        reportMetricTable(report, "phase75.hotspot.render.top",
+                CodeQualityGuardSupport.collectJsRenderHotspots(appJs, 30));
+        reportMetricTable(report, "phase75.hotspot.backend.top",
+                CodeQualityGuardSupport.collectBackendValidationMethods(root, 30));
+    }
+
+    private static void reportMetricTable(CodeQualityGuardSupport.GuardReport report, String prefix,
+                                          List<CodeQualityGuardSupport.MethodMetric> metrics) {
+        report.metric(prefix + ".count", metrics.size());
+        if (metrics.isEmpty()) {
+            report.fail("Phase 7.5 complexity metric table is empty: " + prefix);
+            return;
+        }
+        int index = 1;
+        for (CodeQualityGuardSupport.MethodMetric metric : metrics) {
+            report.metric(prefix + "." + String.format("%03d", index), metric.complexitySummary());
+            index++;
+        }
+    }
+
+    private static void checkGiantJsFunctionNoGrowth(CodeQualityGuardSupport.GuardReport report,
+                                                     List<CodeQualityGuardSupport.MethodMetric> jsFunctions) {
+        Map<String, CodeQualityGuardSupport.MethodMetric> byName = jsFunctions.stream()
+                .collect(java.util.stream.Collectors.toMap(function -> function.name, function -> function, (left, right) -> left));
+        for (Map.Entry<String, FunctionBaseline> entry : GIANT_JS_FUNCTION_BASELINES.entrySet()) {
+            String name = entry.getKey();
+            FunctionBaseline baseline = entry.getValue();
+            CodeQualityGuardSupport.MethodMetric actual = byName.get(name);
+            if (actual == null) {
+                report.metric("js.function.ratchet." + name, "removed_or_split baselineLines="
+                        + baseline.lines + " baselineChars=" + baseline.chars);
+                continue;
+            }
+            report.metric("js.function.ratchet." + name, actual.lines + " lines " + actual.chars
+                    + " chars baselineLines=" + baseline.lines + " baselineChars=" + baseline.chars);
+            if (actual.lines > baseline.lines || actual.chars > baseline.chars) {
+                report.fail("Known giant JS function grew after Phase 7 ratchet: " + name
+                        + " lines=" + actual.lines + "/" + baseline.lines
+                        + " chars=" + actual.chars + "/" + baseline.chars);
+            }
         }
     }
 
@@ -307,6 +424,16 @@ public final class CodeQualityGuardTest {
         FileBaseline(int lines, int bytes) {
             this.lines = lines;
             this.bytes = bytes;
+        }
+    }
+
+    private static final class FunctionBaseline {
+        final int lines;
+        final int chars;
+
+        FunctionBaseline(int lines, int chars) {
+            this.lines = lines;
+            this.chars = chars;
         }
     }
 }

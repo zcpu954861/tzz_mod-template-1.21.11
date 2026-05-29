@@ -8,8 +8,11 @@ import com.zcpu.tzzmod.webadmin.write.WebAdminWriteTarget;
 import java.util.List;
 import net.minecraft.server.MinecraftServer;
 
-// 该 executor 只负责“按旧顺序调用 typed 写入口”。它不做去重、不重排、不尝试跨 store
-// 回滚；失败恢复仍由 save coordinator 按旧逻辑保留 Logic Chain editor lock / draft。
+// 该 executor 只负责“按旧顺序调用 typed 写入口”。它消费 planner 产出的 OperationPlan，
+// 按 draft node -> action append -> existing node edit -> action edit/delete/reorder -> node delete
+// 顺序停止在第一个失败点，并把最后尝试的草稿返回给 coordinator 做旧有失败恢复。
+// 它不重试、不重排、不写 channel metadata、不释放锁、不尝试跨 store rollback；失败恢复仍由
+// save coordinator 按旧逻辑保留 Logic Chain editor lock / draft。
 final class LogicChainTypedWriteExecutor {
     private final Adapter adapter;
 

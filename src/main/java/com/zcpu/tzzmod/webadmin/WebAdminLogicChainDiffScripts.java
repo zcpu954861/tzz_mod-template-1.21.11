@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
+// Diff 模块只把 draft/original 快照转换成中文可读的未保存摘要和 banner。
+// 它必须 fail-soft：摘要构造失败不能清空草稿、不能驱动保存事务，也不能把 raw JSON 当主摘要。
+// 新增 diff 字段时要同时确认 save payload 过滤、pending-delete 视觉标记和 guard baseline。
 final class WebAdminLogicChainDiffScripts {
     private WebAdminLogicChainDiffScripts() {
     }

@@ -1,5 +1,9 @@
 package com.zcpu.tzzmod.webadmin;
 
+// Logic Chain editor 模块维护前端 edit session、modal draft、lock 心跳、dirty 状态和保存 payload 组装。
+// 它只负责把用户草稿整理成后端 typed save request；不直接写 runtime/store，不改变后端事务顺序。
+// diff 模块在本文件内部按原生成顺序拼接，后续拆分 action panel、protected draft 或 save payload 时
+// 必须保留 draft/saved/protected/pending-delete/failed/committed 的状态边界。
 final class WebAdminLogicChainEditorScripts {
     private WebAdminLogicChainEditorScripts() {
     }

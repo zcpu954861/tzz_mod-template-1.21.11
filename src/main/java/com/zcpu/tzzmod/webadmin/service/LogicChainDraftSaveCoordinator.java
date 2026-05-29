@@ -15,8 +15,11 @@ import java.util.Map;
 import net.minecraft.server.MinecraftServer;
 
 // saveDraft 的主流程固定为 preflight -> editor lock -> fingerprint -> validate ->
-// plan -> execute -> channel metadata -> release。Coordinator 只搬运旧顺序，不把
-// 多个 typed store 包装成完整原子事务；底层失败仍按旧逻辑保留 editor lock / draft。
+// plan -> execute -> channel metadata -> release。Coordinator 只编排保存流程边界：
+// request 先通过 WebAdmin 写前置和 graph fingerprint，再由 planner 描述 typed/channel metadata
+// 边界，executor 调旧 typed 写入口，最后才处理 channel metadata tail 和成功释放锁。
+// 这里不把多个 typed store 包装成完整原子事务；底层失败仍按旧逻辑保留 editor lock / draft。
+// 后续扩展应新增 planner/executor adapter 与 guard，不要把新 store mutation 直接塞进 coordinator。
 final class LogicChainDraftSaveCoordinator {
     private final WebAdminLogicChainEditorService service;
     private final LogicChainTypedWriteExecutor executor;
@@ -80,6 +83,8 @@ final class LogicChainDraftSaveCoordinator {
             service.audit(context, result, WebAdminLogicChainEditorService.requestSummary(safeRequest), Map.of("attempt", "validation_failed", "errorCount", errors.size()));
             return result;
         }
+        // mixed-write fail-closed 是保存边界 guard，不改变旧 validation 语义：typed node/action/delete
+        // 与 channel metadata tail 仍分批保存，避免任一 store 失败后产生半应用假象。
         LogicChainDraftOperationPlanner.OperationPlan plan = LogicChainDraftOperationPlanner.plan(safeRequest);
         if (plan.hasNodeDelete() && plan.hasNonNodeDeleteTypedStoreDrafts()) {
             WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(WebAdminLogicChainEditorService.error(
@@ -157,6 +162,8 @@ final class LogicChainDraftSaveCoordinator {
         return result;
     }
 
+    // ServiceAdapter 是兼容旧 typed 写入口的桥：它只把 executor 的顺序调用转发回原 service
+    // adapter 方法，不隐藏新副作用、不释放锁、不补做跨 store rollback，也不改变 WebAdmin API 形状。
     private static final class ServiceAdapter implements LogicChainTypedWriteExecutor.Adapter {
         private final WebAdminLogicChainEditorService service;
 

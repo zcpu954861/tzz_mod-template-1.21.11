@@ -685,6 +685,8 @@ public final class WebAdminLogicChainEditorServiceTest {
         requireValidationField(nullMetadataResult, "required", "channelMetadataDrafts[0].channel");
     }
 
+    // 该测试只冻结 planner 的 phase 边界和顺序；真实 mutation、锁释放和失败恢复仍由
+    // saveDraft 既有集成用例覆盖，避免把 planner 误当成新的执行层。
     private static void testDraftOperationPlannerPreservesTypedWriteOrderBoundaries() {
         WebAdminLogicChainEditorRequest request = timerDraftRequest("editor.planner", "editor-lock", "base-fingerprint", "editor.planner.timer");
         request.actionAppend = actionAppendDraftRequest(

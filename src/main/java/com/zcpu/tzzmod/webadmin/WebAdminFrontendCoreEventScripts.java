@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
+// WebAdmin delegated event/realtime 模块维护全局 route table、listener 顺序和 silent refresh 边界。
+// 新交互应加入命名 handler + route entry，避免 inline lambda、BeforeVxx wrapper 或巨型 if/closest 回潮。
+// 这里的状态更新必须保持非扰动：不重置输入、滚动、modal、dirty draft 或已打开的二级配置页。
 final class WebAdminFrontendCoreEventScripts {
     private WebAdminFrontendCoreEventScripts() {
     }

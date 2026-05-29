@@ -4374,67 +4374,60 @@ public final class WebAdminLogicChainEditorService {
             return channels;
         }
         if (hasActionAppend(request)) {
-            WebAdminLogicChainEditorRequest.ActionAppendDraft append = request.actionAppend;
-            WebAdminActionRelayActionsUpdateRequest.ActionEntry action = append == null ? null : append.action;
-            if (action != null && "signal".equalsIgnoreCase(safe(action.type))) {
-                String channel = channelRef(action.value);
-                if (!channel.isBlank()) {
-                    channels.add(channel);
-                }
-            }
+            addSignalActionReferencedChannel(channels, request.actionAppend == null ? null : request.actionAppend.action);
         }
         if (hasActionEdit(request)) {
             for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : request.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : request.actionEdits) {
-                WebAdminActionRelayActionsUpdateRequest.ActionEntry action = edit == null ? null : edit.action;
-                if (action != null && "signal".equalsIgnoreCase(safe(action.type))) {
-                    String channel = channelRef(action.value);
-                    if (!channel.isBlank()) {
-                        channels.add(channel);
-                    }
-                }
+                addSignalActionReferencedChannel(channels, edit == null ? null : edit.action);
             }
         }
         if (hasExistingNodeEdit(request)) {
             for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : request.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : request.existingNodeEdits) {
-                String nodeType = normalizeExistingNodeEditType(edit == null ? "" : edit.nodeType);
-                if ("signal_join".equals(nodeType) && edit != null && edit.signalJoin != null) {
-                    channels.addAll(signalJoinRequestInputChannels(edit.signalJoin));
-                    String output = SignalChannel.normalize(edit.signalJoin.outputChannel);
-                    if (!output.isBlank()) {
-                        channels.add(output);
-                    }
-                } else if ("timer".equals(nodeType) && edit != null && edit.timer != null) {
-                    String output = SignalChannel.normalize(edit.timer.outputChannel);
-                    if (!output.isBlank()) {
-                        channels.add(output);
-                    }
-                } else if ("signal_listener".equals(nodeType) && edit != null && edit.signalListenerBasic != null) {
-                    String channel = SignalChannel.normalize(edit.signalListenerBasic.channel);
-                    if (!channel.isBlank()) {
-                        channels.add(channel);
-                    }
-                } else if ("channel_metadata".equals(nodeType) && edit != null && edit.channelMetadata != null) {
-                    String channel = SignalChannel.normalize(edit.channelMetadata.channel);
-                    if (!channel.isBlank()) {
-                        channels.add(channel);
-                    }
-                } else if (isDeviceExistingNodeType(nodeType) && edit != null && edit.deviceBasic != null) {
-                    String channel = SignalChannel.normalize(edit.deviceBasic.channel);
-                    if (!channel.isBlank()) {
-                        channels.add(channel);
-                    }
-                }
+                addExistingNodeEditReferencedChannels(channels, edit);
             }
         }
         if (request.nodes != null && !request.nodes.isEmpty()) {
             for (WebAdminLogicChainEditorRequest.DraftEdge edge : request.edges == null ? List.<WebAdminLogicChainEditorRequest.DraftEdge>of() : request.edges) {
-                String channel = edgeChannelId(edge);
-                if (!channel.isBlank()) {
-                    channels.add(channel);
-                }
+                addResolvedChannel(channels, edgeChannelId(edge));
             }
         }
         return channels;
+    }
+
+    private static void addSignalActionReferencedChannel(Set<String> channels, WebAdminActionRelayActionsUpdateRequest.ActionEntry action) {
+        if (action != null && "signal".equalsIgnoreCase(safe(action.type))) {
+            addChannelRef(channels, action.value);
+        }
+    }
+
+    private static void addExistingNodeEditReferencedChannels(Set<String> channels, WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit) {
+        String nodeType = normalizeExistingNodeEditType(edit == null ? "" : edit.nodeType);
+        if ("signal_join".equals(nodeType) && edit != null && edit.signalJoin != null) {
+            channels.addAll(signalJoinRequestInputChannels(edit.signalJoin));
+            addNormalizedChannel(channels, edit.signalJoin.outputChannel);
+        } else if ("timer".equals(nodeType) && edit != null && edit.timer != null) {
+            addNormalizedChannel(channels, edit.timer.outputChannel);
+        } else if ("signal_listener".equals(nodeType) && edit != null && edit.signalListenerBasic != null) {
+            addNormalizedChannel(channels, edit.signalListenerBasic.channel);
+        } else if ("channel_metadata".equals(nodeType) && edit != null && edit.channelMetadata != null) {
+            addNormalizedChannel(channels, edit.channelMetadata.channel);
+        } else if (isDeviceExistingNodeType(nodeType) && edit != null && edit.deviceBasic != null) {
+            addNormalizedChannel(channels, edit.deviceBasic.channel);
+        }
+    }
+
+    private static void addChannelRef(Set<String> channels, String value) {
+        addResolvedChannel(channels, channelRef(value));
+    }
+
+    private static void addNormalizedChannel(Set<String> channels, String value) {
+        addResolvedChannel(channels, SignalChannel.normalize(value));
+    }
+
+    private static void addResolvedChannel(Set<String> channels, String channel) {
+        if (!channel.isBlank()) {
+            channels.add(channel);
+        }
     }
 
     private static RegionTriggerType parseRegionTrigger(String bucket) {

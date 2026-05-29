@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
+// VBD helper 模块负责 native trigger 的可读摘要、diff rows、trigger 输出行和 capture requirement
+// 摘要。这里的 UI 表面必须以中文 summary 为主，nativeTriggerJson 只能作为 secondary/debug 数据。
+// 输出频道仍由 graph edge/draft 预览表达，正式 VBD store 写入只发生在 Logic Chain save 边界。
 final class WebAdminLogicChainVbdScripts {
     private WebAdminLogicChainVbdScripts() {
     }

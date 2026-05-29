@@ -14,6 +14,9 @@ public final class WebAdminPerformanceBaselineGuardTest {
     private static final int PHASE6_APP_JS_BEFORE_BYTES = 1_843_648;
     private static final String PHASE6_APP_JS_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
     private static final int PHASE6_APP_JS_WARNING_LIMIT_BYTES = 1_880_521;
+    private static final int PHASE7_APP_JS_RATCHET_BYTES = 1_846_211;
+    private static final String PHASE7_APP_JS_RATCHET_SHA256 = "474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069";
+    private static final int PHASE7_APP_CSS_RATCHET_BYTES = 123_251;
 
     private static final Map<String, Map<String, String>> PHASE6_DOM_BASELINES = phase6DomBaselines();
 
@@ -37,8 +40,21 @@ public final class WebAdminPerformanceBaselineGuardTest {
         report.metric("performance.app_js.before.bytes", PHASE6_APP_JS_BEFORE_BYTES);
         report.metric("performance.app_js.before.sha256", PHASE6_APP_JS_BEFORE_SHA256);
         report.metric("performance.app_js.after.bytes", appJsBytes);
-        report.metric("performance.app_js.after.sha256", sha256Hex(appJs));
+        String appJsSha256 = sha256Hex(appJs);
+        report.metric("performance.app_js.after.sha256", appJsSha256);
         report.metric("performance.app_js.delta.bytes", appJsBytes - PHASE6_APP_JS_BEFORE_BYTES);
+        report.metric("performance.phase7.app_js.ratchet.bytes", PHASE7_APP_JS_RATCHET_BYTES);
+        report.metric("performance.phase7.app_js.ratchet.sha256", PHASE7_APP_JS_RATCHET_SHA256);
+        report.metric("performance.phase7.app_css.ratchet.bytes", PHASE7_APP_CSS_RATCHET_BYTES);
+        if (appJsBytes != PHASE7_APP_JS_RATCHET_BYTES || !PHASE7_APP_JS_RATCHET_SHA256.equals(appJsSha256)) {
+            report.fail("Phase 7 performance asset ratchet changed app.js: actualBytes=" + appJsBytes
+                    + " expectedBytes=" + PHASE7_APP_JS_RATCHET_BYTES
+                    + " actualSha256=" + appJsSha256 + " expectedSha256=" + PHASE7_APP_JS_RATCHET_SHA256);
+        }
+        if (appCssBytes != PHASE7_APP_CSS_RATCHET_BYTES) {
+            report.fail("Phase 7 performance asset ratchet changed app.css: actualBytes=" + appCssBytes
+                    + " expectedBytes=" + PHASE7_APP_CSS_RATCHET_BYTES);
+        }
         if (appJsBytes > PHASE6_APP_JS_WARNING_LIMIT_BYTES) {
             report.warning("Phase 6 app.js bytes exceeded current + 2% warning limit: actual="
                     + appJsBytes + " limit=" + PHASE6_APP_JS_WARNING_LIMIT_BYTES);
@@ -51,6 +67,13 @@ public final class WebAdminPerformanceBaselineGuardTest {
         Files.createDirectories(output.getParent());
         Files.writeString(output, appJs, StandardCharsets.UTF_8);
         String node = CodeQualityGuardSupport.findNodeExecutable();
+        CodeQualityGuardSupport.CommandResult nodeCheck =
+                CodeQualityGuardSupport.runCommand(Duration.ofSeconds(30), node, "--check", output.toString());
+        report.metric("performance.node_check.build/tmp/webadmin-app.js", "exit=" + nodeCheck.exitCode);
+        if (nodeCheck.exitCode != 0) {
+            report.fail("Performance guard standalone node --check failed: " + nodeCheck.output);
+        }
+        checkPhase7SourceRatchets(report);
         String parseScript = "const fs=require('fs');const vm=require('vm');const p=process.argv[1];"
                 + "const code=fs.readFileSync(p,'utf8');const start=process.hrtime.bigint();"
                 + "new vm.Script(code);const ms=Number(process.hrtime.bigint()-start)/1e6;"
@@ -168,24 +191,57 @@ public final class WebAdminPerformanceBaselineGuardTest {
                 "vbdSelectedTrigger", "right_click",
                 "vbdDraftSourceNodeId", "vbd:one");
         putExtraScenario(baselines, "pendingDelete",
+                "hash.dom", "9ef14a29a4e8768a",
                 "pendingDeleteCard", "9",
                 "pendingDeleteBadge", "4",
                 "pendingDeleteDiff", "5",
                 "savePayloadPendingDeleteLeak", "false");
         putExtraScenario(baselines, "vbdFallback",
+                "hash.dom", "e2e15cb55f58bf43",
                 "vbdSourceCard", "1",
                 "vbdSourceNodeIds", "vbd:one",
                 "vbdTriggerKeys", "right_click",
                 "vbdSelectedTrigger", "right_click",
                 "vbdDraftSourceNodeId", "");
         putExtraScenario(baselines, "vbdSourcePriority",
+                "hash.dom", "7d6699f95a8680f7",
                 "vbdSourceCard", "1",
                 "vbdSourceNodeIds", "vbd:one",
                 "vbdTriggerKeys", "right_click",
                 "vbdSelectedTrigger", "right_click",
                 "vbdDraftSourceNodeId", "vbd:one");
-        putExtraScenario(baselines, "minimapCap", "minimapSegments", "24");
+        putExtraScenario(baselines, "minimapCap", "hash.dom", "aae5ee535b805d59", "minimapSegments", "24");
         return baselines;
+    }
+
+    private static void checkPhase7SourceRatchets(CodeQualityGuardSupport.GuardReport report) throws Exception {
+        String canvas = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminLogicChainCanvasScripts.java");
+        report.requireContains(canvas, "const relatedIndex=logicChainRelatedNodeIndex(graph);",
+                "Phase 7 related index remains render-local");
+        report.requireContains(canvas, "logicChainPositionedNode(item,nodes,graph,relatedIndex)",
+                "Phase 7 related index is passed into node cards rather than stored on graph");
+        report.requireContains(canvas, "(graph?.segments||[]).slice(0,24).map(seg=>[String(seg?.channel||''),Number(seg?.downstreamChannels?.length||0)]",
+                "Phase 7 minimap key remains capped to first 24 segment channel/downstream counts");
+        report.requireContains(canvas, "let logicChainMinimapMemo={key:'',html:''};",
+                "Phase 7 minimap memo stores key/html only");
+        report.require(!canvas.contains("logicChainMinimapMemo={key,html,graph")
+                        && !canvas.contains("logicChainMinimapMemo={graph"),
+                "Phase 7 minimap memo must not store graph references");
+        report.requireContains(canvas, "function focusLogicChainNodeDetail(id){const next=String(id||'');"
+                        + "appState.logicChainCanvas.selectedNodeId=next;"
+                        + "appState.logicChainCanvas.focusNodeId=next;"
+                        + "appState.logicChainCanvas.selectionPinned=!!next;"
+                        + "appState.logicChainCanvas.detailOpen=true;"
+                        + "if(appState.currentLogicChainGraph)renderLogicChainViewer(",
+                "Phase 7 defers selection-local optimization until full DOM interaction guard exists");
+        report.requireContains(canvas, "function highlightRelatedEdges(id){const next=id||'';"
+                        + "if(appState.logicChainCanvas.hoverNodeId===next)return;"
+                        + "appState.logicChainCanvas.hoverNodeId=next;"
+                        + "if(appState.currentLogicChainGraph)renderLogicChainViewer(",
+                "Phase 7 defers hover class-only optimization until arrow ownership is guarded");
+        report.requireContains(canvas, "function setLogicChainZoom(delta){appState.logicChainCanvas.zoom=Math.max(.45,Math.min(1.8,Number(appState.logicChainCanvas.zoom||1)+Number(delta||0)));"
+                        + "if(appState.currentLogicChainGraph)renderLogicChainViewer(",
+                "Phase 7 defers zoom transform-only optimization until toolbar/pan equivalence is guarded");
     }
 
     private static void putScenario(Map<String, Map<String, String>> baselines, String name,
@@ -288,7 +344,7 @@ public final class WebAdminPerformanceBaselineGuardTest {
                   const extraKeys={pendingDelete:['pendingDeleteCard','pendingDeleteBadge','pendingDeleteDiff'],vbd:['vbdStableIdentity','vbdNoDuplicate','vbdTargetChannelOnly','vbdSourceCard','vbdSourceNodeIds'],vbdFallback:['vbdSourceCard','vbdSourceNodeIds'],vbdSourcePriority:['vbdSourceCard','vbdSourceNodeIds'],minimapCap:['minimapSegments']};
                   const hashKeys=new Set(['dom']);
                   for(const [key,value] of Object.entries(s)){
-                    if(key==='hash'){if(originalScenario)for(const [hashKey,hashValue] of Object.entries(value)){if(hashKeys.has(hashKey))console.log(`scenario.${scenario}.hash.${hashKey}=${hashValue}`);}}
+                  if(key==='hash'){for(const [hashKey,hashValue] of Object.entries(value)){if(hashKeys.has(hashKey))console.log(`scenario.${scenario}.hash.${hashKey}=${hashValue}`);}}
                     else if((originalScenario&&baseKeys.has(key))||(extraKeys[scenario]||[]).includes(key))console.log(`scenario.${scenario}.${key}=${value}`);
                   }
                   if(scenario==='pendingDelete')console.log(`scenario.${scenario}.savePayloadPendingDeleteLeak=${result.savePayloadPendingDeleteLeak||'false'}`);

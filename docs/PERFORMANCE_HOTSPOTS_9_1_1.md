@@ -304,6 +304,28 @@ sha256: 474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069
 delta: +2,563
 ```
 
+## Phase 7 performance ratchet
+
+Phase 7 does not add another render optimization. It turns Phase 6 behavior proof into harder regression guards:
+
+- Generated `app.js` is exact-frozen at `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`.
+- Generated `app.css` is exact-frozen at `123,251` bytes.
+- `WebAdminPerformanceBaselineGuardTest` now runs standalone `node --check build/tmp/webadmin-app.js` before VM parse timing; parse/compile timing remains warning/report only.
+- DOM hash baselines now also cover `pendingDelete`, `vbdFallback`, `vbdSourcePriority` and `minimapCap`, not only the original initial/selected/hover/edit/draft/unsaved/VBD scenarios.
+- Source guards keep `logicChainRelatedNodeIndex(graph)` render-local and prevent minimap memo from storing graph references. The minimap key remains limited to `segments.slice(0,24)` channel id and downstream count.
+- Source guards also freeze the current full-render behavior for hover, selection and zoom. Class-only hover, panel-only selection and transform-only zoom are still deferred until a dedicated interaction DOM-equivalence guard exists.
+
+## Phase 7.5 if / complexity hotspot audit
+
+Phase 7.5 adds complexity visibility before Phase 8 rather than changing frontend render behavior:
+
+- Generated `app.js` remains exact-frozen at `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`.
+- Generated `app.css` remains exact-frozen at `123,251` bytes.
+- New guard metrics report Top 50 JS if-density functions, Top 50 selector-density functions and Top 30 interaction/render hotspots.
+- Render-local `relatedIndex` and minimap memo remain the only Phase 6 render optimizations accepted into baseline.
+- Additional render/event optimizations are deferred when they would require changing generated JS under the current exact asset ratchet.
+- The only processed Phase 7.5 cleanup is backend helper extraction in channel metadata reference collection; it reduces service size without touching render/layout/runtime output.
+
 ## 建议性能基线
 
 ### Unit / smoke 可做

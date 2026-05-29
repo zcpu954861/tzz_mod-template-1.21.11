@@ -20,6 +20,9 @@ public final class WebAdminFrontendBundleGuardTest {
     private static final int APP_JS_PHASE6_BEFORE_BYTES = 1_843_648;
     private static final String APP_JS_PHASE6_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
     private static final int APP_JS_PHASE6_WARNING_LIMIT_BYTES = 1_880_521;
+    private static final int APP_JS_PHASE7_RATCHET_BYTES = 1_846_211;
+    private static final String APP_JS_PHASE7_RATCHET_SHA256 = "474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069";
+    private static final int APP_CSS_PHASE7_RATCHET_BYTES = 123_251;
 
     private static final Map<String, Integer> SOURCE_COUNT_BASELINES = new LinkedHashMap<>();
     private static final Map<String, Integer> INLINE_EVENT_ATTRIBUTE_BASELINES = new LinkedHashMap<>();
@@ -85,10 +88,23 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.phase6_after.sha256", appJsSha256);
         report.metric("webadmin.app_js.phase6_delta.bytes", appJsBytes - APP_JS_PHASE6_BEFORE_BYTES);
         report.metric("webadmin.app_css.bytes", appCssBytes);
+        report.metric("webadmin.app_js.phase7_ratchet.bytes", APP_JS_PHASE7_RATCHET_BYTES);
+        report.metric("webadmin.app_js.phase7_ratchet.sha256", APP_JS_PHASE7_RATCHET_SHA256);
+        report.metric("webadmin.app_css.phase7_ratchet.bytes", APP_CSS_PHASE7_RATCHET_BYTES);
         checkPhase4BeforeAfterEquivalence(report, appJs, appJsBytes, appJsSha256);
         if (appJsBytes > APP_JS_PHASE3_HARD_LIMIT_BYTES) {
             report.fail("Phase 3 generated app.js exceeded baseline + 5% hard limit: actualBytes="
                     + appJsBytes + " limit=" + APP_JS_PHASE3_HARD_LIMIT_BYTES + " actualSha256=" + appJsSha256);
+        }
+        if (appJsBytes != APP_JS_PHASE7_RATCHET_BYTES || !APP_JS_PHASE7_RATCHET_SHA256.equals(appJsSha256)) {
+            report.fail("Phase 7 generated app.js ratchet changed: actualBytes=" + appJsBytes
+                    + " expectedBytes=" + APP_JS_PHASE7_RATCHET_BYTES
+                    + " actualSha256=" + appJsSha256 + " expectedSha256=" + APP_JS_PHASE7_RATCHET_SHA256
+                    + ". Dedicated behavior/DOM-equivalence work must update this baseline explicitly.");
+        }
+        if (appCssBytes != APP_CSS_PHASE7_RATCHET_BYTES) {
+            report.fail("Phase 7 generated app.css ratchet changed: actualBytes=" + appCssBytes
+                    + " expectedBytes=" + APP_CSS_PHASE7_RATCHET_BYTES);
         }
         if (appJsBytes > APP_JS_PHASE6_WARNING_LIMIT_BYTES) {
             report.warning("Phase 6 generated app.js exceeded baseline + 2% warning limit: actualBytes="
@@ -132,7 +148,9 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.phase4_after.sha256", appJsSha256);
         boolean matchesPhase4Artifact = beforeBytes == appJsBytes && beforeSha256.equals(appJsSha256) && beforeText.equals(appJs);
         boolean phase6Scope = CodeQualityGuardSupport.read("src/test/java/com/zcpu/tzzmod/stabilization/CodeQualityGuardTest.java")
-                .contains("phase6-logic-chain-performance-baseline");
+                .contains("phase6-logic-chain-performance-baseline")
+                || CodeQualityGuardSupport.read("src/test/java/com/zcpu/tzzmod/stabilization/CodeQualityGuardTest.java")
+                .contains("phase7-codebase-health-guard-ratchet");
         boolean phase6BeforeArtifact = beforeBytes == APP_JS_PHASE6_BEFORE_BYTES
                 && APP_JS_PHASE6_BEFORE_SHA256.equals(beforeSha256);
         boolean phase6DeltaWithinLimit = appJsBytes <= APP_JS_PHASE6_WARNING_LIMIT_BYTES;
@@ -328,7 +346,7 @@ public final class WebAdminFrontendBundleGuardTest {
         int nativeTriggerJsonCount = CodeQualityGuardSupport.count(appJs, "nativeTriggerJson");
         report.metric("webadmin.app_js.nativeTriggerJson", nativeTriggerJsonCount);
         if (nativeTriggerJsonCount > 2) {
-            report.warning("nativeTriggerJson occurrences increased; ensure raw JSON remains secondary/debug only");
+            report.fail("nativeTriggerJson occurrences increased after Phase 7 ratchet; raw JSON must remain secondary/debug only");
         }
         report.require(appJs.contains("data-logic-chain-vbd-native-json-not-primary-summary"),
                 "Readable VBD native trigger summary marker missing from app.js output");

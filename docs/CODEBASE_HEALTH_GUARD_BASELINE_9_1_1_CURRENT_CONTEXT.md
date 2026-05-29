@@ -251,13 +251,66 @@ Deferred after Phase 6:
 - Draft overlay / VBD overlay cross-render memoization remains deferred because there is no single authoritative `draftRevision` and VBD overlay still depends on selected-node fallback and capture writeback mutation.
 - VBD overlay pipeline unification, selected fallback behavior changes, dirty calculation changes and backend save performance tuning remain separate behavior-fix or later-phase work.
 
+## Phase 7 Guard Ratchet Context
+
+Phase 7 hardens the Phase 1-6 code-health gains without changing WebAdmin UI behavior, runtime semantics, WebAdmin API shape, Logic Chain layout semantics, save transaction order or VBD/world-device/RegionController behavior.
+
+- Phase 7 branch: `feature/codebase-health-guard-ratchet-9-1-1`.
+- Phase 7 base: `origin/feature/logic-chain-performance-baseline-9-1-1` at `d918452605e5b380cacd7bbd80c3681380b8c6f1`.
+- `WebAdminFrontendScripts.java` remains a facade only and now carries the `data-webadmin-frontend-bundle-entry-only` source marker. Generated `app.js` remains unchanged.
+- Java-side Chinese comments were added to the frontend split modules and Logic Chain backend save split to document module responsibilities, data flow, state boundaries, invariants and forbidden extension points. Comments were deliberately kept outside JS text blocks, so `/assets/app.js` and `/assets/app.css` are unchanged.
+- `CodeQualityGuardTest` scope marker is now `phase7-codebase-health-guard-ratchet`.
+
+Phase 7 hard ratchets:
+
+- Any growth in existing `BeforeV11` through `BeforeV17`, `BeforeV13-17` total or all `BeforeV\d+` tokens is hard fail; `BeforeV18+` remains hard fail.
+- New frontend script modules keep the 800-line hard budget and add a 400,000-byte hard budget.
+- New frontend style modules keep the 800-line hard budget and add a 400,000-byte hard budget.
+- Non-grandfathered WebAdmin backend services keep the 1,000-line hard budget and add a 160,000-byte hard budget.
+- Non-`StabilizationGuardTest` guard classes keep the 1,000-line hard budget and add a 200,000-byte hard budget.
+- `WebAdminLogicChainEditorService.java` is ratcheted down by Phase 7.5 to 5,005 lines / 305,271 bytes after helper extraction in channel metadata reference collection; `StabilizationGuardTest.java` remains frozen at 12,430 lines / 838,347 bytes.
+- Known giant generated JS functions are hard no-growth by function name, line count and character count.
+- Generated assets are frozen at Phase 6 output: `app.js` `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`; `app.css` `123,251` bytes.
+- `nativeTriggerJson` count growth is hard fail; readable Chinese VBD summaries remain the primary UI surface.
+- `DocsConsistencyGuardTest` recursively rejects independent WebAdmin React/Vite/npm/CDN frontend runtime hooks outside excluded tooling/build/log paths.
+
+Phase 7 performance/DOM ratchets:
+
+- `WebAdminPerformanceBaselineGuardTest` now runs standalone `node --check` before VM parse timing.
+- Additional DOM hashes are hard-baselined for pending-delete, VBD fallback, VBD source-priority and minimap-cap scenarios.
+- Source guards freeze Phase 6 cache boundaries: `relatedIndex` stays render-local, minimap memo stores only `{key, html}`, minimap key uses `segments.slice(0,24)` channel/downstream counts, and minimap does not store graph references.
+- Hover class-only, selection panel-only and zoom transform-only optimizations remain deferred and source-guarded to keep current full render behavior until a focused interaction equivalence guard exists.
+
+Phase 7.5 if / complexity / hotspot audit:
+
+- Phase 7.5 is merged into Phase 7 before Phase 8. It does not change WebAdmin UI behavior, runtime semantics, API shape, Logic Chain layout output or save semantics.
+- `CodeQualityGuardTest` now emits Top 50 Java if-density, Top 50 generated JS if-density, Top 50 JS selector-density, Top 30 interaction, Top 30 render and Top 30 backend validation/save hotspot tables with category/recommendation fields.
+- Safety-boundary `if` checks are explicitly kept: CSRF/same-origin, edit lock, expected fingerprint, protected draft, fail-closed validation and typed save failure branches.
+- One safe backend hotspot was processed: channel metadata referenced-channel collection in `WebAdminLogicChainEditorService` now uses helper extraction while preserving channel order and normalization entry points.
+- Frontend event routing, VBD overlay pipeline, hover/select/zoom local updates, draft diff memoization and large UI builder extraction remain deferred because current automatic guards do not prove browser-visible equivalence for those changes.
+- Detailed before/after metrics and deferred items are recorded in `docs/IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_1.md`.
+
+Phase 7 validation command set:
+
+```powershell
+.\gradlew.bat testClasses
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
+.\gradlew.bat stabilizationGuardTest --rerun-tasks
+.\gradlew.bat localTestMcpGuardTest --rerun-tasks
+git diff --check
+```
+
+This phase still does not run Minecraft, MCP scenario checks, screenshot matrix validation or `tools/tzz-test-mcp` npm commands because MCP tooling is unchanged.
+
 ## README Update
 
 Phase 1 minimally updates README stable version to `v1.68.1-codebase-health-audit`. It does not expand README feature content.
 
-## Validation
+## Historical Phase 1 Validation
 
-Run:
+This older block records the generic Phase 1 checkpoint shape. Phase 7 uses the dedicated Phase 7 validation command set above, not this historical service-test line.
+
+Run when a future prompt explicitly asks for this broader service-test shape:
 
 ```powershell
 .\gradlew.bat testClasses
@@ -274,7 +327,7 @@ This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screensho
 
 - `.codex/` and `logs/` remain unhandled and unsubmitted.
 - Do not submit `reports/mcp/`, screenshots, node_modules, build output, run output, `.gradle/`, temporary scripts or temporary generated reports.
-- Do not commit, push, merge or tag in this phase.
+- During implementation, do not commit, push, merge or tag. Phase 7 checkpoint B6 may commit and push the feature branch after B5 validation and explicit staging; merge/tag remain forbidden until Phase 9.
 
 ## Next Phase
 

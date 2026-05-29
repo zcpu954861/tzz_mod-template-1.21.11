@@ -1,5 +1,8 @@
 package com.zcpu.tzzmod.webadmin;
 
+// Logic Chain viewer 模块负责列表、详情 route shell 和只读/编辑入口状态的页面渲染。
+// 布局算法、draft overlay、VBD trigger overlay 与保存事务分别在独立模块/后端 service 中维护；
+// 本模块只接收 API graph 并组织页面，不持久化自由图文档，也不改变 runtime 语义。
 final class WebAdminLogicChainViewerScripts {
     private WebAdminLogicChainViewerScripts() {
     }

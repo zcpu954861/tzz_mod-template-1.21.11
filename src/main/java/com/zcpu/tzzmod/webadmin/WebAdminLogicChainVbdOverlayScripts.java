@@ -1,5 +1,9 @@
 package com.zcpu.tzzmod.webadmin;
 
+// VBD overlay 模块把已有 VBD trigger draft 投影成图上的预览边和源卡标记，并承接
+// itemSubmit/container capture 的 draft-only 回填。源卡解析优先 sourceNodeId，触发项身份使用 triggerKey；
+// selected node 只保留旧 fallback 语义，不能新增为保存目标。overlay 必须去重、只连当前 trigger
+// 的目标频道，并在 capture context 不一致时 fail-closed。
 final class WebAdminLogicChainVbdOverlayScripts {
     private WebAdminLogicChainVbdOverlayScripts() {
     }

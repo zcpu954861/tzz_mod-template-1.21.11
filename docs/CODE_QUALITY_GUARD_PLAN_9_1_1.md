@@ -374,6 +374,28 @@ Phase 6 implementation note:
 - Phase 4 local before artifact mismatch is warning-only after Phase 6 only when Phase 6 scope, before artifact bytes/SHA, app.js warning limit and Phase 6 marker checks all match; otherwise it stays a hard failure.
 - `BeforeV18+ = 0`, facade boundaries, event router no-growth, pointer-events invariants and raw JSON summary guards remain hard fail.
 
+Phase 7 ratchet implementation note:
+
+- Guard scope marker is `phase7-codebase-health-guard-ratchet`.
+- `BeforeV11-17`, `BeforeV13-17` total and all `BeforeV\d+` token growth are now hard fail, not warning. Decreases remain allowed.
+- `WebAdminFrontendScripts.java` is still facade-only and carries source marker `data-webadmin-frontend-bundle-entry-only`. Business JS, event handlers and route tables must stay in owning modules.
+- New frontend script modules are hard-capped at 800 lines and 400,000 bytes. New frontend style modules are hard-capped at 800 lines and 400,000 bytes.
+- Non-grandfathered backend services are hard-capped at 1,000 lines and 160,000 bytes. Guard classes outside `StabilizationGuardTest` are hard-capped at 1,000 lines and 200,000 bytes.
+- `WebAdminLogicChainEditorService.java` is ratcheted down by Phase 7.5 to 5,005 lines / 305,271 bytes; `StabilizationGuardTest.java` remains frozen at 12,430 lines / 838,347 bytes.
+- Known giant generated JS functions are hard no-growth by line/char baseline: `logicChainExistingDeviceForm`, `logicChainDefaultDraftChannelAnchor`, `realtimeRouteKeysForEvent`, `showLogicChainNewNodeModal`, `showLogicChainPlacedDraftNodeEditModal`, `renderDeviceDetail`, `interactionItemMatcherForm` and `startDeviceConfigEdit`.
+- Generated asset ratchets are hard: `app.js` must remain `1,846,211` bytes with SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`; `app.css` must remain `123,251` bytes unless a dedicated behavior/DOM-equivalence phase updates the baseline.
+- `nativeTriggerJson` occurrence growth is hard fail; raw JSON stays secondary/debug only.
+- `DocsConsistencyGuardTest` recursively rejects independent WebAdmin React/Vite/npm/CDN runtime hooks while excluding tooling/build/log directories.
+- `WebAdminPerformanceBaselineGuardTest` now runs standalone `node --check`, hard-baselines DOM hashes for pending-delete, VBD fallback, VBD source-priority and minimap-cap scenarios, and source-guards Phase 6 relatedIndex/minimap memo/deferred hover-select-zoom boundaries.
+
+Phase 7.5 if/complexity implementation note:
+
+- `CodeQualityGuardSupport` now classifies Java methods and generated JS functions by `if`, `else if`, `switch/case`, `.closest(`, `querySelector(`, inline handler and listener counts.
+- `CodeQualityGuardTest` emits Phase 7.5 Top 50 / Top 30 hotspot tables for Java if density, JS if density, JS selector density, interaction routes, render paths and backend validation/save methods.
+- Safety-boundary `if` branches are reportable but not treated as bad complexity by themselves; new hard failures remain tied to no-growth ratchets, generated asset freeze, new giant handlers, BeforeVxx growth, selector/listener/inline growth and module budgets.
+- `WebAdminLogicChainEditorService` is ratcheted down after helper extraction in channel metadata referenced-channel collection. No generated `app.js` / `app.css` baseline changes were made.
+- Full audit results and deferred hotspot classifications live in `docs/IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_1.md`.
+
 Synthetic scenarios:
 
 - empty/small graph
@@ -455,7 +477,7 @@ For guard implementation:
 git diff --check
 ```
 
-For full checkpoint after code changes:
+For full checkpoint after code changes when a prompt explicitly asks for the broader release-style pass:
 
 ```powershell
 .\gradlew.bat clean build
@@ -464,6 +486,8 @@ For full checkpoint after code changes:
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
 ```
+
+Phase 7 B5 intentionally uses the targeted command set above and does not run `clean build`; Phase 9 owns the final release-style `clean build`.
 
 Only run MCP build/test when the current phase actually touches MCP:
 

@@ -1,5 +1,9 @@
 package com.zcpu.tzzmod.webadmin;
 
+// Draft overlay 模块把 editor draft state 叠加到已计算好的 layout 上，生成仅用于预览的节点、
+// 边、slot 和 anchor。它不调用 API、不写 store、不提交 graph document；所有正式写入仍由
+// Logic Chain save payload 和后端 typed service 校验执行。pending/delete/protected draft 等
+// 状态只能作为前端视觉或草稿边界存在，不能泄漏到 runtime 语义。
 final class WebAdminLogicChainDraftOverlayScripts {
     private WebAdminLogicChainDraftOverlayScripts() {
     }

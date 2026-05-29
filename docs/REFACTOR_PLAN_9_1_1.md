@@ -453,6 +453,9 @@ git diff --check
 - 9.2 开发前 guard 能阻止重新堆叠巨型文件、BeforeVxx wrapper 和 inline handler。
 - README stable baseline 与 current context 不再冲突。
 - `StabilizationGuardTest` 不再继续无限膨胀。
+- Phase 7 已固化：`BeforeVxx` 历史 token no-growth、app.js/app.css exact ratchet、new module byte budget、known giant JS function no-growth、raw JSON summary no-growth、React/Vite/npm/CDN runtime negative scan、Phase 6 cache/source invariants 和额外 DOM hash baseline。
+- Phase 7 中文注释只写在 Java-side 模块边界和 backend split 边界，不进入 JS text block，因此不改变 generated app.js / app.css。
+- Phase 7.5 已插入 Phase 7 checkpoint 前：复杂度热点表、safety-if 分类、deferred 清单和 `IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_1.md` 必须完成后才能进入 Phase 8。
 
 回滚风险：
 
@@ -461,7 +464,8 @@ git diff --check
 必须跑的验证：
 
 ```powershell
-.\gradlew.bat clean build
+.\gradlew.bat testClasses
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check

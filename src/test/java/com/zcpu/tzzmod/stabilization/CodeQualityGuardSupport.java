@@ -264,20 +264,107 @@ final class CodeQualityGuardSupport {
         final String name;
         final int lines;
         final int chars;
+        final int ifCount;
+        final int elseIfCount;
+        final int switchCount;
+        final int caseCount;
+        final int closestCount;
+        final int querySelectorCount;
+        final int inlineHandlerCount;
+        final int addEventListenerCount;
+        final boolean highFrequency;
+        final boolean safetyBoundary;
+        final String category;
+        final String recommendation;
 
         MethodMetric(String location, String name, int lines) {
-            this(location, name, lines, 0);
+            this(location, name, lines, 0, "");
         }
 
         MethodMetric(String location, String name, int lines, int chars) {
+            this(location, name, lines, chars, "");
+        }
+
+        MethodMetric(String location, String name, int lines, int chars, String source) {
             this.location = location;
             this.name = name;
             this.lines = lines;
             this.chars = chars;
+            this.ifCount = countRegex(source, "\\bif\\s*\\(");
+            this.elseIfCount = countRegex(source, "\\belse\\s+if\\s*\\(");
+            this.switchCount = countRegex(source, "\\bswitch\\s*\\(");
+            this.caseCount = countRegex(source, "\\bcase\\b");
+            this.closestCount = count(source, ".closest(");
+            this.querySelectorCount = count(source, "querySelector(");
+            this.inlineHandlerCount = countRegex(source, "\\bon[a-z]+\\s*=");
+            this.addEventListenerCount = count(source, "addEventListener(");
+            this.safetyBoundary = isSafetyBoundary(location, name);
+            this.highFrequency = isHighFrequencyPath(location, name);
+            this.category = classifyHotspot(location, name, this);
+            this.recommendation = recommendHotspot(this);
+        }
+
+        int ifDensityBasisPoints() {
+            return lines <= 0 ? 0 : Math.round((ifCount * 10_000.0f) / lines);
+        }
+
+        int selectorCount() {
+            return closestCount + querySelectorCount;
+        }
+
+        String complexitySummary() {
+            return "file=" + filePart(location)
+                    + " function=" + name
+                    + " line=" + linePart(location)
+                    + " chars=" + chars
+                    + " lines=" + lines
+                    + " if=" + ifCount
+                    + " elseIf=" + elseIfCount
+                    + " switch=" + switchCount
+                    + " case=" + caseCount
+                    + " closest=" + closestCount
+                    + " querySelector=" + querySelectorCount
+                    + " inlineHandler=" + inlineHandlerCount
+                    + " addEventListener=" + addEventListenerCount
+                    + " highFrequency=" + highFrequency
+                    + " safetyBoundary=" + safetyBoundary
+                    + " category=" + category
+                    + " recommendation=" + recommendation;
         }
     }
 
     static List<MethodMetric> collectLargeJavaMethods(Path root, int limit) throws IOException {
+        return collectJavaMethodMetrics(root).stream()
+                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed()
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    static List<MethodMetric> collectJavaIfDensityMethods(Path root, int limit) throws IOException {
+        return collectJavaMethodMetrics(root).stream()
+                .filter(metric -> metric.ifCount > 0)
+                .sorted(Comparator.comparingInt(MethodMetric::ifDensityBasisPoints).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    static List<MethodMetric> collectBackendValidationMethods(Path root, int limit) throws IOException {
+        return collectJavaMethodMetrics(root).stream()
+                .filter(metric -> metric.location.contains("/webadmin/service/")
+                        || metric.location.contains("/webadmin/write/")
+                        || metric.location.contains("/webadmin/draft/"))
+                .filter(metric -> metric.ifCount > 0 || metric.safetyBoundary)
+                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    private static List<MethodMetric> collectJavaMethodMetrics(Path root) throws IOException {
         Pattern methodStart = Pattern.compile("^\\s*(?:(?:public|private|protected|static|final|synchronized|native|abstract|strictfp|default)\\s+)*(?:<[\\w\\s,? extends super&.]+>\\s*)?(?:[\\w\\[\\]<>?,.]+\\s+)?(\\w+)\\s*\\([^;{}]*\\)\\s*(?:throws\\s+[\\w\\s,.$]+)?\\s*\\{\\s*$");
         List<MethodMetric> methods = new ArrayList<>();
         for (Path file : javaFiles(root.resolve("src"))) {
@@ -304,18 +391,66 @@ final class CodeQualityGuardSupport {
                 }
                 String className = file.getFileName().toString().replace(".java", "");
                 String relative = root.relativize(file).toString().replace('\\', '/');
-                methods.add(new MethodMetric(relative + ":" + (i + 1), className + "." + name, end - i + 1));
+                String source = String.join("\n", lines.subList(i, Math.min(end + 1, lines.size())));
+                methods.add(new MethodMetric(relative + ":" + (i + 1),
+                        className + "." + name, end - i + 1, source.length(), source));
                 i = Math.max(i, end);
             }
         }
-        return methods.stream()
-                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed()
+        return methods;
+    }
+
+    static List<MethodMetric> collectLargeJsFunctions(String appJs, int limit) {
+        return collectJsFunctionMetrics(appJs).stream()
+                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.chars).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed())
                         .thenComparing(metric -> metric.location))
                 .limit(limit)
                 .toList();
     }
 
-    static List<MethodMetric> collectLargeJsFunctions(String appJs, int limit) {
+    static List<MethodMetric> collectJsIfDensityFunctions(String appJs, int limit) {
+        return collectJsFunctionMetrics(appJs).stream()
+                .filter(metric -> metric.ifCount > 0)
+                .sorted(Comparator.comparingInt(MethodMetric::ifDensityBasisPoints).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    static List<MethodMetric> collectJsSelectorDensityFunctions(String appJs, int limit) {
+        return collectJsFunctionMetrics(appJs).stream()
+                .filter(metric -> metric.selectorCount() > 0 || metric.inlineHandlerCount > 0 || metric.addEventListenerCount > 0)
+                .sorted(Comparator.comparingInt(MethodMetric::selectorCount).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.inlineHandlerCount).reversed())
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    static List<MethodMetric> collectJsInteractionHotspots(String appJs, int limit) {
+        return collectJsFunctionMetrics(appJs).stream()
+                .filter(metric -> metric.highFrequency && !metric.category.equals("C"))
+                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount + metric.selectorCount()).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    static List<MethodMetric> collectJsRenderHotspots(String appJs, int limit) {
+        return collectJsFunctionMetrics(appJs).stream()
+                .filter(metric -> isRenderHotspotName(metric.name))
+                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.ifCount + metric.selectorCount()).reversed()
+                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.chars).reversed())
+                        .thenComparing(metric -> metric.location))
+                .limit(limit)
+                .toList();
+    }
+
+    private static List<MethodMetric> collectJsFunctionMetrics(String appJs) {
         List<String> lines = List.of(appJs.split("\\R", -1));
         List<Pattern> startPatterns = List.of(
                 Pattern.compile("^\\s*(?:async\\s+)?function\\s+([A-Za-z_$][\\w$]*)\\s*\\([^)]*\\)\\s*\\{"),
@@ -338,14 +473,106 @@ final class CodeQualityGuardSupport {
             for (int line = start.lineIndex; line < nextStart; line++) {
                 chars += lines.get(line).length() + 1;
             }
-            functions.add(new MethodMetric("app.js:" + (start.lineIndex + 1), start.name, nextStart - start.lineIndex, chars));
+            String source = String.join("\n", lines.subList(start.lineIndex, nextStart));
+            functions.add(new MethodMetric("app.js:" + (start.lineIndex + 1),
+                    start.name, nextStart - start.lineIndex, chars, source));
         }
-        return functions.stream()
-                .sorted(Comparator.comparingInt((MethodMetric metric) -> metric.chars).reversed()
-                        .thenComparing(Comparator.comparingInt((MethodMetric metric) -> metric.lines).reversed())
-                        .thenComparing(metric -> metric.location))
-                .limit(limit)
-                .toList();
+        return functions;
+    }
+
+    private static boolean isRenderHotspotName(String name) {
+        String key = name.toLowerCase(Locale.ROOT);
+        return key.contains("render")
+                || key.contains("layout")
+                || key.contains("mindmap")
+                || key.contains("minimap")
+                || key.contains("nodecard")
+                || key.contains("positionednode")
+                || key.contains("edgepath")
+                || key.contains("draftoverlay")
+                || key.contains("vbdoverlay")
+                || key.contains("diffsummary");
+    }
+
+    private static boolean isSafetyBoundary(String location, String name) {
+        String key = (location + " " + name).toLowerCase(Locale.ROOT);
+        return key.contains("/webadmin/write/")
+                || key.contains("/webadmin/draft/")
+                || key.contains("validate")
+                || key.contains("preflight")
+                || key.contains("fingerprint")
+                || key.contains("lock")
+                || key.contains("csrf")
+                || key.contains("sameorigin")
+                || key.contains("conditiongate")
+                || key.contains("protecteddraft");
+    }
+
+    private static boolean isHighFrequencyPath(String location, String name) {
+        String key = (location + " " + name).toLowerCase(Locale.ROOT);
+        return key.contains("event")
+                || key.contains("handle")
+                || key.contains("route")
+                || key.contains("click")
+                || key.contains("hover")
+                || key.contains("pointer")
+                || key.contains("render")
+                || key.contains("layout")
+                || key.contains("minimap")
+                || key.contains("logicchain");
+    }
+
+    private static String classifyHotspot(String location, String name, MethodMetric metric) {
+        String key = (location + " " + name).toLowerCase(Locale.ROOT);
+        if (metric.safetyBoundary) {
+            return "A";
+        }
+        if (key.contains("beforev")) {
+            return "E";
+        }
+        if (key.contains("render") || key.contains("layout") || key.contains("minimap")
+                || key.contains("nodecard") || key.contains("draftoverlay") || key.contains("vbdoverlay")) {
+            return "C";
+        }
+        if (key.contains("draft") || key.contains("selection") || key.contains("session")) {
+            return "D";
+        }
+        if (metric.selectorCount() > 0 || metric.addEventListenerCount > 0 || key.contains("route") || key.contains("handle")) {
+            return "B";
+        }
+        if (metric.chars > 8_000 || key.contains("modal") || key.contains("form") || key.contains("builder")) {
+            return "F";
+        }
+        return "G";
+    }
+
+    private static String recommendHotspot(MethodMetric metric) {
+        return switch (metric.category) {
+            case "A" -> "keep_explicit_fail_closed";
+            case "B" -> "route_table_or_named_handler";
+            case "C" -> "render_local_index_or_memo_only_with_dom_guard";
+            case "D" -> "split_state_owner_or_defer";
+            case "E" -> "pipeline_only_with_order_guard";
+            case "F" -> "pure_builder_helper_extraction";
+            default -> "defer_until_equivalence_guard";
+        };
+    }
+
+    private static String filePart(String location) {
+        int colon = location.lastIndexOf(':');
+        return colon >= 0 ? location.substring(0, colon) : location;
+    }
+
+    private static int linePart(String location) {
+        int colon = location.lastIndexOf(':');
+        if (colon < 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(location.substring(colon + 1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private static final class JsFunctionStart {
