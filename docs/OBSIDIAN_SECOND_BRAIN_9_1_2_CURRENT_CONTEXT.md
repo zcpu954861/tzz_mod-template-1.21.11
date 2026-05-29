@@ -10,6 +10,28 @@ E:\minecraftserver\fabricmod\tzz-mod-docs-obsidian\Tzz Mod work
 
 The vault is not a Git repository. Do not run `git init` there. Do not copy large code blocks into notes. Keep notes as durable project memory, not a phase log dump.
 
+## Precision Repository Index Supplement
+
+The long-term project rule has been upgraded: Obsidian is now a rolling precision repository index and external project memory, not only a summary vault.
+
+The main repository `AGENTS.md` must include the durable rule set:
+
+- read relevant Obsidian notes at the start of TZZ Mod development, refactor, performance, testing, docs, checkpoint, merge and tag tasks;
+- write durable source locations, file responsibilities, class/function responsibilities, data flow, state boundaries, guard/test rules, historical pitfalls, performance hotspots, version decisions and deferred risks back to Obsidian;
+- update Obsidian when source verification shows a note is stale, marking old information stale/deprecated and recording the last verified commit or tag;
+- create/update index notes when adding modules, services, guards, tests, data structures or key flows;
+- keep notes structured and avoid copying large source blocks;
+- treat Obsidian as auxiliary memory, not a replacement for current source checks and automated validation.
+
+9.1.2 should maintain both the performance-note set below and the precision index notes:
+
+- `12_仓库精确索引/功能到文件索引.md`
+- `13_源码文件职责/WebAdmin_文件职责表.md`
+- `13_源码文件职责/LogicChain_文件职责表.md`
+- `15_测试与Guard索引/改动后该跑哪些测试.md`
+- `08_Codex工作流/Codex_工作流与提示词规范.md`
+- `99_索引/TZZ_Mod_索引.md`
+
 ## Source Notes Read At Phase Start
 
 The 9.1.2 audit uses these existing notes as historical context:

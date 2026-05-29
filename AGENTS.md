@@ -39,6 +39,40 @@ git rev-parse --short origin/master
 
 ---
 
+## 1.1 Obsidian 外部项目记忆 / 精确仓库索引
+
+Obsidian vault：
+
+```text
+E:\minecraftserver\fabricmod\tzz-mod-docs-obsidian\Tzz Mod work
+```
+
+Codex 必须把该 vault 当成滚动式精确仓库索引和外部项目记忆库，而不只是总结文档。
+
+长期规则：
+
+1. 每次涉及 TZZ Mod 开发、重构、性能优化、测试、文档、checkpoint、merge/tag 的任务开始时，先读取相关 Obsidian 笔记。
+2. Obsidian 记录功能位置、文件职责、类/函数职责、调用关系、状态边界、数据流、guard/test 规则、历史踩坑、性能热点、版本决策和 deferred 风险。
+3. 新增模块、文件、service、guard、测试、数据结构或关键流程时，必须同步补充到 Obsidian 索引。
+4. 如果 Obsidian 旧笔记与当前源码不一致，必须修正笔记，标注旧信息 stale / deprecated，并写入新的路径、职责和最后核验 commit / tag。
+5. Obsidian 笔记必须结构化，至少包含状态、最后核验版本或 commit、相关源码路径、相关类/函数、职责、不变量、测试入口和相关笔记链接。
+6. 禁止把大段源码直接复制进 Obsidian；只记录索引、职责、数据流、设计原因和维护边界。
+7. 不得覆盖无关个人笔记；只修改 TZZ Mod 相关目录和索引。
+8. Obsidian 是辅助记忆，不替代当前仓库检查、源码验证和自动测试。
+9. vault 已知不是主仓库的一部分；不要 `git init`，不要尝试把 vault 当主仓库提交，只在报告中列出创建/修改的笔记路径。
+
+默认优先读取：
+
+- `99_索引/TZZ_Mod_索引.md`
+- `00_项目总览/TZZ_Mod_项目总览.md`
+- `12_仓库精确索引/功能到文件索引.md`
+- `13_源码文件职责/`
+- `15_测试与Guard索引/改动后该跑哪些测试.md`
+
+涉及 WebAdmin / Logic Chain / runtime / guard 时，还要读取对应模块目录和流程索引，并用当前源码验证关键结论是否仍准确。
+
+---
+
 ## 2. 项目长期目标
 
 TZZ Mod 的长期目标不是单一功能模组，也不是普通后台面板，而是逐步成为面向 Minecraft 小游戏开发的 **小游戏 IDE**。
