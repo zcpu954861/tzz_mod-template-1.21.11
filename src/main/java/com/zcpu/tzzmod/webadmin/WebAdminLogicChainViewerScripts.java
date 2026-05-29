@@ -207,7 +207,7 @@ final class WebAdminLogicChainViewerScripts {
                   appState.logicChainCanvas.routeInfo={fallback:routeInfo.fallback||'#/logic-chains',returnTo:isValidReturnHash(routeInfo.returnTo)?routeInfo.returnTo:'',chainId:routeInfo.chainId||graph?.metadata?.id||'',focusChannel:routeInfo.focusChannel||graph?.stats?.focusChannel||graph?.metadata?.rootChannel||graph?.root?.channel||'',temporary:!!routeInfo.temporary};
                 """)
                 .append("""
-                  const renderedGraph=logicChainRenderedGraphWithDraftOverlay(graph), canvasNodes=logicChainNodeMap(renderedGraph), detailGraph=logicChainGraphWithNewDraftDetails(renderedGraph), nodes=logicChainNodeMap(detailGraph), metadata=graph?.metadata||{}, stats=graph?.stats||{}, root=graph?.root||{};
+                  const renderedGraph=logicChainRenderedGraphWithDraftOverlay(graph), canvasNodes=logicChainNodeMap(renderedGraph), detailGraph=logicChainGraphWithNewDraftDetails(renderedGraph), nodes=logicChainNodeMap(detailGraph), detailEdgeIndexes=logicChainEdgeIndexes(detailGraph), metadata=graph?.metadata||{}, stats=graph?.stats||{}, root=graph?.root||{};
                 """)
                 .append("""
                   const graphKey=metadata.id||`${metadata.rootType||root.refType||'channel'}:${metadata.rootRef||metadata.rootChannel||root.channel||root.id||''}`;
@@ -261,7 +261,7 @@ final class WebAdminLogicChainViewerScripts {
                       </main>
                 """)
                 .append("""
-                      <aside class="logic-chain-right" data-logic-chain-node-detail="true" data-logic-chain-node-detail-panel="true">${logicChainSelectedNodePanel(detailGraph,nodes)}</aside>
+                      <aside class="logic-chain-right" data-logic-chain-node-detail="true" data-logic-chain-node-detail-panel="true">${logicChainSelectedNodePanel(detailGraph,nodes,detailEdgeIndexes)}</aside>
                 """)
                 .append("""
                     </section>

@@ -9,7 +9,7 @@ Important current facts:
 - WebAdmin frontend is Java string resources, not React/Vite.
 - Logic Chain hover, selection and zoom currently route through full `renderLogicChainViewer` behavior.
 - 9.1.1 already added render-local related-node index and minimap memoization.
-- Hover/select local updates remain deferred because they can change node classes, edge classes, arrow owner and `marker-end`.
+- Phase 3 adds a hard DOM-equivalence guard and render-local edge index reuse, but hover/select local updates remain deferred because they can change node classes, edge classes, arrow owner and `marker-end`.
 
 ## Graph Fixture Sizes
 
@@ -142,6 +142,42 @@ Hard checks needed before any Phase 3 local-update optimization:
 | save payload | no `_pendingDelete` leakage; same typed payloads |
 | zoom/pan | transform, toolbar percentage, pan state |
 | modal input | value, caret/focus, scroll and dirty state |
+
+## Phase 3 Guarded Implementation
+
+Implemented guard:
+
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminLogicChainDomEquivalenceGuardTest.java`
+- wired from `CodeQualityGuardTest`;
+- hard-fails missing snapshots, source marker drift and baseline changes;
+- keeps timing and low-end estimates report-only in `WebAdminPerformanceBaselineGuardTest`.
+
+Phase 3 hard snapshots now cover:
+
+| Surface | Phase 3 hard-check detail |
+| --- | --- |
+| node geometry/class | `nodeHash`, `classHash`, selected/related/dimmed counts for initial, hover, selection, draft, unsaved and VBD scenarios. |
+| edge identity/path | `edgeHash` includes from/to/type attrs, visual group/style, route shape, `d`, `marker-end`, arrow owner and VBD trigger identity attrs. |
+| right detail panel | `panelHash` covers the selection scenario and selected-panel edge-index reuse. |
+| diff banner | `diffHash` covers draft and unsaved-expanded scenarios; `_pendingDelete` leakage remains hard-fail guarded. |
+| minimap | `minimapHash` and `minimapSegments=24` preserve the cap. |
+| VBD overlay | `vbdHash`, `vbdSourceNodeIds`, `vbdTriggerKeys` and `vbdDraftSourceNodeId` preserve source priority and selected trigger identity. |
+| interaction equivalence | hover, selection and zoom interaction paths are compared against canonical full-render states. |
+
+Accepted production changes:
+
+- `logicChainEdgeIndexes` now also returns `traversalForward` / `traversalReverse` so view-mode traversal reuses the same render-local index.
+- `renderLogicChainViewer` passes `detailEdgeIndexes` into `logicChainSelectedNodePanel`; the panel reuses `byFrom` / `byTo` rather than scanning all edges twice.
+- `logicChainEdgePath` emits nonvisual edge identity attributes for guard extraction. CSS and event delegation do not consume these attrs.
+
+Still deferred:
+
+- hover class-only update;
+- selection panel-only update;
+- zoom transform-only update;
+- drag pointermove coalescing;
+- cross-render draft diff memoization without a reliable draft revision/fingerprint;
+- broad VBD overlay memo or rewrite.
 
 ## Low-End Acceptance Notes
 

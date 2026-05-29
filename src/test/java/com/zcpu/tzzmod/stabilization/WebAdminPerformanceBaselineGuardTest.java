@@ -17,8 +17,8 @@ public final class WebAdminPerformanceBaselineGuardTest {
     private static final int PHASE6_APP_JS_BEFORE_BYTES = 1_843_648;
     private static final String PHASE6_APP_JS_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
     private static final int PHASE6_APP_JS_WARNING_LIMIT_BYTES = 1_880_521;
-    private static final int PHASE7_APP_JS_RATCHET_BYTES = 1_846_211;
-    private static final String PHASE7_APP_JS_RATCHET_SHA256 = "474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069";
+    private static final int PHASE7_APP_JS_RATCHET_BYTES = 1_846_979;
+    private static final String PHASE7_APP_JS_RATCHET_SHA256 = "858381ebf36e20a59e07f86332391a0d4ae736c9f2e72c5aa0b9ce81d03c70e0";
     private static final int PHASE7_APP_CSS_RATCHET_BYTES = 123_251;
 
     private static final Map<String, Map<String, String>> PHASE6_DOM_BASELINES = phase6DomBaselines();

@@ -85,6 +85,17 @@ Phase 2 accepted only low-risk lookup/index changes that can be proven by determ
 
 Phase 2 deliberately deferred Timer structure rewrites, VBD runtime snapshot narrowing, itemSubmit scan rewrites, container `TOTAL_MATCHER` memoization and `SignalDeviceStore` receiver/relay indexes because they need stronger order/fingerprint/no-force-load guards before production changes.
 
+## Phase 3 WebAdmin / Logic Chain Optimization Record
+
+Phase 3 accepted only full-render-path improvements whose visible output is protected by deterministic DOM equivalence:
+
+- `WebAdminLogicChainDomEquivalenceGuardTest` is now wired into `CodeQualityGuardTest`. It hard-checks canonical full-render equivalence for hover, selection and zoom paths, plus structured snapshots for node geometry/class state, edge identity/path/`marker-end`, right detail panel, diff banner, minimap cap and VBD trigger overlay source/triggerKey.
+- `logicChainEdgePath` now emits nonvisual `data-logic-chain-edge-from`, `data-logic-chain-edge-to`, `data-logic-chain-edge-type` and VBD trigger identity attributes so guards can prove edge and VBD overlay identity without changing CSS, event handling or visible DOM semantics.
+- `logicChainEdgeIndexes` now builds traversal indexes in the same render-local pass as `byFrom` / `byTo`, so view-mode traversal no longer rebuilds forward/reverse maps from `graph.edges`.
+- `renderLogicChainViewer` builds a render-local `detailEdgeIndexes` for `detailGraph`; `logicChainSelectedNodePanel` reuses it for incoming/outgoing rows while preserving edge order and right-panel HTML baselines.
+
+Phase 3 deliberately still defers hover class-only updates, selection panel-only updates, zoom transform-only updates, draft diff cross-render memoization and VBD overlay pipeline rewrites. Those require broader browser-like DOM mutation coverage, modal caret/scroll guards or reliable draft revision/fingerprint keys before they can replace the current full-render behavior.
+
 ## Deferred High-Risk Optimizations
 
 | Candidate | Defer reason | Required future proof |

@@ -62,6 +62,12 @@ Risk policy:
 | Store/session registries | snapshots, protected drafts, selection sessions and template sessions need large-store and expiry tests. | `WARN`; terminal bounded maps are safer than unbounded registries, but expire scans need guard. | Phase 1/4. |
 | Snapshot manifest/package | manual WebAdmin path, but large JSON load/diff can allocate heavily. | `WARN`; not tick path, but low-end VPS IO needs measurement. | Phase 1/4. |
 
+Phase 3 follow-up:
+
+- accepted render-local edge traversal index reuse, selected-detail-panel edge-index reuse and nonvisual edge identity attrs for DOM guard extraction;
+- added `WebAdminLogicChainDomEquivalenceGuardTest` for hard node/edge/panel/diff/minimap/VBD overlay snapshots and hover/selection/zoom canonical full-render equivalence;
+- kept high-risk local DOM update candidates deferred, so the Phase 0 hover/click/zoom full-render warning remains a measured risk rather than an unguarded rewrite.
+
 ## Top 50 Static Performance Suspects
 
 This table is the Phase 0 static candidate list. Phase 1 must convert it into deterministic benchmark rows with timing and low-end estimates. `Tick path` means server/client tick or synchronous Minecraft main-thread path; `High frequency UI` means hover, pointermove, click, zoom or route silent refresh.
