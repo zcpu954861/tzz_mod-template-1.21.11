@@ -3,6 +3,7 @@ package com.zcpu.tzzmod.condition.state;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.core.storage.JsonLoadCacheSupport;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
 import com.zcpu.tzzmod.util.JsonNullability;
 import com.zcpu.tzzmod.webadmin.WebAdminStoragePaths;
@@ -11,7 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.server.MinecraftServer;
 
 public final class StateVariableStore {
@@ -19,6 +22,19 @@ public final class StateVariableStore {
     public static final String FILE_NAME = "state_variables.json";
     private static final String LABEL = "state variables";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int LOAD_CACHE_MAX_ENTRIES = 32;
+    private static final Map<Path, CachedSnapshot> SNAPSHOT_CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Path, CachedSnapshot> eldest) {
+            return size() > LOAD_CACHE_MAX_ENTRIES;
+        }
+    };
+    private static final Map<Path, CachedLoadResult> STATUS_CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Path, CachedLoadResult> eldest) {
+            return size() > LOAD_CACHE_MAX_ENTRIES;
+        }
+    };
 
     private StateVariableStore() {
     }
@@ -49,6 +65,18 @@ public final class StateVariableStore {
 
     public static void flushDirty(MinecraftServer server) {
         // 8.2 writes are flushed synchronously by StateVariableService.
+    }
+
+    public static synchronized StateVariableSnapshot loadSnapshotCached(Path path) {
+        Path key = JsonLoadCacheSupport.cacheKey(path);
+        JsonLoadCacheSupport.FileFingerprint fingerprint = JsonLoadCacheSupport.fingerprint(path);
+        CachedSnapshot cached = SNAPSHOT_CACHE.get(key);
+        if (cached != null && cached.fingerprint.equals(fingerprint)) {
+            return cached.snapshot;
+        }
+        StateVariableSnapshot snapshot = loadSnapshot(path);
+        SNAPSHOT_CACHE.put(key, new CachedSnapshot(JsonLoadCacheSupport.fingerprint(path), snapshot));
+        return snapshot;
     }
 
     public static StateVariableSnapshot loadSnapshot(Path path) {
@@ -90,11 +118,37 @@ public final class StateVariableStore {
         }
     }
 
+    public static synchronized StateVariableLoadResult loadSnapshotWithStatusCached(Path path) {
+        Path key = JsonLoadCacheSupport.cacheKey(path);
+        JsonLoadCacheSupport.FileFingerprint fingerprint = JsonLoadCacheSupport.fingerprint(path);
+        CachedLoadResult cached = STATUS_CACHE.get(key);
+        if (cached != null && cached.fingerprint.equals(fingerprint)) {
+            return cached.result;
+        }
+        StateVariableLoadResult loaded = loadSnapshotWithStatus(path);
+        STATUS_CACHE.put(key, new CachedLoadResult(JsonLoadCacheSupport.fingerprint(path), loaded));
+        return loaded;
+    }
+
     public static boolean saveSnapshot(Path path, StateVariableSnapshot snapshot) {
         DataFile dataFile = new DataFile();
         dataFile.version = DATA_VERSION;
         dataFile.variables = new ArrayList<>(snapshot == null ? List.of() : snapshot.records());
-        return JsonStoreSupport.write(path, dataFile, LABEL);
+        boolean saved = JsonStoreSupport.write(path, dataFile, LABEL);
+        if (saved) {
+            clearCachedLoad(path);
+        }
+        return saved;
+    }
+
+    public static synchronized void clearCachedLoad(MinecraftServer server) {
+        clearCachedLoad(path(server));
+    }
+
+    public static synchronized void clearCachedLoad(Path path) {
+        Path key = JsonLoadCacheSupport.cacheKey(path);
+        SNAPSHOT_CACHE.remove(key);
+        STATUS_CACHE.remove(key);
     }
 
     public static final class DataFile {
@@ -112,5 +166,11 @@ public final class StateVariableStore {
             snapshot = snapshot == null ? StateVariableSnapshot.empty() : snapshot;
             message = message == null ? "" : message;
         }
+    }
+
+    private record CachedSnapshot(JsonLoadCacheSupport.FileFingerprint fingerprint, StateVariableSnapshot snapshot) {
+    }
+
+    private record CachedLoadResult(JsonLoadCacheSupport.FileFingerprint fingerprint, StateVariableLoadResult result) {
     }
 }

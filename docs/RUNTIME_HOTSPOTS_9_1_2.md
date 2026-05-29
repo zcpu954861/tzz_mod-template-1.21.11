@@ -119,9 +119,9 @@ Runtime report rows must also explicitly answer:
 | --- | --- | --- |
 | channel to listener/device index | listener index accepted in Phase 2; device index still deferred | listener ordering guard added; device receiver/relay sort/refresh guard still required. |
 | VBD id/source maps | safe if dirty invalidation is centralized | lookup equivalence guard. |
-| condition group runtime cache | safe only by store path + fingerprint + invalidation | blank-gate no-load guard. |
+| condition group runtime cache | accepted in Phase 4 for runtime gate/replay only with path + content fingerprint + invalidation | blank-gate no-load guard and cached-load equivalence guard. |
 | state variable snapshot lookup | accepted in Phase 2 as binary search over sorted snapshot records | stable-id lookup equivalence guard. |
-| state variable store cache | safe only by path + invalidation on mutation | state mutation tests. |
+| state variable store cache | accepted in Phase 4 through StateVariableService cached raw/status loads with save invalidation | state mutation and corrupt/missing cached-load tests. |
 | SignalJoin accepted-signal cache/channel index | accepted in Phase 2 with bounded content-fingerprint cache and enabled input-channel index | cache invalidation, corrupt fail-closed and join order guards. |
 | MapDataStore bounds prefilter | accepted for `findPlannerRegionContaining`, before exact polygon contains | geometry equivalence guard. |
 | RegionController planner-region id index/cache | accepted in `MapDataStore.getPlannerRegion` with first-match semantics | player x controller x plannerRegions fixture and id-index equivalence guard. |
@@ -129,3 +129,4 @@ Runtime report rows must also explicitly answer:
 | itemSubmit requirement precompilation | safe if matcher output unchanged | consume/all-or-nothing tests. |
 | container matcher totals reuse | safe if snapshot identity fixed per evaluation | container condition tests. |
 | protected draft expiry batch cleanup | safe if terminal states unchanged | registry lifecycle tests. |
+| snapshot manifest/package parsed cache | deferred | rollback package fingerprint, retention and degraded package guards. |

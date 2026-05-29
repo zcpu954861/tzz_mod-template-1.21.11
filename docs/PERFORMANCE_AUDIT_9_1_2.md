@@ -68,6 +68,13 @@ Phase 3 follow-up:
 - added `WebAdminLogicChainDomEquivalenceGuardTest` for hard node/edge/panel/diff/minimap/VBD overlay snapshots and hover/selection/zoom canonical full-render equivalence;
 - kept high-risk local DOM update candidates deferred, so the Phase 0 hover/click/zoom full-render warning remains a measured risk rather than an unguarded rewrite.
 
+Phase 4 follow-up:
+
+- accepted bounded content-fingerprint cached loads for StateVariable and ConditionGroup stores, with save invalidation, rollback cache clearing and hard missing/corrupt/repair/external-replacement guards;
+- switched only runtime condition gate and read-only replay to cached condition group loads; WebAdmin write validators and editing services remain uncached authoritative reads;
+- kept StateVariable writes synchronous and preserved raw missing-file creation behavior through `StateVariableService`;
+- accepted next-expiry short-circuit for container and single-item-submit template sessions only; selection sessions and protected draft registry cleanup remain unchanged because world-device protected draft rollback needs server-aware cleanup.
+
 ## Top 50 Static Performance Suspects
 
 This table is the Phase 0 static candidate list. Phase 1 must convert it into deterministic benchmark rows with timing and low-end estimates. `Tick path` means server/client tick or synchronous Minecraft main-thread path; `High frequency UI` means hover, pointermove, click, zoom or route silent refresh.
@@ -250,9 +257,11 @@ Allocation suspects are static until Phase 1 adds counters or timing proxies.
 | Zoom transform-only update | Deferred | Toolbar percentage, pan state and canvas transform need interaction guard. |
 | Draft overlay cross-render memo | Deferred | No authoritative draft revision key yet. |
 | VBD overlay pipeline consolidation | Deferred | Existing selected fallback/source priority is behavior-sensitive. |
-| Condition group runtime cache | Planned | Safe only if invalidated by store path/fingerprint and blank gate still avoids load entirely. |
-| State variable runtime snapshot cache | Planned | Safe only if mutations invalidate cached snapshot and corrupt JSON fallback remains unchanged. |
+| Condition group runtime cache | Accepted in Phase 4 for runtime gate/replay | Bounded path/content-fingerprint cache; save and snapshot rollback invalidate; blank gate still returns before store load. |
+| State variable runtime snapshot cache | Accepted in Phase 4 through StateVariableService cached loads | Synchronous save invalidates; corrupt/status fallback and legacy raw missing-file creation are guarded. |
 | Signal device channel index | Planned | Must preserve order, enabled filter, duplicate/missing handling and dirty flush semantics. |
 | RegionController planner-region id index/cache | Planned | Must match `MapDataStore.getPlannerRegion` result and missing-region behavior before reducing repeated player x controller lookups. |
 | Region bounds prefilter | Planned | Must preserve enter/exit/stay transition order and polygon result. |
 | Timer bucket/index | Planned | Must preserve `LinkedHashMap` order and due execution budget. |
+| Snapshot manifest/package parsed cache | Deferred | Rollback package fingerprint, retention and degraded-message semantics need stronger package equivalence guards. |
+| Protected draft expiry bucketing | Deferred | Terminal visibility and cleanup-required world-device drafts must remain server-cleanup-aware. |

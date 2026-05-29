@@ -151,7 +151,7 @@ Low-end store benchmarks must account for ordinary VPS SSD variance, Windows Def
 Store benchmark cases:
 
 - cold load;
-- repeated load;
+- cached/repeated load with content-fingerprint refresh;
 - single small mutation followed by save;
 - batch mutation followed by save;
 - corrupt JSON fallback;

@@ -44,12 +44,20 @@ final class RuntimeOptimizationEquivalenceGuardTest {
 
     private static void checkSourceMarkers(CodeQualityGuardSupport.GuardReport report) throws IOException {
         String stateSnapshot = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/condition/state/StateVariableSnapshot.java");
+        String stateStore = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/condition/state/StateVariableStore.java");
+        String conditionStore = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminConditionGroupStore.java");
+        String conditionGate = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/condition/runtime/ConditionGateService.java");
         String listenerStore = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/signal/SignalListenerStore.java");
         String joinStore = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinStore.java");
         String joinRuntime = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinRuntimeService.java");
         String mapStore = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/map/MapDataStore.java");
         String snapshotService = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotService.java");
         report.requireContains(stateSnapshot, "while (low <= high)", "StateVariableSnapshot must use sorted lookup marker");
+        report.requireContains(stateStore, "loadSnapshotWithStatusCached", "StateVariableStore cached load marker");
+        report.requireContains(stateStore, "removeEldestEntry", "StateVariableStore cached load LRU bound marker");
+        report.requireContains(conditionStore, "loadWithStatusCached", "ConditionGroupStore cached load marker");
+        report.requireContains(conditionStore, "removeEldestEntry", "ConditionGroupStore cached load LRU bound marker");
+        report.requireContains(conditionGate, "loadWithStatusCached(server)", "ConditionGateService runtime cached condition group load marker");
         report.requireContains(listenerStore, "indexEnabledListenersByChannel", "SignalListenerStore channel index marker");
         report.requireContains(joinStore, "FileFingerprint", "SignalJoinStore cached load fingerprint marker");
         report.requireContains(joinStore, "removeEldestEntry", "SignalJoinStore cached load LRU bound marker");
@@ -59,6 +67,10 @@ final class RuntimeOptimizationEquivalenceGuardTest {
         report.requireContains(mapStore, "boundsMayContain(region, blockX, blockZ)", "MapDataStore bounds prefilter marker");
         report.requireContains(snapshotService, "SignalJoinStore.clearCachedLoad(server)",
                 "Snapshot rollback must clear SignalJoin cached load");
+        report.requireContains(snapshotService, "WebAdminConditionGroupStore.clearCachedLoad(server)",
+                "Snapshot rollback must clear ConditionGroup cached load");
+        report.requireContains(snapshotService, "StateVariableStore.clearCachedLoad(server)",
+                "Snapshot rollback must clear StateVariable cached load");
     }
 
     private static void checkStateVariableSnapshotLookupEquivalence(CodeQualityGuardSupport.GuardReport report) {

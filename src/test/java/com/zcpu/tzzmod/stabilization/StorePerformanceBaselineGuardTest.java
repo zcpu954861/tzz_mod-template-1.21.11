@@ -49,6 +49,7 @@ public final class StorePerformanceBaselineGuardTest {
     static void run(CodeQualityGuardSupport.GuardReport report) throws Exception {
         report.metric("performance.912.store.seed", SyntheticFixtureFactory.SEED);
         checkCorruptJsonFallbacks(report);
+        checkCachedLoadEquivalence(report);
         checkSessionLifecycleMarkers(report);
         runStateVariableStoreBenchmarks(report);
         runConditionGroupStoreBenchmarks(report);
@@ -106,6 +107,10 @@ public final class StorePerformanceBaselineGuardTest {
             report.require(source.contains("while (TERMINAL_ORDER.size() > MAX_TERMINAL_STATUS)"),
                     "Session terminal status cleanup must remain capped");
         }
+        report.require(container.contains("nextExpiryMillis") && container.contains("if (now < nextExpiryMillis)"),
+                "Container template session cleanup must keep next-expiry short-circuit marker");
+        report.require(itemSubmit.contains("nextExpiryMillis") && itemSubmit.contains("if (now < nextExpiryMillis)"),
+                "itemSubmit template session cleanup must keep next-expiry short-circuit marker");
 
         WebAdminProtectedDraftRegistry.clearForTests();
         WebAdminProtectedDraftRegistry.ProtectedDraftEntry terminal = new WebAdminProtectedDraftRegistry.ProtectedDraftEntry(
@@ -188,6 +193,144 @@ public final class StorePerformanceBaselineGuardTest {
         clearSessionStaticState(WebAdminSingleItemSubmitTemplateSessions.class);
     }
 
+    private static void checkCachedLoadEquivalence(CodeQualityGuardSupport.GuardReport report) throws Exception {
+        checkStateVariableCachedLoadEquivalence(report);
+        checkConditionGroupCachedLoadEquivalence(report);
+        String snapshotService = CodeQualityGuardSupport.read("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotService.java");
+        report.requireContains(snapshotService, "WebAdminConditionGroupStore.clearCachedLoad(server)",
+                "Snapshot rollback must clear condition group cached load");
+        report.requireContains(snapshotService, "StateVariableStore.clearCachedLoad(server)",
+                "Snapshot rollback must clear state variable cached load");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void checkStateVariableCachedLoadEquivalence(CodeQualityGuardSupport.GuardReport report) throws Exception {
+        clearCacheMap(StateVariableStore.class, "SNAPSHOT_CACHE");
+        clearCacheMap(StateVariableStore.class, "STATUS_CACHE");
+        Path root = tempRoot("state-cache");
+        Path path = root.resolve(StateVariableStore.FILE_NAME);
+
+        Path missingStatusPath = root.resolve("missing-status").resolve(StateVariableStore.FILE_NAME);
+        StateVariableStore.StateVariableLoadResult missing = StateVariableStore.loadSnapshotWithStatusCached(missingStatusPath);
+        report.require(!missing.filePresent() && missing.snapshot().size() == 0,
+                "Cached state status load must preserve missing no-create result");
+        report.require(!Files.exists(missingStatusPath), "Cached state status missing load must not create file");
+
+        Path missingSnapshotPath = root.resolve("missing-snapshot").resolve(StateVariableStore.FILE_NAME);
+        StateVariableSnapshot created = StateVariableStore.loadSnapshotCached(missingSnapshotPath);
+        report.require(created.size() == 0 && Files.exists(missingSnapshotPath),
+                "Cached raw state snapshot load must preserve legacy missing-file creation");
+
+        StateVariableSnapshot first = new StateVariableSnapshot(SyntheticFixtureFactory.stateVariables(SyntheticFixtureFactory.FixtureTier.SMALL));
+        report.require(StateVariableStore.saveSnapshot(path, first), "StateVariable cache guard must save first fixture");
+        StateVariableStore.StateVariableLoadResult firstCached = StateVariableStore.loadSnapshotWithStatusCached(path);
+        report.require(firstCached.snapshot().size() == first.size(), "Cached state load must match first fixture");
+
+        StateVariableSnapshot second = new StateVariableSnapshot(SyntheticFixtureFactory.stateVariables(SyntheticFixtureFactory.FixtureTier.MEDIUM));
+        report.require(StateVariableStore.saveSnapshot(path, second), "StateVariable save must invalidate cached load result");
+        StateVariableStore.StateVariableLoadResult secondCached = StateVariableStore.loadSnapshotWithStatusCached(path);
+        report.require(secondCached.snapshot().size() == second.size(), "Cached state load must refresh after saveSnapshot");
+
+        java.nio.file.attribute.FileTime cachedStateMtime = Files.getLastModifiedTime(path);
+        StateVariableSnapshot external = new StateVariableSnapshot(SyntheticFixtureFactory.stateVariables(SyntheticFixtureFactory.FixtureTier.LARGE));
+        Files.writeString(path, stateJson(external), StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(path, cachedStateMtime);
+        StateVariableStore.StateVariableLoadResult externalCached = StateVariableStore.loadSnapshotWithStatusCached(path);
+        report.require(externalCached.snapshot().size() == external.size(),
+                "Cached state load must refresh after external file replacement even when mtime is restored");
+
+        Files.writeString(path, "{bad json", StandardCharsets.UTF_8);
+        StateVariableStore.StateVariableLoadResult corrupt = StateVariableStore.loadSnapshotWithStatusCached(path);
+        report.require(corrupt.degraded() && corrupt.message().contains("已停止写入"),
+                "Cached state corrupt load must preserve degraded Chinese message");
+        report.require(Files.readString(path).equals("{bad json"), "Cached state corrupt load must not overwrite file");
+
+        Files.writeString(path, stateJson(first), StandardCharsets.UTF_8);
+        StateVariableStore.StateVariableLoadResult repaired = StateVariableStore.loadSnapshotWithStatusCached(path);
+        report.require(repaired.snapshot().size() == first.size() && !repaired.degraded(),
+                "Cached state load must refresh after corrupt file repair");
+
+        Map<Path, ?> statusCache = (Map<Path, ?>) cacheField(StateVariableStore.class, "STATUS_CACHE").get(null);
+        statusCache.clear();
+        for (int index = 0; index < 40; index++) {
+            Path cachePath = root.resolve("bound-" + index).resolve(StateVariableStore.FILE_NAME);
+            StateVariableStore.saveSnapshot(cachePath, first);
+            StateVariableStore.loadSnapshotWithStatusCached(cachePath);
+        }
+        report.require(statusCache.size() <= 32, "StateVariable cached load must remain LRU bounded");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void checkConditionGroupCachedLoadEquivalence(CodeQualityGuardSupport.GuardReport report) throws Exception {
+        clearCacheMap(WebAdminConditionGroupStore.class, "LOAD_CACHE");
+        Path root = tempRoot("condition-cache");
+        Path path = root.resolve(WebAdminConditionGroupStore.FILE_NAME);
+
+        Path missingPath = root.resolve("missing").resolve(WebAdminConditionGroupStore.FILE_NAME);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult missing = WebAdminConditionGroupStore.loadWithStatusCached(missingPath);
+        report.require(!missing.degraded() && missing.file().groups.isEmpty(), "Cached condition group missing load must return empty file");
+        report.require(!Files.exists(missingPath), "Cached condition group missing load must not create file");
+
+        WebAdminConditionGroupStore.ConditionGroupFile first = SyntheticFixtureFactory.conditionGroupFile(SyntheticFixtureFactory.FixtureTier.SMALL);
+        report.require(WebAdminConditionGroupStore.save(path, first), "ConditionGroup cache guard must save first fixture");
+        WebAdminConditionGroupStore.ConditionGroupLoadResult firstCached = WebAdminConditionGroupStore.loadWithStatusCached(path);
+        report.require(firstCached.file().groups.size() == first.groups.size(), "Cached condition group load must match first fixture");
+
+        WebAdminConditionGroupStore.ConditionGroupFile second = SyntheticFixtureFactory.conditionGroupFile(SyntheticFixtureFactory.FixtureTier.MEDIUM);
+        report.require(WebAdminConditionGroupStore.save(path, second), "ConditionGroup save must invalidate cached load result");
+        WebAdminConditionGroupStore.ConditionGroupLoadResult secondCached = WebAdminConditionGroupStore.loadWithStatusCached(path);
+        report.require(secondCached.file().groups.size() == second.groups.size(), "Cached condition group load must refresh after save");
+
+        java.nio.file.attribute.FileTime cachedConditionMtime = Files.getLastModifiedTime(path);
+        WebAdminConditionGroupStore.ConditionGroupFile external = SyntheticFixtureFactory.conditionGroupFile(SyntheticFixtureFactory.FixtureTier.LARGE);
+        Files.writeString(path, GSON.toJson(external), StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(path, cachedConditionMtime);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult externalCached = WebAdminConditionGroupStore.loadWithStatusCached(path);
+        report.require(externalCached.file().groups.size() == external.groups.size(),
+                "Cached condition group load must refresh after external file replacement even when mtime is restored");
+
+        Files.writeString(path, "{bad json", StandardCharsets.UTF_8);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult corrupt = WebAdminConditionGroupStore.loadWithStatusCached(path);
+        report.require(corrupt.degraded() && corrupt.message().contains("条件组配置文件读取失败"),
+                "Cached condition group corrupt load must preserve degraded Chinese message");
+        report.require(Files.readString(path).equals("{bad json"), "Cached condition group corrupt load must not overwrite file");
+
+        Files.writeString(path, GSON.toJson(first), StandardCharsets.UTF_8);
+        WebAdminConditionGroupStore.ConditionGroupLoadResult repaired = WebAdminConditionGroupStore.loadWithStatusCached(path);
+        report.require(repaired.file().groups.size() == first.groups.size() && !repaired.degraded(),
+                "Cached condition group load must refresh after corrupt file repair");
+
+        Map<Path, ?> loadCache = (Map<Path, ?>) cacheField(WebAdminConditionGroupStore.class, "LOAD_CACHE").get(null);
+        loadCache.clear();
+        for (int index = 0; index < 40; index++) {
+            Path cachePath = root.resolve("bound-" + index).resolve(WebAdminConditionGroupStore.FILE_NAME);
+            WebAdminConditionGroupStore.save(cachePath, first);
+            WebAdminConditionGroupStore.loadWithStatusCached(cachePath);
+        }
+        report.require(loadCache.size() <= 32, "ConditionGroup cached load must remain LRU bounded");
+    }
+
+    private static String stateJson(StateVariableSnapshot snapshot) {
+        StateVariableStore.DataFile dataFile = new StateVariableStore.DataFile();
+        dataFile.version = StateVariableStore.DATA_VERSION;
+        dataFile.variables = new java.util.ArrayList<>(snapshot == null ? List.of() : snapshot.records());
+        return GSON.toJson(dataFile);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void clearCacheMap(Class<?> owner, String fieldName) throws Exception {
+        Object value = cacheField(owner, fieldName).get(null);
+        if (value instanceof Map<?, ?> map) {
+            ((Map<Object, Object>) map).clear();
+        }
+    }
+
+    private static Field cacheField(Class<?> owner, String fieldName) throws Exception {
+        Field field = owner.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field;
+    }
+
     @SuppressWarnings("unchecked")
     private static void clearSessionStaticState(Class<?> sessionClass) throws Exception {
         for (String fieldName : List.of("SESSIONS_BY_ID", "ACTIVE_BY_PLAYER", "ACTIVE_BY_DEVICE", "TERMINAL_STATUS", "TERMINAL_ORDER")) {
@@ -203,6 +346,13 @@ public final class StorePerformanceBaselineGuardTest {
             } catch (NoSuchFieldException ignored) {
                 // Selection sessions do not share every index; the concrete classes under test do.
             }
+        }
+        try {
+            Field field = sessionClass.getDeclaredField("nextExpiryMillis");
+            field.setAccessible(true);
+            field.setLong(null, Long.MAX_VALUE);
+        } catch (NoSuchFieldException ignored) {
+            // Selection sessions do not use the next-expiry short-circuit.
         }
     }
 
@@ -283,6 +433,7 @@ public final class StorePerformanceBaselineGuardTest {
 
     private static void runStateVariableStoreBenchmarks(CodeQualityGuardSupport.GuardReport report) throws Exception {
         Double previous = null;
+        Double previousCached = null;
         for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
             Path path = tempRoot("state-" + tier.id).resolve(StateVariableStore.FILE_NAME);
             StateVariableSnapshot snapshot = new StateVariableSnapshot(SyntheticFixtureFactory.stateVariables(tier));
@@ -307,11 +458,33 @@ public final class StorePerformanceBaselineGuardTest {
                     storeExtra(bytes, 1, "per WebAdmin save / action state mutation", "n/a")
             ));
             previous = ms;
+
+            StateVariableStore.loadSnapshotWithStatusCached(path);
+            long cachedNanos = SyntheticFixtureFactory.measureNanos(() -> {
+                StateVariableStore.StateVariableLoadResult loaded = StateVariableStore.loadSnapshotWithStatusCached(path);
+                SyntheticFixtureFactory.Blackhole.consumeInt(loaded.snapshot().size());
+            });
+            double cachedMs = SyntheticFixtureFactory.nanosToMillis(cachedNanos);
+            emit(report, SyntheticFixtureFactory.benchmarkRow(
+                    "store",
+                    "state_variables.cached_status_load",
+                    tier,
+                    snapshot.size(),
+                    -1,
+                    cachedMs,
+                    previousCached,
+                    "O(bytes hash)",
+                    "StateVariable cached load 保留内容指纹刷新，避免重复 Gson parse，但仍读取文件 bytes 以防外部替换。",
+                    false,
+                    storeExtra(bytes, 0, "per runtime context / WebAdmin status read", "n/a")
+            ));
+            previousCached = cachedMs;
         }
     }
 
     private static void runConditionGroupStoreBenchmarks(CodeQualityGuardSupport.GuardReport report) throws Exception {
         Double previous = null;
+        Double previousCached = null;
         for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
             Path path = tempRoot("condition-" + tier.id).resolve(WebAdminConditionGroupStore.FILE_NAME);
             WebAdminConditionGroupStore.ConditionGroupFile file = SyntheticFixtureFactory.conditionGroupFile(tier);
@@ -336,6 +509,27 @@ public final class StorePerformanceBaselineGuardTest {
                     storeExtra(bytes, 1, "per WebAdmin save / configured gate load", "n/a")
             ));
             previous = ms;
+
+            WebAdminConditionGroupStore.loadWithStatusCached(path);
+            long cachedNanos = SyntheticFixtureFactory.measureNanos(() -> {
+                WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = WebAdminConditionGroupStore.loadWithStatusCached(path);
+                SyntheticFixtureFactory.Blackhole.consumeInt(loaded.file().groups.size());
+            });
+            double cachedMs = SyntheticFixtureFactory.nanosToMillis(cachedNanos);
+            emit(report, SyntheticFixtureFactory.benchmarkRow(
+                    "store",
+                    "condition_groups.cached_runtime_load",
+                    tier,
+                    file.groups.size(),
+                    -1,
+                    cachedMs,
+                    previousCached,
+                    "O(bytes hash)",
+                    "ConditionGroup cached load 仅用于 runtime gate / replay，保存和 rollback 后显式失效，WebAdmin 写路径仍保留 uncached 校验。",
+                    false,
+                    storeExtra(bytes, 0, "per configured runtime gate / replay", "n/a")
+            ));
+            previousCached = cachedMs;
         }
     }
 

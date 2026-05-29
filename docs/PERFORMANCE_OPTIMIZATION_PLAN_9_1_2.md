@@ -36,8 +36,8 @@ Global rules:
 | 5 | blank condition gate no-load guard | protects legacy behavior | hard fail if group/context loaded | 1 |
 | 6 | SignalDeviceStore id/source/channel indexes | reduce O(n) lookups | order/duplicate/missing guards | deferred |
 | 7 | SignalListener channel index | reduce emit filtering | listener order guard | 2 |
-| 8 | condition group cache by path/fingerprint | avoid repeated JSON read | invalidation and status guard | 4 |
-| 9 | state variable store cache | avoid gate-time JSON read | mutation invalidation guard | 4 |
+| 8 | condition group cache by path/fingerprint | avoid repeated JSON read | invalidation and status guard | accepted in Phase 4 for runtime gate/replay only |
+| 9 | state variable store cache | avoid gate-time JSON read | mutation invalidation guard | accepted in Phase 4 with synchronous save invalidation |
 | 10 | VBD tick pre-index by enabled VBD and trigger type | reduce per tick scans | no force-load, bound-object only | deferred |
 | 11 | VBD container scan narrow by trigger/cooldown | reduce container fingerprint work | fingerprint semantics | deferred |
 | 12 | itemSubmit matcher precompile per requirement set | reduce repeated parsing/scans | consume all-or-nothing | deferred |
@@ -96,6 +96,19 @@ Phase 3 accepted only full-render-path improvements whose visible output is prot
 
 Phase 3 deliberately still defers hover class-only updates, selection panel-only updates, zoom transform-only updates, draft diff cross-render memoization and VBD overlay pipeline rewrites. Those require broader browser-like DOM mutation coverage, modal caret/scroll guards or reliable draft revision/fingerprint keys before they can replace the current full-render behavior.
 
+## Phase 4 Store / Session / Registry Optimization Record
+
+Phase 4 accepted conservative opt-in store/session changes only:
+
+- `JsonLoadCacheSupport` provides a shared path-normalized content fingerprint for cached JSON load paths. It reads bytes and hashes content on each cache check, so external replacement, same-size edits and repaired corrupt files refresh instead of returning stale data.
+- `StateVariableStore` now has bounded cached raw/status load paths. `StateVariableService` uses them while preserving the legacy raw missing-file creation behavior, and `saveSnapshot` invalidates both caches only after successful synchronous write.
+- `WebAdminConditionGroupStore` now has bounded cached load paths. Runtime `ConditionGateService` and read-only `ConditionGateReplayService` use the cached path; WebAdmin write validators and condition group editing services deliberately keep uncached authoritative reads.
+- `WebAdminSnapshotService.clearRestoredCaches` now clears StateVariable and ConditionGroup caches after rollback, matching the existing SignalDevice, SignalListener, SignalJoin and RegionController cache cleanup.
+- `WebAdminContainerTemplateSessions` and `WebAdminSingleItemSubmitTemplateSessions` now track the earliest active expiry and skip active-session scans before that point. Selection sessions and protected draft registry cleanup remain unchanged because world-device protected draft rollback requires server-aware cleanup checks.
+- `StorePerformanceBaselineGuardTest` now hard-checks missing/corrupt/repair/save/external-replacement/cache-bound behavior for StateVariable and ConditionGroup caches, rollback clear markers and session next-expiry source markers. It also emits cached-load benchmark rows with `serialization_count=0` while keeping timing report-only.
+
+Phase 4 deliberately does not change JSON file format, pretty-write output, synchronous save timing, edit lock/draft authority, protected draft terminal states, selection world-device cleanup, snapshot manifest/package semantics or WebAdmin backend write validation authority.
+
 ## Deferred High-Risk Optimizations
 
 | Candidate | Defer reason | Required future proof |
@@ -108,6 +121,8 @@ Phase 3 deliberately still defers hover class-only updates, selection panel-only
 | write-behind store save across existing save boundary | save timing and crash recovery semantics may change | explicit transactional design. |
 | replacing JSON file format | out of 9.1.2 scope | separate migration phase. |
 | browser-only performance marker as hard budget | machine/browser noise | keep timing report-only, hard fail deterministic invariants. |
+| snapshot manifest/package parsed-object cache | rollback fingerprint, retention and degraded package semantics are behavior-sensitive | package/manifest equivalence guards before caching. |
+| protected draft registry expiry bucket/cap | terminal visibility and world-device cleanup-required entries are stateful | protected-draft state matrix and server cleanup guard. |
 
 ## Phase Checkpoint Policy
 

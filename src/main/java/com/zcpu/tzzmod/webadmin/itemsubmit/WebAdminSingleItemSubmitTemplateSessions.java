@@ -61,6 +61,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
     private static final int MAX_TERMINAL_STATUS = 128;
     private static MinecraftServer currentServer;
     private static WebAdminEditLockService lockService;
+    private static long nextExpiryMillis = Long.MAX_VALUE;
 
     private WebAdminSingleItemSubmitTemplateSessions() {
     }
@@ -88,6 +89,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         SESSIONS_BY_ID.put(session.sessionId, session);
         ACTIVE_BY_PLAYER.put(session.targetPlayerUuid, session.sessionId);
         ACTIVE_BY_DEVICE.put(session.deviceId, session.sessionId);
+        trackNextExpiry(session.expiresAtMillis);
         try {
             sendOpen(targetPlayer, session);
         } catch (Exception exception) {
@@ -205,6 +207,7 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
         SESSIONS_BY_ID.clear();
         ACTIVE_BY_PLAYER.clear();
         ACTIVE_BY_DEVICE.clear();
+        nextExpiryMillis = Long.MAX_VALUE;
         currentServer = null;
     }
 
@@ -217,9 +220,29 @@ public final class WebAdminSingleItemSubmitTemplateSessions {
 
     private static void expireOld() {
         long now = System.currentTimeMillis();
+        if (now < nextExpiryMillis) {
+            return;
+        }
         for (WebAdminSingleItemSubmitTemplateSession session : SESSIONS_BY_ID.values().stream().filter(session -> session.expiresAtMillis <= now).toList()) {
             expireSession(session);
         }
+        recomputeNextExpiry();
+    }
+
+    private static void trackNextExpiry(long expiresAtMillis) {
+        if (expiresAtMillis > 0L) {
+            nextExpiryMillis = Math.min(nextExpiryMillis, expiresAtMillis);
+        }
+    }
+
+    private static void recomputeNextExpiry() {
+        long next = Long.MAX_VALUE;
+        for (WebAdminSingleItemSubmitTemplateSession session : SESSIONS_BY_ID.values()) {
+            if (session != null && session.expiresAtMillis > 0L) {
+                next = Math.min(next, session.expiresAtMillis);
+            }
+        }
+        nextExpiryMillis = next;
     }
 
     private static void expireSession(WebAdminSingleItemSubmitTemplateSession session) {
