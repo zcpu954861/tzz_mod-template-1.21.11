@@ -216,6 +216,41 @@ Phase 5 guard changes:
 
 Phase 5 deliberately does not change UI behavior, WebAdmin route/API behavior, request/response shape, error codes, Chinese error messages, edit lock / target lock behavior, expectedFingerprint handling, write-before snapshot behavior, audit/realtime publication, VBD/world device/RegionController runtime semantics, CSS, frontend modules, commands, stores data format, MCP tooling or performance caching.
 
+## Phase 6 Logic Chain Performance Baseline Context
+
+Phase 6 establishes a Logic Chain render performance and DOM-equivalence baseline before applying small, safe optimizations.
+
+- Phase 6 branch: `feature/logic-chain-performance-baseline-9-1-1`.
+- Phase 6 base: `origin/feature/logic-chain-backend-service-split-9-1-1` at `995f3dd79c7927f707068883770446cc3380878e`.
+- `origin/master` and `v1.68.1-codebase-health-audit` remain `57212e5bb40777620742dbdd8ee65a867a993b23`.
+- WebAdmin routes, `WebAdminFrontendAssets`, `WebAdminServer`, `WebAdminFrontendStyles`, backend save services, runtime classes, commands, stores and MCP tooling remain unchanged.
+- This phase does not run Minecraft, MCP scenario checks or screenshot matrix validation.
+
+Phase 6 performance guard changes:
+
+- `WebAdminPerformanceBaselineGuardTest` now reports `performance.phase=phase6-logic-chain-performance-baseline`.
+- The guard records app.js before/after bytes and SHA-256. Phase 6 before is `1,843,648` bytes, SHA-256 `057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3`; current Phase 6 after is `1,846,211` bytes, SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069` (`+2,563` bytes).
+- Synthetic Logic Chain render baselines cover initial readonly render, selected-node render, hover render, edit-mode render, draft overlay render, unsaved-expanded diff render, VBD trigger overlay render, pending-delete draft action render, VBD selected fallback/source priority and minimap segment cap.
+- DOM equivalence is hard-guarded through stable signatures for node positions/classes, edge path `d`, `marker-end`, target arrow owner markers, selected/related/dimmed classes, selected panel HTML, diff banner HTML, minimap HTML and VBD trigger overlay source markers.
+- Pending-delete card/badge/diff markers across SignalListener and Timer draft action buckets, `_pendingDelete` save payload leakage, VBD trigger stable identity/no duplicate/target-channel/source-card markers, VBD selected fallback/source priority and `segments.slice(0,24)` minimap cap are hard-guarded.
+- The Phase 4 local before artifact comparison is downgraded to a warning only when Phase 6 scope marker, Phase 6 before bytes/SHA, Phase 6 app.js warning limit and Phase 6 performance markers all match. Otherwise the Phase 4 before artifact mismatch remains a hard failure.
+- Render timing is report/warning only. Syntax, markers and DOM equivalence are hard fail.
+- Existing `node --check`, `BeforeV18+ = 0`, event/router no-growth checks, pointer-events invariants, facade checks and raw JSON summary guards remain active.
+
+Phase 6 low-risk optimizations:
+
+- `logicChainRelatedNodeIndex(graph)` precomputes related node sets once inside `logicChainMindMap()` for the current render and passes the index down to positioned node cards. It deliberately does not write cache fields onto `graph`, so read-only paths that reuse WebAdmin API response objects are not polluted.
+- `logicChainMinimap(graph)` memoizes the current `segments.slice(0,24)` HTML in a module-level `{key, html}` memo. The key is derived only from channel id and downstream count; draft overlay, hover, selected node, zoom and pan are intentionally excluded because they must not affect minimap output.
+- These optimizations do not cache WebAdmin API response object references, edit lock state, modal inputs, protected draft terminal state or save payload data.
+- Chinese comments document cache keys, invalidation conditions and stale graph risks.
+
+Deferred after Phase 6:
+
+- Hover/select class-only updates remain deferred because hover and selection also affect arrow ownership and `marker-end`.
+- Zoom transform-only update remains deferred until toolbar percentage and DOM equivalence are covered by a focused interaction guard.
+- Draft overlay / VBD overlay cross-render memoization remains deferred because there is no single authoritative `draftRevision` and VBD overlay still depends on selected-node fallback and capture writeback mutation.
+- VBD overlay pipeline unification, selected fallback behavior changes, dirty calculation changes and backend save performance tuning remain separate behavior-fix or later-phase work.
+
 ## README Update
 
 Phase 1 minimally updates README stable version to `v1.68.1-codebase-health-audit`. It does not expand README feature content.

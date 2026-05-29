@@ -361,6 +361,19 @@ Guard mode:
 - Phase 6: synthetic graph timing trend warning.
 - Later: hard fail only for extreme regressions after enough baseline data.
 
+Phase 6 implementation note:
+
+- Guard scope marker is `phase6-logic-chain-performance-baseline`.
+- `WebAdminPerformanceBaselineGuardTest` now runs a synthetic Logic Chain render harness without Minecraft, MCP scenario or screenshots.
+- Hard fail coverage includes marker presence, synthetic render exceptions, node position/class signatures, edge path `d`, `marker-end`, target arrow owner markers, selected/related/dimmed class signatures, selected panel HTML, diff banner HTML, minimap HTML, VBD trigger overlay source markers, SignalListener/Timer pending-delete markers and payload leakage, VBD selected fallback/source priority and minimap cap.
+- Timing is still warning/report only. Initial soft targets are small hover/selected around 16 ms and initial/edit/draft/VBD render around 50 ms on the local Node VM harness.
+- app.js Phase 6 before baseline is `1,843,648` bytes / SHA-256 `057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3`; current Phase 6 after is `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069` (`+2,563` bytes). Current + 2% is a warning and the existing Phase 3 hard limit remains active.
+- Implemented optimization markers are `logicChainRelatedNodeIndex` and `logicChainMinimapKey`. They are intentionally current-render caches, not cross-render layout/draft caches.
+- Related-node index is render-local: `logicChainMindMap()` builds it from the current rendered graph edges and passes it through `logicChainPositionedNode()` to `logicChainNodeCard()`. It is never stored on `graph`; hover, selected node, connection mode and draft overlay are still read from current render state.
+- Minimap memo stores only `{key, html}` at module scope, not graph references. The key covers only `segments.slice(0,24)` channel id and downstream count; draft, hover, selected, zoom and pan are excluded because they do not affect current minimap semantics.
+- Phase 4 local before artifact mismatch is warning-only after Phase 6 only when Phase 6 scope, before artifact bytes/SHA, app.js warning limit and Phase 6 marker checks all match; otherwise it stays a hard failure.
+- `BeforeV18+ = 0`, facade boundaries, event router no-growth, pointer-events invariants and raw JSON summary guards remain hard fail.
+
 Synthetic scenarios:
 
 - empty/small graph

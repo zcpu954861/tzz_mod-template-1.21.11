@@ -17,6 +17,9 @@ public final class WebAdminFrontendBundleGuardTest {
     private static final int APP_JS_PHASE3_HARD_LIMIT_BYTES = 1_930_207;
     private static final String APP_JS_PHASE2_BASELINE_SHA256 = "1992d2e7634e14ac9611d893cf8439725bbc0fe4ee65f672cc90910b64238b74";
     private static final int APP_CSS_WARNING_BASELINE_BYTES = 123_251;
+    private static final int APP_JS_PHASE6_BEFORE_BYTES = 1_843_648;
+    private static final String APP_JS_PHASE6_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
+    private static final int APP_JS_PHASE6_WARNING_LIMIT_BYTES = 1_880_521;
 
     private static final Map<String, Integer> SOURCE_COUNT_BASELINES = new LinkedHashMap<>();
     private static final Map<String, Integer> INLINE_EVENT_ATTRIBUTE_BASELINES = new LinkedHashMap<>();
@@ -76,11 +79,20 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.sha256", appJsSha256);
         report.metric("webadmin.app_js.phase2_baseline_sha256", APP_JS_PHASE2_BASELINE_SHA256);
         report.metric("webadmin.app_js.phase3_hard_limit", APP_JS_PHASE3_HARD_LIMIT_BYTES);
+        report.metric("webadmin.app_js.phase6_before.bytes", APP_JS_PHASE6_BEFORE_BYTES);
+        report.metric("webadmin.app_js.phase6_before.sha256", APP_JS_PHASE6_BEFORE_SHA256);
+        report.metric("webadmin.app_js.phase6_after.bytes", appJsBytes);
+        report.metric("webadmin.app_js.phase6_after.sha256", appJsSha256);
+        report.metric("webadmin.app_js.phase6_delta.bytes", appJsBytes - APP_JS_PHASE6_BEFORE_BYTES);
         report.metric("webadmin.app_css.bytes", appCssBytes);
         checkPhase4BeforeAfterEquivalence(report, appJs, appJsBytes, appJsSha256);
         if (appJsBytes > APP_JS_PHASE3_HARD_LIMIT_BYTES) {
             report.fail("Phase 3 generated app.js exceeded baseline + 5% hard limit: actualBytes="
                     + appJsBytes + " limit=" + APP_JS_PHASE3_HARD_LIMIT_BYTES + " actualSha256=" + appJsSha256);
+        }
+        if (appJsBytes > APP_JS_PHASE6_WARNING_LIMIT_BYTES) {
+            report.warning("Phase 6 generated app.js exceeded baseline + 2% warning limit: actualBytes="
+                    + appJsBytes + " limit=" + APP_JS_PHASE6_WARNING_LIMIT_BYTES);
         }
         warnIfBeyondFivePercent(report, "app.js", appJsBytes, APP_JS_WARNING_BASELINE_BYTES);
         warnIfBeyondFivePercent(report, "app.css", appCssBytes, APP_CSS_WARNING_BASELINE_BYTES);
@@ -118,7 +130,33 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.phase4_before.sha256", beforeSha256);
         report.metric("webadmin.app_js.phase4_after.bytes", appJsBytes);
         report.metric("webadmin.app_js.phase4_after.sha256", appJsSha256);
-        if (beforeBytes != appJsBytes || !beforeSha256.equals(appJsSha256) || !beforeText.equals(appJs)) {
+        boolean matchesPhase4Artifact = beforeBytes == appJsBytes && beforeSha256.equals(appJsSha256) && beforeText.equals(appJs);
+        boolean phase6Scope = CodeQualityGuardSupport.read("src/test/java/com/zcpu/tzzmod/stabilization/CodeQualityGuardTest.java")
+                .contains("phase6-logic-chain-performance-baseline");
+        boolean phase6BeforeArtifact = beforeBytes == APP_JS_PHASE6_BEFORE_BYTES
+                && APP_JS_PHASE6_BEFORE_SHA256.equals(beforeSha256);
+        boolean phase6DeltaWithinLimit = appJsBytes <= APP_JS_PHASE6_WARNING_LIMIT_BYTES;
+        boolean phase6PerformanceBaseline = phase6Scope
+                && phase6BeforeArtifact
+                && phase6DeltaWithinLimit
+                && appJs.contains("data-logic-chain-render-perf-markers")
+                && appJs.contains("function logicChainRelatedNodeIndex")
+                && appJs.contains("function logicChainMinimapKey");
+        report.metric("webadmin.app_js.phase4_before.matches_current", matchesPhase4Artifact);
+        report.metric("webadmin.app_js.phase4_before.phase6_scope", phase6Scope);
+        report.metric("webadmin.app_js.phase4_before.phase6_baseline_artifact", phase6BeforeArtifact);
+        report.metric("webadmin.app_js.phase4_before.phase6_delta_within_limit", phase6DeltaWithinLimit);
+        report.metric("webadmin.app_js.phase4_before.historical_after_phase6", !matchesPhase4Artifact && phase6PerformanceBaseline);
+        if (!matchesPhase4Artifact && phase6PerformanceBaseline) {
+            // Phase 4 的 before artifact 是本地阶段内等价快照；Phase 6 会有意改变 app.js 来加入
+            // 性能 marker 和当前渲染缓存。这里继续报告历史 artifact 差异，但由 Phase 6 DOM 等价
+            // guard 负责硬失败，避免本地 build/tmp 快照阻塞后续合法优化。
+            report.warning("Phase 4 before artifact is historical after Phase 6 app.js performance changes: beforeBytes="
+                    + beforeBytes + " afterBytes=" + appJsBytes + " beforeSha256=" + beforeSha256
+                    + " afterSha256=" + appJsSha256);
+            return;
+        }
+        if (!matchesPhase4Artifact) {
             report.fail("Phase 4 Logic Chain module split changed generated app.js output: beforeBytes="
                     + beforeBytes + " afterBytes=" + appJsBytes + " beforeSha256=" + beforeSha256
                     + " afterSha256=" + appJsSha256);

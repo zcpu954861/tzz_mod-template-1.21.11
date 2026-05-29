@@ -271,6 +271,39 @@ Guard suggestion:
 - pointer-events none CSS marker。
 - graph render 拆分后 minimap 输入仍是当前语义的 graph。
 
+## Phase 6 implemented performance baseline
+
+Phase 6 first establishes a hard DOM equivalence baseline and then applies only current-render, low-risk optimizations.
+
+Implemented:
+
+- `logicChainRelatedNodeIndex(graph)` precomputes related node ids once inside `logicChainMindMap()` for the current render and passes the index down to each node card. It removes the previous `logicChainNodeCard -> logicChainRelatedNodeIds -> scan all graph.edges` pattern from every card render while preserving current hover/selected class semantics and without mutating the graph object.
+- `logicChainMinimapKey(graph)` and `logicChainMinimap(graph)` memoize the exact `segments.slice(0,24)` minimap HTML by channel id and downstream count. The memo stores only `{key, html}`, not graph references; the minimap remains not draft-aware, not hover-aware and not clickable.
+- `WebAdminPerformanceBaselineGuardTest` now records app.js before/after bytes and runs synthetic Logic Chain render checks for initial, selected, hover, edit mode, draft overlay, unsaved-expanded diff, VBD trigger overlay, SignalListener/Timer pending-delete, VBD selected fallback/source priority and minimap cap scenarios.
+- DOM equivalence signatures hard-guard node position/class output, edge path `d`, `marker-end`, target arrow owner markers, selected/related/dimmed classes, selected panel HTML, diff banner HTML, minimap HTML, VBD overlay markers, pending-delete visual/payload boundaries across SignalListener and Timer draft action buckets, and VBD trigger source identity.
+
+Deferred:
+
+- Hover class-only updates remain deferred because hover and selected node can change target arrow ownership and `marker-end`.
+- Click/select panel-only updates remain deferred because selection affects graph card classes, edge classes, arrow ownership and edit-mode draft targeting.
+- Zoom transform-only updates remain deferred until toolbar percentage and pan bounds are covered by a focused interaction guard.
+- Draft overlay, VBD overlay and diff cross-render memoization remain deferred until a reliable draft fingerprint/revision covers direct mutations, selected fallback and capture writeback.
+
+Phase 6 app.js before baseline:
+
+```text
+bytes: 1,843,648
+sha256: 057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3
+```
+
+Phase 6 app.js current after baseline:
+
+```text
+bytes: 1,846,211
+sha256: 474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069
+delta: +2,563
+```
+
 ## 建议性能基线
 
 ### Unit / smoke 可做
