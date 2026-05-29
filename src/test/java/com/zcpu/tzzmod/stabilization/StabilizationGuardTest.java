@@ -3035,7 +3035,7 @@ public final class StabilizationGuardTest {
                 "dirtyCheck:()=>!!appState.actionRelayActionsEdit?.lockId&&modalDraftDirty('action_relay_actions'",
                 "dirtyCheck:()=>modalDraftDirty('signal_listener_create'",
                 "closeWebAdminModal(true,true)",
-                "event.key==='Escape'){if(appState.modalDiscardConfirmOpen)",
+                "const globalModalEscapeRoutes",
                 "normalizeActionRelayEditableAction",
                 "actionRelayActionsEditableJson",
                 "actionRelayActionsDirty(draft)"
@@ -6922,7 +6922,7 @@ public final class StabilizationGuardTest {
         String matrix = Files.readString(root.resolve("docs/CONDITION_ENGINE_CAPABILITY_MATRIX_8_5.md"), StandardCharsets.UTF_8);
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
         String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminConditionGroupStore.java"), StandardCharsets.UTF_8);
@@ -7217,7 +7217,7 @@ public final class StabilizationGuardTest {
         String groupService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java"), StandardCharsets.UTF_8);
         String nativeService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java"), StandardCharsets.UTF_8);
         String requestDto = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminVirtualBlockDeviceNativeTriggersUpdateRequest.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String dispatcher = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceDispatcher.java"), StandardCharsets.UTF_8);
         String interaction = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceInteractionHandler.java"), StandardCharsets.UTF_8);
         String container = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/device/VirtualBlockDeviceContainerHandler.java"), StandardCharsets.UTF_8);
@@ -7509,7 +7509,7 @@ public final class StabilizationGuardTest {
         String regionTracker = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerTracker.java"), StandardCharsets.UTF_8);
         String regionCommand = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerCommand.java"), StandardCharsets.UTF_8);
         String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String compatibilityTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/condition/runtime/ConditionGroupCompatibilityServiceTest.java"), StandardCharsets.UTF_8);
         String gateConfigTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGateConfigTest.java"), StandardCharsets.UTF_8);
         String availableListTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupServiceTest.java"), StandardCharsets.UTF_8);
@@ -7701,7 +7701,7 @@ public final class StabilizationGuardTest {
         String doctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java"), StandardCharsets.UTF_8);
         String webAdminDoctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminDoctorService.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
         String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventType.java"), StandardCharsets.UTF_8);
         String dtos = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminDtos.java"), StandardCharsets.UTF_8);
@@ -7946,7 +7946,7 @@ public final class StabilizationGuardTest {
         String relay = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/ModBlock/entity/ActionRelayBlockEntity.java"), StandardCharsets.UTF_8);
         String regionTracker = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/region/RegionControllerTracker.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String conditionGroupService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionGroupService.java"), StandardCharsets.UTF_8);
         String listenerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalListenerActionsService.java"), StandardCharsets.UTF_8);
         String relayService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionRelayActionsService.java"), StandardCharsets.UTF_8);
@@ -8168,7 +8168,7 @@ public final class StabilizationGuardTest {
         String store = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinStore.java"), StandardCharsets.UTF_8);
         String validator = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/signal/join/SignalJoinValidator.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
         String signalService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalService.java"), StandardCharsets.UTF_8);
         String joinService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminSignalJoinService.java"), StandardCharsets.UTF_8);
@@ -8352,7 +8352,7 @@ public final class StabilizationGuardTest {
         String regionService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminRegionControllerService.java"), StandardCharsets.UTF_8);
         String doctorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminConditionRuntimeDoctorService.java"), StandardCharsets.UTF_8);
         String realtime = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/realtime/WebAdminRealtimeEventBus.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String test = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/action/ControlledStateActionServiceTest.java"), StandardCharsets.UTF_8);
         String webadminTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminControlledStateActionServiceTest.java"), StandardCharsets.UTF_8);
         String stateVariableWebAdminTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminStateVariableServiceTest.java"), StandardCharsets.UTF_8);
@@ -8633,7 +8633,7 @@ public final class StabilizationGuardTest {
         String timerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerService.java"), StandardCharsets.UTF_8);
         String timerDoctor = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerDoctorService.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
         String logicChain = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
@@ -8842,8 +8842,8 @@ public final class StabilizationGuardTest {
         requireContains(timerManualModal, "data-timer-manual-form=\"true\"", "8.12 Timer manual modal uses data marker form");
         requireContains(timerManualModal, "onsubmit=\"event.preventDefault();submitTimerManualForm(this)\"", "8.12 Timer manual modal submit path is safe");
         requireContains(timerManualModal, "timerManualModalFooter(op,d.saving)", "8.12 Timer manual modal uses Timer-specific footer");
-        requireContains(scripts, "target.closest('[data-timer-manual-submit]')", "8.12 Timer manual submit uses delegated click handler");
-        requireContains(scripts, "target.closest('[data-timer-action-submit]')", "8.12 Timer action save uses delegated click handler");
+        requireContains(scripts, "{selector:'[data-timer-manual-submit]',handler:handleGlobalTimerManualSubmitClick}", "8.12 Timer manual submit uses delegated click handler");
+        requireContains(scripts, "{selector:'[data-timer-action-submit]',handler:handleGlobalTimerActionSubmitClick}", "8.12 Timer action save uses delegated click handler");
         requireFalse(timerManualModal.contains("runTimerManual(${jsString(op)})") || timerManualModal.contains("requestSubmit()"),
                 "8.12 Timer manual modal must not use unsafe inline runTimerManual/requestSubmit");
         requireFalse(timerActionBucketModal.contains("requestSubmit()"),
@@ -8954,7 +8954,7 @@ public final class StabilizationGuardTest {
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String logicChain = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
         String logicChainTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainServiceTest.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
 
@@ -9324,9 +9324,10 @@ public final class StabilizationGuardTest {
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String request = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java"), StandardCharsets.UTF_8);
         String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String editorBackend = editorService + "\n" + readLogicChainEditorBackendSplit(root);
         String logicService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String editLockService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminEditLockService.java"), StandardCharsets.UTF_8);
         String validationError = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminValidationError.java"), StandardCharsets.UTF_8);
@@ -9471,7 +9472,7 @@ public final class StabilizationGuardTest {
                 "join_output",
                 "timer_outputs_channel"
         )) {
-            requireContains(request + "\n" + editorService + "\n" + validationError + "\n" + editLockService + "\n" + operationType + "\n" + rolePolicy, marker, "8.14 backend marker: " + marker);
+            requireContains(request + "\n" + editorBackend + "\n" + validationError + "\n" + editLockService + "\n" + operationType + "\n" + rolePolicy, marker, "8.14 backend marker: " + marker);
         }
         for (String legacyFourFieldError : List.of(
                 "error(\"nodes[0].column\", \"logic_chain_join_column_invalid\", \"Signal Join 只能放在上游频道卡的下游合法列。\", column)",
@@ -9481,7 +9482,7 @@ public final class StabilizationGuardTest {
                 "error(\"actionAppend.ownerId\", \"logic_chain_action_append_owner_id_required\", \"追加 Action 需要已有 action 容器 ID。\", \"\")",
                 "error(\"channelMetadataDrafts[\" + index + \"].channel\", \"duplicate_channel\", \"频道端点 metadata 不能重复提交同一个 channel。\", channel)"
         )) {
-            requireFalse(editorService.contains(legacyFourFieldError), "8.14 structured validation must not use legacy four-field error: " + legacyFourFieldError);
+            requireFalse(editorBackend.contains(legacyFourFieldError), "8.14 structured validation must not use legacy four-field error: " + legacyFourFieldError);
         }
 
         for (String marker : List.of(
@@ -9842,8 +9843,8 @@ public final class StabilizationGuardTest {
         requireFalse(scripts.contains("==='timer'?[0]:[2]"), "8.14 frontend must not keep Signal Join C2-only legal slots");
         requireContains(scripts, "logicChainJoinProcessingDraftActive", "8.14 frontend still marks Join draft mode without forcing an empty processing column");
         requireFalse(scripts.contains("keys.forEach(lane=>{map[lane]=lane>=3?lane+1:lane;});return map;"), "8.14 Join draft layout must not reserve a forced empty processing column");
-        requireFalse(editorService.contains("String joinId = safe(request.id);"), "8.14 Signal Join typed lock target must use the normalized service id");
-        requireFalse(editorService.contains("String timerId = safe(request.id);"), "8.14 Timer typed lock target must use the normalized service id");
+        requireFalse(editorBackend.contains("String joinId = safe(request.id);"), "8.14 Signal Join typed lock target must use the normalized service id");
+        requireFalse(editorBackend.contains("String timerId = safe(request.id);"), "8.14 Timer typed lock target must use the normalized service id");
         requireFalse(scripts.contains("type==='timer'?[0,5]"), "8.14 frontend must not render Timer C5 as legal slot");
         String legalSlotFunction = extractBetween(scripts, "function logicChainLegalSlotsForColumn", "function logicChainResolveDraftSlot");
         String joinSlotFunction = extractBetween(scripts, "function logicChainJoinInputAdjacentLegalSlots", "function logicChainDraftAnchorSlot");
@@ -9880,7 +9881,7 @@ public final class StabilizationGuardTest {
         requireContains(editorService, "if (actionAppend && nodes.isEmpty() && !edges.isEmpty())", "8.16 mixed draft payload rejects standalone action append edges while preserving new-node draft edges");
         String metadataRefFunction = extractBetween(editorService, "private static Set<String> channelMetadataDraftReferencedChannels", "private static RegionTriggerType parseRegionTrigger");
         requireContains(metadataRefFunction, "if (hasActionAppend(request))", "8.14 action append metadata refs must use actionAppend.action instead of draft edges");
-        requireContains(editorService, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
+        requireContains(editorBackend, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
         requireContains(scripts, "connectLogicChainDraftCandidate(channelRef,{toggle:false})", "8.14 draft channel endpoint add path does not toggle off an existing connection");
         String actionAppendLayout = extractBetween(scripts, "if(editor.actionAppend)", "const draftEdges=[]");
         requireContains(actionAppendLayout, "draft:action_append:${append.ownerType||'owner'}:${append.ownerId||''}:${append.bucket||'default'}:${actionIndex}", "8.14 action append draft id includes actionIndex");
@@ -9938,9 +9939,9 @@ public final class StabilizationGuardTest {
         requireContains(nodeCard, "data-logic-chain-primary-node-id", "8.14 reference card exposes safe primary id dataset");
         requireFalse(nodeCard.contains("onclick=") || nodeCard.contains("onkeydown=") || nodeCard.contains("onmouseenter=") || nodeCard.contains("onmouseleave=") || nodeCard.contains("onpointerdown="),
                 "8.14 node card must not contain unsafe inline handlers");
-        requireContains(scripts, "document.addEventListener('pointerdown',event=>{if(handleLogicChainEditorDelegatedPointerDown(event))return;},true)", "8.14 draft drag pointerdown uses event delegation");
-        requireContains(scripts, "document.addEventListener('pointerup',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;},true)", "v17 capture retry uses pointerup fallback before click delegation");
-        requireContains(scripts, "document.addEventListener('click',event=>{if(handleLogicChainVbdCaptureRetryDelegatedClick(event))return;if(handleLogicChainEditorDelegatedClick(event))return;},true)", "8.14 connection handles must be captured before card click handlers and v17 capture retry buttons");
+        requireContains(scripts, "document.addEventListener('pointerdown',handleGlobalPointerDownCapture,true)", "8.14 draft drag pointerdown uses event delegation");
+        requireContains(scripts, "document.addEventListener('pointerup',handleGlobalPointerUpCapture,true)", "v17 capture retry uses pointerup fallback before click delegation");
+        requireContains(scripts, "handleGlobalVbdCaptureRetryRoute},{handler:handleGlobalLogicChainClickRoute", "8.14 capture route keeps v17 capture retry before Logic Chain card handlers");
         String editorRouteGuard = extractBetween(scripts, "function maybeReleaseLogicChainEditorForRoute", "function logicChainRootChannel");
         requireContains(editorRouteGuard, "logicChainEditorRouteMatches(e,h)", "8.14 route guard only bypasses the original editor route");
         requireFalse(editorRouteGuard.contains("h==='#/logic-chains'||h.startsWith('#/logic-chains/')||isLogicChainResolveRoute(h)"), "8.14 route guard must not broadly bypass Logic Chain route changes");
@@ -10015,7 +10016,7 @@ public final class StabilizationGuardTest {
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String logicChainService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String operationType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminOperationType.java"), StandardCharsets.UTF_8);
         String rolePolicy = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/write/WebAdminRolePolicy.java"), StandardCharsets.UTF_8);
@@ -10319,7 +10320,7 @@ public final class StabilizationGuardTest {
         String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
         String timerService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminTimerService.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String editorTest = Files.readString(root.resolve("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java"), StandardCharsets.UTF_8);
         String actionType = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/action/ActionType.java"), StandardCharsets.UTF_8);
 
@@ -10601,7 +10602,7 @@ public final class StabilizationGuardTest {
         String matrix = Files.readString(root.resolve("docs/WEBADMIN_HELP_CAPABILITY_MATRIX_8_17.md"), StandardCharsets.UTF_8);
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String service = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java"), StandardCharsets.UTF_8);
@@ -10909,7 +10910,7 @@ public final class StabilizationGuardTest {
         String matrix = Files.readString(root.resolve("docs/SNAPSHOT_ROLLBACK_CAPABILITY_MATRIX_8_18.md"), StandardCharsets.UTF_8);
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String models = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/snapshot/WebAdminSnapshotModels.java"), StandardCharsets.UTF_8);
@@ -11040,8 +11041,8 @@ public final class StabilizationGuardTest {
         requireContains(snapshotSection, "snapshotRecordSearchHaystack", "8.18 snapshot search must match localized display labels");
         requireContains(service, "snapshotKindLabel(record.kind)", "8.18 snapshot server search must match localized kind labels");
         requireContains(service, "snapshotOperationLabel(record.trigger == null ? \"\" : record.trigger.operation)", "8.18 snapshot server search must match localized operation labels");
-        requireContains(scripts, "if(handleSnapshotTimelineNodeClick(event))return;", "8.18 snapshot timeline delegated click handler is registered");
-        requireContains(scripts, "if(handleSnapshotDiffDelegatedClick(event))return;", "8.18 snapshot diff delegated click handler is registered");
+        requireContains(scripts, "{handler:handleSnapshotTimelineNodeClick}", "8.18 snapshot timeline delegated click handler is registered");
+        requireContains(scripts, "{handler:handleSnapshotDiffDelegatedClick}", "8.18 snapshot diff delegated click handler is registered");
         requireContains(snapshotSection, "<button type=\"button\" class=\"snapshot-diff-row", "8.18 snapshot diff items are safe buttons");
         requireFalse(snapshotSection.contains("onclick=\"openSnapshotTimelineNode"),
                 "8.18 snapshot timeline nodes must not generate broken inline onclick with nested double quotes");
@@ -11272,7 +11273,7 @@ public final class StabilizationGuardTest {
         String context = Files.readString(contextPath, StandardCharsets.UTF_8);
         String matrix = Files.readString(matrixPath, StandardCharsets.UTF_8);
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String shell = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendShell.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
@@ -11550,7 +11551,7 @@ public final class StabilizationGuardTest {
         String context = Files.readString(contextPath, StandardCharsets.UTF_8);
         String matrix = Files.readString(matrixPath, StandardCharsets.UTF_8);
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
-        String scripts = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendScripts.java"), StandardCharsets.UTF_8);
+        String scripts = WebAdminFrontendAssets.appJs();
         String styles = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String logicChainService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
@@ -12301,6 +12302,12 @@ public final class StabilizationGuardTest {
                 "logic_chain_node_count_compare"
         ));
         requireEquals(expected, actual, "8.13 must not add condition types");
+    }
+
+    private static String readLogicChainEditorBackendSplit(Path root) throws IOException {
+        return Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftSaveCoordinator.java"), StandardCharsets.UTF_8)
+                + "\n" + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftOperationPlanner.java"), StandardCharsets.UTF_8)
+                + "\n" + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainTypedWriteExecutor.java"), StandardCharsets.UTF_8);
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {

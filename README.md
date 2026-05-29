@@ -2,7 +2,7 @@
 
 Tzz_mod（mod id: `tzz_mod`）是用于替代复杂“全员逃走中”datapack 逻辑的 Minecraft / Fabric 游戏开发工具。它不是单纯的管理后台：模组同时提供手机、AR、地图区域、任务、封锁卡、SignalBridge、ActionEngine、区域控制器、虚拟监听器、WebAdmin 编辑层和本地测试辅助能力。
 
-- 当前稳定版本：`v1.67.0-legacy-datapack-parity-audit`
+- 当前稳定版本：`v1.68.1-codebase-health-audit`
 - 当前开发基线：`9.1 Logic Chain / Global Editor Capability Completion`；本阶段补齐现有 Logic Chain / Global Editor 的受控配置创建、选择、编辑、引用和诊断能力。它不新增 runtime 语义，不新增 ActionType / ConditionNodeType，不做 GameController / MissionSystem / PhaseController、typed actions、Rich Text Builder、full Logic Chain Editor、Scratch editor、if / else runtime、freeform graph document save、画布手写坐标 / freeform 世界写入或旧数据包迁移；World Device Reference 只允许受保护客户端辅助 hotbar 放置并支持取消 cleanup。
 - 作者：`zcpu`
 - 目标 Minecraft：`1.21.11`

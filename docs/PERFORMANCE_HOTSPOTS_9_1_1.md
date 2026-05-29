@@ -271,6 +271,61 @@ Guard suggestion:
 - pointer-events none CSS marker。
 - graph render 拆分后 minimap 输入仍是当前语义的 graph。
 
+## Phase 6 implemented performance baseline
+
+Phase 6 first establishes a hard DOM equivalence baseline and then applies only current-render, low-risk optimizations.
+
+Implemented:
+
+- `logicChainRelatedNodeIndex(graph)` precomputes related node ids once inside `logicChainMindMap()` for the current render and passes the index down to each node card. It removes the previous `logicChainNodeCard -> logicChainRelatedNodeIds -> scan all graph.edges` pattern from every card render while preserving current hover/selected class semantics and without mutating the graph object.
+- `logicChainMinimapKey(graph)` and `logicChainMinimap(graph)` memoize the exact `segments.slice(0,24)` minimap HTML by channel id and downstream count. The memo stores only `{key, html}`, not graph references; the minimap remains not draft-aware, not hover-aware and not clickable.
+- `WebAdminPerformanceBaselineGuardTest` now records app.js before/after bytes and runs synthetic Logic Chain render checks for initial, selected, hover, edit mode, draft overlay, unsaved-expanded diff, VBD trigger overlay, SignalListener/Timer pending-delete, VBD selected fallback/source priority and minimap cap scenarios.
+- DOM equivalence signatures hard-guard node position/class output, edge path `d`, `marker-end`, target arrow owner markers, selected/related/dimmed classes, selected panel HTML, diff banner HTML, minimap HTML, VBD overlay markers, pending-delete visual/payload boundaries across SignalListener and Timer draft action buckets, and VBD trigger source identity.
+
+Deferred:
+
+- Hover class-only updates remain deferred because hover and selected node can change target arrow ownership and `marker-end`.
+- Click/select panel-only updates remain deferred because selection affects graph card classes, edge classes, arrow ownership and edit-mode draft targeting.
+- Zoom transform-only updates remain deferred until toolbar percentage and pan bounds are covered by a focused interaction guard.
+- Draft overlay, VBD overlay and diff cross-render memoization remain deferred until a reliable draft fingerprint/revision covers direct mutations, selected fallback and capture writeback.
+
+Phase 6 app.js before baseline:
+
+```text
+bytes: 1,843,648
+sha256: 057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3
+```
+
+Phase 6 app.js current after baseline:
+
+```text
+bytes: 1,846,211
+sha256: 474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069
+delta: +2,563
+```
+
+## Phase 7 performance ratchet
+
+Phase 7 does not add another render optimization. It turns Phase 6 behavior proof into harder regression guards:
+
+- Generated `app.js` is exact-frozen at `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`.
+- Generated `app.css` is exact-frozen at `123,251` bytes.
+- `WebAdminPerformanceBaselineGuardTest` now runs standalone `node --check build/tmp/webadmin-app.js` before VM parse timing; parse/compile timing remains warning/report only.
+- DOM hash baselines now also cover `pendingDelete`, `vbdFallback`, `vbdSourcePriority` and `minimapCap`, not only the original initial/selected/hover/edit/draft/unsaved/VBD scenarios.
+- Source guards keep `logicChainRelatedNodeIndex(graph)` render-local and prevent minimap memo from storing graph references. The minimap key remains limited to `segments.slice(0,24)` channel id and downstream count.
+- Source guards also freeze the current full-render behavior for hover, selection and zoom. Class-only hover, panel-only selection and transform-only zoom are still deferred until a dedicated interaction DOM-equivalence guard exists.
+
+## Phase 7.5 if / complexity hotspot audit
+
+Phase 7.5 adds complexity visibility before Phase 8 rather than changing frontend render behavior:
+
+- Generated `app.js` remains exact-frozen at `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`.
+- Generated `app.css` remains exact-frozen at `123,251` bytes.
+- New guard metrics report Top 50 JS if-density functions, Top 50 selector-density functions and Top 30 interaction/render hotspots.
+- Render-local `relatedIndex` and minimap memo remain the only Phase 6 render optimizations accepted into baseline.
+- Additional render/event optimizations are deferred when they would require changing generated JS under the current exact asset ratchet.
+- The only processed Phase 7.5 cleanup is backend helper extraction in channel metadata reference collection; it reduces service size without touching render/layout/runtime output.
+
 ## 建议性能基线
 
 ### Unit / smoke 可做

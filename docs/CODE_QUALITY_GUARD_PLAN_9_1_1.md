@@ -35,9 +35,12 @@
 | `onclick=` | 251 |
 | `oninput=` | 150 |
 | `onchange=` | 108 |
+| `onkeydown=` | 17 |
+| `htmlEvent(` | 45 |
 | `htmlHandler(` | 177 |
 | `innerHTML` | 61 |
 | `BeforeV13-17` total | 97 |
+| all `BeforeV\d+` tokens | 184 |
 
 ### Existing guard coverage / gaps
 
@@ -46,7 +49,7 @@
 | `StabilizationGuardTest` 9.1 markers | typed config editor markers, no freeform graph save, protected draft required, conflict markers | code size budget, JS function length, event complexity, app.js/app.css byte budget |
 | WebAdmin render smoke harness | basic generated JS/HTML smoke, marker presence | real browser performance, DOM equivalence for hover/click/zoom, modal scroll/focus retention after optimization |
 | local test MCP guard | MCP foundation and safety markers | WebAdmin code-health budgets when MCP is not touched |
-| Existing docs/current context checks | some phase markers are discoverable | README stable version mismatch and 9.1.1 docs-plan consistency |
+| Existing docs/current context checks | some phase markers are discoverable | README stable version and 9.1.1 docs-plan consistency need dedicated guard coverage |
 | Existing backend service tests | many Logic Chain save paths and protected draft paths | explicit planner/coordinator/executor boundaries, rollback-scope assertions, channel metadata mixed-write boundary |
 
 ## File size guard
@@ -123,6 +126,22 @@ Rule:
 - New WebAdmin business logic cannot be added to this file after Phase 2.
 - Before Phase 2, additions require explicit justification in the current phase prompt.
 
+Phase 2 implementation note:
+
+- `WebAdminFrontendScripts.java` has been reduced to an ordered concat facade.
+- Existing frontend count, inline handler, BeforeVxx and hotspot checks must scan generated `WebAdminFrontendAssets.appJs()` or all script modules, not the facade source file.
+- Hot slice checks should use stable generated markers/function boundaries instead of fixed line numbers from the pre-split source file.
+- New `*Scripts.java` modules remain under the Phase 2 800-line budget; large `appJs()` text-block methods are report-only until later semantic extraction phases.
+
+Phase 4 implementation note:
+
+- Logic Chain render/layout/draft code is split into smaller ordered modules: viewer shell, canvas, node panel, layout, draft overlay, diff summary, VBD helper and VBD overlay.
+- `WebAdminFrontendScripts.java` remains the only `/assets/app.js` facade and keeps the Logic Chain module order byte-equivalent to the Phase 3 generated output.
+- `WebAdminLogicChainCanvasScripts` intentionally has multiple ordered entry methods because the original canvas responsibilities were interleaved with node panel, layout and draft overlay code; this preserves generated source order without changing JS behavior.
+- `WebAdminLogicChainEditorScripts` imports `WebAdminLogicChainDiffScripts.appJs()` in the original local order, and the guard checks that local ordering.
+- `WebAdminFrontendBundleGuardTest` reports Phase 4 before/after app.js bytes and SHA-256 and performs an exact comparison when `build/tmp/webadmin-app-phase4-before.js` is present in the local phase workspace.
+- The Phase 4 exact before artifact is not a committed long-term baseline; later phases that intentionally change generated JS should establish their own current-context baseline and guard mode.
+
 Guard checks:
 
 - line count must not increase unless the commit also creates module files and net appJs behavior is split.
@@ -186,14 +205,25 @@ Current hot slices:
 | Logic Chain delegated handlers | 8103-8123 | 48 `if`, 13 `.closest(` calls, 19 `closest` tokens, 1 `querySelector(` call, 6 listeners |
 | VBD overlay patch stack | 8128-8397 | 368 `if`, 1 `.closest(` call, 3 `closest` tokens, 3 `querySelector(` calls, 33 inline handlers |
 
+Phase 3 event-router baseline after split:
+
+| Slice | Guard marker | Phase 3 count |
+| --- | --- | --- |
+| Global route handlers | `function globalEventTargetOutside` -> `beforeunload` | 30 `if`, 4 `.closest(` calls, 4 `querySelector(` calls |
+| Modal ESC router | `const globalModalEscapeRoutes` -> `function unavailableFeature` | 1 `if`, 0 `.closest(` calls, 0 `querySelector(` calls |
+| Logic Chain route handlers | `function handleLogicChainConnectHandleClick` -> node delete confirm marker | 32 `if`, 4 `.closest(` calls, 1 `querySelector(` call |
+| VBD overlay stack | VBD trigger graph summary marker -> draft action delete panel | 114 `if`, 1 `.closest(` call, 0 `querySelector(` calls |
+
 Guard rules:
 
-- `document.addEventListener` count must not increase without explicit event-router plan.
-- `.closest(` count must not increase after Phase 3.
-- New inline handlers are hard fail after Phase 3.
+- `document.addEventListener` and total `addEventListener(` counts must not increase after Phase 3.
+- `.closest(` and `querySelector(` counts must not increase after Phase 3.
+- Known inline handlers, `htmlEvent(`, `htmlHandler(` and `innerHTML` are hard no-growth checks after Phase 3.
+- Zero-baseline inline event attributes are hard fail after Phase 3.
 - Event route table entries must be named handlers, not long inline lambdas.
-- `handleLogicChainEditorDelegatedClick` should ratchet below current score 18.
-- `WebAdminFrontendScripts.java:5294` keydown ESC router must be tracked alongside global click handlers.
+- Required markers include `dispatchDelegatedEvent`, `globalClickCommandRoutes`, `globalClickSideEffectRoutes`, `globalClickLateRoutes`, `globalPrimaryKeydownRoutes`, `globalModalEscapeRoutes`, `logicChainClickRoutes`, `logicChainHoverRoutes` and `logicChainMouseOutRoutes`.
+- VBD trigger card selection must stay in document bubble routing, after the Logic Chain capture route and before outside-close side effects, so it mirrors the old inline click plus document bubble sequence.
+- Phase 2 byte-identical `app.js` SHA is no longer a hard gate after event rewrite; guard still reports SHA and hard-fails if `app.js` exceeds baseline + 5%.
 
 Suggested thresholds after Phase 3:
 
@@ -302,6 +332,15 @@ Suggested negative scans:
 | fake `WebAdminMapServer` reference | hard docs/source grep | use actual `MapServer` / `MapDataStore` names |
 | route/snapshot adapter | hard if extracted | write-before snapshot, audit, realtime and CSRF/same-origin remain before mutation |
 
+Phase 5 implementation note:
+
+- `WebAdminLogicChainEditorService.saveDraft()` is reduced to a facade into `LogicChainDraftSaveCoordinator`; the rest of the public service API remains unchanged.
+- `LogicChainDraftSaveCoordinator` owns the frozen save flow only: preflight, editor lock, fingerprint, validation, mixed-write fail-closed guards, typed execution, channel metadata tail write and successful editor lock release.
+- `LogicChainDraftOperationPlanner` centralizes operation presence checks and the typed/channel metadata boundaries without executing store mutation or introducing freeform graph save.
+- `LogicChainTypedWriteExecutor` preserves the original typed order: new nodes -> action append -> existing node edits -> action edits -> action deletes -> action reorders -> node deletes.
+- VBD/world device/RegionController/action/node delete typed writes still delegate to the existing adapter methods; rollback remains partial and must not be documented as a full cross-store atomic transaction.
+- Guard now ratchets `WebAdminLogicChainEditorService.java` after the coordinator split and requires coordinator/planner/executor markers plus a planner ordering test.
+
 ## Performance marker baseline guard
 
 Initial markers:
@@ -318,9 +357,44 @@ Initial markers:
 
 Guard mode:
 
-- Phase 1: marker presence only.
+- Phase 1: doc/test registry or existing marker presence only; do not add new `src/main` performance markers just to satisfy this guard.
 - Phase 6: synthetic graph timing trend warning.
 - Later: hard fail only for extreme regressions after enough baseline data.
+
+Phase 6 implementation note:
+
+- Guard scope marker is `phase6-logic-chain-performance-baseline`.
+- `WebAdminPerformanceBaselineGuardTest` now runs a synthetic Logic Chain render harness without Minecraft, MCP scenario or screenshots.
+- Hard fail coverage includes marker presence, synthetic render exceptions, node position/class signatures, edge path `d`, `marker-end`, target arrow owner markers, selected/related/dimmed class signatures, selected panel HTML, diff banner HTML, minimap HTML, VBD trigger overlay source markers, SignalListener/Timer pending-delete markers and payload leakage, VBD selected fallback/source priority and minimap cap.
+- Timing is still warning/report only. Initial soft targets are small hover/selected around 16 ms and initial/edit/draft/VBD render around 50 ms on the local Node VM harness.
+- app.js Phase 6 before baseline is `1,843,648` bytes / SHA-256 `057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3`; current Phase 6 after is `1,846,211` bytes / SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069` (`+2,563` bytes). Current + 2% is a warning and the existing Phase 3 hard limit remains active.
+- Implemented optimization markers are `logicChainRelatedNodeIndex` and `logicChainMinimapKey`. They are intentionally current-render caches, not cross-render layout/draft caches.
+- Related-node index is render-local: `logicChainMindMap()` builds it from the current rendered graph edges and passes it through `logicChainPositionedNode()` to `logicChainNodeCard()`. It is never stored on `graph`; hover, selected node, connection mode and draft overlay are still read from current render state.
+- Minimap memo stores only `{key, html}` at module scope, not graph references. The key covers only `segments.slice(0,24)` channel id and downstream count; draft, hover, selected, zoom and pan are excluded because they do not affect current minimap semantics.
+- Phase 4 local before artifact mismatch is warning-only after Phase 6 only when Phase 6 scope, before artifact bytes/SHA, app.js warning limit and Phase 6 marker checks all match; otherwise it stays a hard failure.
+- `BeforeV18+ = 0`, facade boundaries, event router no-growth, pointer-events invariants and raw JSON summary guards remain hard fail.
+
+Phase 7 ratchet implementation note:
+
+- Guard scope marker is `phase7-codebase-health-guard-ratchet`.
+- `BeforeV11-17`, `BeforeV13-17` total and all `BeforeV\d+` token growth are now hard fail, not warning. Decreases remain allowed.
+- `WebAdminFrontendScripts.java` is still facade-only and carries source marker `data-webadmin-frontend-bundle-entry-only`. Business JS, event handlers and route tables must stay in owning modules.
+- New frontend script modules are hard-capped at 800 lines and 400,000 bytes. New frontend style modules are hard-capped at 800 lines and 400,000 bytes.
+- Non-grandfathered backend services are hard-capped at 1,000 lines and 160,000 bytes. Guard classes outside `StabilizationGuardTest` are hard-capped at 1,000 lines and 200,000 bytes.
+- `WebAdminLogicChainEditorService.java` is ratcheted down by Phase 7.5 to 5,005 lines / 305,271 bytes; `StabilizationGuardTest.java` remains frozen at 12,430 lines / 838,347 bytes.
+- Known giant generated JS functions are hard no-growth by line/char baseline: `logicChainExistingDeviceForm`, `logicChainDefaultDraftChannelAnchor`, `realtimeRouteKeysForEvent`, `showLogicChainNewNodeModal`, `showLogicChainPlacedDraftNodeEditModal`, `renderDeviceDetail`, `interactionItemMatcherForm` and `startDeviceConfigEdit`.
+- Generated asset ratchets are hard: `app.js` must remain `1,846,211` bytes with SHA-256 `474cc3093532f70d78583f996e8d6606496f45db831232f32607439a821a0069`; `app.css` must remain `123,251` bytes unless a dedicated behavior/DOM-equivalence phase updates the baseline.
+- `nativeTriggerJson` occurrence growth is hard fail; raw JSON stays secondary/debug only.
+- `DocsConsistencyGuardTest` recursively rejects independent WebAdmin React/Vite/npm/CDN runtime hooks while excluding tooling/build/log directories.
+- `WebAdminPerformanceBaselineGuardTest` now runs standalone `node --check`, hard-baselines DOM hashes for pending-delete, VBD fallback, VBD source-priority and minimap-cap scenarios, and source-guards Phase 6 relatedIndex/minimap memo/deferred hover-select-zoom boundaries.
+
+Phase 7.5 if/complexity implementation note:
+
+- `CodeQualityGuardSupport` now classifies Java methods and generated JS functions by `if`, `else if`, `switch/case`, `.closest(`, `querySelector(`, inline handler and listener counts.
+- `CodeQualityGuardTest` emits Phase 7.5 Top 50 / Top 30 hotspot tables for Java if density, JS if density, JS selector density, interaction routes, render paths and backend validation/save methods.
+- Safety-boundary `if` branches are reportable but not treated as bad complexity by themselves; new hard failures remain tied to no-growth ratchets, generated asset freeze, new giant handlers, BeforeVxx growth, selector/listener/inline growth and module budgets.
+- `WebAdminLogicChainEditorService` is ratcheted down after helper extraction in channel metadata referenced-channel collection. No generated `app.js` / `app.css` baseline changes were made.
+- Full audit results and deferred hotspot classifications live in `docs/IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_1.md`.
 
 Synthetic scenarios:
 
@@ -352,9 +426,11 @@ Docs consistency checks:
 - 9.1.1 implementation phases that change guard thresholds must update `CODE_QUALITY_GUARD_PLAN_9_1_1.md` or successor current context.
 - New WebAdmin write capability must update current context / capability matrix / help text.
 
-Initial inconsistency:
+Phase 1 consistency baseline:
 
-- README stable version says `v1.67.0-legacy-datapack-parity-audit` while current audit baseline is `v1.68.0-logic-chain-global-editor-capability-completion`.
+- README stable version should be `v1.68.1-codebase-health-audit`.
+- `docs/CODEBASE_HEALTH_GUARD_BASELINE_9_1_1_CURRENT_CONTEXT.md` records the Phase 1 guard baseline.
+- The older audit docs may still mention `v1.68.0` as the historical audit input baseline when clearly scoped as history.
 
 ## Acceptance criteria for 9.1.1 guard work
 
@@ -367,7 +443,7 @@ Initial inconsistency:
 - event handler complexity is tracked.
 - pointer-events invariants are tracked.
 - performance marker names are stable.
-- docs consistency warning exists for README/current context mismatch.
+- docs consistency guard enforces README/current context mismatch as a hard failure for Phase 1 baseline files.
 
 ## Overall 9.1.1 acceptance checklist
 
@@ -395,19 +471,23 @@ For guard implementation:
 
 ```powershell
 .\gradlew.bat testClasses
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
 ```
 
-For full checkpoint after code changes:
+For full checkpoint after code changes when a prompt explicitly asks for the broader release-style pass:
 
 ```powershell
 .\gradlew.bat clean build
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
 ```
+
+Phase 7 B5 intentionally uses the targeted command set above and does not run `clean build`; Phase 9 owns the final release-style `clean build`.
 
 Only run MCP build/test when the current phase actually touches MCP:
 

@@ -60,6 +60,8 @@ public final class WebAdminLogicChainEditorServiceTest {
         testJoinCycleGuardRejectsReachableInputAndTruncates();
         testSaveRejectsDirectNonChannelVisualEndpoints();
         testChannelMetadataDraftValidation();
+        testMalformedDraftListsRemainValidationFailures();
+        testDraftOperationPlannerPreservesTypedWriteOrderBoundaries();
         testSaveRejectsModeSpecificJoinThresholdErrors();
         testSaveRejectsInvalidPlacementAndUnplacedDraft();
         testActionAppendRejectsInvalidShapeAndAllowsMixedDraft();
@@ -657,6 +659,82 @@ public final class WebAdminLogicChainEditorServiceTest {
         requireFalse(appendFakeEdgeResult.success(), "action append cannot use fake draft edges to save orphan metadata");
         requireValidationCode(appendFakeEdgeResult, "logic_chain_action_append_edges_not_allowed");
         requireValidationCode(appendFakeEdgeResult, "logic_chain_channel_metadata_unreferenced");
+    }
+
+    private static void testMalformedDraftListsRemainValidationFailures() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminWriteResult entered = enter(fixture, "editor.malformed.nulls");
+
+        WebAdminLogicChainEditorRequest nullNode = rootRequest("editor.malformed.nulls");
+        nullNode.lockId = lockId(entered);
+        nullNode.baseGraphFingerprint = fingerprint(entered);
+        List<WebAdminLogicChainEditorRequest.DraftNode> nodes = new java.util.ArrayList<>();
+        nodes.add(null);
+        nullNode.nodes = nodes;
+        WebAdminWriteResult nullNodeResult = fixture.service.validateDraft(null, fixture.editor, fixture.session, nullNode, fixture.csrf, true);
+        requireFalse(nullNodeResult.success(), "null draft node remains a structured validation failure");
+        requireValidationCode(nullNodeResult, "logic_chain_draft_node_id_invalid");
+        requireValidationCode(nullNodeResult, "logic_chain_node_type_deferred");
+
+        WebAdminLogicChainEditorRequest nullMetadata = timerDraftRequest("editor.malformed.nulls", lockId(entered), fingerprint(entered), "editor.malformed.nulls.timer");
+        List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> metadataDrafts = new java.util.ArrayList<>();
+        metadataDrafts.add(null);
+        nullMetadata.channelMetadataDrafts = metadataDrafts;
+        WebAdminWriteResult nullMetadataResult = fixture.service.validateDraft(null, fixture.editor, fixture.session, nullMetadata, fixture.csrf, true);
+        requireFalse(nullMetadataResult.success(), "null channel metadata draft remains a structured validation failure");
+        requireValidationField(nullMetadataResult, "required", "channelMetadataDrafts[0].channel");
+    }
+
+    // 该测试只冻结 planner 的 phase 边界和顺序；真实 mutation、锁释放和失败恢复仍由
+    // saveDraft 既有集成用例覆盖，避免把 planner 误当成新的执行层。
+    private static void testDraftOperationPlannerPreservesTypedWriteOrderBoundaries() {
+        WebAdminLogicChainEditorRequest request = timerDraftRequest("editor.planner", "editor-lock", "base-fingerprint", "editor.planner.timer");
+        request.actionAppend = actionAppendDraftRequest(
+                "editor.planner",
+                "editor-lock",
+                "base-fingerprint",
+                "listener",
+                "listener.planner",
+                "",
+                messageAction("append")
+        ).actionAppend;
+        WebAdminSignalListenerBasicConfigUpdateRequest listenerEdit = new WebAdminSignalListenerBasicConfigUpdateRequest();
+        listenerEdit.listenerRef = "listener.planner";
+        listenerEdit.expectedFingerprint = "listener-fingerprint";
+        listenerEdit.lockId = "listener-lock";
+        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingEdit = new WebAdminLogicChainEditorRequest.ExistingNodeEditDraft();
+        existingEdit.nodeType = "signal_listener";
+        existingEdit.targetId = "listener.planner";
+        existingEdit.signalListenerBasic = listenerEdit;
+        request.existingNodeEdits = List.of(existingEdit);
+        request.actionEdits = actionEditDraftRequest(
+                "editor.planner",
+                "editor-lock",
+                "base-fingerprint",
+                "listener",
+                "listener.planner",
+                "",
+                0,
+                messageAction("replace")
+        ).actionEdits;
+        request.actionDeletes = List.of(actionDeleteDraft("timer", "timer.planner", "complete", 0, "timer-fingerprint", "timer-lock"));
+        request.actionReorders = List.of(actionReorderDraft("listener", "listener.planner", "", 0, 1, "listener-actions-fingerprint", "listener-actions-lock"));
+        request.nodeDeletes = List.of(nodeDeleteDraft("signal_listener", "listener.delete.planner", "delete-fingerprint", "delete-lock"));
+        request.channelMetadataDrafts = List.of(channelMetadataDraft("editor.planner.channel", "Planner channel", ""));
+
+        LogicChainDraftOperationPlanner.OperationPlan plan = LogicChainDraftOperationPlanner.plan(request);
+        requireEquals(1, plan.draftNodes().size(), "planner keeps new draft nodes as the first typed phase");
+        requireTrue(plan.actionAppend() != null, "planner keeps action append as the second typed phase");
+        requireEquals(1, plan.existingNodeEdits().size(), "planner keeps existing node edits after append");
+        requireEquals(1, plan.actionEdits().size(), "planner keeps action edits after existing node edits");
+        requireEquals(1, plan.actionDeletes().size(), "planner keeps action deletes before reorders");
+        requireEquals(1, plan.actionReorders().size(), "planner keeps action reorders before node deletes");
+        requireEquals(1, plan.nodeDeletes().size(), "planner keeps node deletes as the last typed phase");
+        requireEquals(1, plan.channelMetadataDrafts().size(), "planner keeps channel metadata as the tail boundary");
+        requireTrue(plan.hasTypedStoreDrafts(), "planner reports typed writes");
+        requireTrue(plan.hasNonNodeDeleteTypedStoreDrafts(), "planner reports non-node-delete typed writes");
+        requireTrue(plan.hasNodeDelete(), "planner reports node delete boundary");
+        requireTrue(plan.hasChannelMetadataDrafts(), "planner reports channel metadata boundary");
     }
 
     private static void testSaveRejectsModeSpecificJoinThresholdErrors() throws Exception {

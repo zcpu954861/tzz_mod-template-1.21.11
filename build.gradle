@@ -51,9 +51,18 @@ tasks.register("localTestMcpGuardTest", JavaExec) {
 	mainClass = "com.zcpu.tzzmod.stabilization.LocalTestMcpFoundationGuardTest"
 }
 
+tasks.register("codeQualityGuardTest", JavaExec) {
+	group = "verification"
+	description = "Runs 9.1.1 code quality guard baseline checks."
+	dependsOn tasks.named("testClasses")
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = "com.zcpu.tzzmod.stabilization.CodeQualityGuardTest"
+}
+
 tasks.named("check") {
 	dependsOn tasks.named("stabilizationGuardTest")
 	dependsOn tasks.named("localTestMcpGuardTest")
+	dependsOn tasks.named("codeQualityGuardTest")
 }
 
 tasks.withType(Test).configureEach {
