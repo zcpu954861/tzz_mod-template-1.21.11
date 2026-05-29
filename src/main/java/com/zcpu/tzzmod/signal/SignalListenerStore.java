@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,13 +40,7 @@ public final class SignalListenerStore {
 
     public static synchronized List<SignalListenerData> getEnabledListenersForChannel(MinecraftServer server, String channel) {
         String normalizedChannel = SignalChannel.normalize(channel);
-        List<SignalListenerData> result = new ArrayList<>();
-        for (SignalListenerData listener : getState(server).listeners) {
-            if (listener.enabled() && listener.channel().equals(normalizedChannel)) {
-                result.add(listener);
-            }
-        }
-        return List.copyOf(result);
+        return getState(server).enabledListenersForChannel(normalizedChannel);
     }
 
     public static synchronized SignalListenerData createListener(MinecraftServer server, String channel, String name) {
@@ -523,6 +518,23 @@ public final class SignalListenerStore {
         return copy;
     }
 
+    private static Map<String, List<SignalListenerData>> indexEnabledListenersByChannel(List<SignalListenerData> listeners) {
+        Map<String, List<SignalListenerData>> mutable = new LinkedHashMap<>();
+        if (listeners != null) {
+            for (SignalListenerData listener : listeners) {
+                if (listener == null || !listener.enabled()) {
+                    continue;
+                }
+                mutable.computeIfAbsent(listener.channel(), ignored -> new ArrayList<>()).add(listener);
+            }
+        }
+        Map<String, List<SignalListenerData>> indexed = new LinkedHashMap<>();
+        for (Map.Entry<String, List<SignalListenerData>> entry : mutable.entrySet()) {
+            indexed.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        return indexed;
+    }
+
     public static String shortId(String id) {
         if (id == null || id.isBlank()) {
             return "未知";
@@ -586,6 +598,8 @@ public final class SignalListenerStore {
     private static final class State {
         private final Path path;
         private final List<SignalListenerData> listeners = new ArrayList<>();
+        private Map<String, List<SignalListenerData>> enabledListenersByChannel = Map.of();
+        private boolean enabledListenerIndexDirty = true;
         private boolean dirty;
 
         private State(Path path) {
@@ -594,6 +608,16 @@ public final class SignalListenerStore {
 
         private void markDirty() {
             dirty = true;
+            enabledListenerIndexDirty = true;
+        }
+
+        private List<SignalListenerData> enabledListenersForChannel(String normalizedChannel) {
+            if (enabledListenerIndexDirty) {
+                // 运行时 signal fan-out 只按 channel 查 enabled listener；索引按 listeners 当前顺序重建，避免改变触发顺序。
+                enabledListenersByChannel = indexEnabledListenersByChannel(listeners);
+                enabledListenerIndexDirty = false;
+            }
+            return List.copyOf(enabledListenersByChannel.getOrDefault(normalizedChannel, List.of()));
         }
 
         private void flushDirty() {

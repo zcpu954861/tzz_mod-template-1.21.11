@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.zcpu.tzzmod.Tzz_mod;
 import com.zcpu.tzzmod.core.storage.JsonStoreSupport;
+import com.zcpu.tzzmod.signal.SignalChannel;
 import com.zcpu.tzzmod.webadmin.WebAdminStoragePaths;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,13 @@ public final class SignalJoinStore {
     public static final int DATA_VERSION = 1;
     public static final String FILE_NAME = "signal_joins.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int LOAD_CACHE_MAX_ENTRIES = 32;
+    private static final Map<Path, CachedLoadResult> LOAD_CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Path, CachedLoadResult> eldest) {
+            return size() > LOAD_CACHE_MAX_ENTRIES;
+        }
+    };
 
     private SignalJoinStore() {
     }
@@ -42,6 +50,22 @@ public final class SignalJoinStore {
 
     public static synchronized SignalJoinLoadResult loadWithStatus(MinecraftServer server) {
         return loadWithStatus(path(server, false));
+    }
+
+    public static synchronized SignalJoinLoadResult loadWithStatusCached(MinecraftServer server) {
+        return loadWithStatusCached(path(server, false));
+    }
+
+    public static synchronized SignalJoinLoadResult loadWithStatusCached(Path path) {
+        Path key = cacheKey(path);
+        FileFingerprint fingerprint = fingerprint(path);
+        CachedLoadResult cached = LOAD_CACHE.get(key);
+        if (cached != null && cached.fingerprint.equals(fingerprint)) {
+            return cached.result;
+        }
+        SignalJoinLoadResult loaded = loadWithStatus(path);
+        LOAD_CACHE.put(key, new CachedLoadResult(fingerprint, loaded));
+        return loaded;
     }
 
     public static synchronized SignalJoinLoadResult loadWithStatus(Path path) {
@@ -82,7 +106,49 @@ public final class SignalJoinStore {
 
     public static synchronized boolean save(Path path, SignalJoinFile file) {
         SignalJoinFile safeFile = file == null ? new SignalJoinFile() : file.normalized();
-        return JsonStoreSupport.write(path, safeFile, "signal joins");
+        boolean saved = JsonStoreSupport.write(path, safeFile, "signal joins");
+        if (saved) {
+            invalidateCachedLoad(path);
+        }
+        return saved;
+    }
+
+    public static synchronized void clearCachedLoad(MinecraftServer server) {
+        invalidateCachedLoad(path(server, false));
+    }
+
+    private static void invalidateCachedLoad(Path path) {
+        LOAD_CACHE.remove(cacheKey(path));
+    }
+
+    private static Path cacheKey(Path path) {
+        return path == null ? Path.of("") : path.toAbsolutePath().normalize();
+    }
+
+    private static FileFingerprint fingerprint(Path path) {
+        try {
+            if (path == null || !Files.exists(path)) {
+                return new FileFingerprint(false, -1L, -1L, "");
+            }
+            byte[] bytes = Files.readAllBytes(path);
+            return new FileFingerprint(
+                    true,
+                    Files.getLastModifiedTime(path).toMillis(),
+                    bytes.length,
+                    sha256(bytes)
+            );
+        } catch (Exception ignored) {
+            return new FileFingerprint(true, -1L, -1L, "");
+        }
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest.digest(bytes == null ? new byte[0] : bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            return Integer.toHexString(java.util.Arrays.hashCode(bytes == null ? new byte[0] : bytes));
+        }
     }
 
     public static String normalizeId(String raw) {
@@ -145,8 +211,9 @@ public final class SignalJoinStore {
 
     public static final class SignalJoinFile {
         public int version = DATA_VERSION;
-        public Map<String, SignalJoinDefinition> joins = new LinkedHashMap<>();
+        public Map<String, SignalJoinDefinition> joins = new IndexedJoinMap(this);
         private transient List<String> warnings = new ArrayList<>();
+        private transient Map<String, List<SignalJoinDefinition>> enabledJoinsByInputChannel;
 
         public SignalJoinFile normalized() {
             SignalJoinFile copy = new SignalJoinFile();
@@ -172,8 +239,76 @@ public final class SignalJoinStore {
             return copy;
         }
 
+        public List<SignalJoinDefinition> enabledJoinsReferencing(String channel) {
+            String normalizedChannel = SignalChannel.normalize(channel);
+            if (enabledJoinsByInputChannel == null) {
+                // accepted signal 热路径只需要当前 channel 的 join；索引按 joins.values() 顺序构建，保持旧输出顺序。
+                // joins 是可变配置 map，因此 map 写入会清空该索引，避免 WebAdmin service 构造文件时读到陈旧候选集。
+                enabledJoinsByInputChannel = indexEnabledJoinsByInputChannel();
+            }
+            return List.copyOf(enabledJoinsByInputChannel.getOrDefault(normalizedChannel, List.of()));
+        }
+
+        private void invalidateRuntimeIndex() {
+            enabledJoinsByInputChannel = null;
+        }
+
+        private Map<String, List<SignalJoinDefinition>> indexEnabledJoinsByInputChannel() {
+            Map<String, List<SignalJoinDefinition>> mutable = new LinkedHashMap<>();
+            if (joins != null) {
+                for (SignalJoinDefinition raw : joins.values()) {
+                    SignalJoinDefinition join = raw == null ? null : raw.normalized();
+                    if (join == null || !join.enabled) {
+                        continue;
+                    }
+                    for (String inputChannel : join.inputChannelNames()) {
+                        if (!inputChannel.isBlank()) {
+                            mutable.computeIfAbsent(inputChannel, ignored -> new ArrayList<>()).add(join);
+                        }
+                    }
+                }
+            }
+            Map<String, List<SignalJoinDefinition>> indexed = new LinkedHashMap<>();
+            for (Map.Entry<String, List<SignalJoinDefinition>> entry : mutable.entrySet()) {
+                indexed.put(entry.getKey(), List.copyOf(entry.getValue()));
+            }
+            return indexed;
+        }
+
         public List<String> warnings() {
             return List.copyOf(warnings == null ? List.of() : warnings);
+        }
+    }
+
+    private static final class IndexedJoinMap extends LinkedHashMap<String, SignalJoinDefinition> {
+        private final SignalJoinFile owner;
+
+        private IndexedJoinMap(SignalJoinFile owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public SignalJoinDefinition put(String key, SignalJoinDefinition value) {
+            owner.invalidateRuntimeIndex();
+            return super.put(key, value);
+        }
+
+        @Override
+        public void putAll(Map<? extends String, ? extends SignalJoinDefinition> map) {
+            owner.invalidateRuntimeIndex();
+            super.putAll(map);
+        }
+
+        @Override
+        public SignalJoinDefinition remove(Object key) {
+            owner.invalidateRuntimeIndex();
+            return super.remove(key);
+        }
+
+        @Override
+        public void clear() {
+            owner.invalidateRuntimeIndex();
+            super.clear();
         }
     }
 
@@ -186,5 +321,11 @@ public final class SignalJoinStore {
         public SignalJoinLoadResult(SignalJoinFile file, boolean degraded, List<String> warnings) {
             this(file, degraded, warnings == null || warnings.isEmpty() ? "" : String.join("；", warnings));
         }
+    }
+
+    private record FileFingerprint(boolean exists, long modifiedMillis, long sizeBytes, String contentHash) {
+    }
+
+    private record CachedLoadResult(FileFingerprint fingerprint, SignalJoinLoadResult result) {
     }
 }

@@ -309,28 +309,29 @@ public final class RuntimePerformanceBaselineGuardTest {
         for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
             List<SignalListenerData> listeners = SyntheticFixtureFactory.listeners(tier);
             String target = SyntheticFixtureFactory.channel(7);
-            long nanos = SyntheticFixtureFactory.measureNanos(() -> {
-                int matches = 0;
-                for (SignalListenerData listener : listeners) {
-                    if (listener.enabled() && listener.channel().equals(target)) {
-                        matches++;
-                    }
+            Map<String, List<SignalListenerData>> indexed = new LinkedHashMap<>();
+            for (SignalListenerData listener : listeners) {
+                if (listener.enabled()) {
+                    indexed.computeIfAbsent(listener.channel(), ignored -> new ArrayList<>()).add(listener);
                 }
-                SyntheticFixtureFactory.Blackhole.consumeInt(matches);
+            }
+            long nanos = SyntheticFixtureFactory.measureNanos(() -> {
+                List<SignalListenerData> matches = indexed.getOrDefault(target, List.of());
+                SyntheticFixtureFactory.Blackhole.consumeInt(matches.size());
             });
             double ms = SyntheticFixtureFactory.nanosToMillis(nanos);
             emit(report, SyntheticFixtureFactory.benchmarkRow(
                     "runtime",
-                    "signal_listener.channel_filter",
+                    "signal_listener.channel_index_lookup",
                     tier,
                     listeners.size(),
                     97,
                     ms,
                     previous,
-                    "O(listeners)",
-                    "Signal Listener 当前按 channel 线性筛选；低配评估先报告增长曲线，Phase 2 再决定是否建索引。",
+                    "O(matches)",
+                    "Signal Listener Phase 2 使用 enabled-by-channel 索引；索引按旧 listeners 顺序重建，timing 只报告低配估算。",
                     false,
-                    runtimeExtra(false, true, false, "none/list-scan", false, "listener cooldown")
+                    runtimeExtra(false, true, false, "channel->enabled-listeners", false, "listener cooldown")
             ));
             previous = ms;
         }
@@ -440,24 +441,30 @@ public final class RuntimePerformanceBaselineGuardTest {
         Double previousStore = null;
         for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
             List<SignalJoinDefinition> joins = SyntheticFixtureFactory.signalJoins(tier);
+            SignalJoinStore.SignalJoinFile indexedFile = new SignalJoinStore.SignalJoinFile();
+            for (SignalJoinDefinition join : joins) {
+                indexedFile.joins.put(join.id, join);
+            }
+            SignalJoinStore.SignalJoinFile normalizedFile = indexedFile.normalized();
             SignalJoinRuntimeService.TestRuntime runtime = SignalJoinRuntimeService.testRuntime();
             long nanos = SyntheticFixtureFactory.measureNanos(() -> {
-                List<String> outputs = runtime.observe(joins, SyntheticFixtureFactory.channel(1), "player-a", 100L);
+                String channel = SyntheticFixtureFactory.channel(1);
+                List<String> outputs = runtime.observe(normalizedFile.enabledJoinsReferencing(channel), channel, "player-a", 100L);
                 SyntheticFixtureFactory.Blackhole.consume(outputs);
             });
             double ms = SyntheticFixtureFactory.nanosToMillis(nanos);
             emit(report, SyntheticFixtureFactory.benchmarkRow(
                     "runtime",
-                    "signal_join.accepted_signal_scan",
+                    "signal_join.accepted_signal_channel_index",
                     tier,
                     joins.size(),
                     2,
                     ms,
                     previous,
-                    "O(joins)",
-                    "SignalJoin accepted-signal 路径会扫描 join 定义；真实 emit 仍保持 report-only，不伪造 Minecraft world。",
+                    "O(matching_joins)",
+                    "SignalJoin Phase 2 accepted-signal 路径按 input channel 缩小候选 join；真实 emit 仍保持 report-only，不伪造 Minecraft world。",
                     false,
-                    runtimeExtra(false, true, false, "none/list-scan", false, "MAX_SIGNAL_DEPTH")
+                    runtimeExtra(false, true, false, "input-channel->enabled-joins", false, "MAX_SIGNAL_DEPTH")
             ));
             previous = ms;
 
@@ -470,11 +477,13 @@ public final class RuntimePerformanceBaselineGuardTest {
                     file.joins.put(join.id, join);
                 }
                 SignalJoinStore.save(path, file);
+                SignalJoinStore.loadWithStatusCached(path);
                 long storeNanos = SyntheticFixtureFactory.measureNanos(() -> {
-                    SignalJoinStore.SignalJoinLoadResult loaded = SignalJoinStore.loadWithStatus(path);
+                    SignalJoinStore.SignalJoinLoadResult loaded = SignalJoinStore.loadWithStatusCached(path);
+                    String channel = SyntheticFixtureFactory.channel(1);
                     List<String> outputs = runtime.observe(
-                            List.copyOf(loaded.file().joins.values()),
-                            SyntheticFixtureFactory.channel(1),
+                            loaded.file().enabledJoinsReferencing(channel),
+                            channel,
                             "player-a",
                             100L
                     );
@@ -483,16 +492,16 @@ public final class RuntimePerformanceBaselineGuardTest {
                 double storeMs = SyntheticFixtureFactory.nanosToMillis(storeNanos);
                 emit(report, SyntheticFixtureFactory.benchmarkRow(
                         "runtime",
-                        "signal_join.store_load_and_scan",
+                        "signal_join.cached_store_load_and_channel_index",
                         tier,
                         joins.size(),
                         -1,
                         storeMs,
                         previousStore,
-                        "O(file_bytes+joins)",
-                        "SignalJoin accepted-signal 真实 store load/scan 路径含 IO；该行显式标记 hot path IO 风险，后续优化不能隐藏顺序语义。",
+                        "O(file_bytes_hash+matching_joins)",
+                        "SignalJoin Phase 2 runtime 使用内容指纹缓存 JSON 解析并按 channel 缩小候选；仍显式报告 raw file hash 的 IO 成本。",
                         false,
-                        runtimeExtra(false, true, true, "none/file-load+list-scan", false, "MAX_SIGNAL_DEPTH")
+                        runtimeExtra(false, true, true, "file-fingerprint-cache+input-channel-index", false, "MAX_SIGNAL_DEPTH")
                 ));
                 previousStore = storeMs;
             } catch (Exception exception) {
@@ -519,16 +528,16 @@ public final class RuntimePerformanceBaselineGuardTest {
             double ms = SyntheticFixtureFactory.nanosToMillis(nanos);
             emit(report, SyntheticFixtureFactory.benchmarkRow(
                     "runtime",
-                    "state_variable.snapshot_sort_and_linear_get",
+                    "state_variable.snapshot_sort_and_binary_get",
                     tier,
                     records.size(),
                     Math.min(256, records.size()),
                     ms,
                     previous,
-                    "O(n log n)+O(sample*n)",
-                    "StateVariableSnapshot 构造会排序，get 当前为线性查找；低配下大规模状态变量先标记为优化候选。",
+                    "O(n log n)+O(sample*log n)",
+                    "StateVariableSnapshot Phase 2 保持 records 排序不变，get 使用 stable id 二分查找，避免大规模状态变量线性扫。",
                     false,
-                    runtimeExtra(false, true, false, "none/list-scan", false, "manual mutation boundary")
+                    runtimeExtra(false, true, false, "state-variable-id-binary-search", false, "manual mutation boundary")
             ));
             previous = ms;
         }
@@ -643,6 +652,10 @@ public final class RuntimePerformanceBaselineGuardTest {
             long lookupNanos = SyntheticFixtureFactory.measureNanos(() -> {
                 int found = 0;
                 int boundsMiss = 0;
+                Map<String, String> plannerRegionIndex = new LinkedHashMap<>();
+                for (String plannerRegionId : plannerRegionIds) {
+                    plannerRegionIndex.putIfAbsent(plannerRegionId, plannerRegionId);
+                }
                 for (int player = 0; player < players; player++) {
                     boolean outsideBounds = player % 4 != 0;
                     for (RegionControllerData controller : controllers) {
@@ -653,11 +666,8 @@ public final class RuntimePerformanceBaselineGuardTest {
                         String targetRegionId = player % 11 == 0
                                 ? "missing-region-" + player
                                 : controller.regionId();
-                        for (String plannerRegionId : plannerRegionIds) {
-                            if (plannerRegionId.equals(targetRegionId)) {
-                                found++;
-                                break;
-                            }
+                        if (plannerRegionIndex.get(targetRegionId) != null) {
+                            found++;
                         }
                     }
                 }
@@ -666,16 +676,16 @@ public final class RuntimePerformanceBaselineGuardTest {
             double lookupMs = SyntheticFixtureFactory.nanosToMillis(lookupNanos);
             emit(report, SyntheticFixtureFactory.benchmarkRow(
                     "runtime",
-                    "region_controller.player_controller_planner_lookup_scan",
+                    "region_controller.player_controller_planner_id_index",
                     tier,
                     controllers.size(),
-                    (long) players * plannerRegionIds.size(),
+                    players,
                     lookupMs,
                     previousPlannerLookup,
-                    "O(players*controllers*plannerRegions)",
-                    "RegionController 真实风险包含 controller regionId 到 planner region 的同步线性查找、missing id 和 bounds miss 分布；Phase 1 只量化。",
+                    "O(players*controllers)",
+                    "MapDataStore Phase 2 为 RegionController 高频 regionId 查询使用 planner region id 索引并保留 first-match；bounds prefilter 只覆盖 findPlannerRegionContaining。",
                     false,
-                    runtimeExtra(true, true, false, "none/region-id-list-scan", false, "10-tick cadence")
+                    runtimeExtra(true, true, false, "planner-region-id-index", false, "10-tick cadence")
             ));
             previousPlannerLookup = lookupMs;
         }

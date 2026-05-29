@@ -26,7 +26,7 @@ public final class SignalJoinRuntimeService {
             return;
         }
         MinecraftServer server = event.world().getServer();
-        SignalJoinStore.SignalJoinLoadResult loaded = SignalJoinStore.loadWithStatus(server);
+        SignalJoinStore.SignalJoinLoadResult loaded = SignalJoinStore.loadWithStatusCached(server);
         if (loaded.degraded()) {
             runtimeStore(server).setDiagnostic("", "store_degraded", loaded.message(), event.gameTime());
             return;
@@ -35,7 +35,7 @@ public final class SignalJoinRuntimeService {
             return;
         }
         String channel = SignalChannel.normalize(rawChannel);
-        List<OutputDecision> outputs = observe(runtimeStore(server), loaded.file().joins.values().stream().toList(), EventView.from(event, channel), depth);
+        List<OutputDecision> outputs = observe(runtimeStore(server), loaded.file().enabledJoinsReferencing(channel), EventView.from(event, channel), depth);
         for (OutputDecision output : outputs) {
             emitOutput(event, output, depth);
         }
@@ -112,6 +112,7 @@ public final class SignalJoinRuntimeService {
         synchronized (SignalJoinRuntimeService.class) {
             STORES.remove(server);
         }
+        SignalJoinStore.clearCachedLoad(server);
     }
 
     public static TestRuntime testRuntime() {

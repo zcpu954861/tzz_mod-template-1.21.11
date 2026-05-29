@@ -18,7 +18,7 @@ Global rules:
 | --- | --- | --- | --- |
 | Phase 0 | audit and plan | six docs plus checkpoint | `git diff --check` for docs-only. |
 | Phase 1 | synthetic fixture and benchmark harness | `SyntheticFixtureFactory`, runtime/store/webadmin benchmark guards | Gradle guard set from prompt. |
-| Phase 2 | runtime optimization | channel/device indexes, safe context/store cache, VBD/Region/Timer improvements | Gradle guard set and low-end report. |
+| Phase 2 | runtime optimization | proven lookup/index/cache changes for listener, join, state snapshot and map planner-region paths | Gradle guard set and low-end report. |
 | Phase 3 | WebAdmin large graph optimization | only DOM-proven render/interaction improvements | DOM equivalence and Gradle guard set. |
 | Phase 4 | store/session/registry optimization | cache/dirty/index/expiry improvements | store benchmarks and Gradle guard set. |
 | Phase 5 | deep simplification | process automatically proven complexity hotspots | code-quality guard and docs update. |
@@ -34,19 +34,19 @@ Global rules:
 | 3 | deterministic runtime fixture generator | proves tick/store hotspots | no Minecraft startup | 1 |
 | 4 | deterministic store fixture generator | proves JSON load/save scale | temp dirs only | 1 |
 | 5 | blank condition gate no-load guard | protects legacy behavior | hard fail if group/context loaded | 1 |
-| 6 | SignalDeviceStore id/source/channel indexes | reduce O(n) lookups | order/duplicate/missing guards | 2 |
+| 6 | SignalDeviceStore id/source/channel indexes | reduce O(n) lookups | order/duplicate/missing guards | deferred |
 | 7 | SignalListener channel index | reduce emit filtering | listener order guard | 2 |
-| 8 | condition group cache by path/fingerprint | avoid repeated JSON read | invalidation and status guard | 2/4 |
-| 9 | state variable snapshot cache | avoid gate-time JSON read | mutation invalidation guard | 2/4 |
-| 10 | VBD tick pre-index by enabled VBD and trigger type | reduce per tick scans | no force-load, bound-object only | 2 |
-| 11 | VBD container scan narrow by trigger/cooldown | reduce container fingerprint work | fingerprint semantics | 2 |
-| 12 | itemSubmit matcher precompile per requirement set | reduce repeated parsing/scans | consume all-or-nothing | 2 |
-| 13 | container matcher total reuse per snapshot | reduce condition x slot scans | matcher equivalence | 2 |
+| 8 | condition group cache by path/fingerprint | avoid repeated JSON read | invalidation and status guard | 4 |
+| 9 | state variable store cache | avoid gate-time JSON read | mutation invalidation guard | 4 |
+| 10 | VBD tick pre-index by enabled VBD and trigger type | reduce per tick scans | no force-load, bound-object only | deferred |
+| 11 | VBD container scan narrow by trigger/cooldown | reduce container fingerprint work | fingerprint semantics | deferred |
+| 12 | itemSubmit matcher precompile per requirement set | reduce repeated parsing/scans | consume all-or-nothing | deferred |
+| 13 | container matcher total reuse per snapshot | reduce condition x slot scans | matcher equivalence | deferred |
 | 14 | RegionController bounding box prefilter | avoid polygon contains for misses | exact polygon still authoritative | 2 |
 | 15 | RegionController planner-region id index/cache | avoid repeated synchronized linear region lookup | missing-region behavior and controller order unchanged | 2 |
-| 16 | RegionController group by dimension | avoid cross-dimension checks | transition order unchanged | 2 |
-| 17 | Timer due bucket or next-due shortcut | reduce every-tick full scan | preserve `LinkedHashMap` due order and `MAX_DUE_EXECUTIONS_PER_TICK` | 2 |
-| 18 | Timer active count counter | reduce start storms | max active limit guard | 2 |
+| 16 | RegionController group by dimension | avoid cross-dimension checks | transition order unchanged | deferred |
+| 17 | Timer due bucket or next-due shortcut | reduce every-tick full scan | preserve `LinkedHashMap` due order and `MAX_DUE_EXECUTIONS_PER_TICK` | deferred |
+| 18 | Timer active count counter | reduce start storms | max active limit guard | deferred |
 | 19 | Logic Chain hover local class update | remove full render on hover | DOM equivalence including arrows | 3 if proven |
 | 20 | Logic Chain select panel/class split | reduce full render on click | panel and graph class equivalence | 3 if proven |
 | 21 | Logic Chain zoom transform-only update | remove full render on zoom | toolbar/pan state guard | 3 if proven |
@@ -66,13 +66,24 @@ Global rules:
 | Guard area | Current state | 9.1.2 required addition |
 | --- | --- | --- |
 | WebAdmin graph DOM | 9.1.1 baseline exists | tiers small/medium/large/stress and interaction rows. |
-| Runtime performance | no dedicated runtime benchmark guard yet | service-level `RuntimePerformanceBaselineGuardTest`. |
-| Store performance | no dedicated store benchmark guard yet | temp-dir `StorePerformanceBaselineGuardTest`. |
+| Runtime performance | `RuntimePerformanceBaselineGuardTest` reports service-level rows and `RuntimeOptimizationEquivalenceGuardTest` hard-checks Phase 2 lookup/index equivalence | keep timing report-only; add semantic hard guards before each new runtime optimization. |
+| Store performance | `StorePerformanceBaselineGuardTest` reports temp-dir JSON/store/session rows | keep corrupt/missing fallback hard guards and store timing report-only. |
 | Low-end reporting | not required in 9.1.1 | x3/x5/x10 estimates on every row. |
 | Complexity curve | code-quality tables exist | benchmark scale factor and complexity estimate. |
 | Semantic invariants | scattered service tests | focused hard guards around optimized paths. |
 | Runtime ordering | scattered service behavior | hard guards for SignalBridge dispatch/history/join order and ActionEngine `executeAll` stop-on-failure. |
 | Store IO reporting | not standardized | bytes, serialization count, write frequency and cleanup complexity. |
+
+## Phase 2 Runtime Optimization Record
+
+Phase 2 accepted only low-risk lookup/index changes that can be proven by deterministic guards:
+
+- `StateVariableSnapshot.get` now uses binary search over the existing sorted `records()` list. Snapshot normalization, duplicate last-write-wins behavior and `records()` ordering are unchanged.
+- `SignalListenerStore` now keeps a lazily rebuilt enabled-listeners-by-channel index inside the per-server store state. The index preserves the old listener list order and is invalidated by existing mutation paths.
+- `SignalJoinRuntimeService` now uses `SignalJoinStore.loadWithStatusCached` and `SignalJoinFile.enabledJoinsReferencing(channel)` on the accepted-signal observer path. The cache is bounded, keyed by path plus content fingerprint, invalidated on save/server clear/snapshot rollback, and still reports raw file hash IO cost.
+- `MapDataStore.getPlannerRegion` now uses a planner-region id index with old first-match semantics. `findPlannerRegionContaining` adds a bounds prefilter before the exact polygon `containsBlock` check.
+
+Phase 2 deliberately deferred Timer structure rewrites, VBD runtime snapshot narrowing, itemSubmit scan rewrites, container `TOTAL_MATCHER` memoization and `SignalDeviceStore` receiver/relay indexes because they need stronger order/fingerprint/no-force-load guards before production changes.
 
 ## Deferred High-Risk Optimizations
 

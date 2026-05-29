@@ -81,6 +81,7 @@ public final class CodeQualityGuardTest {
         WebAdminFrontendBundleGuardTest.run(report);
         WebAdminPerformanceBaselineGuardTest.run(report);
         RuntimePerformanceBaselineGuardTest.run(report);
+        RuntimeOptimizationEquivalenceGuardTest.run(report);
         StorePerformanceBaselineGuardTest.run(report);
         DocsConsistencyGuardTest.run(report);
         report.printAndFail();

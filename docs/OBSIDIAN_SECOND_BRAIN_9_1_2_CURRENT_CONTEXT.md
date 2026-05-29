@@ -32,6 +32,12 @@ The main repository `AGENTS.md` must include the durable rule set:
 - `08_Codex工作流/Codex_工作流与提示词规范.md`
 - `99_索引/TZZ_Mod_索引.md`
 
+Phase 2 runtime optimization added another required precision note:
+
+- `13_源码文件职责/Runtime_文件职责表.md`
+
+It records the current runtime hot-path files, accepted Phase 2 indexes/caches and deferred runtime optimizations. If Phase 2 changes again before checkpoint, update that note and the performance notes together.
+
 ## Source Notes Read At Phase Start
 
 The 9.1.2 audit uses these existing notes as historical context:
