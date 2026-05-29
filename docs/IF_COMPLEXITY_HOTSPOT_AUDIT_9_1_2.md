@@ -38,6 +38,10 @@ Round 1 identified candidate areas and rejected UI/routing/runtime rewrites as u
 | WebAdmin write validation authority | WebAdmin write validators use uncached authoritative reads. | Unchanged; no production write path was moved to cached reads. |
 | Production frontend / routing | Large JS/router/UI-builder debt exists but is guarded mostly by no-growth and DOM snapshots. | Deferred; no production JS touched. |
 
+## Phase 6 Ratchet
+
+The accepted Phase 5 simplification is now protected by `CodeQualityGuardTest` file line/byte no-growth baselines for `WebAdminVirtualBlockDeviceNativeTriggerService.java`. Future work that grows this service must either split responsibilities further or update the baseline only in a dedicated, behavior-proven guard phase.
+
 ## Kept Safety If
 
 These branches remain explicit and are intentionally not collapsed:
@@ -60,7 +64,7 @@ These branches remain explicit and are intentionally not collapsed:
 | timer due structure rewrite | `LinkedHashMap` due order and per-tick budget are runtime behavior. | Deterministic due-order / budget guard. |
 | VBD runtime trigger/container scan narrowing | Must preserve no-force-load, cooldown, fingerprint and event order. | Unloaded chunk no-read and VBD order/fingerprint guard. |
 
-## Validation
+## Phase 5 Validation
 
 Phase 5 validation uses:
 
@@ -73,3 +77,17 @@ git diff --check
 ```
 
 MCP npm build/test is not required unless `tools/tzz-test-mcp` changes.
+
+## Phase 6 Validation
+
+Phase 6 guard ratchet / knowledge-base validation uses the same Gradle guard set because it changes guard code and source docs:
+
+```powershell
+.\gradlew.bat testClasses
+.\gradlew.bat codeQualityGuardTest --rerun-tasks
+.\gradlew.bat stabilizationGuardTest --rerun-tasks
+.\gradlew.bat localTestMcpGuardTest --rerun-tasks
+git diff --check
+```
+
+For the external Obsidian vault, manually inspect the modified markdown files because the vault is outside the main repository and not covered by `git diff --check`.

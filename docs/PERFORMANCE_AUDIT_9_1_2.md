@@ -82,6 +82,13 @@ Phase 5 follow-up:
 - strengthened condition gate config characterization for VBD fields, exact error code, rejected value summary, Chinese message fragments, blank-id no-load behavior and degraded store handling;
 - kept production JS routing, giant UI builders, BeforeVxx wrappers, protected draft registry, timer due structure and VBD runtime scan narrowing deferred because their behavior equivalence is not yet automatically proven.
 
+Phase 6 follow-up:
+
+- ratcheted `WebAdminVirtualBlockDeviceNativeTriggerService.java` into `CodeQualityGuardTest` file line/byte no-growth baselines after the Phase 5 duplicate validator cleanup;
+- confirmed the existing 9.1.2 guard suite already reports runtime, synthetic graph and store/session benchmark rows with low-end estimate fields while keeping noisy timing report-only;
+- kept hard-fail scope on deterministic invariants: generated bundle ratchet, BeforeVxx/no-BeforeV18+ growth, inline handler and selector no-growth, DOM/source marker equivalence, store corrupt/missing/cache invalidation and session cleanup markers;
+- updated the external Obsidian knowledge-base plan so quick entries are categorized by task and Phase 5/6 decisions are indexed as durable repository memory.
+
 ## Top 50 Static Performance Suspects
 
 This table is the Phase 0 static candidate list. Phase 1 must convert it into deterministic benchmark rows with timing and low-end estimates. `Tick path` means server/client tick or synchronous Minecraft main-thread path; `High frequency UI` means hover, pointermove, click, zoom or route silent refresh.
@@ -267,8 +274,8 @@ Allocation suspects are static until Phase 1 adds counters or timing proxies.
 | Condition group runtime cache | Accepted in Phase 4 for runtime gate/replay | Bounded path/content-fingerprint cache; save and snapshot rollback invalidate; blank gate still returns before store load. |
 | State variable runtime snapshot cache | Accepted in Phase 4 through StateVariableService cached loads | Synchronous save invalidates; corrupt/status fallback and legacy raw missing-file creation are guarded. |
 | Signal device channel index | Planned | Must preserve order, enabled filter, duplicate/missing handling and dirty flush semantics. |
-| RegionController planner-region id index/cache | Planned | Must match `MapDataStore.getPlannerRegion` result and missing-region behavior before reducing repeated player x controller lookups. |
-| Region bounds prefilter | Planned | Must preserve enter/exit/stay transition order and polygon result. |
+| RegionController planner-region id index/cache | Accepted in Phase 2 | `MapDataStore.getPlannerRegion` now uses a planner-region id index with old first-match and missing-region behavior guarded. |
+| Region bounds prefilter | Accepted in Phase 2 | `findPlannerRegionContaining` now prefilters by bounds before exact polygon contains while preserving polygon result. |
 | Timer bucket/index | Planned | Must preserve `LinkedHashMap` order and due execution budget. |
 | Snapshot manifest/package parsed cache | Deferred | Rollback package fingerprint, retention and degraded-message semantics need stronger package equivalence guards. |
 | Protected draft expiry bucketing | Deferred | Terminal visibility and cleanup-required world-device drafts must remain server-cleanup-aware. |

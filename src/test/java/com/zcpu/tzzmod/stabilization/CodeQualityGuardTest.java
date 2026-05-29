@@ -25,6 +25,8 @@ public final class CodeQualityGuardTest {
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java", new FileBaseline(75, 123_798),
             "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java",
             new FileBaseline(WEBADMIN_LOGIC_CHAIN_EDITOR_SERVICE_PHASE7_LINE_BASELINE, 305_271),
+            "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminVirtualBlockDeviceNativeTriggerService.java",
+            new FileBaseline(1_464, 82_410),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java", new FileBaseline(3102, 164_014),
             "src/main/java/com/zcpu/tzzmod/webadmin/draft/WebAdminProtectedDraftRegistry.java", new FileBaseline(620, 26_369),
             "src/test/java/com/zcpu/tzzmod/stabilization/StabilizationGuardTest.java",

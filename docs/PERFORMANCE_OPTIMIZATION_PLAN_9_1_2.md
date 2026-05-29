@@ -121,6 +121,17 @@ Phase 5 accepted one low-risk backend helper simplification after read-only suba
 
 Phase 5 deliberately deferred production JS routing rewrites, giant UI builder extraction, BeforeVxx wrapper cleanup, protected draft registry splitting, edit-lock mapping rewrites, timer due structure changes and VBD runtime scan narrowing. Those areas remain behavior-sensitive and need route/DOM/state/runtime golden guards before simplification.
 
+## Phase 6 Guard Ratchet / Knowledge Base Record
+
+Phase 6 does not add production optimization. It ratchets the accepted 9.1.2 work into guard and documentation boundaries:
+
+- runtime benchmark reports remain wired through `RuntimePerformanceBaselineGuardTest`;
+- synthetic graph and generated bundle reports remain wired through `WebAdminPerformanceBaselineGuardTest`, `WebAdminLogicChainDomEquivalenceGuardTest` and `WebAdminFrontendBundleGuardTest`;
+- store/cache/session benchmark reports remain wired through `StorePerformanceBaselineGuardTest`;
+- `CodeQualityGuardTest` continues hard-failing BeforeVxx growth, new BeforeV18+ patch stacking, generated app.js/app.css ratchet changes, inline handler growth, `.closest(` / `querySelector(` growth and known giant JS function growth;
+- the Phase 5 accepted VBD native trigger simplification is now guarded by a file line/byte no-regrowth baseline for `WebAdminVirtualBlockDeviceNativeTriggerService.java`;
+- Obsidian remains the external precision repository index; quick entries should be categorized by task rather than listed as a flat note dump.
+
 ## Deferred High-Risk Optimizations
 
 | Candidate | Defer reason | Required future proof |

@@ -38,6 +38,32 @@ Phase 2 runtime optimization added another required precision note:
 
 It records the current runtime hot-path files, accepted Phase 2 indexes/caches and deferred runtime optimizations. If Phase 2 changes again before checkpoint, update that note and the performance notes together.
 
+Phase 5/6 add two more durable index expectations:
+
+- record `WebAdminVirtualBlockDeviceNativeTriggerService.validateGateBinding(...)` as delegating to `WebAdminConditionGateBindingValidator`, with VBD-specific dynamic container compatibility profile still owned by the VBD service;
+- record that Phase 6 guard ratchets `WebAdminVirtualBlockDeviceNativeTriggerService.java` line/byte growth in `CodeQualityGuardTest` and that timing rows stay warning/report-only.
+
+The main index quick entries should stay categorized by task instead of becoming a flat link dump:
+
+- start-task required reading;
+- 9.1.2 performance notes;
+- source responsibility tables;
+- system architecture / flow notes;
+- history, deferred risks and roadmap notes.
+
+Phase 6 must update at least these vault notes before checkpoint:
+
+- `99_索引/TZZ_Mod_索引.md`
+- `07_9.1.2_真实性能优化/9.1.2_总览.md`
+- `07_9.1.2_真实性能优化/WebAdmin_大图性能.md`
+- `07_9.1.2_真实性能优化/游戏内_Runtime_性能.md`
+- `07_9.1.2_真实性能优化/Store_Session_Registry_性能.md`
+- `07_9.1.2_真实性能优化/压测样本与Benchmark.md`
+- `07_9.1.2_真实性能优化/Deferred_高风险优化.md`
+- `12_仓库精确索引/功能到文件索引.md`
+- `13_源码文件职责/WebAdmin_文件职责表.md`
+- `15_测试与Guard索引/改动后该跑哪些测试.md`
+
 ## Source Notes Read At Phase Start
 
 The 9.1.2 audit uses these existing notes as historical context:
@@ -96,7 +122,7 @@ Record these as durable 9.1.2 boundaries:
 | Phase 3 | add WebAdmin large graph before/after and DOM-equivalence notes. |
 | Phase 4 | add store/session before/after and cache invalidation decisions. |
 | Phase 5 | add complexity simplification decisions. |
-| Phase 6 | ratchet all final knowledge and ensure index links are complete. |
+| Phase 6 | ratchet final guard knowledge, classify quick index entries, update stale `last_verified_commit` values and ensure index links are complete. |
 
 ## Main Repo Source Docs
 
@@ -108,3 +134,4 @@ The vault should link back to:
 - `docs/SYNTHETIC_FIXTURES_9_1_2.md`
 - `docs/PERFORMANCE_OPTIMIZATION_PLAN_9_1_2.md`
 - `docs/OBSIDIAN_SECOND_BRAIN_9_1_2_CURRENT_CONTEXT.md`
+- `docs/IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_2.md`
