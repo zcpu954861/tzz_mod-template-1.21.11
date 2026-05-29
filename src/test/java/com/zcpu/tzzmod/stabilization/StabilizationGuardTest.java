@@ -9324,6 +9324,7 @@ public final class StabilizationGuardTest {
         String readme = Files.readString(root.resolve("README.md"), StandardCharsets.UTF_8);
         String request = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/dto/WebAdminLogicChainEditorRequest.java"), StandardCharsets.UTF_8);
         String editorService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java"), StandardCharsets.UTF_8);
+        String editorBackend = editorService + "\n" + readLogicChainEditorBackendSplit(root);
         String logicService = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainService.java"), StandardCharsets.UTF_8);
         String server = Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java"), StandardCharsets.UTF_8);
         String scripts = WebAdminFrontendAssets.appJs();
@@ -9471,7 +9472,7 @@ public final class StabilizationGuardTest {
                 "join_output",
                 "timer_outputs_channel"
         )) {
-            requireContains(request + "\n" + editorService + "\n" + validationError + "\n" + editLockService + "\n" + operationType + "\n" + rolePolicy, marker, "8.14 backend marker: " + marker);
+            requireContains(request + "\n" + editorBackend + "\n" + validationError + "\n" + editLockService + "\n" + operationType + "\n" + rolePolicy, marker, "8.14 backend marker: " + marker);
         }
         for (String legacyFourFieldError : List.of(
                 "error(\"nodes[0].column\", \"logic_chain_join_column_invalid\", \"Signal Join 只能放在上游频道卡的下游合法列。\", column)",
@@ -9481,7 +9482,7 @@ public final class StabilizationGuardTest {
                 "error(\"actionAppend.ownerId\", \"logic_chain_action_append_owner_id_required\", \"追加 Action 需要已有 action 容器 ID。\", \"\")",
                 "error(\"channelMetadataDrafts[\" + index + \"].channel\", \"duplicate_channel\", \"频道端点 metadata 不能重复提交同一个 channel。\", channel)"
         )) {
-            requireFalse(editorService.contains(legacyFourFieldError), "8.14 structured validation must not use legacy four-field error: " + legacyFourFieldError);
+            requireFalse(editorBackend.contains(legacyFourFieldError), "8.14 structured validation must not use legacy four-field error: " + legacyFourFieldError);
         }
 
         for (String marker : List.of(
@@ -9842,8 +9843,8 @@ public final class StabilizationGuardTest {
         requireFalse(scripts.contains("==='timer'?[0]:[2]"), "8.14 frontend must not keep Signal Join C2-only legal slots");
         requireContains(scripts, "logicChainJoinProcessingDraftActive", "8.14 frontend still marks Join draft mode without forcing an empty processing column");
         requireFalse(scripts.contains("keys.forEach(lane=>{map[lane]=lane>=3?lane+1:lane;});return map;"), "8.14 Join draft layout must not reserve a forced empty processing column");
-        requireFalse(editorService.contains("String joinId = safe(request.id);"), "8.14 Signal Join typed lock target must use the normalized service id");
-        requireFalse(editorService.contains("String timerId = safe(request.id);"), "8.14 Timer typed lock target must use the normalized service id");
+        requireFalse(editorBackend.contains("String joinId = safe(request.id);"), "8.14 Signal Join typed lock target must use the normalized service id");
+        requireFalse(editorBackend.contains("String timerId = safe(request.id);"), "8.14 Timer typed lock target must use the normalized service id");
         requireFalse(scripts.contains("type==='timer'?[0,5]"), "8.14 frontend must not render Timer C5 as legal slot");
         String legalSlotFunction = extractBetween(scripts, "function logicChainLegalSlotsForColumn", "function logicChainResolveDraftSlot");
         String joinSlotFunction = extractBetween(scripts, "function logicChainJoinInputAdjacentLegalSlots", "function logicChainDraftAnchorSlot");
@@ -9880,7 +9881,7 @@ public final class StabilizationGuardTest {
         requireContains(editorService, "if (actionAppend && nodes.isEmpty() && !edges.isEmpty())", "8.16 mixed draft payload rejects standalone action append edges while preserving new-node draft edges");
         String metadataRefFunction = extractBetween(editorService, "private static Set<String> channelMetadataDraftReferencedChannels", "private static RegionTriggerType parseRegionTrigger");
         requireContains(metadataRefFunction, "if (hasActionAppend(request))", "8.14 action append metadata refs must use actionAppend.action instead of draft edges");
-        requireContains(editorService, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
+        requireContains(editorBackend, "saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts)", "8.14 channel metadata drafts are saved only after typed write succeeds");
         requireContains(scripts, "connectLogicChainDraftCandidate(channelRef,{toggle:false})", "8.14 draft channel endpoint add path does not toggle off an existing connection");
         String actionAppendLayout = extractBetween(scripts, "if(editor.actionAppend)", "const draftEdges=[]");
         requireContains(actionAppendLayout, "draft:action_append:${append.ownerType||'owner'}:${append.ownerId||''}:${append.bucket||'default'}:${actionIndex}", "8.14 action append draft id includes actionIndex");
@@ -12301,6 +12302,12 @@ public final class StabilizationGuardTest {
                 "logic_chain_node_count_compare"
         ));
         requireEquals(expected, actual, "8.13 must not add condition types");
+    }
+
+    private static String readLogicChainEditorBackendSplit(Path root) throws IOException {
+        return Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftSaveCoordinator.java"), StandardCharsets.UTF_8)
+                + "\n" + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftOperationPlanner.java"), StandardCharsets.UTF_8)
+                + "\n" + Files.readString(root.resolve("src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainTypedWriteExecutor.java"), StandardCharsets.UTF_8);
     }
 
     private static String readJavaDirectory(Path directory, Path... excludedDirectories) throws IOException {

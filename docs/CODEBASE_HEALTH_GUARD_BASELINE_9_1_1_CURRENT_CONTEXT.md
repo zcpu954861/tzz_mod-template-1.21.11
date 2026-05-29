@@ -193,6 +193,29 @@ Phase 4 guard changes:
 
 Phase 4 deliberately does not change UI behavior, event routing semantics, Logic Chain render/layout algorithms, VBD/native trigger behavior, backend APIs, runtime behavior, CSS, React/Vite architecture or performance caching.
 
+## Phase 5 Backend Logic Chain Service Split Context
+
+Phase 5 mechanically splits the backend Logic Chain draft save coordination while preserving the 9.1 WebAdmin API, save transaction boundaries and runtime semantics.
+
+- Phase 5 branch: `feature/logic-chain-backend-service-split-9-1-1`.
+- Phase 5 base: `origin/feature/logic-chain-render-module-split-9-1-1` at `dc6ec4f28806aef2f8c19cd27f810998428ced95`.
+- `WebAdminServer` remains unchanged: route parsing, CSRF/same-origin context, write-before snapshot, audit/realtime response wrapping and `/api/webadmin/logic-chain-editor/save-draft` response shape stay at the server boundary.
+- `WebAdminLogicChainEditorService.saveDraft()` is now a facade into `LogicChainDraftSaveCoordinator`.
+- `LogicChainDraftSaveCoordinator` preserves the frozen order: write preflight -> editor lock -> base graph fingerprint -> validation -> mixed-write fail-closed guards -> typed write execution -> channel metadata tail write -> successful editor lock release.
+- `LogicChainDraftOperationPlanner` describes which typed operations are present and keeps channel metadata as an independent tail boundary. It does not execute store mutation and does not create a freeform graph save model.
+- `LogicChainTypedWriteExecutor` only calls the existing typed write adapter methods in the original order: new nodes -> action append -> existing node edits -> action edits -> action deletes -> action reorders -> node deletes.
+- The existing VBD, world device, RegionController, action maintenance and node delete store writes remain in `WebAdminLogicChainEditorService` adapter methods, so protected draft state transitions, partial cleanup and typed service calls keep their previous semantics.
+- The split explicitly does not claim full cross-store atomic transactions or complete rollback; existing recoverable failure behavior keeps the Logic Chain editor lock and draft as before.
+
+Phase 5 guard changes:
+
+- `CodeQualityGuardTest` scope marker is `phase5-backend-logic-chain-service-split`.
+- `WebAdminLogicChainEditorService.java` is ratcheted down after the save coordinator split.
+- Guard checks require the new coordinator/planner/executor files, the saveDraft facade delegation, the frozen typed write order, the channel metadata tail boundary, a planner ordering test, and no fake `WebAdminMapServer` / full cross-store atomic transaction claim.
+- Existing frontend bundle, `node --check`, `BeforeV18+ = 0`, event/router no-growth checks and pointer-events guards remain unchanged.
+
+Phase 5 deliberately does not change UI behavior, WebAdmin route/API behavior, request/response shape, error codes, Chinese error messages, edit lock / target lock behavior, expectedFingerprint handling, write-before snapshot behavior, audit/realtime publication, VBD/world device/RegionController runtime semantics, CSS, frontend modules, commands, stores data format, MCP tooling or performance caching.
+
 ## README Update
 
 Phase 1 minimally updates README stable version to `v1.68.1-codebase-health-audit`. It does not expand README feature content.
@@ -203,13 +226,14 @@ Run:
 
 ```powershell
 .\gradlew.bat testClasses
+.\gradlew.bat test --tests com.zcpu.tzzmod.webadmin.service.WebAdminLogicChainEditorServiceTest
 .\gradlew.bat codeQualityGuardTest --rerun-tasks
 .\gradlew.bat stabilizationGuardTest --rerun-tasks
 .\gradlew.bat localTestMcpGuardTest --rerun-tasks
 git diff --check
 ```
 
-This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screenshot matrix, `tools/tzz-test-mcp npm run build`, or `tools/tzz-test-mcp npm test` unless a later prompt explicitly changes scope.
+This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screenshot matrix, `tools/tzz-test-mcp npm run build`, or `tools/tzz-test-mcp npm test` unless a later prompt explicitly changes scope. The targeted Gradle `test --tests` command may be a no-op for the current JavaExec-style service test; `stabilizationGuardTest` still invokes `WebAdminLogicChainEditorServiceTest.run()` and remains the authoritative service-test execution path.
 
 ## Git Hygiene
 
@@ -219,4 +243,4 @@ This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screensho
 
 ## Next Phase
 
-Phase 5 should address backend `WebAdminLogicChainEditorService` boundaries only after a separate prompt confirms scope and baseline.
+Phase 6 should address performance-local render/layout optimizations only after a separate prompt confirms scope and baseline.

@@ -106,6 +106,7 @@ public final class WebAdminLogicChainEditorService {
     private final WebAdminVirtualBlockDeviceNativeTriggerService virtualBlockDeviceNativeTriggerService;
     private final WebAdminDeviceBasicConfigService deviceBasicConfigService;
     private final WebAdminDeviceMetadataService deviceMetadataService;
+    private final LogicChainDraftSaveCoordinator saveCoordinator;
 
     public WebAdminLogicChainEditorService(
             WebAdminPermissionService permissionService,
@@ -137,6 +138,7 @@ public final class WebAdminLogicChainEditorService {
         this.virtualBlockDeviceNativeTriggerService = new WebAdminVirtualBlockDeviceNativeTriggerService(this.permissionService, this.securityService, editLockService);
         this.deviceBasicConfigService = new WebAdminDeviceBasicConfigService(this.permissionService, this.securityService, editLockService);
         this.deviceMetadataService = new WebAdminDeviceMetadataService(this.permissionService, this.securityService, editLockService);
+        this.saveCoordinator = new LogicChainDraftSaveCoordinator(this);
     }
 
     public Map<String, Object> capabilities(WebAdminUser user) {
@@ -244,200 +246,7 @@ public final class WebAdminLogicChainEditorService {
             String csrfToken,
             boolean sameOrigin
     ) {
-        WebAdminLogicChainEditorRequest safeRequest = safeRequest(request);
-        WebAdminWriteTarget target = target(safeRequest);
-        WebAdminWriteContext context = writeContext(user, session, remoteAddress, target);
-        WebAdminWriteResult preflight = writePreflight(user, session, csrfToken, sameOrigin, target);
-        if (!preflight.success()) {
-            audit(context, preflight, Map.of(), Map.of("attempt", "preflight_failed"));
-            return preflight;
-        }
-        WebAdminWriteResult lock = validateEditorLock(user, session, safeRequest);
-        if (!lock.success()) {
-            audit(context, lock, requestSummary(safeRequest), Map.of("attempt", "edit_lock_failed"));
-            return lock;
-        }
-        WebAdminDtos.LogicChainGraphDto graph = currentGraph(server, user, session, safeRequest);
-        String actualFingerprint = graphFingerprintFor(graph);
-        if (safe(safeRequest.baseGraphFingerprint).isBlank() || !actualFingerprint.equals(safe(safeRequest.baseGraphFingerprint))) {
-            Map<String, Object> conflict = new LinkedHashMap<>();
-            conflict.put("expectedFingerprint", safe(safeRequest.baseGraphFingerprint));
-            conflict.put("actualFingerprint", actualFingerprint);
-            conflict.put("rootType", normalizeRootType(safeRequest.rootType));
-            conflict.put("rootRef", safe(safeRequest.rootRef));
-            WebAdminWriteResult result = new WebAdminWriteResult(
-                    false,
-                    WebAdminWriteResultCode.CONFLICT_DETECTED.id(),
-                    "逻辑链运行图已变化，请刷新后重新进入编辑模式。",
-                    target.targetType(),
-                    target.targetId(),
-                    false,
-                    List.of(),
-                    "",
-                    "",
-                    false,
-                    conflict,
-                    Map.of("baseGraphFingerprint", actualFingerprint)
-            );
-            audit(context, result, requestSummary(safeRequest), Map.of("attempt", "fingerprint_conflict", "actualFingerprint", actualFingerprint));
-            return result;
-        }
-        List<WebAdminValidationError> errors = validateDraftRequest(safeRequest, graph, true, user, session);
-        if (!errors.isEmpty()) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, errors);
-            audit(context, result, requestSummary(safeRequest), Map.of("attempt", "validation_failed", "errorCount", errors.size()));
-            return result;
-        }
-        if (hasNodeDelete(safeRequest) && hasNonNodeDeleteTypedStoreDrafts(safeRequest)) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
-                    "nodeDeletes",
-                    "logic_chain_node_delete_mixed_write_fail_closed",
-                    "节点删除草稿不能和其它 typed 写入混合保存，避免删除失败时出现半应用。",
-                    String.valueOf(safeRequest.nodeDeletes == null ? 0 : safeRequest.nodeDeletes.size()),
-                    "",
-                    "",
-                    "",
-                    "先单独保存节点删除草稿，再重新进入编辑模式处理其它字段或 action 草稿。"
-            )));
-            audit(context, result, requestSummary(safeRequest), Map.of("attempt", "node_delete_mixed_write_fail_closed"));
-            return result;
-        }
-        if (hasTypedStoreDrafts(safeRequest) && hasChannelMetadataDrafts(safeRequest)) {
-            WebAdminWriteResult result = WebAdminWriteResult.validationFailed(target, List.of(error(
-                    "channelMetadataDrafts",
-                    "logic_chain_mixed_metadata_typed_write_fail_closed",
-                    "频道 metadata 草稿不能和其它 typed store 写入混合保存，避免保存失败时出现半应用。",
-                    String.valueOf(safeRequest.channelMetadataDrafts == null ? 0 : safeRequest.channelMetadataDrafts.size()),
-                    "",
-                    "",
-                    "",
-                    "先保存纯 typed 草稿，再单独保存频道 metadata 草稿；或移除本次 metadata 草稿。"
-            )));
-            audit(context, result, requestSummary(safeRequest), Map.of("attempt", "mixed_metadata_typed_write_fail_closed"));
-            return result;
-        }
-        WebAdminWriteResult result = ok(target, "逻辑链草稿已保存。", multiDraftSaveData(safeRequest));
-        WebAdminLogicChainEditorRequest.DraftNode draftNode = null;
-        WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit = null;
-        WebAdminLogicChainEditorRequest.ActionEditDraft actionEdit = null;
-        WebAdminLogicChainEditorRequest.NodeDeleteDraft nodeDelete = null;
-        WebAdminLogicChainEditorRequest.ActionDeleteDraft actionDelete = null;
-        WebAdminLogicChainEditorRequest.ActionReorderDraft actionReorder = null;
-        List<WebAdminLogicChainEditorRequest.DraftNode> draftNodes = safeRequest.nodes == null ? List.of() : safeRequest.nodes;
-        if (!draftNodes.isEmpty()) {
-            int nodeIndex = 0;
-            for (WebAdminLogicChainEditorRequest.DraftNode node : draftNodes) {
-                draftNode = node;
-                final int fieldIndex = nodeIndex;
-                result = switch (normalizeNodeType(draftNode.type)) {
-                    case "signal_join" -> saveSignalJoin(server, user, session, remoteAddress, draftNode, safeRequest.edges, csrfToken, sameOrigin);
-                    case "timer" -> saveTimer(server, user, session, remoteAddress, draftNode, safeRequest.edges, csrfToken, sameOrigin);
-                    case "signal_listener" -> saveSignalListener(server, user, session, remoteAddress, draftNode, safeRequest.edges, csrfToken, sameOrigin);
-                    case "virtual_block_device" -> saveVirtualBlockDeviceDraft(server, user, session, remoteAddress, safeRequest, draftNode, safeRequest.edges);
-                    case "world_device", "region_controller" -> saveProtectedWorldBackedDraft(server, user, session, remoteAddress, safeRequest, draftNode, safeRequest.edges);
-                    default -> WebAdminWriteResult.validationFailed(target, List.of(error(
-                            "nodes[" + fieldIndex + "].type",
-                            "unsupported_node_type",
-                            "当前阶段暂不支持该节点类型。",
-                            draftNode.type,
-                            safe(draftNode.id),
-                            "",
-                            "",
-                            "请选择当前阶段支持的 Signal Join、Timer、SignalListener、VBD、世界设备引用或区域控制器草稿节点。"
-                    )));
-                };
-                if (!result.success()) {
-                    break;
-                }
-                nodeIndex++;
-            }
-        }
-        if (result.success() && hasActionAppend(safeRequest)) {
-            result = saveActionAppend(server, user, session, remoteAddress, safeRequest.actionAppend, csrfToken, sameOrigin);
-        }
-        if (result.success()) {
-            for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : safeRequest.existingNodeEdits == null ? List.<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft>of() : safeRequest.existingNodeEdits) {
-                if (!isExistingNodeEditDraftPresent(edit)) {
-                    continue;
-                }
-                existingNodeEdit = edit;
-                result = saveExistingNodeEdit(server, user, session, remoteAddress, edit, csrfToken, sameOrigin);
-                if (!result.success()) {
-                    break;
-                }
-            }
-        }
-        if (result.success()) {
-            for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : safeRequest.actionEdits == null ? List.<WebAdminLogicChainEditorRequest.ActionEditDraft>of() : safeRequest.actionEdits) {
-                if (!isActionEditDraftPresent(edit)) {
-                    continue;
-                }
-                actionEdit = edit;
-                result = saveActionEdit(server, user, session, remoteAddress, edit, csrfToken, sameOrigin);
-                if (!result.success()) {
-                    break;
-                }
-            }
-        }
-        if (result.success()) {
-            for (WebAdminLogicChainEditorRequest.ActionDeleteDraft delete : safeRequest.actionDeletes == null ? List.<WebAdminLogicChainEditorRequest.ActionDeleteDraft>of() : safeRequest.actionDeletes) {
-                if (!isActionDeleteDraftPresent(delete)) {
-                    continue;
-                }
-                actionDelete = delete;
-                result = saveActionDelete(server, user, session, remoteAddress, delete, csrfToken, sameOrigin);
-                if (!result.success()) {
-                    break;
-                }
-            }
-        }
-        if (result.success()) {
-            for (WebAdminLogicChainEditorRequest.ActionReorderDraft reorder : safeRequest.actionReorders == null ? List.<WebAdminLogicChainEditorRequest.ActionReorderDraft>of() : safeRequest.actionReorders) {
-                if (!isActionReorderDraftPresent(reorder)) {
-                    continue;
-                }
-                actionReorder = reorder;
-                result = saveActionReorder(server, user, session, remoteAddress, reorder, csrfToken, sameOrigin);
-                if (!result.success()) {
-                    break;
-                }
-            }
-        }
-        if (result.success()) {
-            for (WebAdminLogicChainEditorRequest.NodeDeleteDraft delete : safeRequest.nodeDeletes == null ? List.<WebAdminLogicChainEditorRequest.NodeDeleteDraft>of() : safeRequest.nodeDeletes) {
-                if (!isNodeDeleteDraftPresent(delete)) {
-                    continue;
-                }
-                nodeDelete = delete;
-                result = saveNodeDelete(server, user, session, remoteAddress, delete, csrfToken, sameOrigin);
-                if (!result.success()) {
-                    break;
-                }
-            }
-        }
-        if (!result.success()) {
-            result = logicChainSaveFailurePreservingEditorLock(safeRequest, result, draftNode, safeRequest.actionAppend, existingNodeEdit, actionEdit, nodeDelete, actionDelete, actionReorder);
-            Map<String, Object> after = new LinkedHashMap<>();
-            after.put("attempt", "typed_write_failed");
-            after.put("mode", logicChainFailedWriteMode(draftNode, safeRequest.actionAppend, existingNodeEdit, actionEdit, nodeDelete, actionDelete, actionReorder));
-            after.put("code", safe(result.code()));
-            after.put("targetType", safe(result.targetType()));
-            after.put("targetId", safe(result.targetId()));
-            audit(context, result, requestSummary(safeRequest), after);
-        }
-        if (result.success()) {
-            WebAdminWriteResult metadataResult = saveChannelMetadataDrafts(server, user, safeRequest.channelMetadataDrafts);
-            if (!metadataResult.success()) {
-                audit(context, metadataResult, requestSummary(safeRequest), Map.of("attempt", "channel_metadata_draft_failed_after_typed_write"));
-                result = logicChainSaveFailurePreservingEditorLock(safeRequest, metadataResult, null, null, null, null, null, null, null);
-            } else {
-                result = ok(target, "逻辑链草稿已保存。", multiDraftSaveData(safeRequest));
-            }
-        }
-        if (result.success() && editLockService != null && !safe(safeRequest.lockId).isBlank()) {
-            editLockService.releaseAfterWrite(WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR, targetId(safeRequest), safeRequest.lockId, user, session, remoteAddress);
-        }
-        return result;
+        return saveCoordinator.saveDraft(server, user, session, remoteAddress, request, csrfToken, sameOrigin);
     }
 
     public WebAdminWriteResult cancel(
@@ -462,6 +271,49 @@ public final class WebAdminLogicChainEditorService {
             WebAdminSelectionSessions.cancelByEditLock(safeRequest.lockId, "Logic Chain 编辑已退出，选择已取消。");
         }
         return result;
+    }
+
+    void releaseEditorLockAfterSuccessfulSave(
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            WebAdminLogicChainEditorRequest request
+    ) {
+        if (editLockService != null && !safe(request == null ? "" : request.lockId).isBlank()) {
+            editLockService.releaseAfterWrite(WebAdminEditLockService.TARGET_LOGIC_CHAIN_EDITOR, targetId(request), request.lockId, user, session, remoteAddress);
+        }
+    }
+
+    WebAdminWriteResult saveDraftNode(
+            MinecraftServer server,
+            WebAdminUser user,
+            WebAdminSession session,
+            String remoteAddress,
+            WebAdminLogicChainEditorRequest request,
+            WebAdminWriteTarget target,
+            WebAdminLogicChainEditorRequest.DraftNode draftNode,
+            List<WebAdminLogicChainEditorRequest.DraftEdge> edges,
+            String csrfToken,
+            boolean sameOrigin,
+            int fieldIndex
+    ) {
+        return switch (normalizeNodeType(draftNode == null ? "" : draftNode.type)) {
+            case "signal_join" -> saveSignalJoin(server, user, session, remoteAddress, draftNode, edges, csrfToken, sameOrigin);
+            case "timer" -> saveTimer(server, user, session, remoteAddress, draftNode, edges, csrfToken, sameOrigin);
+            case "signal_listener" -> saveSignalListener(server, user, session, remoteAddress, draftNode, edges, csrfToken, sameOrigin);
+            case "virtual_block_device" -> saveVirtualBlockDeviceDraft(server, user, session, remoteAddress, request, draftNode, edges);
+            case "world_device", "region_controller" -> saveProtectedWorldBackedDraft(server, user, session, remoteAddress, request, draftNode, edges);
+            default -> WebAdminWriteResult.validationFailed(target, List.of(error(
+                    "nodes[" + Math.max(0, fieldIndex) + "].type",
+                    "unsupported_node_type",
+                    "当前阶段暂不支持该节点类型。",
+                    draftNode == null ? "" : draftNode.type,
+                    safe(draftNode == null ? "" : draftNode.id),
+                    "",
+                    "",
+                    "请选择当前阶段支持的 Signal Join、Timer、SignalListener、VBD、世界设备引用或区域控制器草稿节点。"
+            )));
+        };
     }
 
     private WebAdminWriteResult saveSignalJoin(
@@ -1217,7 +1069,7 @@ public final class WebAdminLogicChainEditorService {
         return result;
     }
 
-    private WebAdminWriteResult saveActionAppend(
+    WebAdminWriteResult saveActionAppend(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1295,7 +1147,7 @@ public final class WebAdminLogicChainEditorService {
         )));
     }
 
-    private WebAdminWriteResult saveExistingNodeEdit(
+    WebAdminWriteResult saveExistingNodeEdit(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1454,7 +1306,7 @@ public final class WebAdminLogicChainEditorService {
         return ok(writeTarget, "实体设备 presence 预检通过。", Map.of("deviceId", device.id()));
     }
 
-    private WebAdminWriteResult saveActionEdit(
+    WebAdminWriteResult saveActionEdit(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1555,7 +1407,7 @@ public final class WebAdminLogicChainEditorService {
         )));
     }
 
-    private WebAdminWriteResult saveActionDelete(
+    WebAdminWriteResult saveActionDelete(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1639,7 +1491,7 @@ public final class WebAdminLogicChainEditorService {
         )));
     }
 
-    private WebAdminWriteResult saveActionReorder(
+    WebAdminWriteResult saveActionReorder(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1688,7 +1540,7 @@ public final class WebAdminLogicChainEditorService {
         )));
     }
 
-    private WebAdminWriteResult saveNodeDelete(
+    WebAdminWriteResult saveNodeDelete(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -1835,7 +1687,7 @@ public final class WebAdminLogicChainEditorService {
         ));
     }
 
-    private WebAdminWriteResult saveChannelMetadataDrafts(
+    WebAdminWriteResult saveChannelMetadataDrafts(
             MinecraftServer server,
             WebAdminUser user,
             List<WebAdminLogicChainEditorRequest.ChannelMetadataDraft> drafts
@@ -2007,7 +1859,7 @@ public final class WebAdminLogicChainEditorService {
         }
     }
 
-    private WebAdminWriteResult logicChainSaveFailurePreservingEditorLock(
+    WebAdminWriteResult logicChainSaveFailurePreservingEditorLock(
             WebAdminLogicChainEditorRequest request,
             WebAdminWriteResult result,
             WebAdminLogicChainEditorRequest.DraftNode draftNode,
@@ -2145,7 +1997,7 @@ public final class WebAdminLogicChainEditorService {
         return "Logic Chain 编辑锁和草稿已保留；按此错误修正当前草稿后可继续保存。";
     }
 
-    private WebAdminWriteResult validateEditorLock(WebAdminUser user, WebAdminSession session, WebAdminLogicChainEditorRequest request) {
+    WebAdminWriteResult validateEditorLock(WebAdminUser user, WebAdminSession session, WebAdminLogicChainEditorRequest request) {
         if (editLockService == null) {
             return WebAdminWriteResult.ok(target(request), false, "编辑锁校验已跳过。");
         }
@@ -2226,7 +2078,7 @@ public final class WebAdminLogicChainEditorService {
         );
     }
 
-    private WebAdminWriteResult writePreflight(
+    WebAdminWriteResult writePreflight(
             WebAdminUser user,
             WebAdminSession session,
             String csrfToken,
@@ -2270,7 +2122,7 @@ public final class WebAdminLogicChainEditorService {
         return data;
     }
 
-    private List<WebAdminValidationError> validateDraftRequest(
+    List<WebAdminValidationError> validateDraftRequest(
             WebAdminLogicChainEditorRequest request,
             WebAdminDtos.LogicChainGraphDto graph,
             boolean requireComplete,
@@ -3483,7 +3335,7 @@ public final class WebAdminLogicChainEditorService {
         return "";
     }
 
-    private WebAdminDtos.LogicChainGraphDto currentGraph(
+    WebAdminDtos.LogicChainGraphDto currentGraph(
             MinecraftServer server,
             WebAdminUser user,
             WebAdminSession session,
@@ -3712,7 +3564,7 @@ public final class WebAdminLogicChainEditorService {
         return item;
     }
 
-    private static WebAdminLogicChainEditorRequest safeRequest(WebAdminLogicChainEditorRequest request) {
+    static WebAdminLogicChainEditorRequest safeRequest(WebAdminLogicChainEditorRequest request) {
         return request == null ? new WebAdminLogicChainEditorRequest() : request;
     }
 
@@ -3748,104 +3600,59 @@ public final class WebAdminLogicChainEditorService {
     }
 
     private static boolean hasActionAppend(WebAdminLogicChainEditorRequest request) {
-        WebAdminLogicChainEditorRequest.ActionAppendDraft draft = request == null ? null : request.actionAppend;
-        return draft != null && (!safe(draft.ownerType).isBlank() || !safe(draft.ownerId).isBlank() || draft.action != null);
+        return LogicChainDraftOperationPlanner.hasActionAppend(request);
     }
 
     private static boolean hasTypedStoreDrafts(WebAdminLogicChainEditorRequest request) {
-        return request != null && ((request.nodes != null && !request.nodes.isEmpty())
-                || hasActionAppend(request)
-                || hasExistingNodeEdit(request)
-                || hasActionEdit(request)
-                || hasNodeDelete(request)
-                || hasActionDelete(request)
-                || hasActionReorder(request));
+        return LogicChainDraftOperationPlanner.hasTypedStoreDrafts(request);
     }
 
     private static boolean hasNonNodeDeleteTypedStoreDrafts(WebAdminLogicChainEditorRequest request) {
-        return request != null && ((request.nodes != null && !request.nodes.isEmpty())
-                || hasActionAppend(request)
-                || hasExistingNodeEdit(request)
-                || hasActionEdit(request)
-                || hasActionDelete(request)
-                || hasActionReorder(request));
+        return LogicChainDraftOperationPlanner.hasNonNodeDeleteTypedStoreDrafts(request);
     }
 
     private static boolean hasChannelMetadataDrafts(WebAdminLogicChainEditorRequest request) {
-        return request != null && request.channelMetadataDrafts != null && !request.channelMetadataDrafts.isEmpty();
+        return LogicChainDraftOperationPlanner.hasChannelMetadataDrafts(request);
     }
 
     private static boolean hasExistingNodeEdit(WebAdminLogicChainEditorRequest request) {
-        List<WebAdminLogicChainEditorRequest.ExistingNodeEditDraft> edits = request == null || request.existingNodeEdits == null ? List.of() : request.existingNodeEdits;
-        return edits.stream().anyMatch(WebAdminLogicChainEditorService::isExistingNodeEditDraftPresent);
+        return LogicChainDraftOperationPlanner.hasExistingNodeEdit(request);
     }
 
     private static boolean isExistingNodeEditDraftPresent(WebAdminLogicChainEditorRequest.ExistingNodeEditDraft draft) {
-        return draft != null && (!safe(draft.nodeType).isBlank()
-                || !safe(draft.targetId).isBlank()
-                || draft.channelMetadata != null
-                || draft.signalJoin != null
-                || draft.timer != null
-                || draft.signalListenerBasic != null
-                || draft.deviceBasic != null
-                || draft.deviceMetadata != null
-                || draft.virtualBlockDevice != null);
+        return LogicChainDraftOperationPlanner.isExistingNodeEditDraftPresent(draft);
     }
 
     private static boolean hasActionEdit(WebAdminLogicChainEditorRequest request) {
-        List<WebAdminLogicChainEditorRequest.ActionEditDraft> edits = request == null || request.actionEdits == null ? List.of() : request.actionEdits;
-        return edits.stream().anyMatch(WebAdminLogicChainEditorService::isActionEditDraftPresent);
+        return LogicChainDraftOperationPlanner.hasActionEdit(request);
     }
 
     private static boolean isActionEditDraftPresent(WebAdminLogicChainEditorRequest.ActionEditDraft draft) {
-        return draft != null && (!safe(draft.ownerType).isBlank()
-                || !safe(draft.ownerId).isBlank()
-                || draft.action != null
-                || !safe(draft.expectedFingerprint).isBlank()
-                || !safe(draft.lockId).isBlank());
+        return LogicChainDraftOperationPlanner.isActionEditDraftPresent(draft);
     }
 
     private static boolean hasNodeDelete(WebAdminLogicChainEditorRequest request) {
-        List<WebAdminLogicChainEditorRequest.NodeDeleteDraft> deletes = request == null || request.nodeDeletes == null ? List.of() : request.nodeDeletes;
-        return deletes.stream().anyMatch(WebAdminLogicChainEditorService::isNodeDeleteDraftPresent);
+        return LogicChainDraftOperationPlanner.hasNodeDelete(request);
     }
 
     private static boolean isNodeDeleteDraftPresent(WebAdminLogicChainEditorRequest.NodeDeleteDraft draft) {
-        return draft != null && (!safe(draft.nodeType).isBlank()
-                || !safe(draft.targetId).isBlank()
-                || !safe(draft.ownerType).isBlank()
-                || !safe(draft.ownerId).isBlank()
-                || !safe(draft.expectedFingerprint).isBlank()
-                || !safe(draft.lockId).isBlank()
-                || !safe(draft.confirmationText).isBlank()
-                || Boolean.TRUE.equals(draft.impactAccepted)
-                || Boolean.TRUE.equals(draft.confirmed));
+        return LogicChainDraftOperationPlanner.isNodeDeleteDraftPresent(draft);
     }
 
     private static boolean hasActionDelete(WebAdminLogicChainEditorRequest request) {
-        List<WebAdminLogicChainEditorRequest.ActionDeleteDraft> deletes = request == null || request.actionDeletes == null ? List.of() : request.actionDeletes;
-        return deletes.stream().anyMatch(WebAdminLogicChainEditorService::isActionDeleteDraftPresent);
+        return LogicChainDraftOperationPlanner.hasActionDelete(request);
     }
 
     private static boolean isActionDeleteDraftPresent(WebAdminLogicChainEditorRequest.ActionDeleteDraft draft) {
-        return draft != null && (!safe(draft.ownerType).isBlank()
-                || !safe(draft.ownerId).isBlank()
-                || !safe(draft.expectedFingerprint).isBlank()
-                || !safe(draft.lockId).isBlank()
-                || Boolean.TRUE.equals(draft.confirmed));
+        return LogicChainDraftOperationPlanner.isActionDeleteDraftPresent(draft);
     }
 
     private static boolean hasActionReorder(WebAdminLogicChainEditorRequest request) {
-        List<WebAdminLogicChainEditorRequest.ActionReorderDraft> reorders = request == null || request.actionReorders == null ? List.of() : request.actionReorders;
-        return reorders.stream().anyMatch(WebAdminLogicChainEditorService::isActionReorderDraftPresent);
+        return LogicChainDraftOperationPlanner.hasActionReorder(request);
     }
 
     private static boolean isActionReorderDraftPresent(WebAdminLogicChainEditorRequest.ActionReorderDraft draft) {
-        return draft != null && (!safe(draft.ownerType).isBlank()
-                || !safe(draft.ownerId).isBlank()
-                || !safe(draft.expectedFingerprint).isBlank()
-                || !safe(draft.lockId).isBlank()
-                || Boolean.TRUE.equals(draft.confirmed));
+        return LogicChainDraftOperationPlanner.isActionReorderDraftPresent(draft);
     }
 
     private static String actionAppendNodeId(String ownerType, String ownerId) {
@@ -4952,7 +4759,7 @@ public final class WebAdminLogicChainEditorService {
         return false;
     }
 
-    private static WebAdminWriteContext writeContext(
+    static WebAdminWriteContext writeContext(
             WebAdminUser user,
             WebAdminSession session,
             String remoteAddress,
@@ -4961,7 +4768,7 @@ public final class WebAdminLogicChainEditorService {
         return WebAdminWriteContext.of(user, session, remoteAddress, WebAdminOperationType.EDIT_LOGIC_CHAIN, target);
     }
 
-    private WebAdminAuditEvent audit(
+    WebAdminAuditEvent audit(
             WebAdminWriteContext context,
             WebAdminWriteResult result,
             Map<String, ?> beforeSummary,
@@ -5015,7 +4822,7 @@ public final class WebAdminLogicChainEditorService {
                 .payload("worldBackedCommitRollbackAdapter", true));
     }
 
-    private static Map<String, Object> requestSummary(WebAdminLogicChainEditorRequest request) {
+    static Map<String, Object> requestSummary(WebAdminLogicChainEditorRequest request) {
         WebAdminLogicChainEditorRequest safeRequest = safeRequest(request);
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("rootType", normalizeRootType(safeRequest.rootType));
@@ -5082,14 +4889,14 @@ public final class WebAdminLogicChainEditorService {
         return summary;
     }
 
-    private static Map<String, Object> multiDraftSaveData(WebAdminLogicChainEditorRequest request) {
+    static Map<String, Object> multiDraftSaveData(WebAdminLogicChainEditorRequest request) {
         Map<String, Object> data = new LinkedHashMap<>(requestSummary(request));
         data.put("multiDraftSession", true);
         data.put("draftOverlaySaved", true);
         return data;
     }
 
-    private static String logicChainFailedWriteMode(
+    static String logicChainFailedWriteMode(
             WebAdminLogicChainEditorRequest.DraftNode draftNode,
             WebAdminLogicChainEditorRequest.ActionAppendDraft actionAppend,
             WebAdminLogicChainEditorRequest.ExistingNodeEditDraft existingNodeEdit,
@@ -5122,17 +4929,17 @@ public final class WebAdminLogicChainEditorService {
         return "multi_draft_session";
     }
 
-    private static WebAdminWriteTarget target(WebAdminLogicChainEditorRequest request) {
+    static WebAdminWriteTarget target(WebAdminLogicChainEditorRequest request) {
         return new WebAdminWriteTarget("LOGIC_CHAIN_EDITOR", targetId(request), "Logic Chain 编辑草稿");
     }
 
-    private static String targetId(WebAdminLogicChainEditorRequest request) {
+    static String targetId(WebAdminLogicChainEditorRequest request) {
         String rootType = normalizeRootType(request == null ? "" : request.rootType);
         String rootRef = safe(request == null ? "" : request.rootRef);
         return (rootType + ":" + rootRef).replaceAll("[\\r\\n\\t]", "_");
     }
 
-    private static WebAdminWriteResult ok(WebAdminWriteTarget target, String message, Map<String, Object> data) {
+    static WebAdminWriteResult ok(WebAdminWriteTarget target, String message, Map<String, Object> data) {
         return new WebAdminWriteResult(
                 true,
                 WebAdminWriteResultCode.OK.id(),
@@ -5149,11 +4956,11 @@ public final class WebAdminLogicChainEditorService {
         );
     }
 
-    private static WebAdminValidationError error(String field, String code, String message, String rejectedValue) {
+    static WebAdminValidationError error(String field, String code, String message, String rejectedValue) {
         return new WebAdminValidationError(field, code, message, rejectedValue);
     }
 
-    private static WebAdminValidationError error(
+    static WebAdminValidationError error(
             String field,
             String code,
             String message,
@@ -5170,7 +4977,7 @@ public final class WebAdminLogicChainEditorService {
         return new WebAdminValidationError(field, code, message, rejectedValue, nodeId, edgeId, normalizedChannel, "error", fixHint);
     }
 
-    private static String normalizeRootType(String rootType) {
+    static String normalizeRootType(String rootType) {
         String value = safe(rootType).trim().toLowerCase(Locale.ROOT);
         return switch (value) {
             case "device", "listener", "receiver", "relay", "region", "region_controller", "action", "signal_join", "timer" -> value;
@@ -5186,11 +4993,11 @@ public final class WebAdminLogicChainEditorService {
         return safe(type).trim().toLowerCase(Locale.ROOT);
     }
 
-    private static String safe(String value) {
+    static String safe(String value) {
         return value == null ? "" : value;
     }
 
-    private static String safe(Object value) {
+    static String safe(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 

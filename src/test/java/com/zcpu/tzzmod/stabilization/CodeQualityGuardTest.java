@@ -17,10 +17,10 @@ public final class CodeQualityGuardTest {
     private static final Map<String, FileBaseline> KNOWN_FILE_BASELINES = Map.of(
             WEBADMIN_FRONTEND_SCRIPTS, new FileBaseline(8433, 1_984_343),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendStyles.java", new FileBaseline(75, 123_798),
-            "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java", new FileBaseline(5205, 318_695),
+            "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java", new FileBaseline(5012, 305_815),
             "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminServer.java", new FileBaseline(3102, 164_014),
             "src/main/java/com/zcpu/tzzmod/webadmin/draft/WebAdminProtectedDraftRegistry.java", new FileBaseline(620, 26_369),
-            "src/test/java/com/zcpu/tzzmod/stabilization/StabilizationGuardTest.java", new FileBaseline(12_423, 839_370)
+            "src/test/java/com/zcpu/tzzmod/stabilization/StabilizationGuardTest.java", new FileBaseline(12_430, 838_347)
     );
 
     private static final Map<String, Integer> BEFORE_V_BASELINES = Map.of(
@@ -67,8 +67,9 @@ public final class CodeQualityGuardTest {
 
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
-        report.metric("branch.scope", "phase4-logic-chain-render-module-split");
+        report.metric("branch.scope", "phase5-backend-logic-chain-service-split");
         checkKnownFileBaselines(report);
+        checkLogicChainBackendSplit(report, root);
         checkFrontendScriptsFacade(report);
         checkBeforeVxx(report);
         checkHotspotRedefinitions(report);
@@ -134,6 +135,50 @@ public final class CodeQualityGuardTest {
                 "function confirmLogicChainActionEditDraft",
                 "WebAdminLogicChainDiffScripts.appJs()",
                 "function renderLogicChainActionAppendChannelCombo");
+    }
+
+    private static void checkLogicChainBackendSplit(CodeQualityGuardSupport.GuardReport report, Path root) throws IOException {
+        String servicePath = "src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorService.java";
+        String coordinatorPath = "src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftSaveCoordinator.java";
+        String plannerPath = "src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainDraftOperationPlanner.java";
+        String executorPath = "src/main/java/com/zcpu/tzzmod/webadmin/service/LogicChainTypedWriteExecutor.java";
+        String service = CodeQualityGuardSupport.read(servicePath);
+        String coordinator = CodeQualityGuardSupport.read(coordinatorPath);
+        String planner = CodeQualityGuardSupport.read(plannerPath);
+        String executor = CodeQualityGuardSupport.read(executorPath);
+        String editorTest = CodeQualityGuardSupport.read("src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminLogicChainEditorServiceTest.java");
+
+        report.metric("backend.logic_chain_editor_service.lines_after_phase5", CodeQualityGuardSupport.lineCount(servicePath));
+        report.metric("backend.logic_chain_save_coordinator.lines", CodeQualityGuardSupport.lineCount(coordinatorPath));
+        report.metric("backend.logic_chain_operation_planner.lines", CodeQualityGuardSupport.lineCount(plannerPath));
+        report.metric("backend.logic_chain_typed_executor.lines", CodeQualityGuardSupport.lineCount(executorPath));
+        report.require(service.contains("private final LogicChainDraftSaveCoordinator saveCoordinator;"),
+                "WebAdminLogicChainEditorService must hold the Phase 5 save coordinator facade");
+        report.require(service.contains("return saveCoordinator.saveDraft(server, user, session, remoteAddress, request, csrfToken, sameOrigin);"),
+                "saveDraft must delegate to LogicChainDraftSaveCoordinator");
+        report.require(coordinator.contains("preflight -> editor lock -> fingerprint -> validate"),
+                "LogicChainDraftSaveCoordinator must document the frozen saveDraft order");
+        report.require(coordinator.contains("不把") && coordinator.contains("完整原子事务"),
+                "LogicChainDraftSaveCoordinator must state that Phase 5 does not claim full cross-store atomicity");
+        report.require(executor.contains("按旧顺序调用 typed 写入口"),
+                "LogicChainTypedWriteExecutor must document order-preserving typed execution");
+        requireOrdered(report, executor,
+                "for (WebAdminLogicChainEditorRequest.DraftNode node : plan.draftNodes())",
+                "if (plan.actionAppend() != null)",
+                "for (WebAdminLogicChainEditorRequest.ExistingNodeEditDraft edit : plan.existingNodeEdits())",
+                "for (WebAdminLogicChainEditorRequest.ActionEditDraft edit : plan.actionEdits())",
+                "for (WebAdminLogicChainEditorRequest.ActionDeleteDraft delete : plan.actionDeletes())",
+                "for (WebAdminLogicChainEditorRequest.ActionReorderDraft reorder : plan.actionReorders())",
+                "for (WebAdminLogicChainEditorRequest.NodeDeleteDraft delete : plan.nodeDeletes())");
+        report.require(planner.contains("channel metadata 仍是尾部独立边界"),
+                "LogicChainDraftOperationPlanner must document the channel metadata tail boundary");
+        report.require(editorTest.contains("testDraftOperationPlannerPreservesTypedWriteOrderBoundaries"),
+                "WebAdminLogicChainEditorServiceTest must cover Phase 5 operation planner ordering");
+        String phase5Backend = service + "\n" + coordinator + "\n" + planner + "\n" + executor;
+        report.require(!phase5Backend.contains("WebAdminMapServer"),
+                "Phase 5 backend split must not introduce non-existent WebAdminMapServer coupling");
+        report.require(!phase5Backend.contains("完整跨 store atomic transaction"),
+                "Phase 5 backend split must not claim a full cross-store atomic transaction");
     }
 
     private static void requireOrdered(CodeQualityGuardSupport.GuardReport report, String text, String... needles) {

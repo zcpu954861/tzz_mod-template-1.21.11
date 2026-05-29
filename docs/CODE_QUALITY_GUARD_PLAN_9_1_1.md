@@ -332,6 +332,15 @@ Suggested negative scans:
 | fake `WebAdminMapServer` reference | hard docs/source grep | use actual `MapServer` / `MapDataStore` names |
 | route/snapshot adapter | hard if extracted | write-before snapshot, audit, realtime and CSRF/same-origin remain before mutation |
 
+Phase 5 implementation note:
+
+- `WebAdminLogicChainEditorService.saveDraft()` is reduced to a facade into `LogicChainDraftSaveCoordinator`; the rest of the public service API remains unchanged.
+- `LogicChainDraftSaveCoordinator` owns the frozen save flow only: preflight, editor lock, fingerprint, validation, mixed-write fail-closed guards, typed execution, channel metadata tail write and successful editor lock release.
+- `LogicChainDraftOperationPlanner` centralizes operation presence checks and the typed/channel metadata boundaries without executing store mutation or introducing freeform graph save.
+- `LogicChainTypedWriteExecutor` preserves the original typed order: new nodes -> action append -> existing node edits -> action edits -> action deletes -> action reorders -> node deletes.
+- VBD/world device/RegionController/action/node delete typed writes still delegate to the existing adapter methods; rollback remains partial and must not be documented as a full cross-store atomic transaction.
+- Guard now ratchets `WebAdminLogicChainEditorService.java` after the coordinator split and requires coordinator/planner/executor markers plus a planner ordering test.
+
 ## Performance marker baseline guard
 
 Initial markers:
