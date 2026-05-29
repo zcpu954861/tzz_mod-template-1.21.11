@@ -80,6 +80,8 @@ public final class CodeQualityGuardTest {
         run(report);
         WebAdminFrontendBundleGuardTest.run(report);
         WebAdminPerformanceBaselineGuardTest.run(report);
+        RuntimePerformanceBaselineGuardTest.run(report);
+        StorePerformanceBaselineGuardTest.run(report);
         DocsConsistencyGuardTest.run(report);
         report.printAndFail();
     }

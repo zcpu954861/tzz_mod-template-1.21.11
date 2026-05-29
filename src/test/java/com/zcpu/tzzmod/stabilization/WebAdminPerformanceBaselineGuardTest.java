@@ -7,8 +7,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class WebAdminPerformanceBaselineGuardTest {
     private static final int PHASE6_APP_JS_BEFORE_BYTES = 1_843_648;
@@ -89,6 +92,8 @@ public final class WebAdminPerformanceBaselineGuardTest {
                 report.warning("Node vm.Script parse timing timed out; syntax is covered by node --check. " + error.getMessage());
         }
         runLogicChainSyntheticBaseline(report, node, output);
+        runPhase912RealJsGraphBenchmarks(report, node, output);
+        runPhase912JavaProxyGraphBenchmarks(report);
 
         String performanceDoc = CodeQualityGuardSupport.read("docs/PERFORMANCE_HOTSPOTS_9_1_1.md");
         String currentContext = CodeQualityGuardSupport.read("docs/CODEBASE_HEALTH_GUARD_BASELINE_9_1_1_CURRENT_CONTEXT.md");
@@ -128,6 +133,265 @@ public final class WebAdminPerformanceBaselineGuardTest {
         warnTiming(report, metrics, "vbd", 50.0d);
     }
 
+    private static void runPhase912RealJsGraphBenchmarks(
+            CodeQualityGuardSupport.GuardReport report,
+            String node,
+            Path appJs
+    ) throws Exception {
+        Path harness = CodeQualityGuardSupport.projectRoot().resolve("build/tmp/webadmin-phase912-real-js-graph-bench.js");
+        Path metricsPath = CodeQualityGuardSupport.projectRoot().resolve("build/tmp/webadmin-phase912-real-js-graph-bench.metrics");
+        Files.writeString(harness, phase912RealJsGraphHarness(), StandardCharsets.UTF_8);
+        CodeQualityGuardSupport.CommandResult result = CodeQualityGuardSupport.runCommand(Duration.ofSeconds(240),
+                node, harness.toString(), appJs.toString(), metricsPath.toString());
+        report.metric("performance.phase912.real_js.exit", result.exitCode);
+        if (result.exitCode != 0) {
+            report.fail("9.1.2 real app.js Logic Chain graph benchmark failed: " + result.output);
+            return;
+        }
+        String metricsOutput = Files.exists(metricsPath)
+                ? Files.readString(metricsPath, StandardCharsets.UTF_8)
+                : "";
+        Map<String, Double> previousByCase = new LinkedHashMap<>();
+        int rowCount = 0;
+        for (String line : metricsOutput.split("\\R")) {
+            if (!line.startsWith("BENCH;")) {
+                continue;
+            }
+            rowCount++;
+            Map<String, String> fields = parseSemicolonFields(line.substring("BENCH;".length()));
+            SyntheticFixtureFactory.FixtureTier tier = tierById(fields.get("tier"));
+            String operation = fields.getOrDefault("operation", "unknown");
+            double ms = parseDouble(fields.get("ms"));
+            int nodeCount = parseInt(fields.get("nodeCount"));
+            int edgeCount = parseInt(fields.get("edgeCount"));
+            int bytes = parseInt(fields.get("bytes"));
+            int minimapSegments = parseInt(fields.get("minimapSegments"));
+            String hash = fields.getOrDefault("hash", "");
+            String error = fields.getOrDefault("error", "");
+            report.require(error.isBlank(), "9.1.2 real JS graph benchmark error operation=" + operation
+                    + " tier=" + tier.id + " error=" + error);
+            report.require(nodeCount > 0, "9.1.2 real JS graph DOM node invariant missing operation=" + operation
+                    + " tier=" + tier.id);
+            report.require(edgeCount > 0 || tier.graphEdges == 0, "9.1.2 real JS graph DOM edge invariant missing operation=" + operation
+                    + " tier=" + tier.id);
+            if ("minimap".equals(operation)) {
+                report.require(minimapSegments <= 24, "9.1.2 real JS minimap cap changed tier=" + tier.id
+                        + " minimapSegments=" + minimapSegments);
+            }
+            String caseName = "logic_chain.real_js." + operation;
+            Double previous = previousByCase.put(caseName, ms);
+            SyntheticFixtureFactory.BenchmarkRow row = SyntheticFixtureFactory.benchmarkRow(
+                    "webadmin_graph",
+                    caseName,
+                    tier,
+                    tier.graphNodes,
+                    tier.graphEdges,
+                    ms,
+                    previous,
+                    realJsComplexity(operation),
+                    "真实生成 app.js 在 Node VM 中执行 renderLogicChainViewer；DOM shape/hash 作为 Phase 1 大图硬不变量，timing 只报告低配估算。",
+                    false,
+                    Map.of(
+                            "bytes", bytes,
+                            "dom_node_count", nodeCount,
+                            "dom_edge_count", edgeCount,
+                            "dom_minimap_segments", minimapSegments,
+                            "dom_signature_hash", hash,
+                            "measurement_mode", "direct",
+                            "direct_measured", true,
+                            "operation_frequency", highFrequencyOperation(operation) ? "high_frequency_interaction" : "route_or_manual",
+                            "dom_equivalence_required", true
+                    )
+            );
+            report.metric("benchmark.webadmin_graph." + caseName + "." + tier.id, row.metricValue());
+            if (!"PASS".equals(row.riskLevel())) {
+                report.warning("9.1.2 real JS WebAdmin graph benchmark risk " + row.riskLevel()
+                        + ": " + caseName + " tier=" + tier.id + " reason=" + row.reason());
+            }
+        }
+        report.require(rowCount == 40, "9.1.2 real JS graph benchmark must emit 40 tier/operation rows; actual=" + rowCount);
+    }
+
+    private static void runPhase912JavaProxyGraphBenchmarks(CodeQualityGuardSupport.GuardReport report) {
+        Map<String, Double> previousByCase = new LinkedHashMap<>();
+        for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
+            SyntheticFixtureFactory.GraphFixture graph = SyntheticFixtureFactory.graph(tier);
+            checkPhase912GraphShape(report, graph);
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.initial_render", "O(nodes+edges)",
+                    "Java proxy 只补充 fixture shape/summary，不替代真实 app.js DOM benchmark。",
+                    () -> renderGraphSummary(graph, false, false));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.edit_mode_render", "O(nodes+edges+drafts)",
+                    "Java proxy 只补充 edit/draft 摘要；真实 DOM 由 logic_chain.real_js.* 行覆盖。",
+                    () -> renderGraphSummary(graph, true, false));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.hover_highlight", "O(edges)",
+                    "Java proxy 只补充 hover 相关边摘要；真实 renderLogicChainViewer 另有 VM benchmark。",
+                    () -> hoverSummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.click_selection", "O(nodes+edges)",
+                    "Java proxy 只补充 selection 摘要；真实右侧 panel/DOM 由 VM benchmark 采集。",
+                    () -> clickSummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.zoom_pan", "O(nodes)",
+                    "Java proxy 只补充 transform checksum；真实 zoom/pan render 由 VM benchmark 采集。",
+                    () -> zoomPanSummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.drag_preview", "O(nodes)",
+                    "Java proxy 只补充 legal/illegal slot 摘要；真实 app.js benchmark 另行输出。",
+                    () -> dragPreviewSummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.vbd_trigger_overlay", "O(edges)",
+                    "Java proxy 只补充 VBD source/target 摘要；真实 VBD overlay DOM 由 VM benchmark 采集。",
+                    () -> vbdOverlaySummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.unsaved_diff_expanded", "O(drafts+deletes)",
+                    "Java proxy 只补充 diff 计数；真实 diff banner HTML 由 VM benchmark 采集。",
+                    () -> diffSummary(graph));
+            runGraphOperation(report, previousByCase, graph, "logic_chain.java_proxy.minimap", "O(min(segments,24))",
+                    "Java proxy 只补充 segment cap；真实 minimap DOM 由 VM benchmark 采集。",
+                    () -> minimapSummary(graph));
+        }
+    }
+
+    private static void checkPhase912GraphShape(CodeQualityGuardSupport.GuardReport report,
+                                                SyntheticFixtureFactory.GraphFixture graph) {
+        report.require(graph.complete(), "9.1.2 synthetic graph fixture incomplete for tier=" + graph.tier().id);
+        for (Map.Entry<String, Boolean> entry : graph.coverage().entrySet()) {
+            report.require(Boolean.TRUE.equals(entry.getValue()),
+                    "9.1.2 graph fixture missing coverage " + entry.getKey() + " tier=" + graph.tier().id);
+        }
+        report.metric("benchmark.webadmin_graph.fixture." + graph.tier().id + ".nodes", graph.nodes().size());
+        report.metric("benchmark.webadmin_graph.fixture." + graph.tier().id + ".edges", graph.edges().size());
+        report.metric("benchmark.webadmin_graph.fixture." + graph.tier().id + ".segments", graph.segments().size());
+    }
+
+    private static void runGraphOperation(
+            CodeQualityGuardSupport.GuardReport report,
+            Map<String, Double> previousByCase,
+            SyntheticFixtureFactory.GraphFixture graph,
+            String caseName,
+            String complexity,
+            String reason,
+            java.util.function.Supplier<String> operation
+    ) {
+        List<String> outputs = new ArrayList<>(3);
+        long nanos = SyntheticFixtureFactory.measureNanos(() -> outputs.add(operation.get()));
+        String output = outputs.isEmpty() ? "" : outputs.get(0);
+        double ms = SyntheticFixtureFactory.nanosToMillis(nanos);
+        Double previous = previousByCase.put(caseName, ms);
+        SyntheticFixtureFactory.BenchmarkRow row = SyntheticFixtureFactory.benchmarkRow(
+                "webadmin_graph",
+                caseName,
+                graph.tier(),
+                graph.nodes().size(),
+                graph.edges().size(),
+                ms,
+                previous,
+                complexity,
+                reason,
+                false,
+                Map.of(
+                        "bytes", SyntheticFixtureFactory.utf8Bytes(output),
+                        "operation_frequency", caseName.contains("hover") || caseName.contains("drag") || caseName.contains("zoom")
+                                ? "high_frequency_interaction"
+                                : "route_or_manual",
+                        "dom_equivalence_required", true
+                )
+        );
+        report.metric("benchmark.webadmin_graph." + caseName + "." + graph.tier().id, row.metricValue());
+        if (!"PASS".equals(row.riskLevel())) {
+            report.warning("9.1.2 WebAdmin graph benchmark risk " + row.riskLevel()
+                    + ": " + caseName + " tier=" + graph.tier().id + " reason=" + row.reason());
+        }
+    }
+
+    private static String renderGraphSummary(SyntheticFixtureFactory.GraphFixture graph, boolean editMode, boolean selected) {
+        StringBuilder builder = new StringBuilder(graph.nodes().size() * 32 + graph.edges().size() * 24);
+        for (SyntheticFixtureFactory.GraphNode node : graph.nodes()) {
+            builder.append(node.id()).append('|').append(node.type()).append('|')
+                    .append(node.column()).append(',').append(node.row());
+            if (editMode && node.draft()) {
+                builder.append("|draft");
+            }
+            if (node.pendingDelete()) {
+                builder.append("|pending-delete");
+            }
+            if (selected && node.id().equals(graph.selectedNodeId())) {
+                builder.append("|selected");
+            }
+            builder.append('\n');
+        }
+        for (SyntheticFixtureFactory.GraphEdge edge : graph.edges()) {
+            builder.append(edge.from()).append("->").append(edge.to()).append('|').append(edge.type()).append('\n');
+        }
+        return builder.toString();
+    }
+
+    private static String hoverSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        Set<String> related = graph.relatedIds(graph.selectedNodeId());
+        return graph.selectedNodeId() + "|related=" + related.size() + "|edges=" + graph.edges().size();
+    }
+
+    private static String clickSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        return renderGraphSummary(graph, false, true) + "panel=" + graph.selectedNodeId()
+                + "|related=" + graph.relatedIds(graph.selectedNodeId()).size();
+    }
+
+    private static String zoomPanSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        double zoom = 1.25d;
+        int panX = 80;
+        int panY = -40;
+        long checksum = 0L;
+        for (SyntheticFixtureFactory.GraphNode node : graph.nodes()) {
+            checksum += Math.round((node.column() * 220 + panX) * zoom);
+            checksum += Math.round((node.row() * 120 + panY) * zoom);
+        }
+        return "zoom=1.25|pan=80,-40|checksum=" + checksum;
+    }
+
+    private static String dragPreviewSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        int legal = 0;
+        int illegal = 0;
+        for (SyntheticFixtureFactory.GraphNode node : graph.nodes()) {
+            if ((node.column() + node.row()) % 5 == 0) {
+                illegal++;
+            } else {
+                legal++;
+            }
+        }
+        return "legal=" + legal + "|illegal=" + illegal;
+    }
+
+    private static String vbdOverlaySummary(SyntheticFixtureFactory.GraphFixture graph) {
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        for (SyntheticFixtureFactory.GraphEdge edge : graph.edges()) {
+            if ("vbd_trigger".equals(edge.type())) {
+                count++;
+                if (builder.length() == 0) {
+                    builder.append("source=").append(edge.from())
+                            .append("|triggerKey=right_click")
+                            .append("|target=").append(edge.to());
+                }
+            }
+        }
+        return builder.append("|count=").append(count).toString();
+    }
+
+    private static String diffSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        int drafts = 0;
+        int deletes = 0;
+        for (SyntheticFixtureFactory.GraphNode node : graph.nodes()) {
+            if (node.draft()) {
+                drafts++;
+            }
+            if (node.pendingDelete()) {
+                deletes++;
+            }
+        }
+        return "drafts=" + drafts + "|pendingDelete=" + deletes + "|expanded=true";
+    }
+
+    private static String minimapSummary(SyntheticFixtureFactory.GraphFixture graph) {
+        return String.join(",", graph.segments().stream().limit(24).toList())
+                + "|segmentCount=" + Math.min(24, graph.segments().size())
+                + "|pointerEvents=none";
+    }
+
     private static void requireMetric(CodeQualityGuardSupport.GuardReport report, Map<String, String> metrics,
                                       String key, String expected) {
         String actual = metrics.get(key);
@@ -163,6 +427,56 @@ public final class WebAdminPerformanceBaselineGuardTest {
             metrics.put(line.substring(0, index).trim(), line.substring(index + 1).trim());
         }
         return metrics;
+    }
+
+    private static Map<String, String> parseSemicolonFields(String value) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        for (String part : value.split(";")) {
+            int index = part.indexOf('=');
+            if (index <= 0) {
+                continue;
+            }
+            fields.put(part.substring(0, index), part.substring(index + 1));
+        }
+        return fields;
+    }
+
+    private static SyntheticFixtureFactory.FixtureTier tierById(String id) {
+        for (SyntheticFixtureFactory.FixtureTier tier : SyntheticFixtureFactory.tiers()) {
+            if (tier.id.equals(id)) {
+                return tier;
+            }
+        }
+        throw new IllegalArgumentException("Unknown fixture tier: " + id);
+    }
+
+    private static double parseDouble(String value) {
+        try {
+            return Double.parseDouble(value == null ? "0" : value);
+        } catch (NumberFormatException ignored) {
+            return 0.0d;
+        }
+    }
+
+    private static int parseInt(String value) {
+        try {
+            return Integer.parseInt(value == null ? "0" : value);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static String realJsComplexity(String operation) {
+        return switch (operation) {
+            case "hover_highlight", "vbd_trigger_overlay" -> "O(nodes+edges)";
+            case "minimap" -> "O(nodes+edges)+O(min(segments,24))";
+            case "drag_preview" -> "O(nodes+edges+drafts)";
+            default -> "O(nodes+edges)";
+        };
+    }
+
+    private static boolean highFrequencyOperation(String operation) {
+        return operation.contains("hover") || operation.contains("drag") || operation.contains("zoom") || operation.contains("click");
     }
 
     private static Map<String, Map<String, String>> phase6DomBaselines() {
@@ -242,6 +556,101 @@ public final class WebAdminPerformanceBaselineGuardTest {
         report.requireContains(canvas, "function setLogicChainZoom(delta){appState.logicChainCanvas.zoom=Math.max(.45,Math.min(1.8,Number(appState.logicChainCanvas.zoom||1)+Number(delta||0)));"
                         + "if(appState.currentLogicChainGraph)renderLogicChainViewer(",
                 "Phase 7 defers zoom transform-only optimization until toolbar/pan equivalence is guarded");
+    }
+
+    private static String phase912RealJsGraphHarness() {
+        return """
+                const fs=require('fs');
+                const vm=require('vm');
+                const crypto=require('crypto');
+                const code=fs.readFileSync(process.argv[2],'utf8');
+                const outputPath=process.argv[3];
+                const rows=[];
+                function emit(line){rows.push(line);}
+                function makeEl(){return {innerHTML:'',dataset:{},className:'',style:{},children:[],scrollTop:0,scrollLeft:0,addEventListener(){},removeEventListener(){},querySelector(){return null;},querySelectorAll(){return [];},closest(){return null;},getAttribute(){return null;},setAttribute(){},focus(){},classList:{add(){},remove(){},contains(){return false;},toggle(){}}};}
+                const view=makeEl();
+                const document={body:makeEl(),documentElement:makeEl(),addEventListener(){},removeEventListener(){},querySelector(){return null;},querySelectorAll(){return [];},getElementById(id){return id==='app-view'?view:null;},createElement(){return makeEl();}};
+                const context={console,document,window:null,globalThis:null,navigator:{onLine:true},location:{hash:'#/logic-chains'},localStorage:{getItem(){return null;},setItem(){},removeItem(){}},addEventListener(){},removeEventListener(){},setTimeout,clearTimeout,setInterval,clearInterval,requestAnimationFrame:(cb)=>{cb();return 1;},cancelAnimationFrame(){},performance:{now:()=>Date.now()},URL,URLSearchParams,TextEncoder,TextDecoder,fetch:async()=>({ok:true,json:async()=>({})})};
+                context.window=context;
+                context.globalThis=context;
+                vm.createContext(context);
+                vm.runInContext(code+`
+                ;globalThis.__phase912Run=function(graph,operation){
+                  appState.me={username:'Owner',role:'OWNER'};
+                  appState.currentLogicChainGraph=graph;
+                  const firstNode=(graph.nodes||[])[Math.min((graph.nodes||[]).length-1,Math.floor((graph.nodes||[]).length/3))]||{};
+                  const firstVbd=(graph.nodes||[]).find(n=>String(n.refType||'')==='virtual_block_device')||firstNode;
+                  appState.logicChainCanvas={zoom:operation==='zoom_pan'?1.35:1,panX:operation==='zoom_pan'?120:0,panY:operation==='zoom_pan'?-60:0,selectedNodeId:'',focusNodeId:'',hoverNodeId:'',detailOpen:true,graphKey:'CHANNEL:root',collapsedChannels:{},viewMode:'BOTH',nodeTypeFilter:'ALL',routeInfo:{fallback:'#/logic-chains'}};
+                  appState.logicChainEditor=null;
+                  if(operation==='hover_highlight')appState.logicChainCanvas.hoverNodeId=firstNode.id||'channel:root';
+                  if(operation==='click_selection'||operation==='vbd_trigger_overlay')appState.logicChainCanvas.selectedNodeId=firstVbd.id||firstNode.id||'channel:root';
+                  if(operation==='click_selection'||operation==='vbd_trigger_overlay')appState.logicChainCanvas.focusNodeId=appState.logicChainCanvas.selectedNodeId;
+                  if(operation==='click_selection'||operation==='vbd_trigger_overlay')appState.logicChainCanvas.selectionPinned=true;
+                  if(operation==='edit_mode_render'||operation==='draft_overlay'||operation==='unsaved_diff_expanded'||operation==='drag_preview'){
+                    appState.logicChainEditor={active:true,routeHash:'#/logic-chains',rootType:'CHANNEL',rootRef:'root',includeDisabled:true,maxDepth:6,lockId:'lock',lockLost:false,baseGraphFingerprint:'base-fp',nodes:[{id:'draft:listener',type:'signal_listener',displayName:'Draft Listener',label:'Draft Listener',column:'C2',slot:1,placed:true,enabled:true,signalListener:{actions:[{type:'message',value:'hello',enabled:true,_pendingDelete:operation==='unsaved_diff_expanded'}]}}],edges:[{from:'channel:root',to:'draft:listener',type:'consumes',label:'draft consumes',metadata:{draft:true,newEdge:true}}],draftChannels:[{channel:'draft.out',displayName:'Draft Out',metadataDraft:true}],existingNodeEdits:[],actionEdits:[],nodeDeletes:operation==='unsaved_diff_expanded'?[{nodeId:firstNode.id||'channel:root',displayName:'Delete Candidate'}]:[],actionDeletes:[],actionReorders:[],dirty:operation!=='edit_mode_render',errors:[],connectionMode:operation==='drag_preview'?'signal_listener':'',saving:false,diffExpanded:operation==='unsaved_diff_expanded'};
+                  }
+                  if(operation==='vbd_trigger_overlay'){
+                    const native={deviceId:'vbd-synthetic',originalJson:'{}',values:{interactionEnabled:true,interactChannel:'draft.out',containerChangeEnabled:true,containerChangeChannel:'container.out'}};
+                    const draft={kind:'virtual_block_device',targetId:'vbd-synthetic',deviceId:'vbd-synthetic',displayName:'VBD Synthetic',confirmed:true,sourceNodeId:firstVbd.id||'',original:{},virtualBlockDevice:{selectedTriggerType:'right_click',nativeTriggerDraft:native,itemSubmitRequirements:[{displayName:'Item One',count:1,consumeCount:1}]}};
+                    appState.logicChainEditor={active:true,routeHash:'#/logic-chains',rootType:'CHANNEL',rootRef:'root',includeDisabled:true,maxDepth:6,lockId:'lock',lockLost:false,baseGraphFingerprint:'base-fp',nodes:[],edges:[],draftChannels:[{channel:'draft.out',displayName:'Draft Out',metadataDraft:true},{channel:'container.out',displayName:'Container Out',metadataDraft:true}],existingNodeEdits:[draft],existingEdit:draft,actionEdits:[],nodeDeletes:[],actionDeletes:[],actionReorders:[],dirty:true,errors:[],connectionMode:'',saving:false,diffExpanded:true};
+                  }
+                  renderLogicChainViewer(graph,{fallback:'#/logic-chains'},{silent:true});
+                  return document.getElementById('app-view').innerHTML||'';
+                };`,context,{filename:'webadmin-app.js'});
+                const tiers=[['small',20,30],['medium',100,200],['large',500,1000],['stress',2000,5000]];
+                const operations=['initial_render','edit_mode_render','hover_highlight','click_selection','zoom_pan','drag_preview','draft_overlay','vbd_trigger_overlay','unsaved_diff_expanded','minimap'];
+                function lcg(seed){let s=seed>>>0;return ()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
+                function makeGraph(tier,nodesCount,edgesCount){
+                  const rand=lcg(912012+nodesCount);
+                  const nodes=[{id:'producer:root',type:'producer',label:'Root',channel:'root',enabled:true,metadata:{nodeKind:'primary'}},{id:'channel:root',type:'channel',label:'Root Channel',channel:'root',enabled:true,metadata:{nodeKind:'primary'}}];
+                  const cycle=['signal_listener','action','virtual_block_device','timer','signal_join','region_controller','state_variable','condition_group','channel'];
+                  for(let i=2;i<nodesCount;i++){
+                    const kind=cycle[i%cycle.length];
+                    const node={id:`${kind}:${i}`,type:'consumer',refType:kind,label:`节点 ${i}`,channel:`synthetic.channel.${i%97}`,enabled:i%13!==0,metadata:{synthetic:true,nodeKind:'primary'}};
+                    if(kind==='action')node.type='action';
+                    if(kind==='virtual_block_device'){node.type='producer';node.refId='vbd-synthetic';node.metadata.deviceId='vbd-synthetic';node.metadata.kind='virtual_block_device';}
+                    if(kind==='channel'){node.type='channel';node.refType='channel';}
+                    nodes.push(node);
+                  }
+                  const edges=[];
+                  for(let i=0;i<Math.min(edgesCount,nodes.length-1);i++){
+                    edges.push({from:nodes[i%nodes.length].id,to:nodes[(i+1)%nodes.length].id,type:i%7===0?'vbd_outputs_channel':'consumes',label:`edge ${i}`,pathGroupId:i%5===0?'draft':''});
+                  }
+                  for(let i=edges.length;i<edgesCount;i++){
+                    const fromIndex=Math.floor(rand()*Math.max(1,nodes.length-1));
+                    const toIndex=Math.min(nodes.length-1,fromIndex+1+Math.floor(rand()*Math.max(1,nodes.length-fromIndex-1)));
+                    const from=nodes[fromIndex];
+                    const to=nodes[toIndex];
+                    if(from&&to&&from.id!==to.id)edges.push({from:from.id,to:to.id,type:i%11===0?'executes':'consumes',label:`edge ${i}`});
+                  }
+                  const segmentCount=Math.max(30,Math.ceil(nodesCount/20));
+                  const segments=Array.from({length:segmentCount},(_,i)=>({channel:`segment.${tier}.${i}`,downstreamChannels:Array.from({length:i%5},(__,j)=>`segment.${tier}.${i}.${j}`)}));
+                  return {id:`synthetic-${tier}`,componentId:`synthetic-${tier}`,displayName:`Synthetic ${tier}`,root:{id:'producer:root',type:'producer',label:'Root',channel:'root'},metadata:{rootType:'CHANNEL',rootRef:'root'},stats:{},segments,nodes,edges};
+                }
+                function count(s,needle){return String(s||'').split(needle).length-1;}
+                function sig(html){
+                  const compact=String(html||'').replace(/\\s+/g,' ').slice(0,400000);
+                  return crypto.createHash('sha256').update(compact).digest('hex').slice(0,16);
+                }
+                function safe(value){return String(value||'').replace(/[;\\r\\n=]/g,'_').slice(0,180);}
+                for(const [tier,nodes,edges] of tiers){
+                  for(const operation of operations){
+                    const graph=makeGraph(tier,nodes,edges);
+                    const start=process.hrtime.bigint();
+                    try{
+                      const html=context.__phase912Run(graph,operation);
+                      const ms=Number(process.hrtime.bigint()-start)/1e6;
+                      const row={ms:ms.toFixed(3),bytes:Buffer.byteLength(html,'utf8'),nodeCount:count(html,'logic-chain-node-card'),edgeCount:count(html,'logic-chain-edge'),minimapSegments:count(html,'logic-chain-minimap-segment'),hash:sig(html)};
+                      emit(`BENCH;operation=${operation};tier=${tier};ms=${row.ms};bytes=${row.bytes};nodeCount=${row.nodeCount};edgeCount=${row.edgeCount};minimapSegments=${row.minimapSegments};hash=${row.hash};error=`);
+                    }catch(error){
+                      const ms=Number(process.hrtime.bigint()-start)/1e6;
+                      emit(`BENCH;operation=${operation};tier=${tier};ms=${ms.toFixed(3)};bytes=0;nodeCount=0;edgeCount=0;minimapSegments=0;hash=error;error=${safe(error&&error.stack?error.stack:error)}`);
+                    }
+                  }
+                }
+                fs.writeFileSync(outputPath,rows.join('\\n'),'utf8');
+                console.log(`rows=${rows.length}`);
+                """;
     }
 
     private static void putScenario(Map<String, Map<String, String>> baselines, String name,
