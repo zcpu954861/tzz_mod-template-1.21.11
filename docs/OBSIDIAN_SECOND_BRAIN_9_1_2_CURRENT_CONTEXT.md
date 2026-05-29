@@ -10,6 +10,24 @@ E:\minecraftserver\fabricmod\tzz-mod-docs-obsidian\Tzz Mod work
 
 The vault is not a Git repository. Do not run `git init` there. Do not copy large code blocks into notes. Keep notes as durable project memory, not a phase log dump.
 
+## Final Release Status
+
+9.1.2 is sealed in the Git release artifact as `v1.68.3-real-performance-deep-simplification`.
+
+| Field | Value |
+| --- | --- |
+| master / peeled commit | `1188c6601d7071e31aff3bfbc2355e7470bebafe` |
+| tag object | `e793aa30e720991d024fafaf4beef99dd54f2993` |
+| previous stable baseline | `v1.68.2-codebase-health-stabilization` / `9bcb2db13af769fb7897befe96eeb93b849bd038` |
+| final guard repair | `1188c66 test: align 9.1.2 code quality guard baselines` |
+
+The final guard repair changed `CodeQualityGuardSupport.bytes()` from raw `Files.size(...)` to CRLF -> LF normalized UTF-8 byte counting. This fixes platform-dependent working-tree byte drift without weakening the no-growth hard guard. The final normalized baselines are:
+
+- `WebAdminVirtualBlockDeviceNativeTriggerService.java`: 1464 lines / 80967 bytes.
+- `StabilizationGuardTest.java`: 12430 lines / 826376 bytes.
+
+The final validation set passed: `testClasses`, `codeQualityGuardTest --rerun-tasks`, `stabilizationGuardTest --rerun-tasks`, `localTestMcpGuardTest --rerun-tasks`, `clean build`, `git diff --check`, and `git diff --cached --check`. MCP npm build/test stayed skipped because `tools/tzz-test-mcp` was unchanged.
+
 ## Precision Repository Index Supplement
 
 The long-term project rule has been upgraded: Obsidian is now a rolling precision repository index and external project memory, not only a summary vault.

@@ -4,6 +4,12 @@
 
 9.1.2 must not depend on user-provided large real worlds or large real Logic Chains. Phase 1 will add deterministic synthetic fixtures with fixed seed `912012`.
 
+## Final Release Status
+
+The final 9.1.2 release artifact is `v1.68.3-real-performance-deep-simplification` at `1188c6601d7071e31aff3bfbc2355e7470bebafe`.
+
+The final validation confirmed synthetic fixture and benchmark guard execution through `codeQualityGuardTest --rerun-tasks`, while keeping timing rows warning/report-only. Synthetic fixtures remain deterministic trend and invariant evidence; they do not replace real browser or real Minecraft smoke validation.
+
 Fixtures must be behavior-safe:
 
 - they must not start Minecraft;
