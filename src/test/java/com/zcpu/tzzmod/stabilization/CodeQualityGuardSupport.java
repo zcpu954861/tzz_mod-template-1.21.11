@@ -45,7 +45,7 @@ final class CodeQualityGuardSupport {
     }
 
     static long bytes(String relative) throws IOException {
-        return Files.size(path(relative));
+        return read(relative).replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8).length;
     }
 
     static long lineCount(String relative) throws IOException {
