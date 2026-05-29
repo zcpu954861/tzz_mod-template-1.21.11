@@ -67,7 +67,7 @@ public final class CodeQualityGuardTest {
 
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
-        report.metric("branch.scope", "phase3-event-router-split");
+        report.metric("branch.scope", "phase4-logic-chain-render-module-split");
         checkKnownFileBaselines(report);
         checkFrontendScriptsFacade(report);
         checkBeforeVxx(report);
@@ -116,9 +116,24 @@ public final class CodeQualityGuardTest {
                 "WebAdminFrontendCoreEventScripts.appJs()",
                 "WebAdminFrontendPageScripts.appJs()",
                 "WebAdminLogicChainViewerScripts.appJs()",
+                "WebAdminLogicChainCanvasScripts.appJs()",
+                "WebAdminLogicChainNodePanelScripts.appJs()",
+                "WebAdminLogicChainCanvasScripts.stageAppJs()",
+                "WebAdminLogicChainLayoutScripts.appJs()",
+                "WebAdminLogicChainDraftOverlayScripts.appJs()",
+                "WebAdminLogicChainCanvasScripts.renderAppJs()",
                 "WebAdminLogicChainEditorScripts.appJs()",
                 "WebAdminLogicChainVbdScripts.appJs()",
+                "WebAdminLogicChainVbdOverlayScripts.appJs()",
                 "WebAdminFrontendBootstrapScripts.appJs()");
+        String editorFacade = CodeQualityGuardSupport.read(
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminLogicChainEditorScripts.java");
+        report.requireContains(editorFacade, "WebAdminLogicChainDiffScripts.appJs()",
+                "Logic Chain editor concat must include diff summary module at the original generated order");
+        requireOrdered(report, editorFacade,
+                "function confirmLogicChainActionEditDraft",
+                "WebAdminLogicChainDiffScripts.appJs()",
+                "function renderLogicChainActionAppendChannelCombo");
     }
 
     private static void requireOrdered(CodeQualityGuardSupport.GuardReport report, String text, String... needles) {

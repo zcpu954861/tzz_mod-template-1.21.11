@@ -77,6 +77,7 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin.app_js.phase2_baseline_sha256", APP_JS_PHASE2_BASELINE_SHA256);
         report.metric("webadmin.app_js.phase3_hard_limit", APP_JS_PHASE3_HARD_LIMIT_BYTES);
         report.metric("webadmin.app_css.bytes", appCssBytes);
+        checkPhase4BeforeAfterEquivalence(report, appJs, appJsBytes, appJsSha256);
         if (appJsBytes > APP_JS_PHASE3_HARD_LIMIT_BYTES) {
             report.fail("Phase 3 generated app.js exceeded baseline + 5% hard limit: actualBytes="
                     + appJsBytes + " limit=" + APP_JS_PHASE3_HARD_LIMIT_BYTES + " actualSha256=" + appJsSha256);
@@ -99,6 +100,28 @@ public final class WebAdminFrontendBundleGuardTest {
         report.metric("webadmin." + name + ".warning_limit", warningLimit);
         if (actual > warningLimit) {
             report.warning(name + " bytes exceeded current + 5% warning baseline: actual=" + actual + " limit=" + warningLimit);
+        }
+    }
+
+    private static void checkPhase4BeforeAfterEquivalence(CodeQualityGuardSupport.GuardReport report, String appJs,
+                                                          int appJsBytes, String appJsSha256) throws Exception {
+        Path before = CodeQualityGuardSupport.projectRoot().resolve("build/tmp/webadmin-app-phase4-before.js");
+        boolean beforeExists = Files.exists(before);
+        report.metric("webadmin.app_js.phase4_before.exists", beforeExists);
+        if (!beforeExists) {
+            return;
+        }
+        String beforeText = Files.readString(before, StandardCharsets.UTF_8);
+        int beforeBytes = beforeText.getBytes(StandardCharsets.UTF_8).length;
+        String beforeSha256 = sha256Hex(beforeText);
+        report.metric("webadmin.app_js.phase4_before.bytes", beforeBytes);
+        report.metric("webadmin.app_js.phase4_before.sha256", beforeSha256);
+        report.metric("webadmin.app_js.phase4_after.bytes", appJsBytes);
+        report.metric("webadmin.app_js.phase4_after.sha256", appJsSha256);
+        if (beforeBytes != appJsBytes || !beforeSha256.equals(appJsSha256) || !beforeText.equals(appJs)) {
+            report.fail("Phase 4 Logic Chain module split changed generated app.js output: beforeBytes="
+                    + beforeBytes + " afterBytes=" + appJsBytes + " beforeSha256=" + beforeSha256
+                    + " afterSha256=" + appJsSha256);
         }
     }
 

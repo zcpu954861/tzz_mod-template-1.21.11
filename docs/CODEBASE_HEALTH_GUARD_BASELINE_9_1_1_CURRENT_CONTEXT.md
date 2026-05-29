@@ -162,6 +162,37 @@ Phase 3 guard changes:
 - Route table entries must use named handlers rather than inline lambdas.
 - `node --check build/tmp/webadmin-app.js`, `BeforeV18+ = 0`, facade checks and pointer-events guards remain hard checks.
 
+## Phase 4 Logic Chain Render Module Split Context
+
+Phase 4 mechanically splits Logic Chain render/layout/draft-related frontend script boundaries while preserving the Phase 3 generated JavaScript output.
+
+- Phase 4 branch: `feature/logic-chain-render-module-split-9-1-1`.
+- Phase 4 base: `origin/feature/webadmin-event-router-split-9-1-1` at `5dc2b4181ab42262508e6a2827b8c8a2c76dbc23`.
+- `WebAdminFrontendScripts.java` remains the bundle facade and now concatenates the smaller Logic Chain render modules in original generated order.
+- `WebAdminFrontendAssets`, `WebAdminServer`, `WebAdminFrontendStyles`, backend/runtime services, commands, stores and MCP tooling remain unchanged.
+- Generated `app.js` is byte-identical to the Phase 4 before artifact: `1,843,648` bytes, SHA-256 `057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3`.
+
+Phase 4 Logic Chain frontend script modules:
+
+- `WebAdminLogicChainViewerScripts`: Logic Chain list/detail route rendering and viewer shell helpers before canvas composition.
+- `WebAdminLogicChainCanvasScripts`: canvas toolbar/minimap helpers, canvas stage entry, mind map/edge path render helpers, and canvas interaction helpers. The class exposes ordered sub-entry methods so generated output remains byte-identical.
+- `WebAdminLogicChainNodePanelScripts`: selected-node detail panel, readonly/deferred cards, node metadata rows and action-entry render helpers.
+- `WebAdminLogicChainLayoutScripts`: layout V2, fixed node height application, saved producer placement adjustment and layout helper functions.
+- `WebAdminLogicChainDraftOverlayScripts`: base draft layout overlay, draft channel/reference insertion, draft slot overlay and related draft layout helpers.
+- `WebAdminLogicChainDiffScripts`: existing draft comparison, draft diff rows, unsaved change banner and diff HTML helper.
+- `WebAdminLogicChainEditorScripts`: Logic Chain edit/draft/save modal helpers; it imports `WebAdminLogicChainDiffScripts.appJs()` at the original generated order.
+- `WebAdminLogicChainVbdScripts`: VBD native trigger readable diff summaries and pre-overlay VBD helper hooks.
+- `WebAdminLogicChainVbdOverlayScripts`: VBD native trigger graph overlay, stable trigger identity, capture retry and itemSubmit/container draft writeback wrappers.
+
+Phase 4 guard changes:
+
+- `CodeQualityGuardTest` facade order now includes the new Logic Chain modules and the ordered Canvas sub-entry methods.
+- `CodeQualityGuardTest` verifies `WebAdminLogicChainEditorScripts` includes `WebAdminLogicChainDiffScripts.appJs()` in the expected local order.
+- `WebAdminFrontendBundleGuardTest` compares generated `app.js` with `build/tmp/webadmin-app-phase4-before.js` when that local phase artifact exists, and reports before/after bytes and SHA-256.
+- `node --check`, `BeforeV18+ = 0`, event/router no-growth checks, pointer-events invariants and raw JSON summary guards remain hard checks.
+
+Phase 4 deliberately does not change UI behavior, event routing semantics, Logic Chain render/layout algorithms, VBD/native trigger behavior, backend APIs, runtime behavior, CSS, React/Vite architecture or performance caching.
+
 ## README Update
 
 Phase 1 minimally updates README stable version to `v1.68.1-codebase-health-audit`. It does not expand README feature content.
@@ -188,4 +219,4 @@ This phase does not run Gradle `clean build`, Minecraft, MCP scenario, screensho
 
 ## Next Phase
 
-Phase 4 should start from the Phase 3 event-router baseline and address Logic Chain render/layout/draft module boundaries without changing runtime semantics.
+Phase 5 should address backend `WebAdminLogicChainEditorService` boundaries only after a separate prompt confirms scope and baseline.

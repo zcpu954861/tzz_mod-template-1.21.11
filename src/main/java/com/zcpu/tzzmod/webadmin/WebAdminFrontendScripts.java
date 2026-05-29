@@ -10,8 +10,15 @@ public final class WebAdminFrontendScripts {
                 + WebAdminFrontendCoreEventScripts.appJs()
                 + WebAdminFrontendPageScripts.appJs()
                 + WebAdminLogicChainViewerScripts.appJs()
+                + WebAdminLogicChainCanvasScripts.appJs()
+                + WebAdminLogicChainNodePanelScripts.appJs()
+                + WebAdminLogicChainCanvasScripts.stageAppJs()
+                + WebAdminLogicChainLayoutScripts.appJs()
+                + WebAdminLogicChainDraftOverlayScripts.appJs()
+                + WebAdminLogicChainCanvasScripts.renderAppJs()
                 + WebAdminLogicChainEditorScripts.appJs()
                 + WebAdminLogicChainVbdScripts.appJs()
+                + WebAdminLogicChainVbdOverlayScripts.appJs()
                 + WebAdminFrontendBootstrapScripts.appJs();
     }
 }

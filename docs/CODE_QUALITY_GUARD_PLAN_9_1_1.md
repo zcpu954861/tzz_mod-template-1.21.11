@@ -133,6 +133,15 @@ Phase 2 implementation note:
 - Hot slice checks should use stable generated markers/function boundaries instead of fixed line numbers from the pre-split source file.
 - New `*Scripts.java` modules remain under the Phase 2 800-line budget; large `appJs()` text-block methods are report-only until later semantic extraction phases.
 
+Phase 4 implementation note:
+
+- Logic Chain render/layout/draft code is split into smaller ordered modules: viewer shell, canvas, node panel, layout, draft overlay, diff summary, VBD helper and VBD overlay.
+- `WebAdminFrontendScripts.java` remains the only `/assets/app.js` facade and keeps the Logic Chain module order byte-equivalent to the Phase 3 generated output.
+- `WebAdminLogicChainCanvasScripts` intentionally has multiple ordered entry methods because the original canvas responsibilities were interleaved with node panel, layout and draft overlay code; this preserves generated source order without changing JS behavior.
+- `WebAdminLogicChainEditorScripts` imports `WebAdminLogicChainDiffScripts.appJs()` in the original local order, and the guard checks that local ordering.
+- `WebAdminFrontendBundleGuardTest` reports Phase 4 before/after app.js bytes and SHA-256 and performs an exact comparison when `build/tmp/webadmin-app-phase4-before.js` is present in the local phase workspace.
+- The Phase 4 exact before artifact is not a committed long-term baseline; later phases that intentionally change generated JS should establish their own current-context baseline and guard mode.
+
 Guard checks:
 
 - line count must not increase unless the commit also creates module files and net appJs behavior is split.
