@@ -109,6 +109,18 @@ Phase 4 accepted conservative opt-in store/session changes only:
 
 Phase 4 deliberately does not change JSON file format, pretty-write output, synchronous save timing, edit lock/draft authority, protected draft terminal states, selection world-device cleanup, snapshot manifest/package semantics or WebAdmin backend write validation authority.
 
+## Phase 5 Deep Simplification Record
+
+Phase 5 accepted one low-risk backend helper simplification after read-only subagent review:
+
+- `WebAdminVirtualBlockDeviceNativeTriggerService.validateGateBinding(...)` now delegates duplicate condition group binding validation to `WebAdminConditionGateBindingValidator`.
+- The VBD service still owns VBD-specific target/profile selection through `gateProfile(...)`, including dynamic container open/close inventory snapshot compatibility.
+- The local `validateGateBinding` wrapper remains as the backend marker and call boundary for VBD native trigger configuration.
+- `WebAdminConditionGateConfigTest` now characterizes VBD gate error field, exact code, rejected value summary, Chinese message fragments, blank optional group behavior, degraded store behavior and container profile compatibility.
+- `StabilizationGuardTest` now checks that VBD native trigger validation delegates to the shared validator and that compatibility analysis remains inside the shared validator.
+
+Phase 5 deliberately deferred production JS routing rewrites, giant UI builder extraction, BeforeVxx wrapper cleanup, protected draft registry splitting, edit-lock mapping rewrites, timer due structure changes and VBD runtime scan narrowing. Those areas remain behavior-sensitive and need route/DOM/state/runtime golden guards before simplification.
+
 ## Deferred High-Risk Optimizations
 
 | Candidate | Defer reason | Required future proof |
@@ -123,6 +135,10 @@ Phase 4 deliberately does not change JSON file format, pretty-write output, sync
 | browser-only performance marker as hard budget | machine/browser noise | keep timing report-only, hard fail deterministic invariants. |
 | snapshot manifest/package parsed-object cache | rollback fingerprint, retention and degraded package semantics are behavior-sensitive | package/manifest equivalence guards before caching. |
 | protected draft registry expiry bucket/cap | terminal visibility and world-device cleanup-required entries are stateful | protected-draft state matrix and server cleanup guard. |
+| production JS routing helper rewrite | delegated event order, modal outside-close timing and realtime route refresh are user-visible | route-key golden matrix and browser-like event-order guard. |
+| large UI builder extraction | output HTML, dirty state, focus and scroll preservation are behavior-sensitive | DOM hash and modal caret/scroll guard. |
+| remaining BeforeVxx wrapper cleanup | patch-stack cleanup can erase compatibility boundaries | exact source/order markers and no new BeforeV18+ growth. |
+| VBD native trigger backend gate validator duplication | accepted in Phase 5 | shared-validator delegation plus exact field/code/message/degraded-store tests. |
 
 ## Phase Checkpoint Policy
 

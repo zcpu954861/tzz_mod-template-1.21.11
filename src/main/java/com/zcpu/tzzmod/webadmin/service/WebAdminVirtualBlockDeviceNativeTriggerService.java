@@ -1,9 +1,6 @@
 package com.zcpu.tzzmod.webadmin.service;
 
-import com.zcpu.tzzmod.condition.ConditionEvaluator;
-import com.zcpu.tzzmod.condition.ConditionValidationResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityProfile;
-import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityResult;
 import com.zcpu.tzzmod.condition.runtime.ConditionGroupCompatibilityService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
@@ -92,9 +89,8 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
     private final WebAdminPermissionService permissionService;
     private final WebAdminWriteSecurityService securityService;
     private final WebAdminEditLockService editLockService;
-    private final Path conditionGroupStorePath;
     private final ConditionGroupCompatibilityService compatibilityService = new ConditionGroupCompatibilityService();
-    private final ConditionEvaluator conditionEvaluator = new ConditionEvaluator();
+    private final WebAdminConditionGateBindingValidator conditionGateBindingValidator;
 
     public WebAdminVirtualBlockDeviceNativeTriggerService(
             WebAdminPermissionService permissionService,
@@ -113,7 +109,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
         this.permissionService = permissionService == null ? new WebAdminPermissionService() : permissionService;
         this.securityService = securityService == null ? new WebAdminWriteSecurityService() : securityService;
         this.editLockService = editLockService;
-        this.conditionGroupStorePath = conditionGroupStorePath;
+        this.conditionGateBindingValidator = new WebAdminConditionGateBindingValidator(conditionGroupStorePath);
     }
 
     public Map<String, Object> overview(MinecraftServer server, String deviceRef) {
@@ -550,43 +546,7 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
             ConditionRuntimeTargetType targetType,
             ConditionGroupCompatibilityProfile profile
     ) {
-        String normalizedGroupId = WebAdminConditionGroupStore.normalizeId(groupId);
-        if (normalizedGroupId.isBlank()) {
-            return;
-        }
-        WebAdminConditionGroupStore.ConditionGroupLoadResult loaded = loadConditionGroups(server);
-        if (loaded.degraded()) {
-            errors.add(new WebAdminValidationError(field, "condition_group_store_degraded", loaded.message(), normalizedGroupId));
-            return;
-        }
-        WebAdminConditionGroupStore.ConditionGroupEntry entry = loaded.file().groups.get(normalizedGroupId);
-        if (entry == null) {
-            errors.add(new WebAdminValidationError(field, "condition_group_missing", "条件组不存在或已删除：" + normalizedGroupId, normalizedGroupId));
-            return;
-        }
-        WebAdminConditionGroupStore.ConditionGroupEntry normalized = WebAdminConditionGroupStore.ConditionGroupEntry.normalized(entry.id, entry);
-        if (!normalized.enabled) {
-            errors.add(new WebAdminValidationError(field, "condition_group_disabled", "条件组已停用，不能绑定到运行时触发：" + normalizedGroupId, normalizedGroupId));
-            return;
-        }
-        if (normalized.groupDefinition == null) {
-            errors.add(new WebAdminValidationError(field, "condition_group_definition_missing", "条件组定义缺失，不能绑定到运行时触发：" + normalizedGroupId, normalizedGroupId));
-            return;
-        }
-        ConditionValidationResult validation = conditionEvaluator.validate(normalized.groupDefinition);
-        if (!validation.valid()) {
-            String firstIssue = validation.issues().stream()
-                    .map(issue -> issue.message())
-                    .filter(message -> message != null && !message.isBlank())
-                    .findFirst()
-                    .orElse("存在无效条件节点");
-            errors.add(new WebAdminValidationError(field, "condition_group_validation_failed", "条件组校验失败，不能绑定到运行时触发：" + firstIssue, normalizedGroupId));
-            return;
-        }
-        ConditionGroupCompatibilityResult compatibility = compatibilityService.analyze(normalized.groupDefinition, profile);
-        if (!compatibility.compatible()) {
-            errors.add(new WebAdminValidationError(field, "condition_group_incompatible", "条件组与当前触发方式不兼容：" + compatibility.message(), normalizedGroupId));
-        }
+        conditionGateBindingValidator.validate(server, errors, field, groupId, targetType, profile);
     }
 
     private ConditionGroupCompatibilityProfile gateProfile(
@@ -617,12 +577,6 @@ public final class WebAdminVirtualBlockDeviceNativeTriggerService {
             return false;
         }
         return ContainerDeviceSupport.hasInventory(world, new BlockPos(device.x(), device.y(), device.z()));
-    }
-
-    private WebAdminConditionGroupStore.ConditionGroupLoadResult loadConditionGroups(MinecraftServer server) {
-        return conditionGroupStorePath == null
-                ? WebAdminConditionGroupStore.loadWithStatus(server)
-                : WebAdminConditionGroupStore.loadWithStatus(conditionGroupStorePath);
     }
 
     private static Map<String, String> conditionPropertiesFrom(

@@ -9,6 +9,7 @@ import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
 import com.zcpu.tzzmod.webadmin.write.WebAdminValidationError;
 import com.zcpu.tzzmod.webadmin.write.WebAdminWriteSecurityService;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -52,10 +53,10 @@ public final class WebAdminConditionGateConfigTest {
                 storePath
         );
 
-        requireGateError(service, "missing", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_missing", "不存在");
-        requireGateError(service, "disabled", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_disabled", "停用");
-        requireGateError(service, "invalid", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_validation_failed", "校验失败");
-        requireGateError(service, "player", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_incompatible", "不兼容");
+        requireGateError(service, "redstoneConditionGroupId", "missing", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_missing", "不存在", "missing");
+        requireGateError(service, "blockStateConditionGroupId", "disabled", ConditionRuntimeTargetType.VBD_BLOCKSTATE, "condition_group_disabled", "停用", "disabled");
+        requireGateError(service, "interactionConditionGroupId", "invalid", ConditionRuntimeTargetType.VBD_INTERACTION, "condition_group_validation_failed", "校验失败", "invalid");
+        requireGateError(service, "redstoneConditionGroupId", "player", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_incompatible", "不兼容", "player");
 
         List<WebAdminValidationError> errors = new ArrayList<>();
         service.validateGateBinding(null, errors, "interactionConditionGroupId", "player", ConditionRuntimeTargetType.VBD_INTERACTION);
@@ -66,8 +67,9 @@ public final class WebAdminConditionGateConfigTest {
         requireTrue(errors.isEmpty(), "always_true group accepted by redstone gate backend");
 
         ConditionGroupCompatibilityService compatibility = new ConditionGroupCompatibilityService();
-        requireGateError(service, "container", ConditionRuntimeTargetType.CONTAINER_OPEN, "condition_group_incompatible", "容器快照");
-        requireGateError(service, "container", ConditionRuntimeTargetType.CONTAINER_CLOSE, "condition_group_incompatible", "容器快照");
+        requireGateError(service, "containerOpenConditionGroupId", "container", ConditionRuntimeTargetType.CONTAINER_OPEN, "condition_group_incompatible", "容器快照", "container");
+        requireGateError(service, "containerCloseConditionGroupId", "container", ConditionRuntimeTargetType.CONTAINER_CLOSE, "condition_group_incompatible", "容器快照", "container");
+        requireGateError(service, "containerChangeConditionGroupId", "player", ConditionRuntimeTargetType.CONTAINER_CHANGE, "condition_group_incompatible", "触发玩家", "player");
         errors.clear();
         service.validateGateBinding(null, errors, "containerOpenConditionGroupId", "container", ConditionRuntimeTargetType.CONTAINER_OPEN,
                 compatibility.profile(ConditionRuntimeTargetType.CONTAINER_OPEN, true));
@@ -83,7 +85,26 @@ public final class WebAdminConditionGateConfigTest {
         service.validateGateBinding(null, errors, "containerCloseConditionGroupId", "container", ConditionRuntimeTargetType.CONTAINER_CLOSE,
                 compatibility.profile(ConditionRuntimeTargetType.CONTAINER_CLOSE, false));
         requireTrue(!errors.isEmpty(), "non-Inventory container close rejects container_slot_item_matches group");
+        requireEquals("containerCloseConditionGroupId", errors.getFirst().field(), "non-Inventory close rejection field preserved");
+        requireEquals("container", errors.getFirst().rejectedValueSummary(), "non-Inventory close rejection raw value preserved");
         requireContains(errors.getFirst().message(), "容器快照", "non-Inventory container close rejection explains snapshot");
+
+        errors.clear();
+        service.validateGateBinding(null, errors, "redstoneConditionGroupId", "   ", ConditionRuntimeTargetType.VBD_REDSTONE);
+        requireTrue(errors.isEmpty(), "blank VBD condition group id stays optional and does not load store");
+
+        Path degradedPath = Files.createTempDirectory("tzz-condition-gate-config-degraded").resolve(WebAdminConditionGroupStore.FILE_NAME);
+        Files.writeString(degradedPath, "{\"broken\":", StandardCharsets.UTF_8);
+        WebAdminVirtualBlockDeviceNativeTriggerService degradedService = new WebAdminVirtualBlockDeviceNativeTriggerService(
+                null,
+                new WebAdminWriteSecurityService(),
+                null,
+                degradedPath
+        );
+        errors.clear();
+        degradedService.validateGateBinding(null, errors, "redstoneConditionGroupId", "   ", ConditionRuntimeTargetType.VBD_REDSTONE);
+        requireTrue(errors.isEmpty(), "blank VBD condition group id does not load degraded store");
+        requireGateError(degradedService, "redstoneConditionGroupId", "allow", ConditionRuntimeTargetType.VBD_REDSTONE, "condition_group_store_degraded", "读取失败", "allow");
 
         WebAdminConditionGateBindingValidator receiverValidator = new WebAdminConditionGateBindingValidator(storePath);
         requireReceiverGateError(receiverValidator, "player", ConditionRuntimeTargetType.SIGNAL_LISTENER, "condition_group_incompatible", "触发玩家");
@@ -127,16 +148,20 @@ public final class WebAdminConditionGateConfigTest {
 
     private static void requireGateError(
             WebAdminVirtualBlockDeviceNativeTriggerService service,
+            String field,
             String groupId,
             ConditionRuntimeTargetType targetType,
             String expectedCode,
-            String expectedChineseMessage
+            String expectedChineseMessage,
+            String expectedRejectedValue
     ) {
         List<WebAdminValidationError> errors = new ArrayList<>();
-        service.validateGateBinding(null, errors, "conditionGroupId", groupId, targetType);
+        service.validateGateBinding(null, errors, field, groupId, targetType);
         requireTrue(!errors.isEmpty(), "backend rejects gate binding: " + groupId);
         WebAdminValidationError error = errors.getFirst();
+        requireEquals(field, error.field(), "backend gate rejection field: " + groupId);
         requireEquals(expectedCode, error.code(), "backend gate rejection code: " + groupId);
+        requireEquals(expectedRejectedValue, error.rejectedValueSummary(), "backend gate rejection raw value: " + groupId);
         requireContains(error.message(), expectedChineseMessage, "backend gate rejection Chinese message: " + groupId);
     }
 

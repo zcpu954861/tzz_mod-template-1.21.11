@@ -75,6 +75,13 @@ Phase 4 follow-up:
 - kept StateVariable writes synchronous and preserved raw missing-file creation behavior through `StateVariableService`;
 - accepted next-expiry short-circuit for container and single-item-submit template sessions only; selection sessions and protected draft registry cleanup remain unchanged because world-device protected draft rollback needs server-aware cleanup.
 
+Phase 5 follow-up:
+
+- accepted duplicate backend validation helper cleanup in `WebAdminVirtualBlockDeviceNativeTriggerService.validateGateBinding(...)` by delegating to `WebAdminConditionGateBindingValidator`;
+- kept VBD-specific dynamic container compatibility profile ownership in the VBD service, so inventory snapshot availability still determines container open/close gate compatibility;
+- strengthened condition gate config characterization for VBD fields, exact error code, rejected value summary, Chinese message fragments, blank-id no-load behavior and degraded store handling;
+- kept production JS routing, giant UI builders, BeforeVxx wrappers, protected draft registry, timer due structure and VBD runtime scan narrowing deferred because their behavior equivalence is not yet automatically proven.
+
 ## Top 50 Static Performance Suspects
 
 This table is the Phase 0 static candidate list. Phase 1 must convert it into deterministic benchmark rows with timing and low-end estimates. `Tick path` means server/client tick or synchronous Minecraft main-thread path; `High frequency UI` means hover, pointermove, click, zoom or route silent refresh.
@@ -265,3 +272,7 @@ Allocation suspects are static until Phase 1 adds counters or timing proxies.
 | Timer bucket/index | Planned | Must preserve `LinkedHashMap` order and due execution budget. |
 | Snapshot manifest/package parsed cache | Deferred | Rollback package fingerprint, retention and degraded-message semantics need stronger package equivalence guards. |
 | Protected draft expiry bucketing | Deferred | Terminal visibility and cleanup-required world-device drafts must remain server-cleanup-aware. |
+| VBD native trigger duplicate gate validator | Accepted in Phase 5 | Duplicate load/normalize/validate/compatibility logic now delegates to `WebAdminConditionGateBindingValidator`; VBD dynamic container profile remains local and exact errors are tested. |
+| Production JS routing helper rewrite | Deferred | Route/event order, modal outside-close timing and realtime refresh behavior need a route-key/event-order golden matrix. |
+| Giant UI builder extraction | Deferred | HTML output, dirty state, focus/caret and scroll preservation need stronger DOM/modal guards before helper extraction. |
+| Remaining BeforeVxx wrapper cleanup | Deferred | Patch-stack cleanup needs exact source/order markers and must preserve BeforeV18+ zero-growth ratchet. |
