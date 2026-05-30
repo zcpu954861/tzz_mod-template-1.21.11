@@ -191,3 +191,19 @@ Frontend and docs include these stability markers:
 - if/else runtime
 - new gameplay controller systems
 - Git-like branch / merge / rebase
+
+## 9.2 Typed Actions Additive Coverage
+
+This section is implemented in 9.2 Phase 6 and does not change the original 8.17 Help capability boundary.
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| 9.2 Phase 6 typed action help coverage | Implemented in 9.2 Phase 6 | Adds read-only Help topic, example, troubleshooting and glossary coverage for typed actions. |
+| docs derive from ActionSchemaRegistry and ActionCapabilityMatrix | Guarded | `WebAdminTypedActionHelpGuardTest` reads the Java registry/matrix dynamically. |
+| Help Center remains read-only and world-independent | Guarded | No POST/PATCH/DELETE help API, no notes/favorites writes. |
+| typed action help covers every current ActionType | Guarded | command, message, sound, signal, state_variable, timer_start, timer_cancel. |
+| typed action help covers every current ActionConfig owner | Guarded | SignalListener, ActionRelay, Region enter/exit/stay and Timer start/tick/complete/cancel buckets. |
+| explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch | Guarded | These remain outside the `ActionConfig` owner matrix. |
+| docs must not diverge from registry / matrix | Guarded | Drift is a Phase 6 stop condition. |
+
+Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. It also does not implement Program Model, Rich Text Builder, GameController, MissionSystem, PhaseController, if / else runtime, typed action sequence runtime, raw JSON editor, user notes, favorites or external docs sync.

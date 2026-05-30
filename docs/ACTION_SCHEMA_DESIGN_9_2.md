@@ -161,6 +161,16 @@ Phase 5 adds `WebAdminActionOwnerMigrationGuardTest` to prove the schema/capabil
 
 This guard consumes schema and capability metadata but does not introduce a new schema version, new runtime model, new action owner, new API, or new saved JSON representation.
 
+## Phase 6 Help / Docs Boundary
+
+9.2 Phase 6 typed action help coverage documents the same schema and capability facts inside WebAdmin Help, repo docs and Obsidian. docs derive from ActionSchemaRegistry and ActionCapabilityMatrix. Help Center remains read-only and world-independent. typed action help covers every current ActionType. typed action help covers every current ActionConfig owner. docs must not diverge from registry / matrix.
+
+The Phase 6 guard reads `ActionSchemaRegistry.schemas()` and `ActionCapabilityMatrix.capabilities()` dynamically, then checks the Help catalog and docs for current action ids, display names, field ids, owner ids, list fields, action condition targets, maxActions=64 and explicit non-owners.
+
+Explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch.
+
+Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. It also does not add a new schema version, typed action sequence runtime, Program Model, Rich Text Builder, raw JSON editor, user notes or external docs sync.
+
 ## Summary / Audit Boundary
 
 Phase 4 implements WebAdmin-only summary helpers:

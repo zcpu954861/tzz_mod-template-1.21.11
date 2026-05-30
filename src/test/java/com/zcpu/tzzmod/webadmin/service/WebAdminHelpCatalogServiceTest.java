@@ -11,7 +11,8 @@ public final class WebAdminHelpCatalogServiceTest {
 
     public static void run() {
         Map<String, Object> catalog = new WebAdminHelpCatalogService().catalog();
-        requireEquals("9.1-logic-chain-global-editor-completion", string(catalog.get("version")), "9.1 help catalog version");
+        requireEquals("9.1-logic-chain-global-editor-completion", string(catalog.get("version")), "8.17 help catalog stable version");
+        requireEquals("9.2-typed-actions-help-docs-guard", string(catalog.get("phaseCoverage")), "9.2 help catalog additive coverage marker");
         requireEquals(Boolean.TRUE, catalog.get("readOnly"), "8.17 help catalog is read-only");
         requireEquals(Boolean.TRUE, catalog.get("noWriteApi"), "8.17 help catalog exposes no write API");
         requireEquals(Boolean.TRUE, catalog.get("copyOnly"), "8.17 help examples are copy-only documentation");
@@ -38,6 +39,7 @@ public final class WebAdminHelpCatalogServiceTest {
                 "signalbridge.channel-basics",
                 "signalbridge.listener-flow",
                 "action.config-basics",
+                "action.typed-schema-capability",
                 "condition.group-basics",
                 "state-variable.basics",
                 "signal-join.basics",
@@ -65,6 +67,7 @@ public final class WebAdminHelpCatalogServiceTest {
                 "example.listener-message",
                 "example.listener-state-variable",
                 "example.condition-controls-action",
+                "example.typed-action-owner-bucket",
                 "example.template-join-timer-listener",
                 "example.signal-no-consumer",
                 "example.template-import-vs-apply",
@@ -82,6 +85,7 @@ public final class WebAdminHelpCatalogServiceTest {
                 "trouble.join-no-output",
                 "trouble.timer-not-triggered",
                 "trouble.listener-action-not-executed",
+                "trouble.action-type-unavailable",
                 "trouble.template-apply-conflict",
                 "trouble.logic-chain-one-entry-many-channels",
                 "trouble.editor-save-failed",
@@ -111,6 +115,15 @@ public final class WebAdminHelpCatalogServiceTest {
                 "signal-listener",
                 "action",
                 "action-config",
+                "typed-action",
+                "action-type",
+                "action-owner-type",
+                "action-capability-matrix",
+                "action-schema-registry",
+                "action-config-owner",
+                "owner-bucket",
+                "explicit-non-owner",
+                "fail-closed",
                 "condition-group",
                 "state-variable",
                 "state-action",
@@ -186,6 +199,15 @@ public final class WebAdminHelpCatalogServiceTest {
                 "external reference fail closed",
                 "Git-like branch / merge / rebase deferred；Snapshot 配置回滚已实现且仅限 allowlist 配置。",
                 "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。",
+                "9.2 Typed Actions 说明来自 ActionSchemaRegistry / ActionCapabilityMatrix",
+                "帮助和文档以 ActionSchemaRegistry / ActionCapabilityMatrix 为事实来源。",
+                "文档不得与 registry / matrix 漂移。",
+                "帮助覆盖所有当前 ActionType。",
+                "帮助覆盖所有当前 ActionConfig owner。",
+                "明确的非动作 owner：vbd_trigger、item_submit、container_change、branch。",
+                "ActionValidationService 是保存时权威校验；unknown action type fail-closed，不落到 command fallback。",
+                "Timer outputChannel 是完成信号输出字段，不是 ActionConfig owner。",
+                "VBD native trigger、itemSubmit、container_change、branch 不是 ActionConfig owner。",
                 "9.1 补齐受控配置入口，不是 freeform graph document save 或 Game Program AST。",
                 "同 index Action 替换覆盖 SignalListener、Timer bucket、ActionRelay 和 Region enter / exit / stay。",
                 "World Device Reference、RegionController 和 VBD 可选择并进入 protected draft 客户端辅助流程",

@@ -4,7 +4,7 @@
 
 | Item | Value |
 | --- | --- |
-| Current phase | 9.2 Phase 5 owner integration / migration guard |
+| Current phase | 9.2 Phase 6 help / docs / Obsidian / guard |
 | Baseline | `v1.68.4-docs-accuracy` / `f8fa12c6e5c20ca82a3d5ea0a87f24d26462fb4c` |
 | Matrix scope | Existing `ActionConfig` owners only |
 
@@ -137,3 +137,25 @@ It deliberately excludes VBD native trigger, itemSubmit, container, Program Mode
 - Logic Chain action append/edit/delete/reorder save payloads staying owner/bucket/index scoped and not carrying display-only summary/display/label fields.
 
 This guard is intentionally compatibility-only. It does not widen the owner list, change runtime action execution, alter WebAdmin write payloads, or turn VBD/itemSubmit/container/branch into `ActionConfig` owners.
+
+## Phase 6 Help / Docs Consistency Guard
+
+9.2 Phase 6 typed action help coverage keeps WebAdmin Help, repo docs and Obsidian aligned with the Java source of truth. The rule is: docs derive from ActionSchemaRegistry and ActionCapabilityMatrix. Help Center remains read-only and world-independent. typed action help covers every current ActionType. typed action help covers every current ActionConfig owner. docs must not diverge from registry / matrix.
+
+The Phase 6 guard checks these current owner facts from `ActionCapabilityMatrix`:
+
+| Owner id | List field | Action condition target | Boundary |
+| --- | --- | --- | --- |
+| `signal_listener` | `actions` | `SIGNAL_LISTENER_ACTION` | maxActions=64 |
+| `action_relay` | `actions` | `ACTION_RELAY_ACTION` | maxActions=64 |
+| `region_enter` | `enterActions` | `REGION_ENTER_ACTION` | maxActions=64 |
+| `region_exit` | `exitActions` | `REGION_EXIT_ACTION` | maxActions=64 |
+| `region_stay` | `stayActions` | `REGION_STAY_ACTION` | maxActions=64 |
+| `timer_on_start` | `onStartActions` | `TIMER_ON_START_ACTION` | maxActions=64 |
+| `timer_on_tick` | `onTickActions` | `TIMER_ON_TICK_ACTION` | maxActions=64 |
+| `timer_on_complete` | `onCompleteActions` | `TIMER_ON_COMPLETE_ACTION` | maxActions=64 |
+| `timer_on_cancel` | `onCancelActions` | `TIMER_ON_CANCEL_ACTION` | maxActions=64 |
+
+Explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch.
+
+Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. VBD native trigger, itemSubmit, container change and branch remain outside the `ActionConfig` owner matrix.

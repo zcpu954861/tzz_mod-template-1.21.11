@@ -13,12 +13,13 @@ public final class WebAdminHelpCatalogService {
         List<Map<String, Object>> glossary = glossary();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("version", "9.1-logic-chain-global-editor-completion");
+        data.put("phaseCoverage", "9.2-typed-actions-help-docs-guard");
         data.put("title", "WebAdmin Help / Example Center");
         data.put("readOnly", true);
         data.put("noWriteApi", true);
         data.put("copyOnly", true);
         data.put("worldScoped", false);
-        data.put("message", "帮助中心是只读内置目录；不会写入用户笔记、收藏或配置。");
+        data.put("message", "帮助中心是只读内置目录；9.2 Typed Actions 说明来自 ActionSchemaRegistry / ActionCapabilityMatrix，不会写入用户笔记、收藏或配置。");
         data.put("categories", categories());
         data.put("topics", topics);
         data.put("examples", examples);
@@ -27,6 +28,7 @@ public final class WebAdminHelpCatalogService {
         data.put("featuredTopicIds", List.of(
                 "getting-started.overview",
                 "signalbridge.channel-basics",
+                "action.typed-schema-capability",
                 "logic-chain.viewer",
                 "templates.prefab",
                 "snapshot.rollback",
@@ -37,6 +39,8 @@ public final class WebAdminHelpCatalogService {
                 "full Logic Chain Editor deferred",
                 "Scratch editor deferred",
                 "if / else runtime deferred",
+                "typed action sequence runtime deferred",
+                "full Rich Text Builder deferred",
                 "old node arbitrary move / reorder deferred；typed-owned node delete is Logic Chain draft-only",
                 "old action arbitrary cross-bucket move deferred；delete / same-bucket reorder are Logic Chain draft-only",
                 "world entity freeform create deferred；client-assisted protected draft binding required",
@@ -56,6 +60,9 @@ public final class WebAdminHelpCatalogService {
                 "StateVariable 保存状态。",
                 "Logic Chain Viewer 的顺序是可视化顺序，不是全局执行顺序。",
                 "Logic Chain Editor 保存 typed config，不保存假图。",
+                "9.2 Typed Actions 帮助来自 ActionSchemaRegistry / ActionCapabilityMatrix。",
+                "ActionValidationService 是保存时权威校验；unknown action type fail-closed，不落到 command fallback。",
+                "VBD native trigger、itemSubmit、container_change、branch 不是 ActionConfig owner。",
                 "9.1 补齐受控配置入口，不是 freeform graph document save 或 Game Program AST。",
                 "Snapshot / Rollback 是 WebAdmin 配置恢复能力，不是 Git 分支系统或世界备份。"
         ));
@@ -154,21 +161,46 @@ public final class WebAdminHelpCatalogService {
                 "Action / ActionConfig",
                 "ActionConfig 是动作系统的 typed 配置，当前用于命令、消息、音效、发信号、状态变量写入和 Timer 控制。",
                 "action",
-                List.of("Action", "ActionConfig", "state_variable", "timer_start"),
+                List.of("Action", "ActionConfig", "ActionType", "state_variable", "timer_start", "ActionSchemaRegistry"),
                 sections(
-                        section("这是什么", "动作是触发后真正产生效果的配置。", "常见动作包括 message、signal、state_variable、timer_start 和 timer_cancel。"),
+                        section("这是什么", "动作是触发后真正产生效果的配置。", "常见动作包括 command、message、sound、signal、state_variable、timer_start 和 timer_cancel。"),
+                        section("当前动作类型", "当前 9.2 ActionType 为 command（执行命令）、message（发送消息）、sound（播放音效，legacy 固定反馈）、signal（发送信号）、state_variable（修改状态变量）、timer_start（启动 Timer）、timer_cancel（取消 Timer）。"),
                         section("最小例子", "监听频道 mission.start。", "添加 message 动作。", "触发频道后玩家看到消息。"),
                         section("常见误区", "Action 列表为空时，信号已经触发但不会有后续效果。")
                 ),
                 sections(
                         section("边界", "帮助中心不新增 ActionType。", "Action 删除 / 重排仅限受控 owner/bucket/index 草稿，不允许跨 source/bucket 任意移动。"),
-                        section("Gate", "单条 action gate false 时只跳过当前 action，不会改写其它 action 或父列表。")
+                        section("Schema / Capability", "ActionSchemaRegistry 描述当前 ActionType 的字段、中文说明、picker 和摘要提示。", "ActionCapabilityMatrix 描述当前 ActionConfig owner/bucket 支持哪些动作、listFieldName、maxActions=64 和 action condition target。"),
+                        section("保存权威", "前端 schema renderer 和 actionTypeOptions 只是辅助输入与过滤。", "保存时以后端 ActionValidationService 为权威；unknown action type fail-closed，不会通过 ActionType.fromId fallback 成 command。"),
+                        section("Gate", "单条 action gate false 时只跳过当前 action，不会改写其它 action 或父列表。", "空 conditionGroupId 不读取 condition group store、不 evaluate、不写 gate history。")
                 ),
-                List.of("example.listener-message", "example.listener-state-variable", "example.condition-controls-action"),
-                List.of("trouble.listener-action-not-executed", "trouble.state-variable-action-failed"),
-                List.of("action", "action-config", "action-gate"),
+                List.of("example.listener-message", "example.listener-state-variable", "example.condition-controls-action", "example.typed-action-owner-bucket"),
+                List.of("trouble.listener-action-not-executed", "trouble.state-variable-action-failed", "trouble.action-type-unavailable"),
+                List.of("action", "action-config", "typed-action", "action-type", "action-gate"),
                 routes(link("动作列表", "#/actions"), link("监听器", "#/listeners")),
-                List.of("condition.group-basics", "state-variable.basics")
+                List.of("action.typed-schema-capability", "condition.group-basics", "state-variable.basics")
+        ));
+        topics.add(topic(
+                "action.typed-schema-capability",
+                "Typed Action / Schema 与 Capability",
+                "9.2 统一解释现有 ActionConfig 的字段、owner 支持、保存校验和中文摘要，不改变运行时。",
+                "action",
+                List.of("Typed Action", "ActionSchemaRegistry", "ActionCapabilityMatrix", "ActionValidationService", "ActionOwnerType"),
+                sections(
+                        section("这是什么", "Typed Action 是现有 ActionConfig 的配置说明层。", "Schema 描述一个动作类型有哪些字段；Capability 描述某个 owner/bucket 能承载哪些动作。"),
+                        section("当前动作类型", "command、message、sound、signal、state_variable、timer_start、timer_cancel。"),
+                        section("当前 owner/bucket", "signal_listener actions；action_relay actions；region_enter enterActions；region_exit exitActions；region_stay stayActions。", "timer_on_start onStartActions；timer_on_tick onTickActions；timer_on_complete onCompleteActions；timer_on_cancel onCancelActions。")
+                ),
+                sections(
+                        section("保存权威", "帮助和文档以 ActionSchemaRegistry / ActionCapabilityMatrix 为事实来源。", "前端只做可选项过滤和字段渲染；后端 ActionValidationService 才是保存时权威。", "unsupported owner/action 和 unknown action type 都 fail-closed。"),
+                        section("非 owner 边界", "明确的非动作 owner：vbd_trigger、item_submit、container_change、branch。", "VBD native trigger、itemSubmit requirement、container change 和 branch 不是 ActionConfig owner。", "Timer outputChannel 是完成信号输出字段，不是 ActionConfig owner。"),
+                        section("Phase 6 guard", "帮助覆盖所有当前 ActionType。", "帮助覆盖所有当前 ActionConfig owner。", "文档不得与 registry / matrix 漂移。")
+                ),
+                List.of("example.typed-action-owner-bucket", "example.condition-controls-action"),
+                List.of("trouble.action-type-unavailable", "trouble.editor-save-failed"),
+                List.of("typed-action", "action-schema-registry", "action-capability-matrix", "action-owner-type", "explicit-non-owner", "fail-closed"),
+                routes(link("动作列表", "#/actions"), link("逻辑链", "#/logic-chains"), link("条件组", "#/condition-groups")),
+                List.of("action.config-basics", "logic-chain.editor-draft")
         ));
         topics.add(topic(
                 "condition.group-basics",
@@ -246,6 +278,7 @@ public final class WebAdminHelpCatalogService {
                 ),
                 sections(
                         section("运行语义", "Timer runtime 实例保存在内存中。", "Timer action list 继续走 ActionConfig 和单条 action gate。"),
+                        section("Action bucket", "Timer 的 ActionConfig owner 是 onStartActions、onTickActions、onCompleteActions 和 onCancelActions。", "outputChannel 只是完成信号输出字段，不是 ActionConfig owner。"),
                         section("诊断路径", "检查 disabled、timerId 缺失、PLAYER context、无输出/动作、REPEAT 高频等 Doctor 提示。")
                 ),
                 List.of("example.timer-delay-channel", "example.template-join-timer-listener"),
@@ -372,7 +405,7 @@ public final class WebAdminHelpCatalogService {
                         section("常见误区", "世界实体不能在 Logic Chain Editor 内手写坐标或 fake-create；必须通过 protected draft / 客户端辅助选择或放置。", "SignalReceiver / ActionRelay 在图上位于频道右侧，连接方向是 channel -> device，不是左侧触发源；缺少上游频道会报告接收频道缺失，不再要求 output channel。", "已有 VBD 节点会打开触发项卡片编辑面板，原生触发字段、itemSubmit 和 container 都在对应触发页内，保存 Logic Chain 前都只是 draft；触发项频道变化会先更新图中的草稿边，不会提前写正式 VBD。", "编辑已有 VBD 触发项不是新增触发项卡；图上只保留该触发项目标频道的草稿边，主频道 / 旧频道不会作为额外输出。", "itemSubmit / container 游戏内保存成功后，WebUI 必须通过 realtime/status payload 看到草稿 requirement；取消或失败可直接重试。", "连接模式不是锁屏状态；连接成功或点击普通卡片会退出连接模式。", "待删除节点或 action card 会变灰并显示待删除，取消 Logic Chain 编辑后恢复。", "实体设备被外部破坏后会标记 missing/broken，保存会 fail closed，不能只改 metadata 伪装成正常节点。")
                 ),
                 sections(
-                        section("边界", "VBD / Region / ActionRelay block / SignalReceiver 等世界实体只能通过受保护草稿和既有游戏内流程进入 Logic Chain。", "VBD 删除只解绑 VBD 状态，不破坏原方块；SignalEmitter / SignalReceiver / ActionRelay 删除会移除物理设备方块，并要求 dry-run 影响确认和固定文本“我确认删除该节点”。", "VBD / World Device Reference / RegionController protected draft 保存会写入真实 typed store；失败会回滚或保留可重试草稿。", "World Device 使用替换原版九格的三格 hotbar；WebUI 和游戏内取消都需要确认，取消后可在 modal 内重新发起。", "受保护 world device draft 会阻止普通 use / break 和 signal-device 命令绕过。", "RegionController 选择使用 RegionPlanner 粒子点线预览；输出必须通过 enter / exit / stay action bucket 中的 signal action，不保存 top-level 输出频道。", "Action 面板在节点信息中保持单入口，进入二级页面后才展示 enter / exit / stay 或其它 bucket；signal action 频道字段支持已有频道 combobox。", "对象名称和频道名称分开显示，保存后对象 displayName 不会被 downstream channel displayName 覆盖。", "帮助中心不启动 Minecraft、不跑 scenario。")
+                        section("边界", "VBD / Region / ActionRelay block / SignalReceiver 等世界实体只能通过受保护草稿和既有游戏内流程进入 Logic Chain。", "VBD native trigger、itemSubmit requirement 和 container change 是相邻 Resource Graph 配置，不是 ActionConfig owner。", "VBD 删除只解绑 VBD 状态，不破坏原方块；SignalEmitter / SignalReceiver / ActionRelay 删除会移除物理设备方块，并要求 dry-run 影响确认和固定文本“我确认删除该节点”。", "VBD / World Device Reference / RegionController protected draft 保存会写入真实 typed store；失败会回滚或保留可重试草稿。", "World Device 使用替换原版九格的三格 hotbar；WebUI 和游戏内取消都需要确认，取消后可在 modal 内重新发起。", "受保护 world device draft 会阻止普通 use / break 和 signal-device 命令绕过。", "RegionController 选择使用 RegionPlanner 粒子点线预览；输出必须通过 enter / exit / stay action bucket 中的 signal action，不保存 top-level 输出频道。", "Action 面板在节点信息中保持单入口，进入二级页面后才展示 enter / exit / stay 或其它 bucket；signal action 频道字段支持已有频道 combobox。", "对象名称和频道名称分开显示，保存后对象 displayName 不会被 downstream channel displayName 覆盖。", "帮助中心不启动 Minecraft、不跑 scenario。")
                 ),
                 List.of("example.signal-no-consumer"),
                 List.of("trouble.readonly-nodes"),
@@ -412,6 +445,7 @@ public final class WebAdminHelpCatalogService {
         examples.add(example("example.listener-message", "监听频道后发送消息", "收到 signal 后向触发玩家发送提示；无玩家上下文时广播给在线玩家。", List.of("SignalListener", "message action"), List.of("创建监听器并填写 channel。", "添加 message action。", "触发频道后查看 History 和消息效果。"), List.of("message action 仍走 ActionEngine 和 gate；operator 通知使用独立 notifyOps。"), List.of("监听器 disabled。", "action list 为空。"), routes(link("监听器", "#/listeners"), link("内置模板", "#/templates/built_in%3Alistener_message_action")), "listener_message_action", List.of("signalbridge.listener-flow")));
         examples.add(example("example.listener-state-variable", "监听器写入 StateVariable", "把某个事件记录成 GLOBAL 或 PLAYER 状态。", List.of("SignalListener", "state_variable action", "StateVariable"), List.of("在监听器动作里选择 state_variable。", "设置 scope、key、operation 和目标模式。", "触发后到状态变量页面确认值。"), List.of("PLAYER scope 需要玩家上下文或明确 targetId。"), List.of("key 为空。", "类型不匹配。", "无玩家上下文。"), routes(link("监听器", "#/listeners"), link("状态变量", "#/state-variables")), "", List.of("state-variable.basics")));
         examples.add(example("example.condition-controls-action", "用 ConditionGroup 控制 action", "只有条件通过时才执行某条 action。", List.of("ConditionGroup", "Action gate", "Debugger"), List.of("创建条件组。", "在 action 的 conditionGroupId 选择该组。", "触发后到条件调试查看 ALLOWED / BLOCKED。"), List.of("未配置 conditionGroupId 时不会读取 store，也不会产生 gate history。"), List.of("条件组不兼容。", "条件组 disabled 或 invalid。"), routes(link("条件组", "#/condition-groups"), link("条件调试", "#/condition-debugger")), "", List.of("condition.group-basics")));
+        examples.add(example("example.typed-action-owner-bucket", "按 owner/bucket 选择动作类型", "在 Listener、ActionRelay、Region 和 Timer bucket 中用同一套 typed action 事实选择当前支持的动作。", List.of("Typed Action", "ActionCapabilityMatrix", "ActionValidationService"), List.of("先确认正在编辑的 owner 和 bucket。", "在动作类型下拉中选择 command、message、sound、signal、state_variable、timer_start 或 timer_cancel。", "保存失败时查看 owner/action 是否被后端 validation 拒绝。"), List.of("前端过滤只是辅助；ActionValidationService 保存时仍会按 ActionCapabilityMatrix fail-closed。", "VBD native trigger、itemSubmit、container change 和 branch 不会出现在 ActionConfig owner 列表。"), List.of("owner/bucket 不匹配。", "unknown action type。", "把 Timer outputChannel 当成 action bucket。"), routes(link("动作列表", "#/actions"), link("逻辑链", "#/logic-chains")), "", List.of("action.typed-schema-capability")));
         examples.add(example("example.template-join-timer-listener", "用 Template apply 创建 Join/Timer/Listener 组合", "从内置 prefab 开始，减少重复配置。", List.of("Template Center", "Signal Join", "Timer", "SignalListener"), List.of("打开模板中心。", "选择内置模板并 dry-run。", "确认前缀和冲突后 apply。", "到逻辑链查看生成 component。"), List.of("apply 写真实配置；import 只保存模板 JSON。"), List.of("前缀冲突。", "placeholder 缺失。", "deferred resource 阻断。"), routes(link("模板中心", "#/templates"), link("逻辑链", "#/logic-chains")), "", List.of("templates.prefab")));
         examples.add(example("example.signal-no-consumer", "Signal 发出但没有后续动作", "确认 signal 已进 history，但没有消费者或 action。", List.of("SignalBridge", "Doctor", "History"), List.of("打开 History 确认频道触发。", "打开频道详情看消费者数量。", "打开 Doctor 看无消费者或 disabled 提示。"), List.of("频道事件存在不代表后续一定有 action。"), List.of("频道名拼写不同。", "消费者 disabled。"), routes(link("SignalBridge", "#/signals"), link("Doctor", "#/doctor"), link("History", "#/history")), "", List.of("signalbridge.channel-basics")));
         examples.add(example("example.template-import-vs-apply", "Template import 与 apply 的区别", "导入 JSON 后为什么世界配置没有变化。", List.of("Template Center", "dry-run", "apply"), List.of("导入 JSON 只进入用户模板库。", "选择模板，执行预览。", "确认 apply 后才写真实配置。"), List.of("导入和 apply 使用不同权限/锁流程。"), List.of("只导入未应用。", "apply dry-run 有冲突。"), routes(link("模板中心", "#/templates")), "", List.of("templates.prefab")));
@@ -431,6 +465,7 @@ public final class WebAdminHelpCatalogService {
         items.add(trouble("trouble.join-no-output", "为什么 Join 没有输出？", List.of("输入未全部满足。", "outputChannel 为空或无消费者。", "Join disabled。"), List.of("看 Join runtime status。", "看 outputChannel 的频道详情。"), List.of("补齐输入。", "配置输出频道和下游消费者。"), "Join 不阻断原始 input signal；它只在满足条件后 emit output。", routes(link("信号汇合", "#/signal-joins"), link("Doctor", "#/doctor"))));
         items.add(trouble("trouble.timer-not-triggered", "为什么 Timer 没触发？", List.of("Timer disabled。", "timer_start 引用不存在。", "PLAYER scope 缺上下文。", "没有 outputChannel 或动作。"), List.of("看 Timer Doctor。", "看启动 action 的执行记录。"), List.of("修正 timerId。", "补输出或 onCompleteActions。"), "Timer runtime 实例是内存态；模板 apply 不会自动启动。", routes(link("计时器", "#/timers"), link("Doctor", "#/doctor"), link("History", "#/history"))));
         items.add(trouble("trouble.listener-action-not-executed", "为什么 Listener 没执行 action？", List.of("监听器 disabled。", "channel 不一致。", "cooldown 中。", "列表 gate 或 action gate 阻断。"), List.of("看 listener 详情。", "看 condition debugger。", "看 History。"), List.of("修正 channel。", "启用 listener/action。", "检查 gate。"), "action gate false 只跳过当前 action，不会改写其它 action。", routes(link("监听器", "#/listeners"), link("条件调试", "#/condition-debugger"))));
+        items.add(trouble("trouble.action-type-unavailable", "为什么某个动作类型不可选或保存被拒绝？", List.of("当前 owner/bucket 不支持该动作。", "VBD native trigger、itemSubmit、container change 或 branch 不是 ActionConfig owner。", "保存 payload 中 action type 未知或为空。"), List.of("确认正在编辑的 owner/bucket。", "对照 Typed Action 帮助里的 owner/bucket 列表。", "查看保存错误是否为 invalid_type 或 unsupported owner/action。"), List.of("换到支持的 owner/bucket。", "只使用当前 7 个 ActionType。", "刷新草稿后重新选择动作类型。"), "ActionValidationService 是保存时权威；unknown action type fail-closed，不会 fallback 成 command 保存。", routes(link("动作列表", "#/actions"), link("逻辑链", "#/logic-chains"))));
         items.add(trouble("trouble.template-apply-conflict", "为什么模板 apply 冲突？", List.of("前缀已存在。", "fingerprint 过期。", "edit lock 丢失。", "deferred resource 或 placeholder 缺失。"), List.of("看 dry-run conflicts。", "刷新模板中心。"), List.of("换前缀。", "重新预览。", "处理缺失 placeholder。"), "Template apply fail closed，不覆盖既有资源。", routes(link("模板中心", "#/templates"))));
         items.add(trouble("trouble.logic-chain-one-entry-many-channels", "为什么逻辑链列表只有一个入口但有很多频道？", List.of("列表按 connected component 聚合。", "一个 component 可以包含多个 channel。"), List.of("打开详情页。", "切换焦点频道。"), List.of("用详情页 focus channel 查看不同入口。"), "Logic Chain 不等于单个 channel；Viewer 只做可视化组织。", routes(link("逻辑链", "#/logic-chains"))));
         items.add(trouble("trouble.editor-save-failed", "为什么编辑器保存失败？", List.of("edit lock 丢失。", "expectedFingerprint 冲突。", "草稿缺必要连线。", "旧节点/旧 action 越界操作。"), List.of("看保存错误列表。", "确认锁状态和草稿连线。"), List.of("刷新后重试。", "只保存支持的 typed config。"), "保存先统一 validation，再写真实服务；不会保存假图。", routes(link("逻辑链", "#/logic-chains"))));
@@ -460,6 +495,15 @@ public final class WebAdminHelpCatalogService {
         addTerm(terms, "signal-listener", "SignalListener", List.of("监听器"), "监听一个频道并执行动作列表的虚拟配置。", "可有列表 gate 和 action gate。");
         addTerm(terms, "action", "Action", List.of("动作"), "被触发后执行的具体效果。", "由 ActionEngine 执行。");
         addTerm(terms, "action-config", "ActionConfig", List.of("动作配置"), "Action 的 typed 配置结构。", "帮助中心不新增 ActionType。");
+        addTerm(terms, "typed-action", "Typed Action", List.of("统一动作配置"), "9.2 对现有 ActionConfig 的字段、owner 支持、validation 和 summary 做统一说明。", "它不是新的 runtime action sequence。");
+        addTerm(terms, "action-type", "ActionType", List.of("动作类型"), "当前动作类型为 command、message、sound、signal、state_variable、timer_start、timer_cancel。", "新增 ActionType 必须另起阶段同步 runtime/schema/capability/validation/editor/summary/docs。");
+        addTerm(terms, "action-owner-type", "ActionOwnerType", List.of("动作 owner"), "能持有 ActionConfig list 的现有 owner/bucket。", "当前只包括 SignalListener、ActionRelay、Region enter/exit/stay 和 Timer start/tick/complete/cancel。");
+        addTerm(terms, "action-capability-matrix", "ActionCapabilityMatrix", List.of("动作能力矩阵"), "后端权威 owner/bucket -> action type 支持表。", "文档和帮助必须从 registry / matrix 核对，不能写成第二份漂移事实。");
+        addTerm(terms, "action-schema-registry", "ActionSchemaRegistry", List.of("动作 schema 注册表"), "静态描述当前 ActionType 字段、picker、中文说明和摘要提示。", "不执行 action、不读 world/store、不把未知类型 fallback 成 command。");
+        addTerm(terms, "action-config-owner", "ActionConfig owner", List.of("动作列表持有者"), "保存 ActionConfig list 的资源边界。", "删除和重排必须保持 owner/bucket/index 范围。");
+        addTerm(terms, "owner-bucket", "Owner Bucket", List.of("动作桶"), "同一 owner 下的具体 action list 字段。", "例如 enterActions、onCompleteActions、actions。");
+        addTerm(terms, "explicit-non-owner", "Explicit Non-owner", List.of("非动作 owner"), "明确不能作为 ActionConfig owner 的相邻配置。", "vbd_trigger、item_submit、container_change、branch 不在 9.2 owner 矩阵中。");
+        addTerm(terms, "fail-closed", "Fail-closed", List.of("失败关闭"), "配置不兼容或未知时拒绝保存/执行后续副作用。", "unknown action type 不会保存为 command fallback。");
         addTerm(terms, "action-engine", "ActionEngine", List.of("动作引擎"), "统一执行 ActionConfig 的 runtime 入口。", "帮助中心不改变执行顺序。");
         addTerm(terms, "condition-group", "ConditionGroup", List.of("条件组"), "可复用的条件树。", "ConditionEngine 只判断。");
         addTerm(terms, "condition-engine", "ConditionEngine", List.of("条件引擎"), "只读评估条件树的引擎。", "不写状态、不发 signal、不执行 action。");

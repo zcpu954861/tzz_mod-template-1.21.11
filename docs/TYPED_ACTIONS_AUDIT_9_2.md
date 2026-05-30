@@ -171,6 +171,20 @@ The guard proves the WebAdmin owner export and frontend option helpers still mat
 
 Phase 5 does not change runtime action execution, `ActionEngine`, owner action order, WebAdmin API shape, save payload fields, snapshot storage, audit schema, `ActionType`, VBD/itemSubmit/container ownership, Program Model, Rich Text Builder, GameController, MissionSystem or PhaseController.
 
+## Phase 6 Implementation Checkpoint
+
+Phase 6 adds Help / docs / Obsidian consistency coverage rather than a runtime/editor expansion:
+
+- `src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminHelpCatalogService.java` includes a 9.2 typed action topic, example, troubleshooting entry and glossary terms for `ActionSchemaRegistry`, `ActionCapabilityMatrix`, `ActionValidationService`, current `ActionType`, current owner buckets and explicit non-owners.
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminTypedActionHelpGuardTest.java` is invoked from `CodeQualityGuardTest` and checks that docs derive from ActionSchemaRegistry and ActionCapabilityMatrix.
+- Help Center remains read-only and world-independent.
+- typed action help covers every current ActionType.
+- typed action help covers every current ActionConfig owner.
+- explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch.
+- docs must not diverge from registry / matrix.
+
+Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. It also does not change `ActionEngine`, owner order, action summaries, audit payload schema, snapshot storage, VBD/itemSubmit/container ownership, Program Model, Rich Text Builder, GameController, MissionSystem, PhaseController, if/else runtime or typed action sequence runtime.
+
 ## Stop Conditions
 
 Stop before implementation if a plan requires any of the following:

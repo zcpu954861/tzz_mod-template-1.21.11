@@ -99,6 +99,17 @@ Phase 4 also updates Timer audit summary lists, `WebAdminSignalService` downstre
 - delete and reorder are owner-local and bucket-local;
 - no supported action is hidden and no unsupported action is shown.
 
+## Phase 6 Guard Targets
+
+- 9.2 Phase 6 typed action help coverage is present in WebAdmin Help, repo docs and Obsidian indexes;
+- docs derive from ActionSchemaRegistry and ActionCapabilityMatrix, rather than from a second unmanaged support list;
+- Help Center remains read-only and world-independent;
+- typed action help covers every current ActionType;
+- typed action help covers every current ActionConfig owner;
+- explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch;
+- docs must not diverge from registry / matrix;
+- Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage.
+
 Implemented Phase 5 guard:
 
 - `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionOwnerMigrationGuardTest.java`
@@ -106,6 +117,14 @@ Implemented Phase 5 guard:
 Phase 5 is a migration/equivalence guard checkpoint. It compares the WebAdmin owner export from `WebAdminActionSchemaScripts` with `ActionCapabilityMatrix`, executes the frontend owner/type option helpers to prove no supported action is hidden and no unsupported action is shown, keeps explicit non-owners excluded, validates old-style action entries and old JSON store fixtures for every current owner/action pair, proves frontend editor draft payloads normalize to the old runtime `ActionConfig`, rejects unknown action ids fail-closed before legacy fallback, checks Timer invalid-type writes do not persist fallback configs, and locks Logic Chain action append/edit/delete/reorder payloads to owner/bucket/index/fingerprint/lock fields without display-only summary fields.
 
 Phase 5 does not add action types, owners, runtime behavior, WebAdmin write APIs, save payload fields or snapshot storage.
+
+Implemented Phase 6 guard:
+
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminTypedActionHelpGuardTest.java`
+
+Phase 6 is a Help / docs / Obsidian consistency checkpoint. It extends `WebAdminHelpCatalogService` with read-only 9.2 typed action coverage for schema, capability, validation authority, explicit non-owners, owner buckets and troubleshooting. The guard reads `ActionSchemaRegistry` and `ActionCapabilityMatrix` dynamically and checks WebAdmin Help plus repo docs for every current action type, owner list field, action condition target, explicit non-owner and read-only boundary. Obsidian 9.2 and WebAdmin indexes are updated as an external precision index; the vault remains outside the main repo and is not committed.
+
+Phase 6 does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. It also does not implement Program Model, Rich Text Builder, GameController, MissionSystem, PhaseController, if/else runtime, typed action sequence runtime, raw JSON editor, user notes, favorites or external docs sync.
 
 ## Manual Acceptance Recommendation
 
