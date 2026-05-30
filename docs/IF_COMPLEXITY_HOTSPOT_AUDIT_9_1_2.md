@@ -6,6 +6,12 @@ Phase 5 rechecks previously deferred complexity hotspots from the 9.1.2 performa
 
 This phase does not change WebAdmin API behavior, production frontend routing, Logic Chain render output, runtime gate semantics, save error codes, Chinese validation messages, fail-closed validation or safety-boundary `if` branches.
 
+## Final Release Status
+
+The final 9.1.2 release is `v1.68.3-real-performance-deep-simplification` at `1188c6601d7071e31aff3bfbc2355e7470bebafe` with tag object `e793aa30e720991d024fafaf4beef99dd54f2993`.
+
+After Phase 6, commit `1188c66 test: align 9.1.2 code quality guard baselines` repaired guard byte counting by switching from raw `Files.size(...)` to CRLF -> LF normalized UTF-8 bytes. This records the platform-independent no-growth baseline and does not weaken the line/byte hard guard.
+
 ## Subagent Review
 
 Phase 5 used 6 read-only subagent roles across 3 review rounds before implementation:

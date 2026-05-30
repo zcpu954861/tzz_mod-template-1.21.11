@@ -13,6 +13,14 @@ This is the Phase 0 audit for 9.1.2 real performance profiling and deep simplifi
 
 The stable baseline is the 9.1.1 code-health stabilized codebase. This audit treats older 9.1.1 performance notes as historical input, then rechecks the current source shape before planning 9.1.2.
 
+## Final Release Status
+
+Final release: `v1.68.3-real-performance-deep-simplification`, peeled commit `1188c6601d7071e31aff3bfbc2355e7470bebafe`, tag object `e793aa30e720991d024fafaf4beef99dd54f2993`.
+
+The final release includes guard repair commit `1188c66 test: align 9.1.2 code quality guard baselines`. The repair changed byte measurement from raw `Files.size(...)` to CRLF -> LF normalized UTF-8 bytes, fixing platform-dependent line-ending drift without weakening no-growth guard behavior.
+
+Final validation passed for `testClasses`, `codeQualityGuardTest --rerun-tasks`, `stabilizationGuardTest --rerun-tasks`, `localTestMcpGuardTest --rerun-tasks`, `clean build`, `git diff --check`, and `git diff --cached --check`. The remaining high-risk performance work stays deferred: real-browser layout/paint/input validation, Minecraft runtime smoke, browser-sensitive hover/click/drag optimizations, real store save/package-diff benchmarks, and protected-draft cleanup benchmarks.
+
 ## Hardware And Low-End Models
 
 The local development machine is high-end and must not be treated as the acceptance target:

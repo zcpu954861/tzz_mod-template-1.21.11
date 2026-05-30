@@ -4,6 +4,12 @@
 
 This document records Phase 0 runtime, store and tick-path hotspots. It does not authorize behavior changes. Phase 1 must add deterministic fixtures and report-only timings before Phase 2/4 optimize these paths.
 
+## Final Release Status
+
+`v1.68.3-real-performance-deep-simplification` is the final 9.1.2 release artifact at `1188c6601d7071e31aff3bfbc2355e7470bebafe`. The release validation passed the Gradle guard set and `clean build`.
+
+Runtime semantics remained unchanged through the final release. Real Minecraft runtime smoke for SignalBridge, ConditionGate, VBD/container/itemSubmit, RegionController and Timer remains a P2 manual/deferred verification item, not a completed 9.1.2 automated proof.
+
 Runtime invariants:
 
 - a blank `conditionGroupId` must keep legacy behavior and must not load condition groups or build an evaluation context;

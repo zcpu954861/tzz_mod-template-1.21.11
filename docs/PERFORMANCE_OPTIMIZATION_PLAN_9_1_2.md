@@ -4,6 +4,14 @@
 
 This plan sequences 9.1.2 performance work after the Phase 0 audit. It is not an implementation record. Each phase must use the subagent rounds and validation commands required by the 9.1.2 prompt.
 
+## Final Release Status
+
+The completed release artifact is `v1.68.3-real-performance-deep-simplification` at `1188c6601d7071e31aff3bfbc2355e7470bebafe` with tag object `e793aa30e720991d024fafaf4beef99dd54f2993`.
+
+The final guard repair commit is `1188c66 test: align 9.1.2 code quality guard baselines`. It updates guard byte counting to CRLF -> LF normalized UTF-8 measurement and preserves no-growth hard-fail behavior.
+
+Final validation passed for the Gradle guard set and `clean build`. Timing rows remain warning/report-only; deterministic source, DOM, store, cache and no-growth invariants remain hard guarded.
+
 Global rules:
 
 - optimize only after benchmark/guard coverage exists;

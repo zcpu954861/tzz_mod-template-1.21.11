@@ -10,6 +10,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class DocsConsistencyGuardTest {
+    private static final String CURRENT_STABLE_VERSION = "v1.68.3-real-performance-deep-simplification";
+    private static final String CURRENT_STABLE_COMMIT = "1188c6601d7071e31aff3bfbc2355e7470bebafe";
+    private static final String PREVIOUS_README_STABLE_VERSION = "v1.68.1-codebase-health-audit";
+
     private static final List<String> REQUIRED_9_1_1_DOCS = List.of(
             "docs/CODEBASE_HEALTH_AUDIT_9_1_1.md",
             "docs/PERFORMANCE_HOTSPOTS_9_1_1.md",
@@ -30,12 +34,31 @@ public final class DocsConsistencyGuardTest {
     static void run(CodeQualityGuardSupport.GuardReport report) throws IOException {
         Path root = CodeQualityGuardSupport.projectRoot();
         String readme = CodeQualityGuardSupport.read("README.md");
-        report.requireContains(readme, "当前稳定版本：`v1.68.1-codebase-health-audit`", "README latest stable version");
+        report.requireContains(readme, "当前稳定版本：`" + CURRENT_STABLE_VERSION + "`",
+                "README latest stable version");
+        report.requireContains(readme, CURRENT_STABLE_COMMIT, "README latest stable commit");
+        report.require(!readme.contains("当前稳定版本：`" + PREVIOUS_README_STABLE_VERSION + "`"),
+                "README current stable version must not regress to 9.1.1");
+        checkCurrentReleaseDocs(report);
         checkRequiredDocs(report);
         checkAuditDocBoundaries(report);
         checkCurrentContext(report);
         checkReadmeLinks(report, root, readme);
         checkNoIndependentFrontendProject(report, root);
+    }
+
+    private static void checkCurrentReleaseDocs(CodeQualityGuardSupport.GuardReport report) throws IOException {
+        String obsidianContext = CodeQualityGuardSupport.read("docs/OBSIDIAN_SECOND_BRAIN_9_1_2_CURRENT_CONTEXT.md");
+        String performanceAudit = CodeQualityGuardSupport.read("docs/PERFORMANCE_AUDIT_9_1_2.md");
+        String performancePlan = CodeQualityGuardSupport.read("docs/PERFORMANCE_OPTIMIZATION_PLAN_9_1_2.md");
+        String ifAudit = CodeQualityGuardSupport.read("docs/IF_COMPLEXITY_HOTSPOT_AUDIT_9_1_2.md");
+        String releaseDocs = obsidianContext + "\n" + performanceAudit + "\n" + performancePlan + "\n" + ifAudit;
+        report.requireContains(releaseDocs, CURRENT_STABLE_VERSION, "9.1.2 release docs stable version");
+        report.requireContains(releaseDocs, CURRENT_STABLE_COMMIT, "9.1.2 release docs stable commit");
+        report.requireContains(releaseDocs, "1188c66", "9.1.2 guard repair short commit");
+        report.requireContains(releaseDocs, "e793aa30e720991d024fafaf4beef99dd54f2993",
+                "9.1.2 release tag object");
+        report.requireContains(releaseDocs, "CRLF -> LF", "9.1.2 guard repair line ending note");
     }
 
     private static void checkRequiredDocs(CodeQualityGuardSupport.GuardReport report) throws IOException {

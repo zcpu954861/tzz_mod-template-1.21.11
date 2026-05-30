@@ -4,6 +4,12 @@
 
 This plan covers WebAdmin and Logic Chain large-graph performance. It does not approve UI behavior changes. Optimizations in Phase 3 require Phase 1 synthetic fixtures plus hard DOM equivalence coverage.
 
+## Final Release Status
+
+`v1.68.3-real-performance-deep-simplification` is the final 9.1.2 release artifact at `1188c6601d7071e31aff3bfbc2355e7470bebafe`. WebAdmin / Logic Chain large-graph guard coverage passed in the final Gradle validation set.
+
+The final benchmark evidence remains synthetic / Node VM based. Real browser layout, paint, input latency, caret/scroll behavior and continuous drag pointermove validation remain P2 deferred verification, so this document must not be read as proving low-end browser smoothness.
+
 Important current facts:
 
 - WebAdmin frontend is Java string resources, not React/Vite.
