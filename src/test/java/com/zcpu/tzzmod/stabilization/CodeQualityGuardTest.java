@@ -4,6 +4,7 @@ import com.zcpu.tzzmod.action.schema.ActionCapabilityMatrixTest;
 import com.zcpu.tzzmod.action.schema.ActionSchemaRegistryTest;
 import com.zcpu.tzzmod.action.validation.ActionValidationServiceTest;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
+import com.zcpu.tzzmod.webadmin.service.WebAdminActionSummaryServiceTest;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -86,7 +87,9 @@ public final class CodeQualityGuardTest {
         ActionCapabilityMatrixTest.run();
         ActionSchemaRegistryTest.run();
         ActionValidationServiceTest.run();
+        WebAdminActionSummaryServiceTest.run();
         WebAdminActionEditorFrontendGuardTest.run(report);
+        WebAdminActionSummaryGuardTest.run(report);
         WebAdminFrontendBundleGuardTest.run(report);
         WebAdminPerformanceBaselineGuardTest.run(report);
         WebAdminLogicChainDomEquivalenceGuardTest.run(report);

@@ -77,10 +77,19 @@ Phase 3 guard entry: `WebAdminActionEditorFrontendGuardTest`, invoked from `Code
 ## Phase 4 Guard Targets
 
 - every action type has a Chinese human summary;
-- Logic Chain action cards use summaries;
-- unsaved diff uses summaries where possible;
-- snapshot / operation diff can show compatible action summaries without changing snapshot storage;
+- Logic Chain action cards and owner action lists use summaries;
+- unsaved diff uses summary-first rows where possible without changing dirty comparison;
+- snapshot / operation diff shows compatible action-index summaries without changing snapshot storage;
 - audit summaries keep command redaction.
+
+Implemented Phase 4 modules:
+
+- `src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionSummaryService.java`
+- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSummaryScripts.java`
+- `src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionSummaryServiceTest.java`
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionSummaryGuardTest.java`
+
+Phase 4 also updates Timer audit summary lists, `WebAdminSignalService` downstream signal discovery, Logic Chain diff summary rows, snapshot operation diff rows and app.js / DOM ratchet baselines. It does not change runtime action execution, owner action order, save payloads, WebAdmin API shape or snapshot storage shape.
 
 ## Phase 5 Guard Targets
 

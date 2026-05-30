@@ -102,7 +102,7 @@ public final class WebAdminSignalService {
         List<WebAdminDtos.SignalChannelEndpointDto> relays = deviceEndpoints(channel, devices, SignalDeviceData.TYPE_ACTION_RELAY);
         List<WebAdminDtos.SignalChannelEndpointDto> joinEndpoints = joinInputEndpoints(channel, joins);
         List<WebAdminDtos.ActionListEntryDto> actions = actionsForChannel(server, channel, devices, listeners, regions);
-        List<String> downstream = downstreamSignals(actions, channel, joins);
+        List<String> downstream = downstreamSignals(server, channel, devices, listeners, regions, joins);
         List<WebAdminDtos.DoctorIssueDto> issues = new ArrayList<>();
         if (counts.listenerCount() == 0 && counts.receiverCount() == 0 && counts.actionRelayCount() == 0 && counts.signalJoinCount() == 0) {
             issues.add(new WebAdminDtos.DoctorIssueDto(
@@ -464,16 +464,32 @@ public final class WebAdminSignalService {
         }
     }
 
-    private List<String> downstreamSignals(List<WebAdminDtos.ActionListEntryDto> actions, String sourceChannel, List<SignalJoinDefinition> joins) {
+    private List<String> downstreamSignals(
+            MinecraftServer server,
+            String sourceChannel,
+            List<SignalDeviceData> devices,
+            List<SignalListenerData> listeners,
+            List<RegionControllerData> regions,
+            List<SignalJoinDefinition> joins
+    ) {
         LinkedHashSet<String> channels = new LinkedHashSet<>();
-        for (WebAdminDtos.ActionListEntryDto action : actions) {
-            if ("SIGNAL".equals(action.type())) {
-                String summary = action.summary();
-                int index = summary.indexOf(':');
-                if (index >= 0) {
-                    add(channels, summary.substring(index + 1).trim());
-                }
+        for (SignalListenerData listener : listeners == null ? List.<SignalListenerData>of() : listeners) {
+            if (SignalChannel.normalize(listener.channel()).equals(sourceChannel)) {
+                addActionChannels(channels, listener.actions());
             }
+        }
+        // Region action 没有单一输入频道；9.2 Phase 4 只移除“解析摘要文本”的脆弱依赖，
+        // 仍保留原 Resource Graph 展示语义：频道详情中继续暴露 Region action 可能产生的下游频道。
+        for (RegionControllerData region : regions == null ? List.<RegionControllerData>of() : regions) {
+            addActionChannels(channels, region.enterActions());
+            addActionChannels(channels, region.exitActions());
+            addActionChannels(channels, region.stayActions());
+        }
+        for (SignalDeviceData device : devices == null ? List.<SignalDeviceData>of() : devices) {
+            if (!SignalChannel.normalize(device.channel()).equals(sourceChannel)) {
+                continue;
+            }
+            addActionRelayActionChannels(server, channels, device);
         }
         for (SignalJoinDefinition raw : joins == null ? List.<SignalJoinDefinition>of() : joins) {
             SignalJoinDefinition join = raw.normalized();

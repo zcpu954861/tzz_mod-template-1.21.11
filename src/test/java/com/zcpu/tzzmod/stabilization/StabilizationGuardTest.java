@@ -8886,10 +8886,10 @@ public final class StabilizationGuardTest {
             requireContains(logicChain + "\n" + signalService + "\n" + scripts, marker, "8.12 minimal Logic Chain/Signal marker: " + marker);
         }
         requireContains(listenerActionsService, "putTimerActionFields(entry, normalized)", "8.12 SignalListener action DTO roundtrips timer fields");
-        requireContains(listenerActionsService, "action.timerActionSummary()", "8.12 SignalListener timer action summaries use structured timer fields");
+        requireContains(listenerActionsService, "displaySummary(action)", "9.2 SignalListener summaries use typed summary service");
         requireContains(scripts, "...timerActionPayload({...action,type:String(action.type||'signal').toLowerCase()})", "8.12 SignalListener edit draft preserves timer action fields");
         requireContains(regionControllerService, "putTimerActionFields(entry, action)", "8.12 RegionController action DTO roundtrips timer fields");
-        requireContains(regionControllerService, "action.timerActionSummary()", "8.12 RegionController timer action summaries use structured timer fields");
+        requireContains(regionControllerService, "displaySummary(action)", "9.2 RegionController summaries use typed summary service");
         requireContains(scripts, "...timerActionPayload({...action,type:String(action.type||'signal').toLowerCase()})", "8.12 RegionController edit draft preserves timer action fields");
         requireContains(timerService, "WebAdminConditionGateBindingValidator", "8.12 Timer action condition group backend reject is wired");
         requireContains(timerService, "ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION", "8.12 Timer action condition gate uses Timer action target types");

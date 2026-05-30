@@ -4,7 +4,7 @@
 
 | Item | Value |
 | --- | --- |
-| Current phase | 9.2 Phase 3 unified action editor UI |
+| Current phase | 9.2 Phase 4 action summary / diff / snapshot / audit |
 | Baseline | `v1.68.4-docs-accuracy` / `f8fa12c6e5c20ca82a3d5ea0a87f24d26462fb4c` |
 | Matrix scope | Existing `ActionConfig` owners only |
 
@@ -36,21 +36,21 @@ Phase 3 exports this same matrix to WebAdmin UI through `WebAdminActionSchemaScr
 | `timer_start` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 | `timer_cancel` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 
-At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets. Phase 3 resolves WebAdmin owner filtering and common value-field rendering for current action owners; summary / diff / audit / snapshot unification remains Phase 4 work.
+At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets. Phase 3 resolves WebAdmin owner filtering and common value-field rendering for current action owners. Phase 4 resolves the presentation summary gap for cards, action lists, unsaved diff, snapshot diff and audit-safe action lists.
 
 ## Owner Capability Detail
 
 | Owner / bucket | Storage / DTO boundary | WebAdmin save boundary | Lock / fingerprint | Condition target | List operations | Current summary / audit | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SignalListener `actions` | `SignalListenerData.actions` | `WebAdminSignalListenerActionsService` and Logic Chain typed writes | SignalListener action config lock and expected fingerprint | SignalListener action target | add / edit / delete / clear; Logic Chain same-bucket reorder | Owner-specific DTO summary and audit | Listener list gate and single-action gate semantics must remain. |
-| ActionRelay `actions` | ActionRelay block entity action list | `WebAdminActionRelayActionsService` and Logic Chain typed writes | ActionRelay actions lock and expected fingerprint | ActionRelay action target | add / edit / delete / reorder / clear | Most complete common validation and summary helpers | Runtime must not force-load unloaded relays. |
-| Region `enterActions` | `RegionControllerData.enterActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region enter action target | add / edit / delete / clear; Logic Chain reorder | Region service summary / audit | Enter state update order must not change. |
-| Region `exitActions` | `RegionControllerData.exitActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region exit action target | add / edit / delete / clear; Logic Chain reorder | Region service summary / audit | Exit state update order must not change. |
-| Region `stayActions` | `RegionControllerData.stayActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region stay action target | add / edit / delete / clear; Logic Chain reorder | Region service summary / audit | Stay interval must remain unchanged. |
-| Timer `onStartActions` | `TimerDefinition.onStartActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer start action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | Start creates active instance before onStart. |
-| Timer `onTickActions` | `TimerDefinition.onTickActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer tick action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | DELAY mode clears / ignores tick bucket per existing save semantics. |
-| Timer `onCompleteActions` | `TimerDefinition.onCompleteActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer complete action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | Complete outputChannel is not an `ActionConfig` action. |
-| Timer `onCancelActions` | `TimerDefinition.onCancelActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer cancel action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | Cancel removes active instance before onCancel. |
+| SignalListener `actions` | `SignalListenerData.actions` | `WebAdminSignalListenerActionsService` and Logic Chain typed writes | SignalListener action config lock and expected fingerprint | SignalListener action target | add / edit / delete / clear; Logic Chain same-bucket reorder | Phase 4 shared display/audit summary | Listener list gate and single-action gate semantics must remain. |
+| ActionRelay `actions` | ActionRelay block entity action list | `WebAdminActionRelayActionsService` and Logic Chain typed writes | ActionRelay actions lock and expected fingerprint | ActionRelay action target | add / edit / delete / reorder / clear | Phase 4 shared display/audit summary | Runtime must not force-load unloaded relays. |
+| Region `enterActions` | `RegionControllerData.enterActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region enter action target | add / edit / delete / clear; Logic Chain reorder | Phase 4 shared display/audit summary | Enter state update order must not change. |
+| Region `exitActions` | `RegionControllerData.exitActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region exit action target | add / edit / delete / clear; Logic Chain reorder | Phase 4 shared display/audit summary | Exit state update order must not change. |
+| Region `stayActions` | `RegionControllerData.stayActions` | `WebAdminRegionControllerService` and Logic Chain typed writes | RegionController config lock and expected fingerprint | Region stay action target | add / edit / delete / clear; Logic Chain reorder | Phase 4 shared display/audit summary | Stay interval must remain unchanged. |
+| Timer `onStartActions` | `TimerDefinition.onStartActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer start action target | add / edit / delete / reorder via Timer config / Logic Chain | Phase 4 shared display summary and audit-safe summary list | Start creates active instance before onStart. |
+| Timer `onTickActions` | `TimerDefinition.onTickActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer tick action target | add / edit / delete / reorder via Timer config / Logic Chain | Phase 4 shared display summary and audit-safe summary list | DELAY mode clears / ignores tick bucket per existing save semantics. |
+| Timer `onCompleteActions` | `TimerDefinition.onCompleteActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer complete action target | add / edit / delete / reorder via Timer config / Logic Chain | Phase 4 shared display summary and audit-safe summary list | Complete outputChannel is not an `ActionConfig` action. |
+| Timer `onCancelActions` | `TimerDefinition.onCancelActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer cancel action target | add / edit / delete / reorder via Timer config / Logic Chain | Phase 4 shared display summary and audit-safe summary list | Cancel removes active instance before onCancel. |
 
 ## Phase 2 Backend Validation
 
@@ -100,10 +100,10 @@ Explicit non-owner negative markers stay exported for `vbd_trigger`, `item_submi
 
 | Gap | Risk | Target phase |
 | --- | --- | --- |
-| Timer action fields are not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Backend validation resolved in Phase 2; WebAdmin editor rendering resolved in Phase 3; summary consistency remains Phase 4. |
+| Timer action fields were not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Backend validation resolved in Phase 2; WebAdmin editor rendering resolved in Phase 3; summary consistency resolved in Phase 4. |
 | Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering resolved in Phase 3; owner migration guard remains Phase 5. |
-| Action summaries are owner-specific. | Diff, audit and card text can disagree. | Phase 4 |
-| Snapshot diff is resource-level. | Action-index changes are hard to read. | Phase 4, compatible summary only |
+| Action summaries were owner-specific. | Diff, audit and card text could disagree. | Resolved in Phase 4 through WebAdmin shared summary service/helper. |
+| Snapshot diff was resource-level. | Action-index changes were hard to read. | Phase 4 adds compatible action-index summary rows without changing snapshot storage. |
 
 ## Phase 1 Registry Owner Enum
 

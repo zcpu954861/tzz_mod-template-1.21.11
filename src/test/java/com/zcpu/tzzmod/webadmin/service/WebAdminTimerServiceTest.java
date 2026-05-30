@@ -352,6 +352,14 @@ public final class WebAdminTimerServiceTest {
         requireRecentEventSince(baselineSeq, "timer_changed", "Timer create publishes config realtime");
         requireRecentEventSince(baselineSeq, "write_audit_appended", "Timer create publishes write audit realtime");
 
+        WebAdminTimerRequest commandAudit = validRequest("timer.audit-command");
+        commandAudit.onCompleteActions = List.of(commandAction("/say ultra-command-value"));
+        WebAdminWriteResult commandCreated = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", commandAudit, fixture.csrf, true);
+        requireTrue(commandCreated.success(), "command action timer create succeeds before audit redaction assertion");
+        String auditLog = Files.readString(fixture.auditLogPath, StandardCharsets.UTF_8);
+        requireContains(auditLog, "<command redacted length=", "Timer audit log records redacted command summary");
+        requireFalse(auditLog.contains("ultra-command-value"), "Timer audit log does not leak command action value");
+
         String fingerprint = string(((Map<?, ?>) fixture.service.detail(null, fixture.editor, fixture.session, "timer.audit")).get("expectedFingerprint"));
         WebAdminTimerRequest reset = runtimeRequest(fingerprint);
         reset.confirmed = true;
@@ -481,6 +489,12 @@ public final class WebAdminTimerServiceTest {
         return entry;
     }
 
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry commandAction(String value) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = messageAction(value);
+        entry.type = "command";
+        return entry;
+    }
+
     private static WebAdminActionRelayActionsUpdateRequest.ActionEntry timerAction(String timerId, String type) {
         WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
         entry.type = type;
@@ -574,6 +588,12 @@ public final class WebAdminTimerServiceTest {
 
     private static void requireFalse(boolean condition, String message) {
         requireTrue(!condition, message);
+    }
+
+    private static void requireContains(String text, String marker, String message) {
+        if (text == null || !text.contains(marker)) {
+            throw new AssertionError(message + " missing=" + marker);
+        }
     }
 
     private static void requireEquals(Object expected, Object actual, String message) {

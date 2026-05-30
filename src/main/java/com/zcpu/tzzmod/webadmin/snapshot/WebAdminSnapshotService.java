@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.zcpu.tzzmod.Tzz_mod;
+import com.zcpu.tzzmod.action.ActionConfig;
+import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeGateStore;
 import com.zcpu.tzzmod.condition.state.StateVariableStore;
 import com.zcpu.tzzmod.condition.state.StateVariableType;
@@ -17,6 +19,7 @@ import com.zcpu.tzzmod.signal.SignalListenerStore;
 import com.zcpu.tzzmod.signal.join.SignalJoinStore;
 import com.zcpu.tzzmod.webadmin.WebAdminAuditLogger;
 import com.zcpu.tzzmod.webadmin.WebAdminConditionGroupStore;
+import com.zcpu.tzzmod.webadmin.WebAdminJsonResponse;
 import com.zcpu.tzzmod.webadmin.WebAdminSession;
 import com.zcpu.tzzmod.webadmin.WebAdminUser;
 import com.zcpu.tzzmod.webadmin.realtime.WebAdminRealtimeEvent;
@@ -38,6 +41,7 @@ import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotModels.StoreSpec;
 import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotStore.ManifestLoadResult;
 import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotStore.PackageLoadResult;
 import com.zcpu.tzzmod.webadmin.snapshot.WebAdminSnapshotStore.SnapshotCollectionResult;
+import com.zcpu.tzzmod.webadmin.service.WebAdminActionSummaryService;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditEvent;
 import com.zcpu.tzzmod.webadmin.write.WebAdminAuditWriter;
 import com.zcpu.tzzmod.webadmin.write.WebAdminEditLockService;
@@ -1147,10 +1151,15 @@ public final class WebAdminSnapshotService {
         }
         JsonObject beforeObject = before.getAsJsonObject();
         JsonObject afterObject = after.getAsJsonObject();
+        ActionListDiffs actionDiffs = actionListFieldDiffs(beforeObject, afterObject);
+        result.addAll(actionDiffs.fields());
         Set<String> names = new LinkedHashSet<>();
         beforeObject.keySet().stream().sorted().forEach(names::add);
         afterObject.keySet().stream().sorted().forEach(names::add);
         for (String name : names) {
+            if (actionDiffs.genericCoveredFields().contains(name)) {
+                continue;
+            }
             JsonElement beforeValue = beforeObject.get(name);
             JsonElement afterValue = afterObject.get(name);
             if (jsonEquivalent(beforeValue, afterValue)) {
@@ -1172,6 +1181,110 @@ public final class WebAdminSnapshotService {
             result.add(field);
         }
         return result;
+    }
+
+    private static ActionListDiffs actionListFieldDiffs(JsonObject beforeObject, JsonObject afterObject) {
+        List<SnapshotFieldDiff> result = new ArrayList<>();
+        Set<String> genericCoveredFields = new LinkedHashSet<>();
+        for (String fieldName : List.of(
+                "actions",
+                "enterActions",
+                "exitActions",
+                "stayActions",
+                "onStartActions",
+                "onTickActions",
+                "onCompleteActions",
+                "onCancelActions"
+        )) {
+            JsonElement before = beforeObject.get(fieldName);
+            JsonElement after = afterObject.get(fieldName);
+            if (!isActionArray(before) && !isActionArray(after)) {
+                continue;
+            }
+            ActionListFieldDiffs fieldDiffs = actionListFieldDiffs(fieldName, asArray(before), asArray(after));
+            result.addAll(fieldDiffs.fields());
+            if (fieldDiffs.genericCovered()) {
+                genericCoveredFields.add(fieldName);
+            }
+        }
+        return new ActionListDiffs(List.copyOf(result), Set.copyOf(genericCoveredFields));
+    }
+
+    private static ActionListFieldDiffs actionListFieldDiffs(String fieldName, JsonArray before, JsonArray after) {
+        List<SnapshotFieldDiff> result = new ArrayList<>();
+        int beforeSize = before == null ? 0 : before.size();
+        int afterSize = after == null ? 0 : after.size();
+        int max = Math.max(beforeSize, afterSize);
+        boolean fallbackNeeded = false;
+        for (int index = 0; index < max; index++) {
+            JsonElement beforeElement = index < beforeSize ? before.get(index) : null;
+            JsonElement afterElement = index < afterSize ? after.get(index) : null;
+            if (jsonEquivalent(beforeElement, afterElement)) {
+                continue;
+            }
+            ActionConfig beforeAction = actionFromJson(beforeElement);
+            ActionConfig afterAction = actionFromJson(afterElement);
+            if (beforeAction == null && afterAction == null) {
+                fallbackNeeded = true;
+                continue;
+            }
+            if ((beforeElement != null && beforeAction == null) || (afterElement != null && afterAction == null)) {
+                fallbackNeeded = true;
+            }
+            if (beforeAction != null && afterAction != null && beforeAction.normalized().equals(afterAction.normalized())) {
+                fallbackNeeded = true;
+                continue;
+            }
+            SnapshotFieldDiff field = new SnapshotFieldDiff();
+            field.field = fieldName + "[" + index + "]";
+            field.changeType = beforeAction == null ? "created" : afterAction == null ? "deleted" : "updated";
+            field.beforeValue = beforeAction == null ? "" : WebAdminActionSummaryService.displaySummary(beforeAction);
+            field.afterValue = afterAction == null ? "" : WebAdminActionSummaryService.displaySummary(afterAction);
+            result.add(field);
+        }
+        return new ActionListFieldDiffs(List.copyOf(result), !fallbackNeeded && !result.isEmpty());
+    }
+
+    private static boolean isActionArray(JsonElement value) {
+        return value != null && value.isJsonArray();
+    }
+
+    private static JsonArray asArray(JsonElement value) {
+        return isActionArray(value) ? value.getAsJsonArray() : null;
+    }
+
+    private static ActionConfig actionFromJson(JsonElement value) {
+        if (value == null || !value.isJsonObject()) {
+            return null;
+        }
+        JsonElement typeValue = value.getAsJsonObject().get("type");
+        if (typeValue == null || !typeValue.isJsonPrimitive()) {
+            return null;
+        }
+        String type = safe(typeValue.getAsString());
+        ActionType matched = null;
+        for (ActionType candidate : ActionType.values()) {
+            if (candidate.id().equalsIgnoreCase(type) || candidate.name().equalsIgnoreCase(type)) {
+                matched = candidate;
+                break;
+            }
+        }
+        if (matched == null) {
+            return null;
+        }
+        try {
+            JsonObject copy = value.getAsJsonObject().deepCopy();
+            copy.addProperty("type", matched.name());
+            return WebAdminJsonResponse.GSON.fromJson(copy, ActionConfig.class).normalized();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private record ActionListDiffs(List<SnapshotFieldDiff> fields, Set<String> genericCoveredFields) {
+    }
+
+    private record ActionListFieldDiffs(List<SnapshotFieldDiff> fields, boolean genericCovered) {
     }
 
     private static JsonElement parseJsonElement(String json) {

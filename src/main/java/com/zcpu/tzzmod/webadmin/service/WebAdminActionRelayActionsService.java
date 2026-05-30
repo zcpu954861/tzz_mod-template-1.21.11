@@ -1666,7 +1666,7 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static List<String> actionSummaryList(List<ActionConfig> actions) {
-        return normalizeActions(actions).stream().map(WebAdminActionRelayActionsService::actionSummary).toList();
+        return WebAdminActionSummaryService.displaySummaryList(normalizeActions(actions));
     }
 
     private static List<String> actionFingerprintList(List<ActionConfig> actions) {
@@ -1692,52 +1692,15 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static List<String> auditActionSummaryList(List<ActionConfig> actions) {
-        return normalizeActions(actions).stream().map(WebAdminActionRelayActionsService::auditActionSummary).toList();
+        return WebAdminActionSummaryService.auditSummaryList(normalizeActions(actions));
     }
 
     private static String actionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String prefix = action.enabled() ? "" : "[disabled] ";
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return prefix + action.type().id() + ": " + action.stateActionSummary();
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return prefix + action.type().id() + ": " + action.timerActionSummary();
-        }
-        return prefix + action.type().id() + ": " + safe(action.value());
+        return WebAdminActionSummaryService.displaySummary(action);
     }
 
     private static String auditActionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String prefix = action.enabled() ? "" : "[disabled] ";
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return prefix + action.type().id()
-                    + ": " + action.stateActionSummary()
-                    + " " + action.stateAuditFingerprint()
-                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return prefix + action.type().id()
-                    + ": " + action.timerActionSummary()
-                    + " " + action.timerAuditFingerprint()
-                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
-        }
-        String value = safe(action.value());
-        if (action.type() == ActionType.COMMAND) {
-            value = "<command redacted length=" + value.length() + ">";
-        } else if (action.type() == ActionType.MESSAGE && value.length() > 96) {
-            value = value.substring(0, 96) + "...";
-        }
-        return prefix + action.type().id()
-                + ": " + value
-                + " requiresOp=" + action.requiresOp()
-                + " cooldownTicks=" + action.cooldownTicks()
-                + " notifyOps=" + action.notifyOps()
-                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        return WebAdminActionSummaryService.auditSummary(action);
     }
 
     private static Boolean parseBoolean(Object value) {

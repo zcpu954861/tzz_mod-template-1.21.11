@@ -147,9 +147,16 @@ The renderer only builds UI fields. It does not save data, create APIs, validate
 - Existing owner action list order and same-index edit semantics remain stable.
 - Snapshot storage remains resource-level unless a later phase explicitly designs an additive typed summary layer.
 
-## Summary / Audit Direction
+## Summary / Audit Boundary
 
-Later phases should produce human Chinese summaries such as:
+Phase 4 implements WebAdmin-only summary helpers:
+
+```text
+src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionSummaryService.java
+src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSummaryScripts.java
+```
+
+They produce human Chinese summaries such as:
 
 - `发送信号到频道 xxx`
 - `设置状态变量 xxx = yyy`
@@ -158,7 +165,9 @@ Later phases should produce human Chinese summaries such as:
 - `启动计时器 xxx`
 - `取消计时器 xxx`
 
-Command summaries must keep current redaction / safety boundaries. Raw JSON must not become the primary user-facing summary.
+The backend service has separate display and audit methods. Display summaries are used by cards, action lists and snapshot diff rows; audit summaries keep command redaction and stable state/timer fingerprints where needed. The frontend helper mirrors display logic for draft UI and unsaved diff text only.
+
+Summary helpers must not execute actions, validate writes, read stores, create APIs, change `ActionConfig` payloads, change dirty comparison, or write snapshot storage. Raw JSON must not become the primary user-facing summary.
 
 ## Extension Rule
 

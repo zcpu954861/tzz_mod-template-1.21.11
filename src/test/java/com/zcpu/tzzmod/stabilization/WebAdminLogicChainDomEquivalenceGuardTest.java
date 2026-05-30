@@ -163,12 +163,12 @@ final class WebAdminLogicChainDomEquivalenceGuardTest {
         values.put("scenario.zoom.domHash", "6294bf507dee0fe7");
         values.put("scenario.draft.nodeHash", "8620955a585710f1");
         values.put("scenario.draft.edgeHash", "13f57dc432a91ec1");
-        values.put("scenario.draft.diffHash", "c84c24e85163c222");
+        values.put("scenario.draft.diffHash", "89e4b150a1cacea6");
         values.put("scenario.draft.panelHash", "0e332cab4c677c49");
-        values.put("scenario.draft.domHash", "bcdfc2f966d169d9");
-        values.put("scenario.unsaved.diffHash", "c4551a28a45d4b40");
+        values.put("scenario.draft.domHash", "064e6b6e70c11728");
+        values.put("scenario.unsaved.diffHash", "f4172896fc5e8317");
         values.put("scenario.unsaved.payloadPendingDeleteLeak", "false");
-        values.put("scenario.unsaved.domHash", "8fd8f0e6473e6a06");
+        values.put("scenario.unsaved.domHash", "ae5407102c04a0d3");
         values.put("scenario.vbd.edgeHash", "67af61cd6b60af9b");
         values.put("scenario.vbd.classHash", "f873ac11e4279927");
         values.put("scenario.vbd.vbdHash", "cb564f7b2aa80113");

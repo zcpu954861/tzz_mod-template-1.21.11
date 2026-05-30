@@ -17,8 +17,8 @@ public final class WebAdminPerformanceBaselineGuardTest {
     private static final int PHASE6_APP_JS_BEFORE_BYTES = 1_843_648;
     private static final String PHASE6_APP_JS_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
     private static final int PHASE6_APP_JS_WARNING_LIMIT_BYTES = 1_880_521;
-    private static final int PHASE7_APP_JS_RATCHET_BYTES = 1_859_186;
-    private static final String PHASE7_APP_JS_RATCHET_SHA256 = "beef672762cda9ad23a607755830e6118238a89887c1ad28753f950221c9326d";
+    private static final int PHASE7_APP_JS_RATCHET_BYTES = 1_862_468;
+    private static final String PHASE7_APP_JS_RATCHET_SHA256 = "e1760f507ef6b9dbdd338139a2583a0d6bc789636ba19255b5258ac4d4db4203";
     private static final int PHASE7_APP_CSS_RATCHET_BYTES = 123_251;
 
     private static final Map<String, Map<String, String>> PHASE6_DOM_BASELINES = phase6DomBaselines();
@@ -505,7 +505,7 @@ public final class WebAdminPerformanceBaselineGuardTest {
                 "vbdSelectedTrigger", "right_click",
                 "vbdDraftSourceNodeId", "vbd:one");
         putExtraScenario(baselines, "pendingDelete",
-                "hash.dom", "9ef14a29a4e8768a",
+                "hash.dom", "805052736547689f",
                 "pendingDeleteCard", "9",
                 "pendingDeleteBadge", "4",
                 "pendingDeleteDiff", "5",

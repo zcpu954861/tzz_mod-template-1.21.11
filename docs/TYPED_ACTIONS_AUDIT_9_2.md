@@ -138,7 +138,27 @@ Phase 3 adds a schema-driven WebAdmin action value renderer and owner capability
 
 Phase 3 adds `WebAdminActionEditorFrontendGuardTest` to `CodeQualityGuardTest`. The guard checks schema export, owner matrix export, unknown-owner fail-closed behavior, non-owner negative markers, Logic Chain draft renderer migration, condition picker markers, draft preservation markers and Java matrix consistency.
 
-Phase 3 still does not implement unified summary / diff / snapshot / audit. It also does not change runtime execution, owner order, save payloads, WebAdmin write API shape, `ActionType`, VBD/itemSubmit/container ownership, Program Model, GameController, MissionSystem, PhaseController or Rich Text Builder.
+Phase 3 did not implement unified summary / diff / snapshot / audit. Phase 4 adds that presentation layer without changing runtime execution, owner order, save payloads, WebAdmin write API shape, `ActionType`, VBD/itemSubmit/container ownership, Program Model, GameController, MissionSystem, PhaseController or Rich Text Builder.
+
+## Phase 4 Implementation Checkpoint
+
+Phase 4 adds a WebAdmin-only action summary layer:
+
+- `src/main/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionSummaryService.java` generates Chinese display summaries and audit-safe summaries for all existing action types.
+- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSummaryScripts.java` mirrors display summary logic for WebAdmin draft cards, owner action lists and unsaved diff text.
+- ActionRelay, SignalListener, RegionController, Timer and readonly graph DTO summaries now delegate to the shared summary service / helper.
+- `WebAdminSignalService.downstreamSignals` no longer parses human summary text to discover downstream signal channels; it reads `ActionConfig` signal actions directly.
+- Timer audit paths use redacted action summary lists instead of raw `TimerStore.summary(...)` action lists, so command values are not leaked through audit before/after maps.
+- Snapshot operation diff adds compatible action-index rows such as `actions[0]` and `onCompleteActions[0]` with Chinese summaries; snapshot storage, manifest/package schema and canonical resource JSON remain unchanged.
+- Logic Chain existing action edit diff adds a summary-first row while preserving existing field-level dirty comparison and save payload behavior.
+
+Phase 4 tests / guards:
+
+- `src/test/java/com/zcpu/tzzmod/webadmin/service/WebAdminActionSummaryServiceTest.java`
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionSummaryGuardTest.java`
+- Updated `WebAdminTimerServiceTest`, `WebAdminSnapshotServiceTest`, `WebAdminControlledStateActionServiceTest`, DOM equivalence and bundle/performance ratchets.
+
+Known compatible limitation: snapshot raw JSON preview can still show canonical resource JSON as a secondary/debug preview. The Phase 4 invariant is that primary action diff rows and user-facing summaries are readable Chinese action summaries, not raw JSON.
 
 ## Stop Conditions
 
