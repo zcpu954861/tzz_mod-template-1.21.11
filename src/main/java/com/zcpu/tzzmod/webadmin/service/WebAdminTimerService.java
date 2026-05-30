@@ -2,6 +2,10 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
+import com.zcpu.tzzmod.action.validation.ActionValidationError;
+import com.zcpu.tzzmod.action.validation.ActionValidationResult;
+import com.zcpu.tzzmod.action.validation.ActionValidationService;
 import com.zcpu.tzzmod.scheduler.TimerDefinition;
 import com.zcpu.tzzmod.scheduler.TimerMode;
 import com.zcpu.tzzmod.scheduler.TimerOperationResult;
@@ -406,7 +410,7 @@ public final class WebAdminTimerService {
                 server,
                 timerActionField(safeBucket),
                 List.of(action == null ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry() : action),
-                timerActionTargetType(safeBucket),
+                timerActionOwnerType(safeBucket),
                 errors
         );
         if (!errors.isEmpty()) {
@@ -511,7 +515,7 @@ public final class WebAdminTimerService {
                 server,
                 timerActionField(safeBucket),
                 List.of(action == null ? new WebAdminActionRelayActionsUpdateRequest.ActionEntry() : action),
-                timerActionTargetType(safeBucket),
+                timerActionOwnerType(safeBucket),
                 errors
         );
         if (!errors.isEmpty()) {
@@ -972,12 +976,12 @@ public final class WebAdminTimerService {
             errors.add(error(issue.field(), issue.code(), issue.message(), issue.rejectedValue()));
         }
         TimerMode mode = timer == null || timer.mode == null ? TimerMode.DELAY : timer.mode;
-        validateActionEntries(server, "onStartActions", request == null ? null : request.onStartActions, ConditionRuntimeTargetType.TIMER_ON_START_ACTION, errors);
+        validateActionEntries(server, "onStartActions", request == null ? null : request.onStartActions, ActionOwnerType.TIMER_START, errors);
         if (mode != TimerMode.DELAY) {
-            validateActionEntries(server, "onTickActions", request == null ? null : request.onTickActions, ConditionRuntimeTargetType.TIMER_ON_TICK_ACTION, errors);
+            validateActionEntries(server, "onTickActions", request == null ? null : request.onTickActions, ActionOwnerType.TIMER_TICK, errors);
         }
-        validateActionEntries(server, "onCompleteActions", request == null ? null : request.onCompleteActions, ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION, errors);
-        validateActionEntries(server, "onCancelActions", request == null ? null : request.onCancelActions, ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION, errors);
+        validateActionEntries(server, "onCompleteActions", request == null ? null : request.onCompleteActions, ActionOwnerType.TIMER_COMPLETE, errors);
+        validateActionEntries(server, "onCancelActions", request == null ? null : request.onCancelActions, ActionOwnerType.TIMER_CANCEL, errors);
         return List.copyOf(errors);
     }
 
@@ -1009,7 +1013,7 @@ public final class WebAdminTimerService {
             MinecraftServer server,
             String field,
             List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries,
-            ConditionRuntimeTargetType targetType,
+            ActionOwnerType ownerType,
             List<WebAdminValidationError> errors
     ) {
         List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> safeEntries = entries == null ? List.of() : entries;
@@ -1017,6 +1021,7 @@ public final class WebAdminTimerService {
             errors.add(error(field, "timer_too_many_actions", "每个 Timer action list 最多支持 64 条动作。", String.valueOf(safeEntries.size())));
             return;
         }
+        ActionValidationService.ConditionGroupValidator conditionValidator = actionConditionValidator(server);
         for (int index = 0; index < safeEntries.size(); index++) {
             WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = safeEntries.get(index);
             String prefix = field + "[" + index + "]";
@@ -1024,14 +1029,46 @@ public final class WebAdminTimerService {
                 errors.add(error(prefix, "timer_action_required", "Timer action 不能为空。", ""));
                 continue;
             }
-            ActionType type = parseActionType(entry.type);
-            if (type == null) {
-                errors.add(error(prefix + ".type", "timer_action_type_invalid", "Action 类型必须是 command、signal、message、sound、state_variable、timer_start 或 timer_cancel。", safe(entry.type)));
-            } else if (type == ActionType.TIMER_START || type == ActionType.TIMER_CANCEL) {
-                WebAdminActionRelayActionsService.validateTimerAction(errors, prefix, entry, type);
-            }
-            conditionGateBindingValidator.validate(server, errors, prefix + ".conditionGroupId", entry.conditionGroupId, targetType);
+            ActionValidationResult validation = ActionValidationService.validate(
+                    ownerType,
+                    prefix,
+                    WebAdminActionRelayActionsService.actionDraftFromEntry(entry),
+                    conditionValidator
+            );
+            errors.addAll(timerCompatibleErrors(validation.errors()));
         }
+    }
+
+    private ActionValidationService.ConditionGroupValidator actionConditionValidator(MinecraftServer server) {
+        if (server == null && testStorePath == null) {
+            return null;
+        }
+        return (field, groupId, targetType) -> {
+            List<WebAdminValidationError> webErrors = new ArrayList<>();
+            conditionGateBindingValidator.validate(server, webErrors, field, groupId, targetType);
+            List<ActionValidationError> result = new ArrayList<>();
+            for (WebAdminValidationError error : webErrors) {
+                result.add(new ActionValidationError(error.field(), error.code(), error.message(), error.rejectedValueSummary()));
+            }
+            return List.copyOf(result);
+        };
+    }
+
+    private static List<WebAdminValidationError> timerCompatibleErrors(List<ActionValidationError> errors) {
+        List<WebAdminValidationError> result = new ArrayList<>();
+        for (ActionValidationError error : errors == null ? List.<ActionValidationError>of() : errors) {
+            if ("invalid_type".equals(error.code())) {
+                result.add(error(
+                        error.field(),
+                        "timer_action_type_invalid",
+                        "Action 类型必须是 command、signal、message、sound、state_variable、timer_start 或 timer_cancel。",
+                        error.rejectedValue()
+                ));
+            } else {
+                result.add(error(error.field(), error.code(), error.message(), error.rejectedValue()));
+            }
+        }
+        return List.copyOf(result);
     }
 
     private TimerStore.TimerLoadResult loadResult(MinecraftServer server) {
@@ -1350,6 +1387,16 @@ public final class WebAdminTimerService {
             case "complete" -> ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION;
             case "cancel" -> ConditionRuntimeTargetType.TIMER_ON_CANCEL_ACTION;
             default -> ConditionRuntimeTargetType.TIMER_ON_COMPLETE_ACTION;
+        };
+    }
+
+    private static ActionOwnerType timerActionOwnerType(String bucket) {
+        return switch (bucket) {
+            case "start" -> ActionOwnerType.TIMER_START;
+            case "tick" -> ActionOwnerType.TIMER_TICK;
+            case "complete" -> ActionOwnerType.TIMER_COMPLETE;
+            case "cancel" -> ActionOwnerType.TIMER_CANCEL;
+            default -> ActionOwnerType.TIMER_COMPLETE;
         };
     }
 

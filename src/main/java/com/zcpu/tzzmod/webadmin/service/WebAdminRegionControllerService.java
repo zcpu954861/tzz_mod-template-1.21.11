@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.map.MapDataStore;
@@ -757,7 +758,7 @@ public final class WebAdminRegionControllerService {
     ) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
-        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
+        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions, actionOwnerType(actionTargetType));
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }
@@ -1083,6 +1084,14 @@ public final class WebAdminRegionControllerService {
             case ENTER -> ConditionRuntimeTargetType.REGION_ENTER_ACTION;
             case EXIT -> ConditionRuntimeTargetType.REGION_EXIT_ACTION;
             case STAY -> ConditionRuntimeTargetType.REGION_STAY_ACTION;
+        };
+    }
+
+    private static ActionOwnerType actionOwnerType(ConditionRuntimeTargetType actionTargetType) {
+        return switch (actionTargetType == null ? ConditionRuntimeTargetType.REGION_STAY_ACTION : actionTargetType) {
+            case REGION_ENTER_ACTION -> ActionOwnerType.REGION_ENTER;
+            case REGION_EXIT_ACTION -> ActionOwnerType.REGION_EXIT;
+            default -> ActionOwnerType.REGION_STAY;
         };
     }
 

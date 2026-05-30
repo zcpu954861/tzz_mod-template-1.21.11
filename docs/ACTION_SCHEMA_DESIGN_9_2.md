@@ -31,7 +31,7 @@ src/main/java/com/zcpu/tzzmod/action/schema/
 | `ActionOwnerType` | Existing owners and buckets: listener, relay, region enter/exit/stay, timer start/tick/complete/cancel. |
 | `ActionCapability` | Phase 1 metadata-only owner support for current action types. |
 | `ActionSchemaRegistry` | Static immutable lookup by `ActionType`, strict lookup by id, owner metadata query. |
-| `ActionCapabilityMatrix` | Deferred to Phase 2 as authoritative backend validation / fail-closed matrix. |
+| `ActionCapabilityMatrix` | Phase 2 authoritative owner/bucket matrix used by backend validation. |
 
 ## Schema Boundary
 
@@ -103,18 +103,26 @@ This separation is required because owner-specific state still differs:
 
 Backend validation is authoritative. Frontend schema-driven rendering and filtering must only make the UI easier to use.
 
-Validation must eventually cover:
+Phase 2 implementation adds:
+
+- `ActionCapabilityMatrix` and `ActionOwnerCapability` under `com.zcpu.tzzmod.action.schema`;
+- `ActionDraft`, `ActionValidationService`, `ActionValidationResult` and `ActionValidationError` under `com.zcpu.tzzmod.action.validation`;
+- owner-service integration for ActionRelay, SignalListener, Region enter/exit/stay and Timer start/tick/complete/cancel buckets.
+
+Validation now covers:
 
 - unknown type fail-closed before legacy `ActionType.fromId` fallback is used for saves;
 - owner supports action type;
 - required fields present;
 - type and range checks;
-- channel syntax and existence rules where applicable;
+- channel syntax rules where applicable;
 - state variable operation compatibility;
 - timer target and missing policy compatibility;
 - condition group compatibility by owner/bucket/action target;
 - dangerous command policy / confirmation;
 - preservation of old error code compatibility where callers depend on it.
+
+State-variable existence and channel metadata existence are not upgraded into new cross-store requirements in Phase 2, because that would change current save compatibility. Phase 2 keeps validation aligned with existing owner services while centralizing the facts they already enforce.
 
 ## Compatibility Requirements
 

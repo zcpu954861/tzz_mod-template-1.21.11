@@ -72,9 +72,9 @@ VBD native triggers, interaction matcher, itemSubmit requirements and container 
 - Timer start creates the active instance before onStart actions; cancel removes the instance before onCancel actions; complete runs onComplete before outputChannel.
 - `conditionGroupId` remains a gate reference, not a branch node. Blank gates must keep the old lazy skip behavior.
 
-## Save / Validation / Summary / Audit / Snapshot Current State
+## Save / Validation / Summary / Audit / Snapshot Phase 0 State
 
-Current implementation is intentionally owner-specific:
+Phase 0 observed owner-specific implementation before the Phase 2 backend validation work:
 
 | Area | Current state | 9.2 target |
 | --- | --- | --- |
@@ -88,8 +88,8 @@ Current implementation is intentionally owner-specific:
 
 ## Confirmed Gaps
 
-- Timer action validation is the most visible migration gap. It is not "no validation"; it is not yet governed by a unified schema/capability model, and common fields such as command / signal / message / sound / state_variable are not uniformly covered the same way as ActionRelay.
-- `ActionType.fromId` and legacy `ActionConfig` construction still have compatibility fallback behavior. New save validation must fail closed before relying on that fallback.
+- Timer action validation was the most visible migration gap. Phase 2 routes Timer lifecycle buckets through `ActionValidationService`, so command / signal / message / sound / state_variable / timer_start / timer_cancel fields now share backend validation with the other action owners.
+- `ActionType.fromId` and legacy `ActionConfig` construction still have compatibility fallback behavior for old reads / normalization. Phase 2 save validation now strict-parses action type before constructing `ActionConfig`, so unknown save payloads fail closed instead of silently becoming `command`.
 - Summary, allowed type filtering and field rendering are duplicated across ActionRelay, SignalListener, Region, Timer and Logic Chain paths.
 - VBD native trigger editing has typed resource behavior of its own, but it is not an `ActionConfig` action list and should not be forced into this matrix.
 
@@ -113,6 +113,17 @@ Phase 1 adds `com.zcpu.tzzmod.action.schema` as a static metadata registry:
 - `ActionSchemaRegistry`.
 
 The registry covers every existing `ActionType` and the current Resource Graph `ActionConfig` owners only. It does not call `ActionEngine`, load stores, read Minecraft world/server state, create new action types, validate writes, render WebAdmin UI or alter save payloads. Owner capability data in Phase 1 is intentionally metadata-only; authoritative owner/action fail-closed validation remains Phase 2.
+
+## Phase 2 Implementation Checkpoint
+
+Phase 2 adds:
+
+- `ActionCapabilityMatrix` / `ActionOwnerCapability` as the authoritative owner-bucket support table;
+- `ActionDraft` / `ActionValidationService` / `ActionValidationResult` / `ActionValidationError` as save-time typed validation;
+- `ActionCapabilityMatrixTest` and `ActionValidationServiceTest`, both invoked by `CodeQualityGuardTest`;
+- existing `WebAdminTimerServiceTest` coverage extended for Timer bucket invalid type, invalid signal channel, invalid state variable fields, action condition group validation and direct bucket append validation.
+
+The implementation keeps runtime execution, owner action order, save payload fields and `WebAdminWriteResult` shape unchanged. Timer retains legacy Timer-specific top-level error codes where they already existed.
 
 ## Stop Conditions
 

@@ -29,7 +29,7 @@ This roadmap is for Resource Graph typed action configuration. It is not a 10.x 
 | --- | --- | --- | --- | --- |
 | Phase 0 | Preflight audit | Five 9.2 docs and Obsidian index | `git diff --check` if docs-only | Any doc claims runtime/editor/validation is already unified when it is not. |
 | Phase 1 | Action schema registry | Static immutable schema metadata for existing action types; implemented in `com.zcpu.tzzmod.action.schema` | `testClasses`, `codeQualityGuardTest`, `git diff --check` | Registry changes runtime execution or save payloads. |
-| Phase 2 | Capability matrix + backend validation | Owner/bucket capability and authoritative validation | Full guard set | Timer/common validation inconsistency not resolved or compatibility breaks. |
+| Phase 2 | Capability matrix + backend validation | Owner/bucket capability and authoritative validation implemented for current owners | Full guard set | Timer/common validation inconsistency not resolved or compatibility breaks. |
 | Phase 3 | Unified action editor | Schema-driven WebAdmin field renderer with owner adapters | Full guard set, node syntax checks via guard | Editor breaks draft, dirty confirm, lock, picker or realtime semantics. |
 | Phase 4 | Summary / diff / snapshot / audit | Human Chinese action summaries for cards, diff, snapshot and audit where compatible | Full guard set | Summary work changes snapshot storage or audit/result payload shape. |
 | Phase 5 | Owner integration / migration guard | Existing owners wired through schema/capability/summary paths | Full guard set | Old JSON configs, order, index, delete or reorder semantics break. |
@@ -49,11 +49,11 @@ Implemented guard entry: `src/test/java/com/zcpu/tzzmod/action/schema/ActionSche
 
 ## Phase 2 Guard Targets
 
-- owner supports action type checks are backend-authoritative;
-- unsupported owner/action combinations fail closed;
-- Timer buckets are brought under the same common field validation standard or explicitly covered by equivalent typed validation;
-- condition group compatibility is checked by owner/bucket/action target;
-- legacy error code and `WebAdminWriteResult` compatibility is preserved.
+- owner supports action type checks are backend-authoritative through `ActionCapabilityMatrix`;
+- unsupported owner/action combinations fail closed in `ActionValidationService`;
+- Timer buckets are brought under the same common field validation standard for command / message / sound / signal / state_variable / timer actions;
+- condition group compatibility is checked by owner/bucket/action target through an injected WebAdmin gate validator;
+- legacy error code and `WebAdminWriteResult` compatibility is preserved, including Timer's `timer_action_type_invalid` mapping.
 
 ## Phase 3 Guard Targets
 

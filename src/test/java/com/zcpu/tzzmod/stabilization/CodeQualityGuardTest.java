@@ -1,6 +1,8 @@
 package com.zcpu.tzzmod.stabilization;
 
+import com.zcpu.tzzmod.action.schema.ActionCapabilityMatrixTest;
 import com.zcpu.tzzmod.action.schema.ActionSchemaRegistryTest;
+import com.zcpu.tzzmod.action.validation.ActionValidationServiceTest;
 import com.zcpu.tzzmod.webadmin.WebAdminFrontendAssets;
 
 import java.io.IOException;
@@ -81,7 +83,9 @@ public final class CodeQualityGuardTest {
     public static void main(String[] args) throws Exception {
         CodeQualityGuardSupport.GuardReport report = new CodeQualityGuardSupport.GuardReport("9.1.1 code quality guard baseline");
         run(report);
+        ActionCapabilityMatrixTest.run();
         ActionSchemaRegistryTest.run();
+        ActionValidationServiceTest.run();
         WebAdminFrontendBundleGuardTest.run(report);
         WebAdminPerformanceBaselineGuardTest.run(report);
         WebAdminLogicChainDomEquivalenceGuardTest.run(report);

@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
@@ -475,7 +476,7 @@ public final class WebAdminSignalListenerActionsService {
     private ActionValidation validateActionEntry(MinecraftServer server, WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
-        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
+        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions, ActionOwnerType.SIGNAL_LISTENER);
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }

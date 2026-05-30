@@ -4,13 +4,23 @@
 
 | Item | Value |
 | --- | --- |
-| Phase | 9.2 Phase 0 |
+| Current phase | 9.2 Phase 2 capability matrix + backend validation |
 | Baseline | `v1.68.4-docs-accuracy` / `f8fa12c6e5c20ca82a3d5ea0a87f24d26462fb4c` |
 | Matrix scope | Existing `ActionConfig` owners only |
 
 This matrix is a planning and audit artifact. It does not grant permission to change runtime execution, owner order, save payloads, WebAdmin API shape or validation results.
 
-Phase 1 implementation adds `ActionOwnerType` and metadata-only `ActionCapability` under `com.zcpu.tzzmod.action.schema`. That registry is not the Phase 2 authoritative validator: it does not hold edit locks, expected fingerprints, write adapters, condition compatibility rules or fail-closed owner/action enforcement.
+Phase 1 implementation adds `ActionOwnerType` and metadata-only `ActionCapability` under `com.zcpu.tzzmod.action.schema`.
+
+Phase 2 implementation adds the authoritative backend matrix:
+
+```text
+src/main/java/com/zcpu/tzzmod/action/schema/ActionCapabilityMatrix.java
+src/main/java/com/zcpu/tzzmod/action/schema/ActionOwnerCapability.java
+src/main/java/com/zcpu/tzzmod/action/validation/ActionValidationService.java
+```
+
+The matrix is authoritative for owner/action support, bucket ids, list field names, max action count and condition runtime targets. All current owner buckets keep the existing `maxActions=64` save boundary. It still does not hold edit locks, expected fingerprints, write adapters, store writers, audit writers or realtime adapters; those remain owner-service responsibilities.
 
 ## Action Type Coverage
 
@@ -24,7 +34,7 @@ Phase 1 implementation adds `ActionOwnerType` and metadata-only `ActionCapabilit
 | `timer_start` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 | `timer_cancel` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 
-The current code can carry these action types in the listed owner lists, but validation consistency is not equal across all owners. Timer buckets are the main schema/capability validation gap.
+At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets; editor rendering and summary unification remain later phases.
 
 ## Owner Capability Detail
 
@@ -39,6 +49,14 @@ The current code can carry these action types in the listed owner lists, but val
 | Timer `onTickActions` | `TimerDefinition.onTickActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer tick action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | DELAY mode clears / ignores tick bucket per existing save semantics. |
 | Timer `onCompleteActions` | `TimerDefinition.onCompleteActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer complete action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | Complete outputChannel is not an `ActionConfig` action. |
 | Timer `onCancelActions` | `TimerDefinition.onCancelActions` | `WebAdminTimerService` and Logic Chain typed writes | Timer config lock and expected fingerprint | Timer cancel action target | add / edit / delete / reorder via Timer config / Logic Chain | Timer service summary / audit | Cancel removes active instance before onCancel. |
+
+## Phase 2 Backend Validation
+
+`ActionValidationService` is now the common save-time validator for current `ActionConfig` owners. It checks strict action type parsing before `ActionConfig` construction, owner support through `ActionCapabilityMatrix`, common boolean / cooldown / value constraints, command management-command blocking, signal channel syntax, state variable mutation field validity, timer target / policy / duration / missing-behavior fields and optional action-level condition group compatibility.
+
+Condition group validation is injected from WebAdmin owner services, so blank `conditionGroupId` remains a lazy skip and does not load the condition group store. Nonblank ids are validated with the owner bucket's `*_ACTION` target from the capability matrix.
+
+`WebAdminActionRelayActionsService`, `WebAdminSignalListenerActionsService`, `WebAdminRegionControllerService` and `WebAdminTimerService` all route save-time action drafts through this validation layer. Timer keeps its legacy `timer_action_type_invalid`, `timer_action_required` and `timer_too_many_actions` error codes while gaining common validation for command / message / sound / signal / state_variable actions.
 
 ## Explicit Non-Owners
 
@@ -64,8 +82,8 @@ The current code can carry these action types in the listed owner lists, but val
 
 | Gap | Risk | Target phase |
 | --- | --- | --- |
-| Timer action fields are not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Phase 2 |
-| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Phase 1 / Phase 2 |
+| Timer action fields are not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Resolved for backend validation in Phase 2; editor/summary still later. |
+| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering waits for Phase 3. |
 | Action summaries are owner-specific. | Diff, audit and card text can disagree. | Phase 4 |
 | Snapshot diff is resource-level. | Action-index changes are hard to read. | Phase 4, compatible summary only |
 
