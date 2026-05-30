@@ -124,6 +124,21 @@ Validation now covers:
 
 State-variable existence and channel metadata existence are not upgraded into new cross-store requirements in Phase 2, because that would change current save compatibility. Phase 2 keeps validation aligned with existing owner services while centralizing the facts they already enforce.
 
+## Phase 3 Frontend Renderer
+
+Phase 3 adds Java-string frontend modules:
+
+```text
+src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSchemaScripts.java
+src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionFieldRenderScripts.java
+```
+
+`WebAdminActionSchemaScripts` exports the existing Java `ActionSchemaRegistry` / `ActionCapabilityMatrix` facts into a static readonly `TZZ_ACTION_EDITOR_DATA` structure. It provides helpers such as `actionSchemaByType`, `actionOwnerId`, `actionSupportedTypesForOwner` and `actionTypeOptions`. Unknown owners fail closed unless a caller passes an explicit fallback list; explicit non-owners remain VBD trigger, itemSubmit, container and branch.
+
+`WebAdminActionFieldRenderScripts` renders value fields for the current action types. It delegates `state_variable` to the existing state action editor and `timer_start` / `timer_cancel` to the existing timer action editor, preserving legacy field ids and sync helpers. Signal actions use owner-specific channel comboboxes when available; the fallback uses the existing custom `channel-combo` style and never uses native `<datalist>`.
+
+The renderer only builds UI fields. It does not save data, create APIs, validate writes, execute actions, change `ActionConfig` payloads or replace owner-specific lock / fingerprint / audit / realtime boundaries.
+
 ## Compatibility Requirements
 
 - Old `ActionConfig` JSON remains readable.

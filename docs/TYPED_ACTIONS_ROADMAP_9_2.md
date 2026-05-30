@@ -64,6 +64,16 @@ Implemented guard entry: `src/test/java/com/zcpu/tzzmod/action/schema/ActionSche
 - no raw JSON primary editor;
 - no growth in giant script files.
 
+Implemented Phase 3 frontend modules:
+
+- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSchemaScripts.java`
+- `src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionFieldRenderScripts.java`
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionEditorFrontendGuardTest.java`
+
+Phase 3 wires the existing ActionRelay, SignalListener, RegionController, Timer and Logic Chain action editors through schema/capability helpers and a common value-field renderer. Owner services, write APIs, save payloads, edit locks, expected fingerprints, audit, realtime events and runtime execution remain owned by the existing modules.
+
+Phase 3 guard entry: `WebAdminActionEditorFrontendGuardTest`, invoked from `CodeQualityGuardTest`. It checks schema export, owner matrix export, owner fail-closed filtering, Logic Chain draft action renderer use, condition picker markers, draft-preservation markers and Java matrix consistency. Bundle/performance ratchets now also cover the Phase 3 app.js output.
+
 ## Phase 4 Guard Targets
 
 - every action type has a Chinese human summary;
@@ -89,7 +99,7 @@ If implementation stays metadata/editor/validation/summary only and does not cha
 - Region enter / exit / stay action editing;
 - Timer start / tick / complete / cancel action buckets;
 - save / cancel draft flows;
-- action summary and unsaved diff text.
+- for Phase 4+ or final 9.2 acceptance, action summary and unsaved diff text.
 
 ## Deferred
 

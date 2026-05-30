@@ -125,6 +125,21 @@ Phase 2 adds:
 
 The implementation keeps runtime execution, owner action order, save payload fields and `WebAdminWriteResult` shape unchanged. Timer retains legacy Timer-specific top-level error codes where they already existed.
 
+## Phase 3 Implementation Checkpoint
+
+Phase 3 adds a schema-driven WebAdmin action value renderer and owner capability filtering for existing editors:
+
+- `WebAdminActionSchemaScripts` exports Java schema and capability facts to the generated app.js bundle.
+- `WebAdminActionFieldRenderScripts` renders value fields for command/message/sound/signal/state_variable/timer_start/timer_cancel.
+- ActionRelay, SignalListener, RegionController, Timer buckets and Logic Chain action append/edit/draft modals now use `actionTypeOptions` / `renderTypedActionValueEditor` instead of duplicating all value-field branches.
+- Owner-specific channel comboboxes, condition group pickers, edit locks, expected fingerprints, validation failure draft preservation and scroll preservation remain in their existing owner modules.
+- The generic fallback channel picker uses WebAdmin's custom combobox pattern, not native `<datalist>`.
+- Command editor text still documents that backend validation blocks dangerous server-management commands such as `stop/op/ban/kick/whitelist`.
+
+Phase 3 adds `WebAdminActionEditorFrontendGuardTest` to `CodeQualityGuardTest`. The guard checks schema export, owner matrix export, unknown-owner fail-closed behavior, non-owner negative markers, Logic Chain draft renderer migration, condition picker markers, draft preservation markers and Java matrix consistency.
+
+Phase 3 still does not implement unified summary / diff / snapshot / audit. It also does not change runtime execution, owner order, save payloads, WebAdmin write API shape, `ActionType`, VBD/itemSubmit/container ownership, Program Model, GameController, MissionSystem, PhaseController or Rich Text Builder.
+
 ## Stop Conditions
 
 Stop before implementation if a plan requires any of the following:

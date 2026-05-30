@@ -10,6 +10,8 @@ final class WebAdminFrontendPageScripts {
         return WebAdminFrontendDashboardScripts.appJs()
                 + WebAdminFrontendDeviceScripts.appJs()
                 + WebAdminFrontendDeviceSessionScripts.appJs()
+                + WebAdminActionSchemaScripts.appJs()
+                + WebAdminActionFieldRenderScripts.appJs()
                 + WebAdminFrontendDeviceEditorScripts.appJs()
                 + WebAdminFrontendSignalScripts.appJs()
                 + WebAdminFrontendActionTimerScripts.appJs()

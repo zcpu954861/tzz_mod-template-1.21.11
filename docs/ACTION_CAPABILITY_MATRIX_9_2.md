@@ -4,7 +4,7 @@
 
 | Item | Value |
 | --- | --- |
-| Current phase | 9.2 Phase 2 capability matrix + backend validation |
+| Current phase | 9.2 Phase 3 unified action editor UI |
 | Baseline | `v1.68.4-docs-accuracy` / `f8fa12c6e5c20ca82a3d5ea0a87f24d26462fb4c` |
 | Matrix scope | Existing `ActionConfig` owners only |
 
@@ -22,6 +22,8 @@ src/main/java/com/zcpu/tzzmod/action/validation/ActionValidationService.java
 
 The matrix is authoritative for owner/action support, bucket ids, list field names, max action count and condition runtime targets. All current owner buckets keep the existing `maxActions=64` save boundary. It still does not hold edit locks, expected fingerprints, write adapters, store writers, audit writers or realtime adapters; those remain owner-service responsibilities.
 
+Phase 3 exports this same matrix to WebAdmin UI through `WebAdminActionSchemaScripts`. Frontend owner helpers map old UI owner/bucket names to the matrix ids, and owner type selects use the exported support list. This is a convenience filter only: backend `ActionValidationService` remains authoritative and still rejects unsupported owner/action combinations fail-closed.
+
 ## Action Type Coverage
 
 | ActionType | SignalListener | ActionRelay | Region enter | Region exit | Region stay | Timer start | Timer tick | Timer complete | Timer cancel | Notes |
@@ -34,7 +36,7 @@ The matrix is authoritative for owner/action support, bucket ids, list field nam
 | `timer_start` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 | `timer_cancel` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 
-At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets; editor rendering and summary unification remain later phases.
+At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets. Phase 3 resolves WebAdmin owner filtering and common value-field rendering for current action owners; summary / diff / audit / snapshot unification remains Phase 4 work.
 
 ## Owner Capability Detail
 
@@ -70,7 +72,7 @@ Condition group validation is injected from WebAdmin owner services, so blank `c
 | Timer `outputChannel` | Completion signal output field, not an `ActionConfig`. |
 | Program Model / branch / mission step | Not implemented in 9.2; belongs to later 10.x work. |
 
-## Capability Rules For Later Phases
+## Capability Rules
 
 - Frontend filtering is only a convenience. Backend capability validation is authoritative.
 - Unsupported owner/action combinations must fail closed.
@@ -78,12 +80,28 @@ Condition group validation is injected from WebAdmin owner services, so blank `c
 - Delete and reorder must remain owner-local and bucket-local; cross-owner or cross-bucket movement remains rejected.
 - `expectedFingerprint`, edit lock, CSRF/same-origin, confirmation and audit semantics must remain owner-specific where they are today.
 
+## Phase 3 Frontend Filtering
+
+Implemented owner ids exposed to JS:
+
+- `signal_listener`
+- `action_relay`
+- `region_enter`
+- `region_exit`
+- `region_stay`
+- `timer_on_start`
+- `timer_on_tick`
+- `timer_on_complete`
+- `timer_on_cancel`
+
+Explicit non-owner negative markers stay exported for `vbd_trigger`, `item_submit`, `container_change` and `branch`. Logic Chain append/edit paths use the same owner id adapter and do not widen unsupported owners to all action types.
+
 ## Validation Gaps To Track
 
 | Gap | Risk | Target phase |
 | --- | --- | --- |
-| Timer action fields are not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Resolved for backend validation in Phase 2; editor/summary still later. |
-| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering waits for Phase 3. |
+| Timer action fields are not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Backend validation resolved in Phase 2; WebAdmin editor rendering resolved in Phase 3; summary consistency remains Phase 4. |
+| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering resolved in Phase 3; owner migration guard remains Phase 5. |
 | Action summaries are owner-specific. | Diff, audit and card text can disagree. | Phase 4 |
 | Snapshot diff is resource-level. | Action-index changes are hard to read. | Phase 4, compatible summary only |
 
