@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.map.MapDataStore;
@@ -757,7 +758,7 @@ public final class WebAdminRegionControllerService {
     ) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
-        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
+        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions, actionOwnerType(actionTargetType));
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }
@@ -887,38 +888,11 @@ public final class WebAdminRegionControllerService {
     }
 
     private static String actionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String prefix = action.enabled() ? "" : "[disabled] ";
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return prefix + action.type().id() + ": " + action.stateActionSummary();
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return prefix + action.type().id() + ": " + action.timerActionSummary();
-        }
-        return prefix + action.type().id() + ": " + safe(action.value());
+        return WebAdminActionSummaryService.displaySummary(action);
     }
 
     private static String auditActionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String value = safe(action.value());
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
-        } else if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            value = action.timerActionSummary() + " " + action.timerAuditFingerprint();
-        } else
-        if (action.type() == ActionType.COMMAND) {
-            value = "<command redacted length=" + value.length() + ">";
-        } else if (value.length() > 96) {
-            value = value.substring(0, 96) + "...";
-        }
-        return action.type().id()
-                + ":" + value
-                + " enabled=" + action.enabled()
-                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        return WebAdminActionSummaryService.auditSummary(action);
     }
 
     private static Map<String, Object> auditSummary(RegionControllerData controller) {
@@ -939,9 +913,9 @@ public final class WebAdminRegionControllerService {
         summary.put("enterActionCount", normalized.enterActions().size());
         summary.put("exitActionCount", normalized.exitActions().size());
         summary.put("stayActionCount", normalized.stayActions().size());
-        summary.put("enterActions", normalized.enterActions().stream().map(WebAdminRegionControllerService::auditActionSummary).toList());
-        summary.put("exitActions", normalized.exitActions().stream().map(WebAdminRegionControllerService::auditActionSummary).toList());
-        summary.put("stayActions", normalized.stayActions().stream().map(WebAdminRegionControllerService::auditActionSummary).toList());
+        summary.put("enterActions", WebAdminActionSummaryService.auditSummaryList(normalized.enterActions()));
+        summary.put("exitActions", WebAdminActionSummaryService.auditSummaryList(normalized.exitActions()));
+        summary.put("stayActions", WebAdminActionSummaryService.auditSummaryList(normalized.stayActions()));
         summary.put("expectedFingerprint", fingerprintFor(normalized));
         return summary;
     }
@@ -1083,6 +1057,14 @@ public final class WebAdminRegionControllerService {
             case ENTER -> ConditionRuntimeTargetType.REGION_ENTER_ACTION;
             case EXIT -> ConditionRuntimeTargetType.REGION_EXIT_ACTION;
             case STAY -> ConditionRuntimeTargetType.REGION_STAY_ACTION;
+        };
+    }
+
+    private static ActionOwnerType actionOwnerType(ConditionRuntimeTargetType actionTargetType) {
+        return switch (actionTargetType == null ? ConditionRuntimeTargetType.REGION_STAY_ACTION : actionTargetType) {
+            case REGION_ENTER_ACTION -> ActionOwnerType.REGION_ENTER;
+            case REGION_EXIT_ACTION -> ActionOwnerType.REGION_EXIT;
+            default -> ActionOwnerType.REGION_STAY;
         };
     }
 

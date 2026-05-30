@@ -1,7 +1,6 @@
 package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
-import com.zcpu.tzzmod.action.ActionType;
 import com.zcpu.tzzmod.signal.SignalEventRecord;
 import com.zcpu.tzzmod.signal.device.SignalDeviceData;
 import com.zcpu.tzzmod.signal.device.SignalDeviceStore;
@@ -11,7 +10,6 @@ import com.zcpu.tzzmod.webadmin.dto.WebAdminDtos;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 final class WebAdminReadonlySupport {
     static final int DEFAULT_LIST_LIMIT = 100;
@@ -87,20 +85,7 @@ final class WebAdminReadonlySupport {
     }
 
     static String actionSummary(ActionConfig action) {
-        if (action == null) {
-            return "missing action";
-        }
-        String value = action.value() == null ? "" : action.value().trim();
-        if (action.type() == ActionType.COMMAND && value.length() > 80) {
-            value = value.substring(0, 77) + "...";
-        }
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return "state_variable: " + action.stateActionSummary();
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return action.type().id() + ": " + action.timerActionSummary();
-        }
-        return actionType(action).toLowerCase(Locale.ROOT) + (value.isBlank() ? "" : ": " + value);
+        return WebAdminActionSummaryService.displaySummary(action);
     }
 
     static List<WebAdminDtos.SignalHistoryEntryDto> historyDtos(

@@ -22,6 +22,7 @@ public final class WebAdminSnapshotServiceTest {
         testManualSnapshotManifestPackageAndDiff();
         testTimerBeforeWriteAutoSnapshotRecordsOperationDiff();
         testOperationDiffCoversSnapshotResourceTypes();
+        testActionSummaryDiffKeepsGenericFallbackForMalformedArrayEntries();
         testResourceMetadataChangesProduceUpdatedDiffs();
         testBadManifestAndPackageFallback();
         testPackageFingerprintMismatchBlocksRollbackPlan();
@@ -135,6 +136,42 @@ public final class WebAdminSnapshotServiceTest {
                 "timer".equals(entry.resourceType)
                         && !entry.fieldDiffs.isEmpty()
         ), "Timer operation diff exposes shallow field diff");
+        requireTrue(annotated.operationDiff.entries.stream().anyMatch(entry ->
+                "timer".equals(entry.resourceType)
+                        && entry.fieldDiffs.stream().anyMatch(field ->
+                        "onCompleteActions[0]".equals(field.field)
+                                && field.beforeValue.contains("Before")
+                                && field.afterValue.contains("向玩家显示消息")
+                                && field.beforeValue.contains("向玩家显示消息")
+                                && field.afterValue.contains("After"))
+        ), "Timer operation diff exposes action list Chinese summary diff");
+    }
+
+    private static void testActionSummaryDiffKeepsGenericFallbackForMalformedArrayEntries() throws Exception {
+        Fixture fixture = fixture();
+        WebAdminSnapshotService service = service();
+        writeTimerWithMixedActions(fixture.webAdminDir, "Before", "opaque-before");
+        SnapshotRecord before = create(service, fixture, SnapshotKind.MANUAL, "混合 Action 前", "manual");
+        writeTimerWithMixedActions(fixture.webAdminDir, "After", "opaque-after");
+        SnapshotRecord after = create(service, fixture, SnapshotKind.MANUAL, "混合 Action 后", "manual");
+
+        SnapshotPackage previous = WebAdminSnapshotStore.loadPackage(fixture.snapshotRoot, before.snapshotId).pack();
+        SnapshotPackage current = WebAdminSnapshotStore.loadPackage(fixture.snapshotRoot, after.snapshotId).pack();
+        var diff = WebAdminSnapshotService.diff(previous, current);
+        var timerDiff = diff.entries.stream()
+                .filter(entry -> "timer".equals(entry.resourceType) && "timer.mixed".equals(entry.resourceId))
+                .findFirst()
+                .orElseThrow();
+        requireTrue(timerDiff.fieldDiffs.stream().anyMatch(field ->
+                "onCompleteActions[0]".equals(field.field)
+                        && field.beforeValue.contains("向玩家显示消息")
+                        && field.afterValue.contains("After")
+        ), "mixed action array still exposes parsed action summary row");
+        requireTrue(timerDiff.fieldDiffs.stream().anyMatch(field ->
+                "onCompleteActions".equals(field.field)
+                        && field.beforeValue.contains("列表")
+                        && field.afterValue.contains("列表")
+        ), "mixed action array keeps generic diff row for malformed or non-action entries");
     }
 
     private static void testResourceMetadataChangesProduceUpdatedDiffs() throws Exception {
@@ -376,11 +413,56 @@ public final class WebAdminSnapshotServiceTest {
                       "startPolicy": "RESTART",
                       "outputChannel": "timer.done",
                       "onTickActions": [],
-                      "onCompleteActions": []
+                      "onCompleteActions": [
+                        {
+                          "type": "message",
+                          "value": "%s 完成动作",
+                          "enabled": true,
+                          "requiresOp": false,
+                          "cooldownTicks": 0,
+                          "notifyOps": false
+                        }
+                      ]
                     }
                   }
                 }
-                """.formatted(timerId, timerId, displayName, note);
+                """.formatted(timerId, timerId, displayName, note, displayName);
+        Files.writeString(webAdminDir.resolve("timers.json"), json, StandardCharsets.UTF_8);
+    }
+
+    private static void writeTimerWithMixedActions(Path webAdminDir, String suffix, String opaqueValue) throws Exception {
+        Files.createDirectories(webAdminDir);
+        String json = """
+                {
+                  "version": 1,
+                  "timers": {
+                    "timer.mixed": {
+                      "id": "timer.mixed",
+                      "displayName": "Timer Mixed %s",
+                      "enabled": true,
+                      "mode": "DELAY",
+                      "durationTicks": 40,
+                      "intervalTicks": 20,
+                      "maxRuns": 1,
+                      "scope": "GLOBAL",
+                      "startPolicy": "RESTART",
+                      "outputChannel": "timer.done",
+                      "onCompleteActions": [
+                        {
+                          "type": "message",
+                          "value": "%s message",
+                          "enabled": true
+                        },
+                        {
+                          "type": "unknown_phase4_probe",
+                          "value": "%s",
+                          "enabled": true
+                        }
+                      ]
+                    }
+                  }
+                }
+                """.formatted(suffix, suffix, opaqueValue);
         Files.writeString(webAdminDir.resolve("timers.json"), json, StandardCharsets.UTF_8);
     }
 

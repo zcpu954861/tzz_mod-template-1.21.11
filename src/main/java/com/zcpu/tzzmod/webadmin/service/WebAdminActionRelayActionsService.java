@@ -4,6 +4,11 @@ import com.zcpu.tzzmod.ModBlock.ModBlocks;
 import com.zcpu.tzzmod.ModBlock.entity.ActionRelayBlockEntity;
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
+import com.zcpu.tzzmod.action.validation.ActionDraft;
+import com.zcpu.tzzmod.action.validation.ActionValidationError;
+import com.zcpu.tzzmod.action.validation.ActionValidationResult;
+import com.zcpu.tzzmod.action.validation.ActionValidationService;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationRequest;
 import com.zcpu.tzzmod.condition.state.StateVariableMutationValidation;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
@@ -792,7 +797,14 @@ public final class WebAdminActionRelayActionsService {
     }
 
     public static List<WebAdminValidationError> validateActionEntries(List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries) {
-        return validateRequest(null, requestFor(entries), new WebAdminConditionGateBindingValidator()).errors();
+        return validateActionEntries(entries, ActionOwnerType.ACTION_RELAY);
+    }
+
+    public static List<WebAdminValidationError> validateActionEntries(
+            List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries,
+            ActionOwnerType ownerType
+    ) {
+        return validateRequest(null, requestFor(entries), new WebAdminConditionGateBindingValidator(), ownerType).errors();
     }
 
     private static WebAdminActionRelayActionsUpdateRequest requestFor(List<WebAdminActionRelayActionsUpdateRequest.ActionEntry> entries) {
@@ -921,6 +933,15 @@ public final class WebAdminActionRelayActionsService {
             WebAdminActionRelayActionsUpdateRequest request,
             WebAdminConditionGateBindingValidator gateBindingValidator
     ) {
+        return validateRequest(server, request, gateBindingValidator, ActionOwnerType.ACTION_RELAY);
+    }
+
+    private static Validation validateRequest(
+            MinecraftServer server,
+            WebAdminActionRelayActionsUpdateRequest request,
+            WebAdminConditionGateBindingValidator gateBindingValidator,
+            ActionOwnerType ownerType
+    ) {
         List<WebAdminValidationError> errors = new ArrayList<>();
         WebAdminConditionGateBindingValidator validator = gateBindingValidator == null
                 ? new WebAdminConditionGateBindingValidator()
@@ -941,53 +962,83 @@ public final class WebAdminActionRelayActionsService {
             errors.add(new WebAdminValidationError("actions", "too_many", "Action 列表最多支持 " + MAX_ACTIONS + " 条。", String.valueOf(entries.size())));
         }
         List<ActionConfig> actions = new ArrayList<>();
+        ActionValidationService.ConditionGroupValidator conditionValidator = conditionValidator(server, validator);
         for (int index = 0; index < entries.size(); index++) {
             WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = entries.get(index);
             String prefix = "actions[" + index + "]";
-            if (entry == null) {
-                errors.add(new WebAdminValidationError(prefix, "required", "Action 配置不能为空。", ""));
-                continue;
-            }
-            ActionType type = parseType(entry.type);
-            if (type == null) {
-                errors.add(new WebAdminValidationError(prefix + ".type", "invalid_type", "Action 类型必须是 command、signal、message、sound、state_variable、timer_start 或 timer_cancel。", safe(entry.type)));
-                continue;
-            }
-            Boolean enabled = parseBoolean(entry.enabled);
-            Boolean requiresOp = parseBoolean(entry.requiresOp);
-            Boolean notifyOps = parseBoolean(entry.notifyOps);
-            Integer cooldownTicks = parseInteger(entry.cooldownTicks);
-            if (enabled == null) {
-                errors.add(new WebAdminValidationError(prefix + ".enabled", "invalid_boolean", "启用状态必须是 boolean。", String.valueOf(entry.enabled)));
-                enabled = Boolean.TRUE;
-            }
-            if (requiresOp == null) {
-                errors.add(new WebAdminValidationError(prefix + ".requiresOp", "invalid_boolean", "requiresOp 必须是 boolean。", String.valueOf(entry.requiresOp)));
-                requiresOp = Boolean.FALSE;
-            }
-            if (notifyOps == null) {
-                errors.add(new WebAdminValidationError(prefix + ".notifyOps", "invalid_boolean", "notifyOps 必须是 boolean。", String.valueOf(entry.notifyOps)));
-                notifyOps = Boolean.FALSE;
-            }
-            if (cooldownTicks == null || cooldownTicks < 0 || cooldownTicks > 72000) {
-                errors.add(new WebAdminValidationError(prefix + ".cooldownTicks", "out_of_range", "Action 冷却字段必须是 0～72000 的整数。", String.valueOf(entry.cooldownTicks)));
-                cooldownTicks = 0;
-            }
-            String value = normalizeValue(type, entry.value);
-            validateValue(server, errors, prefix + ".value", type, value, entry);
-            String actionConditionGroupId = WebAdminConditionGroupStore.normalizeId(entry.conditionGroupId);
-            if (server != null) {
-                validator.validate(
-                        server,
-                        errors,
-                        prefix + ".conditionGroupId",
-                        actionConditionGroupId,
-                        ConditionRuntimeTargetType.ACTION_RELAY_ACTION
-                );
-            }
-            actions.add(actionFromEntry(entry, type, value, enabled, requiresOp, cooldownTicks, notifyOps, actionConditionGroupId));
+            ActionValidationResult actionValidation = ActionValidationService.validate(
+                    ownerType,
+                    prefix,
+                    actionDraftFromEntry(entry),
+                    conditionValidator
+            );
+            errors.addAll(webAdminErrors(actionValidation.errors()));
+            actionValidation.action().ifPresent(actions::add);
         }
         return new Validation(List.copyOf(errors), errors.isEmpty() ? normalizeActions(actions) : List.copyOf(actions));
+    }
+
+    public static ActionDraft actionDraftFromEntry(WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+        return ActionDraft.builder(entry.type)
+                .value(entry.value)
+                .enabled(entry.enabled)
+                .requiresOp(entry.requiresOp)
+                .cooldownTicks(entry.cooldownTicks)
+                .notifyOps(entry.notifyOps)
+                .conditionGroupId(entry.conditionGroupId)
+                .stateOperation(entry.stateOperation)
+                .stateScope(entry.stateScope)
+                .stateTargetMode(entry.stateTargetMode)
+                .stateTargetId(entry.stateTargetId)
+                .stateKey(entry.stateKey)
+                .stateValueType(entry.stateValueType)
+                .stateValue(entry.stateValue)
+                .stateDelta(entry.stateDelta)
+                .stateCreateIfMissing(entry.stateCreateIfMissing)
+                .stateInitialValue(entry.stateInitialValue)
+                .timerId(entry.timerId)
+                .timerTargetMode(entry.timerTargetMode)
+                .timerTargetId(entry.timerTargetId)
+                .timerStartPolicyOverride(entry.timerStartPolicyOverride)
+                .timerDurationOverrideTicks(entry.timerDurationOverrideTicks)
+                .timerMissingBehavior(entry.timerMissingBehavior)
+                .build();
+    }
+
+    private static ActionValidationService.ConditionGroupValidator conditionValidator(
+            MinecraftServer server,
+            WebAdminConditionGateBindingValidator gateBindingValidator
+    ) {
+        if (server == null) {
+            return null;
+        }
+        WebAdminConditionGateBindingValidator validator = gateBindingValidator == null
+                ? new WebAdminConditionGateBindingValidator()
+                : gateBindingValidator;
+        return (field, groupId, targetType) -> {
+            List<WebAdminValidationError> webErrors = new ArrayList<>();
+            validator.validate(server, webErrors, field, groupId, targetType);
+            return actionErrors(webErrors);
+        };
+    }
+
+    private static List<ActionValidationError> actionErrors(List<WebAdminValidationError> errors) {
+        List<ActionValidationError> result = new ArrayList<>();
+        for (WebAdminValidationError error : errors == null ? List.<WebAdminValidationError>of() : errors) {
+            result.add(new ActionValidationError(error.field(), error.code(), error.message(), error.rejectedValueSummary()));
+        }
+        return List.copyOf(result);
+    }
+
+    public static List<WebAdminValidationError> webAdminErrors(List<ActionValidationError> errors) {
+        List<WebAdminValidationError> result = new ArrayList<>();
+        for (ActionValidationError error : errors == null ? List.<ActionValidationError>of() : errors) {
+            result.add(new WebAdminValidationError(error.field(), error.code(), error.message(), error.rejectedValue()));
+        }
+        return List.copyOf(result);
     }
 
     private static void validateValue(
@@ -1615,7 +1666,7 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static List<String> actionSummaryList(List<ActionConfig> actions) {
-        return normalizeActions(actions).stream().map(WebAdminActionRelayActionsService::actionSummary).toList();
+        return WebAdminActionSummaryService.displaySummaryList(normalizeActions(actions));
     }
 
     private static List<String> actionFingerprintList(List<ActionConfig> actions) {
@@ -1641,52 +1692,15 @@ public final class WebAdminActionRelayActionsService {
     }
 
     private static List<String> auditActionSummaryList(List<ActionConfig> actions) {
-        return normalizeActions(actions).stream().map(WebAdminActionRelayActionsService::auditActionSummary).toList();
+        return WebAdminActionSummaryService.auditSummaryList(normalizeActions(actions));
     }
 
     private static String actionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String prefix = action.enabled() ? "" : "[disabled] ";
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return prefix + action.type().id() + ": " + action.stateActionSummary();
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return prefix + action.type().id() + ": " + action.timerActionSummary();
-        }
-        return prefix + action.type().id() + ": " + safe(action.value());
+        return WebAdminActionSummaryService.displaySummary(action);
     }
 
     private static String auditActionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String prefix = action.enabled() ? "" : "[disabled] ";
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return prefix + action.type().id()
-                    + ": " + action.stateActionSummary()
-                    + " " + action.stateAuditFingerprint()
-                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return prefix + action.type().id()
-                    + ": " + action.timerActionSummary()
-                    + " " + action.timerAuditFingerprint()
-                    + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
-        }
-        String value = safe(action.value());
-        if (action.type() == ActionType.COMMAND) {
-            value = "<command redacted length=" + value.length() + ">";
-        } else if (action.type() == ActionType.MESSAGE && value.length() > 96) {
-            value = value.substring(0, 96) + "...";
-        }
-        return prefix + action.type().id()
-                + ": " + value
-                + " requiresOp=" + action.requiresOp()
-                + " cooldownTicks=" + action.cooldownTicks()
-                + " notifyOps=" + action.notifyOps()
-                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        return WebAdminActionSummaryService.auditSummary(action);
     }
 
     private static Boolean parseBoolean(Object value) {

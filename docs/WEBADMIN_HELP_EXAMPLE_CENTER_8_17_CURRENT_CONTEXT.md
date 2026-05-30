@@ -200,3 +200,22 @@ Future work can add:
 - IDE 内上下文帮助
 
 These are intentionally not write-enabled in 8.17.
+
+## 9.2 Typed Actions Coverage
+
+9.2 Phase 6 typed action help coverage is an additive post-8.17 update. It does not rewrite the original 8.17 Help / Example Center scope.
+
+Implemented in 9.2 Phase 6:
+
+- WebAdmin Help includes a Typed Action / Schema 与 Capability topic.
+- Help examples include owner/bucket action selection guidance.
+- Troubleshooting explains why an action type is unavailable or rejected.
+- Glossary includes Typed Action, ActionType, ActionOwnerType, ActionCapabilityMatrix, ActionSchemaRegistry, ActionConfig owner, owner bucket, explicit non-owner and fail-closed.
+- docs derive from ActionSchemaRegistry and ActionCapabilityMatrix.
+- Help Center remains read-only and world-independent.
+- typed action help covers every current ActionType.
+- typed action help covers every current ActionConfig owner.
+- explicit typed action non-owners: vbd_trigger, item_submit, container_change, branch.
+- docs must not diverge from registry / matrix.
+
+The 9.2 coverage does not add ActionType, owner, runtime behavior, WebAdmin API, save payload or snapshot storage. It also does not implement Program Model, Rich Text Builder, GameController, MissionSystem, PhaseController, if / else runtime, typed action sequence runtime, raw JSON editor, user notes, favorites or external docs sync.

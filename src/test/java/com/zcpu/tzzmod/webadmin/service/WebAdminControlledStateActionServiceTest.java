@@ -192,8 +192,7 @@ public final class WebAdminControlledStateActionServiceTest {
         );
         requireEquals("STATE_VARIABLE", WebAdminReadonlySupport.actionType(action), "readonly action list exposes STATE_VARIABLE type");
         String summary = WebAdminReadonlySupport.actionSummary(action);
-        requireContains(summary, "state_variable:", "readonly action summary keeps state action prefix");
-        requireContains(summary, "设置变量", "readonly action summary keeps Chinese state operation");
+        requireContains(summary, "设置状态变量 game.ready = true", "readonly action summary uses unified Chinese state summary");
         requireFalse(summary.contains("stateValue"), "readonly action summary does not expose stateValue field name");
         requireFalse(summary.contains("stateInitialValue"), "readonly action summary does not expose stateInitialValue field name");
     }

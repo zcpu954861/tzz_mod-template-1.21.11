@@ -174,6 +174,75 @@ public final class WebAdminTimerServiceTest {
         WebAdminWriteResult missingResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", invalidMissingBehavior, fixture.csrf, true);
         requireFalse(missingResult.success(), "invalid timer cancel missing behavior rejected");
         requireValidationCode(missingResult, "timer_missing_behavior_invalid");
+
+        WebAdminTimerRequest unknownType = validRequest("timer.bad-action-type");
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry unknownAction = messageAction("will not save");
+        unknownAction.type = "unknown_action";
+        unknownType.onStartActions = List.of(unknownAction);
+        WebAdminWriteResult unknownResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", unknownType, fixture.csrf, true);
+        requireFalse(unknownResult.success(), "unknown timer action type rejected");
+        requireValidationCode(unknownResult, "timer_action_type_invalid");
+        requireTrue(Boolean.TRUE.equals(fixture.service.detail(null, fixture.editor, fixture.session, "timer.bad-action-type").get("notFound")),
+                "unknown timer action type does not save fallback command config");
+
+        WebAdminTimerRequest blankType = validRequest("timer.blank-action-type");
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry blankAction = messageAction("will not save");
+        blankAction.type = "";
+        blankType.onCancelActions = List.of(blankAction);
+        WebAdminWriteResult blankResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", blankType, fixture.csrf, true);
+        requireFalse(blankResult.success(), "blank timer action type rejected");
+        requireValidationCode(blankResult, "timer_action_type_invalid");
+
+        WebAdminTimerRequest invalidSignal = validRequest("timer.bad-action-signal");
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry signalAction = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        signalAction.type = "signal";
+        signalAction.value = "Bad Channel";
+        invalidSignal.onStartActions = List.of(signalAction);
+        WebAdminWriteResult signalResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", invalidSignal, fixture.csrf, true);
+        requireFalse(signalResult.success(), "timer bucket rejects invalid signal action channel");
+        requireValidationCode(signalResult, "invalid_channel");
+
+        WebAdminTimerRequest invalidState = validRequest("timer.bad-action-state");
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry stateAction = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
+        stateAction.type = "state_variable";
+        stateAction.stateOperation = "increment_variable";
+        stateAction.stateScope = "GLOBAL";
+        stateAction.stateTargetMode = "global";
+        stateAction.stateKey = "score";
+        stateAction.stateValueType = "INTEGER";
+        stateAction.stateDelta = 0;
+        invalidState.onCancelActions = List.of(stateAction);
+        WebAdminWriteResult stateResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", invalidState, fixture.csrf, true);
+        requireFalse(stateResult.success(), "timer bucket rejects invalid state action fields");
+        requireValidationCode(stateResult, "invalid_delta");
+
+        WebAdminTimerRequest missingCondition = validRequest("timer.missing-action-condition");
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry gatedAction = messageAction("gated");
+        gatedAction.conditionGroupId = "missing.gate";
+        missingCondition.onStartActions = List.of(gatedAction);
+        WebAdminWriteResult conditionResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", missingCondition, fixture.csrf, true);
+        requireFalse(conditionResult.success(), "timer action condition group is checked in test store path");
+        requireValidationCode(conditionResult, "condition_group_missing");
+
+        WebAdminTimerRequest valid = validRequest("timer.append-invalid-action");
+        WebAdminWriteResult created = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", valid, fixture.csrf, true);
+        requireTrue(created.success(), "timer for append validation created");
+        Map<?, ?> detail = fixture.service.detail(null, fixture.editor, fixture.session, "timer.append-invalid-action");
+        WebAdminWriteResult appendInvalidSignal = fixture.service.addActionToBucket(
+                null,
+                fixture.editor,
+                fixture.session,
+                "127.0.0.1",
+                "timer.append-invalid-action",
+                "complete",
+                signalAction,
+                string(detail.get("expectedFingerprint")),
+                "",
+                fixture.csrf,
+                true
+        );
+        requireFalse(appendInvalidSignal.success(), "timer direct append rejects invalid signal action channel");
+        requireValidationCode(appendInvalidSignal, "invalid_channel");
     }
 
     private static void testWriteSecurityFingerprintDeleteStatusAndRuntimeApis() throws Exception {
@@ -284,6 +353,14 @@ public final class WebAdminTimerServiceTest {
         requireTrue(Files.readString(fixture.auditLogPath, StandardCharsets.UTF_8).contains("timer.audit"), "Timer create writes audit log");
         requireRecentEventSince(baselineSeq, "timer_changed", "Timer create publishes config realtime");
         requireRecentEventSince(baselineSeq, "write_audit_appended", "Timer create publishes write audit realtime");
+
+        WebAdminTimerRequest commandAudit = validRequest("timer.audit-command");
+        commandAudit.onCompleteActions = List.of(commandAction("/say ultra-command-value"));
+        WebAdminWriteResult commandCreated = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", commandAudit, fixture.csrf, true);
+        requireTrue(commandCreated.success(), "command action timer create succeeds before audit redaction assertion");
+        String auditLog = Files.readString(fixture.auditLogPath, StandardCharsets.UTF_8);
+        requireContains(auditLog, "<command redacted length=", "Timer audit log records redacted command summary");
+        requireFalse(auditLog.contains("ultra-command-value"), "Timer audit log does not leak command action value");
 
         String fingerprint = string(((Map<?, ?>) fixture.service.detail(null, fixture.editor, fixture.session, "timer.audit")).get("expectedFingerprint"));
         WebAdminTimerRequest reset = runtimeRequest(fingerprint);
@@ -414,6 +491,12 @@ public final class WebAdminTimerServiceTest {
         return entry;
     }
 
+    private static WebAdminActionRelayActionsUpdateRequest.ActionEntry commandAction(String value) {
+        WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = messageAction(value);
+        entry.type = "command";
+        return entry;
+    }
+
     private static WebAdminActionRelayActionsUpdateRequest.ActionEntry timerAction(String timerId, String type) {
         WebAdminActionRelayActionsUpdateRequest.ActionEntry entry = new WebAdminActionRelayActionsUpdateRequest.ActionEntry();
         entry.type = type;
@@ -507,6 +590,12 @@ public final class WebAdminTimerServiceTest {
 
     private static void requireFalse(boolean condition, String message) {
         requireTrue(!condition, message);
+    }
+
+    private static void requireContains(String text, String marker, String message) {
+        if (text == null || !text.contains(marker)) {
+            throw new AssertionError(message + " missing=" + marker);
+        }
     }
 
     private static void requireEquals(Object expected, Object actual, String message) {

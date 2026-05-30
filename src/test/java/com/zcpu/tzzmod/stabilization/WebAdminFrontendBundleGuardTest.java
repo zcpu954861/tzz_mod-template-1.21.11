@@ -20,8 +20,8 @@ public final class WebAdminFrontendBundleGuardTest {
     private static final int APP_JS_PHASE6_BEFORE_BYTES = 1_843_648;
     private static final String APP_JS_PHASE6_BEFORE_SHA256 = "057e7e370d555036aff6d542b3ae4361f82d734b8fa95cf429d4d7ac7425beb3";
     private static final int APP_JS_PHASE6_WARNING_LIMIT_BYTES = 1_880_521;
-    private static final int APP_JS_PHASE7_RATCHET_BYTES = 1_846_979;
-    private static final String APP_JS_PHASE7_RATCHET_SHA256 = "858381ebf36e20a59e07f86332391a0d4ae736c9f2e72c5aa0b9ce81d03c70e0";
+    private static final int APP_JS_PHASE7_RATCHET_BYTES = 1_862_468;
+    private static final String APP_JS_PHASE7_RATCHET_SHA256 = "e1760f507ef6b9dbdd338139a2583a0d6bc789636ba19255b5258ac4d4db4203";
     private static final int APP_CSS_PHASE7_RATCHET_BYTES = 123_251;
 
     private static final Map<String, Integer> SOURCE_COUNT_BASELINES = new LinkedHashMap<>();

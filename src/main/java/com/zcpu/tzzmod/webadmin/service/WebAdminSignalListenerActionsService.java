@@ -2,6 +2,7 @@ package com.zcpu.tzzmod.webadmin.service;
 
 import com.zcpu.tzzmod.action.ActionConfig;
 import com.zcpu.tzzmod.action.ActionType;
+import com.zcpu.tzzmod.action.schema.ActionOwnerType;
 import com.zcpu.tzzmod.condition.runtime.ConditionActionGateService;
 import com.zcpu.tzzmod.condition.runtime.ConditionRuntimeTargetType;
 import com.zcpu.tzzmod.signal.SignalChannel;
@@ -475,7 +476,7 @@ public final class WebAdminSignalListenerActionsService {
     private ActionValidation validateActionEntry(MinecraftServer server, WebAdminActionRelayActionsUpdateRequest.ActionEntry entry) {
         WebAdminActionRelayActionsUpdateRequest request = new WebAdminActionRelayActionsUpdateRequest();
         request.actions = entry == null ? List.of() : List.of(entry);
-        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions);
+        List<WebAdminValidationError> errors = WebAdminActionRelayActionsService.validateActionEntries(request.actions, ActionOwnerType.SIGNAL_LISTENER);
         if (!errors.isEmpty()) {
             return new ActionValidation(errors, null);
         }
@@ -535,37 +536,11 @@ public final class WebAdminSignalListenerActionsService {
     }
 
     private static String actionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + action.stateActionSummary();
-        }
-        if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + action.timerActionSummary();
-        }
-        return (action.enabled() ? "" : "[disabled] ") + action.type().id() + ": " + safe(action.value());
+        return WebAdminActionSummaryService.displaySummary(action);
     }
 
     private static String auditActionSummary(ActionConfig action) {
-        if (action == null || action.type() == null) {
-            return "unknown";
-        }
-        String value = safe(action.value());
-        if (action.type() == ActionType.STATE_VARIABLE) {
-            value = action.stateActionSummary() + " " + action.stateAuditFingerprint();
-        } else if (action.type() == ActionType.TIMER_START || action.type() == ActionType.TIMER_CANCEL) {
-            value = action.timerActionSummary() + " " + action.timerAuditFingerprint();
-        } else
-        if (action.type() == ActionType.COMMAND) {
-            value = "<command redacted length=" + value.length() + ">";
-        } else if (value.length() > 96) {
-            value = value.substring(0, 96) + "...";
-        }
-        return action.type().id()
-                + ":" + value
-                + " enabled=" + action.enabled()
-                + " conditionGroupId=" + WebAdminConditionGroupStore.normalizeId(action.conditionGroupId());
+        return WebAdminActionSummaryService.auditSummary(action);
     }
 
     private static Map<String, Object> auditSummary(SignalListenerData rawListener) {
@@ -580,7 +555,7 @@ public final class WebAdminSignalListenerActionsService {
         summary.put("enabled", listener.enabled());
         summary.put("cooldownTicks", listener.cooldownTicks());
         summary.put("actionCount", listener.actions().size());
-        summary.put("actions", listener.actions().stream().map(WebAdminSignalListenerActionsService::auditActionSummary).toList());
+        summary.put("actions", WebAdminActionSummaryService.auditSummaryList(listener.actions()));
         summary.put("expectedFingerprint", WebAdminSignalListenerBasicConfigService.fingerprintFor(listener));
         return summary;
     }
