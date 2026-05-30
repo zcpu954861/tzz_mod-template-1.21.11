@@ -182,6 +182,8 @@ public final class WebAdminTimerServiceTest {
         WebAdminWriteResult unknownResult = fixture.service.create(null, fixture.editor, fixture.session, "127.0.0.1", unknownType, fixture.csrf, true);
         requireFalse(unknownResult.success(), "unknown timer action type rejected");
         requireValidationCode(unknownResult, "timer_action_type_invalid");
+        requireTrue(Boolean.TRUE.equals(fixture.service.detail(null, fixture.editor, fixture.session, "timer.bad-action-type").get("notFound")),
+                "unknown timer action type does not save fallback command config");
 
         WebAdminTimerRequest blankType = validRequest("timer.blank-action-type");
         WebAdminActionRelayActionsUpdateRequest.ActionEntry blankAction = messageAction("will not save");

@@ -4,7 +4,7 @@
 
 | Item | Value |
 | --- | --- |
-| Current phase | 9.2 Phase 4 action summary / diff / snapshot / audit |
+| Current phase | 9.2 Phase 5 owner integration / migration guard |
 | Baseline | `v1.68.4-docs-accuracy` / `f8fa12c6e5c20ca82a3d5ea0a87f24d26462fb4c` |
 | Matrix scope | Existing `ActionConfig` owners only |
 
@@ -36,7 +36,7 @@ Phase 3 exports this same matrix to WebAdmin UI through `WebAdminActionSchemaScr
 | `timer_start` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 | `timer_cancel` | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Existing | Requires timer target fields. |
 
-At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets. Phase 3 resolves WebAdmin owner filtering and common value-field rendering for current action owners. Phase 4 resolves the presentation summary gap for cards, action lists, unsaved diff, snapshot diff and audit-safe action lists.
+At Phase 0, the current code could carry these action types in the listed owner lists, but validation consistency was not equal across all owners. Phase 2 resolves the backend validation gap for Timer buckets. Phase 3 resolves WebAdmin owner filtering and common value-field rendering for current action owners. Phase 4 resolves the presentation summary gap for cards, action lists, unsaved diff, snapshot diff and audit-safe action lists. Phase 5 adds an owner migration guard proving the exported UI owner matrix, backend capability matrix and old `ActionConfig` save normalization stay equivalent.
 
 ## Owner Capability Detail
 
@@ -101,7 +101,7 @@ Explicit non-owner negative markers stay exported for `vbd_trigger`, `item_submi
 | Gap | Risk | Target phase |
 | --- | --- | --- |
 | Timer action fields were not fully described by a shared schema/capability validator. | UI could look unified while backend checks differ. | Backend validation resolved in Phase 2; WebAdmin editor rendering resolved in Phase 3; summary consistency resolved in Phase 4. |
-| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering resolved in Phase 3; owner migration guard remains Phase 5. |
+| Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Backend save validation resolved in Phase 2; frontend filtering resolved in Phase 3; owner migration guard resolved in Phase 5. |
 | Action summaries were owner-specific. | Diff, audit and card text could disagree. | Resolved in Phase 4 through WebAdmin shared summary service/helper. |
 | Snapshot diff was resource-level. | Action-index changes were hard to read. | Phase 4 adds compatible action-index summary rows without changing snapshot storage. |
 
@@ -120,3 +120,20 @@ The implemented registry limits owner metadata to current `ActionConfig` owners:
 - `TIMER_CANCEL` (`timer_on_cancel`)
 
 It deliberately excludes VBD native trigger, itemSubmit, container, Program Model, branch and sequence owners.
+
+## Phase 5 Owner Migration Guard
+
+`src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionOwnerMigrationGuardTest.java` is invoked from `CodeQualityGuardTest` and covers:
+
+- `WebAdminActionSchemaScripts` owner export count, ids, max actions, reorder flags, condition targets and supported action ids against `ActionCapabilityMatrix`;
+- explicit non-owner markers for `vbd_trigger`, `item_submit`, `container_change` and `branch`, with matching backend exclusion;
+- old-style WebAdmin action entries for every current `ActionOwnerType` and every current `ActionType` validating through the typed owner path;
+- validated drafts producing the same normalized runtime `ActionConfig` as the legacy `actionFromEntry(...)` path;
+- frontend `actionSupportedTypesForOwner(...)` and `actionTypeOptions(...)` helper output matching the backend matrix for every current owner, with non-owners and unknown owners returning no options;
+- old SignalListener / RegionController / Timer JSON fixture action lists remaining readable and validating to the same normalized `ActionConfig` fields;
+- frontend `actionDraftPayload(...)` normalization mirrored into DTO validation so new editor drafts remain equivalent to old runtime configs;
+- unknown action ids returning `invalid_type` and producing no persistent `ActionConfig`;
+- Timer invalid-type writes failing without persisting fallback command configs;
+- Logic Chain action append/edit/delete/reorder save payloads staying owner/bucket/index scoped and not carrying display-only summary/display/label fields.
+
+This guard is intentionally compatibility-only. It does not widen the owner list, change runtime action execution, alter WebAdmin write payloads, or turn VBD/itemSubmit/container/branch into `ActionConfig` owners.

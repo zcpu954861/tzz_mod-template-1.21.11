@@ -88,6 +88,7 @@ public final class CodeQualityGuardTest {
         ActionSchemaRegistryTest.run();
         ActionValidationServiceTest.run();
         WebAdminActionSummaryServiceTest.run();
+        WebAdminActionOwnerMigrationGuardTest.run(report);
         WebAdminActionEditorFrontendGuardTest.run(report);
         WebAdminActionSummaryGuardTest.run(report);
         WebAdminFrontendBundleGuardTest.run(report);

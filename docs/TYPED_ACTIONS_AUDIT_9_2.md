@@ -160,6 +160,17 @@ Phase 4 tests / guards:
 
 Known compatible limitation: snapshot raw JSON preview can still show canonical resource JSON as a secondary/debug preview. The Phase 4 invariant is that primary action diff rows and user-facing summaries are readable Chinese action summaries, not raw JSON.
 
+## Phase 5 Implementation Checkpoint
+
+Phase 5 adds a compatibility guard rather than a runtime/editor expansion:
+
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionOwnerMigrationGuardTest.java`
+- `CodeQualityGuardTest` invokes the guard after the schema, capability, validation and summary tests.
+
+The guard proves the WebAdmin owner export and frontend option helpers still match `ActionCapabilityMatrix`; VBD native trigger, itemSubmit, container change and branch remain explicit non-owners; old-style action entries and old JSON store fixtures for every current owner/action pair validate through the typed owner path; frontend editor draft payloads normalize to the same old runtime `ActionConfig`; unknown action ids fail closed without producing fallback configs; Timer invalid-type writes do not persist fallback command configs; and Logic Chain action append/edit/delete/reorder payloads remain owner/bucket/index/fingerprint/lock scoped without summary/display fields.
+
+Phase 5 does not change runtime action execution, `ActionEngine`, owner action order, WebAdmin API shape, save payload fields, snapshot storage, audit schema, `ActionType`, VBD/itemSubmit/container ownership, Program Model, Rich Text Builder, GameController, MissionSystem or PhaseController.
+
 ## Stop Conditions
 
 Stop before implementation if a plan requires any of the following:

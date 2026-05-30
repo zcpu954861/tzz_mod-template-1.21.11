@@ -147,6 +147,20 @@ The renderer only builds UI fields. It does not save data, create APIs, validate
 - Existing owner action list order and same-index edit semantics remain stable.
 - Snapshot storage remains resource-level unless a later phase explicitly designs an additive typed summary layer.
 
+## Phase 5 Migration Guard Boundary
+
+Phase 5 adds `WebAdminActionOwnerMigrationGuardTest` to prove the schema/capability/editor export did not drift from existing owner save semantics:
+
+- owner ids, max action counts, reorder flags, action condition targets and supported action ids exported by `WebAdminActionSchemaScripts` must match `ActionCapabilityMatrix`;
+- frontend owner/type option helpers must expose exactly the matrix-supported action ids for every current owner and no options for explicit non-owners or unknown owners;
+- explicit non-owner ids stay excluded from the backend matrix;
+- old WebAdmin action entries and old JSON store fixtures validate for every current owner/action pair and normalize to the same old `ActionConfig`;
+- frontend `actionDraftPayload(...)` normalization stays equivalent to the backend DTO validation and old runtime config path;
+- unknown action ids fail closed and do not use the legacy `ActionType.fromId` command fallback;
+- Logic Chain action save payloads stay owner/bucket/index scoped and do not include display-only summary text.
+
+This guard consumes schema and capability metadata but does not introduce a new schema version, new runtime model, new action owner, new API, or new saved JSON representation.
+
 ## Summary / Audit Boundary
 
 Phase 4 implements WebAdmin-only summary helpers:

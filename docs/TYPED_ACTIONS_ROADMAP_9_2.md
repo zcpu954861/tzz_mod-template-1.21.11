@@ -99,6 +99,14 @@ Phase 4 also updates Timer audit summary lists, `WebAdminSignalService` downstre
 - delete and reorder are owner-local and bucket-local;
 - no supported action is hidden and no unsupported action is shown.
 
+Implemented Phase 5 guard:
+
+- `src/test/java/com/zcpu/tzzmod/stabilization/WebAdminActionOwnerMigrationGuardTest.java`
+
+Phase 5 is a migration/equivalence guard checkpoint. It compares the WebAdmin owner export from `WebAdminActionSchemaScripts` with `ActionCapabilityMatrix`, executes the frontend owner/type option helpers to prove no supported action is hidden and no unsupported action is shown, keeps explicit non-owners excluded, validates old-style action entries and old JSON store fixtures for every current owner/action pair, proves frontend editor draft payloads normalize to the old runtime `ActionConfig`, rejects unknown action ids fail-closed before legacy fallback, checks Timer invalid-type writes do not persist fallback configs, and locks Logic Chain action append/edit/delete/reorder payloads to owner/bucket/index/fingerprint/lock fields without display-only summary fields.
+
+Phase 5 does not add action types, owners, runtime behavior, WebAdmin write APIs, save payload fields or snapshot storage.
+
 ## Manual Acceptance Recommendation
 
 If implementation stays metadata/editor/validation/summary only and does not change runtime action execution, large Minecraft scenario testing is not required. A final human smoke should still open WebAdmin and check:
