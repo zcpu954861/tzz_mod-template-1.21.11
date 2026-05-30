@@ -50,8 +50,8 @@ public final class WebAdminActionEditorFrontendGuardTest {
         String appJs = WebAdminFrontendAssets.appJs();
         String pageFacade = CodeQualityGuardSupport.read(
                 "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminFrontendPageScripts.java");
-        String schemaScripts = CodeQualityGuardSupport.read(
-                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSchemaScripts.java");
+        String schemaScripts = normalizeNewlines(CodeQualityGuardSupport.read(
+                "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionSchemaScripts.java"));
         String fieldRenderScripts = CodeQualityGuardSupport.read(
                 "src/main/java/com/zcpu/tzzmod/webadmin/WebAdminActionFieldRenderScripts.java");
         String logicChainEditor = CodeQualityGuardSupport.read(
@@ -227,6 +227,10 @@ public final class WebAdminActionEditorFrontendGuardTest {
             report.require(ActionCapabilityMatrix.findByOwnerId(nonOwner).isEmpty(),
                     "Non-owner must not become a backend ActionConfig owner in Phase 3: " + nonOwner);
         }
+    }
+
+    private static String normalizeNewlines(String text) {
+        return text.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static void requireOrdered(CodeQualityGuardSupport.GuardReport report, String text, String... needles) {
