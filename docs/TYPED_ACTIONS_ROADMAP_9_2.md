@@ -28,7 +28,7 @@ This roadmap is for Resource Graph typed action configuration. It is not a 10.x 
 | Phase | Goal | Deliverables | Default validation | Stop conditions |
 | --- | --- | --- | --- | --- |
 | Phase 0 | Preflight audit | Five 9.2 docs and Obsidian index | `git diff --check` if docs-only | Any doc claims runtime/editor/validation is already unified when it is not. |
-| Phase 1 | Action schema registry | Static immutable schema metadata for existing action types | `testClasses`, `codeQualityGuardTest`, `git diff --check` | Registry changes runtime execution or save payloads. |
+| Phase 1 | Action schema registry | Static immutable schema metadata for existing action types; implemented in `com.zcpu.tzzmod.action.schema` | `testClasses`, `codeQualityGuardTest`, `git diff --check` | Registry changes runtime execution or save payloads. |
 | Phase 2 | Capability matrix + backend validation | Owner/bucket capability and authoritative validation | Full guard set | Timer/common validation inconsistency not resolved or compatibility breaks. |
 | Phase 3 | Unified action editor | Schema-driven WebAdmin field renderer with owner adapters | Full guard set, node syntax checks via guard | Editor breaks draft, dirty confirm, lock, picker or realtime semantics. |
 | Phase 4 | Summary / diff / snapshot / audit | Human Chinese action summaries for cards, diff, snapshot and audit where compatible | Full guard set | Summary work changes snapshot storage or audit/result payload shape. |
@@ -44,6 +44,8 @@ This roadmap is for Resource Graph typed action configuration. It is not a 10.x 
 - required/default semantics are valid;
 - registry is immutable / not runtime-polluted;
 - schema has Chinese label and help text.
+
+Implemented guard entry: `src/test/java/com/zcpu/tzzmod/action/schema/ActionSchemaRegistryTest.java`, invoked from `CodeQualityGuardTest`. It also checks strict unknown id lookup, current owner enum boundaries and that the schema package does not import runtime/service dependencies.
 
 ## Phase 2 Guard Targets
 

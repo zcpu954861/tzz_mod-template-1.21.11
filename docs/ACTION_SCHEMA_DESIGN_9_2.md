@@ -17,7 +17,11 @@ It does not execute actions. Runtime execution remains owned by `ActionEngine` a
 
 ## Proposed Types
 
-Names may be adjusted to match code style during implementation.
+Implemented Phase 1 package:
+
+```text
+src/main/java/com/zcpu/tzzmod/action/schema/
+```
 
 | Type | Responsibility |
 | --- | --- |
@@ -25,9 +29,9 @@ Names may be adjusted to match code style during implementation.
 | `ActionFieldSchema` | Metadata for one saved / derived field. |
 | `ActionFieldType` | `text`, `number`, `boolean`, `select`, `textarea`, `channel_picker`, `state_variable_picker`, `condition_group_picker`, `player_target_mode`, `readonly_summary`. |
 | `ActionOwnerType` | Existing owners and buckets: listener, relay, region enter/exit/stay, timer start/tick/complete/cancel. |
-| `ActionCapability` | Owner support for an action type and operation. |
-| `ActionSchemaRegistry` | Static immutable lookup by `ActionType`. |
-| `ActionCapabilityMatrix` | Static immutable lookup by owner/bucket. |
+| `ActionCapability` | Phase 1 metadata-only owner support for current action types. |
+| `ActionSchemaRegistry` | Static immutable lookup by `ActionType`, strict lookup by id, owner metadata query. |
+| `ActionCapabilityMatrix` | Deferred to Phase 2 as authoritative backend validation / fail-closed matrix. |
 
 ## Schema Boundary
 
@@ -71,11 +75,15 @@ Do not rebuild schema objects on every WebAdmin render, hover, save validation o
 | `message` | `value`, target context note, optional gate. |
 | `sound` | `value` as legacy display/config field, with caveat that runtime does not yet use it as a full custom sound id. |
 | `signal` | `value` / channel picker, channel validation, optional gate. |
-| `state_variable` | state operation, scope, target mode, target id, key, value type, value, delta, create-if-missing, initial value. |
-| `timer_start` | timer id, target mode, target player name, missing policy. |
-| `timer_cancel` | timer id, target mode, target player name, missing policy. |
+| `state_variable` | state operation, scope, target mode, target id, key, value type, value, delta, create-if-missing, initial value; value fields follow the current 512-character validation limit and default value type remains `BOOLEAN` to match existing editor defaults. |
+| `timer_start` | `timerId`, `timerTargetMode`, `timerTargetId`, `timerStartPolicyOverride`, `timerDurationOverrideTicks`; `timerTargetMode` has an editor default but blank payloads remain compatibility-valid. |
+| `timer_cancel` | `timerId`, `timerTargetMode`, `timerTargetId`, `timerMissingBehavior`; options include legacy-compatible `fail_if_missing` so future validation does not reject old data. |
 
 Common fields remain `type`, `enabled`, `cooldownTicks`, `requiresOp`, `notifyOps` and `conditionGroupId`.
+
+Phase 1 schema intentionally does not expose `requiresOp` / `notifyOps` as editable fields for `state_variable`, `timer_start` or `timer_cancel`, because the current `ActionConfig` canonical constructor normalizes those values to `false` for those action families. The fields remain part of the compatibility payload contract, not a new editor promise.
+
+Timer owner bucket ids in `ActionOwnerType` use `timer_on_start` / `timer_on_tick` / `timer_on_complete` / `timer_on_cancel` to avoid colliding with `timer_start` / `timer_cancel` action type ids.
 
 ## Owner Capability Separation
 

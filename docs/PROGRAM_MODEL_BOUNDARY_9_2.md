@@ -43,6 +43,8 @@ These belong to 10.x or a separately confirmed future phase.
 
 9.2 action lists remain owner-owned flat lists.
 
+Phase 1 `ActionSchemaRegistry` is still Resource Graph metadata. It describes existing `ActionConfig` structure and current owner applicability, but it does not introduce typed action sequences, branch nodes, fallback lists or a Program Model store.
+
 They are not:
 
 - cross-owner draggable programs;

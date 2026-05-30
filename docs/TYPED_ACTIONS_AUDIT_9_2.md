@@ -42,7 +42,7 @@ Existing `ActionConfig` payloads are still the compatibility contract:
 | --- | --- |
 | Common | `type`, `value`, `enabled`, `requiresOp`, `cooldownTicks`, `notifyOps`, `conditionGroupId` |
 | State variable | `stateOperation`, `stateScope`, `stateTargetMode`, `stateTargetId`, `stateKey`, `stateValueType`, `stateValue`, `stateDelta`, `stateCreateIfMissing`, `stateInitialValue` |
-| Timer | `timerId`, `timerTargetMode`, `timerTargetPlayerName`, `timerMissingPolicy` |
+| Timer | `timerId`, `timerTargetMode`, `timerTargetId`, `timerStartPolicyOverride`, `timerDurationOverrideTicks`, `timerMissingBehavior` |
 | DTO / UI derived | `summary`, `stateActionSummary`, validation errors and owner-specific lock/fingerprint fields |
 
 The later schema registry must describe these fields; it must not rename or reinterpret the saved JSON payload.
@@ -101,6 +101,18 @@ Current implementation is intentionally owner-specific:
 - `docs/PROGRAM_MODEL_BOUNDARY_9_2.md`
 - `docs/TYPED_ACTIONS_ROADMAP_9_2.md`
 - Obsidian `18_9.2_TypedActions/` notes and related index updates.
+
+## Phase 1 Implementation Checkpoint
+
+Phase 1 adds `com.zcpu.tzzmod.action.schema` as a static metadata registry:
+
+- `ActionFieldType`, `ActionFieldOption`, `ActionFieldSchema`;
+- `ActionOwnerType`;
+- `ActionCapability`;
+- `ActionSchema`;
+- `ActionSchemaRegistry`.
+
+The registry covers every existing `ActionType` and the current Resource Graph `ActionConfig` owners only. It does not call `ActionEngine`, load stores, read Minecraft world/server state, create new action types, validate writes, render WebAdmin UI or alter save payloads. Owner capability data in Phase 1 is intentionally metadata-only; authoritative owner/action fail-closed validation remains Phase 2.
 
 ## Stop Conditions
 

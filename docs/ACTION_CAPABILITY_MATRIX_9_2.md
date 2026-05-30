@@ -10,6 +10,8 @@
 
 This matrix is a planning and audit artifact. It does not grant permission to change runtime execution, owner order, save payloads, WebAdmin API shape or validation results.
 
+Phase 1 implementation adds `ActionOwnerType` and metadata-only `ActionCapability` under `com.zcpu.tzzmod.action.schema`. That registry is not the Phase 2 authoritative validator: it does not hold edit locks, expected fingerprints, write adapters, condition compatibility rules or fail-closed owner/action enforcement.
+
 ## Action Type Coverage
 
 | ActionType | SignalListener | ActionRelay | Region enter | Region exit | Region stay | Timer start | Timer tick | Timer complete | Timer cancel | Notes |
@@ -66,3 +68,19 @@ The current code can carry these action types in the listed owner lists, but val
 | Allowed action types are repeated across services and scripts. | Future drift between UI and backend. | Phase 1 / Phase 2 |
 | Action summaries are owner-specific. | Diff, audit and card text can disagree. | Phase 4 |
 | Snapshot diff is resource-level. | Action-index changes are hard to read. | Phase 4, compatible summary only |
+
+## Phase 1 Registry Owner Enum
+
+The implemented registry limits owner metadata to current `ActionConfig` owners:
+
+- `SIGNAL_LISTENER`
+- `ACTION_RELAY`
+- `REGION_ENTER`
+- `REGION_EXIT`
+- `REGION_STAY`
+- `TIMER_START` (`timer_on_start`)
+- `TIMER_TICK` (`timer_on_tick`)
+- `TIMER_COMPLETE` (`timer_on_complete`)
+- `TIMER_CANCEL` (`timer_on_cancel`)
+
+It deliberately excludes VBD native trigger, itemSubmit, container, Program Model, branch and sequence owners.
